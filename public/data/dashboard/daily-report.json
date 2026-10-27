@@ -1,0 +1,30 @@
+{
+  "title": "Daily Report Deadline",
+  "dueLabel": "Due today, 5:30 PM",
+  "timezoneNote": "London time (GMT) · reminders at 4:30 & 5:15 PM",
+  "deadline": {
+    "hour": 17,
+    "minute": 30,
+    "timeZone": "Europe/London"
+  },
+  "reports": [
+    {
+      "dept": "Security",
+      "detail": "Submitted 4:12 PM by Daniel Okafor",
+      "status": {
+        "tone": "ok",
+        "label": "Submitted"
+      }
+    },
+    {
+      "dept": "Cleaning",
+      "detail": "7 of 10 sections complete",
+      "progress": 70,
+      "status": {
+        "tone": "warn",
+        "label": "Draft"
+      }
+    }
+  ],
+  "action": "Remind Cleaning Lead"
+}

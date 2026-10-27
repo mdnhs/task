@@ -1,0 +1,54 @@
+{
+  "title": "Manager Attention Required",
+  "subtitle": "Items waiting for your decision",
+  "items": [
+    {
+      "dep": "Security",
+      "kind": "red",
+      "icon": "roster",
+      "title": "Approve overtime for Canary Wharf night cover",
+      "by": "Daniel Okafor",
+      "note": "Security · Decide by 6:00 PM",
+      "status": {
+        "tone": "bad",
+        "label": "Urgent"
+      }
+    },
+    {
+      "dep": "Cleaning",
+      "kind": "amber",
+      "icon": "chat",
+      "title": "Complaint: missed washroom clean at Riverside House",
+      "by": "Grace Mensah",
+      "note": "Cleaning · Client awaiting reply",
+      "status": {
+        "tone": "warn",
+        "label": "High"
+      }
+    },
+    {
+      "dep": "Security",
+      "kind": "amber",
+      "icon": "badge",
+      "title": "SIA licences expiring for 2 officers in 12 days",
+      "by": "Priya Shah",
+      "note": "Employee Files · Renewal not started",
+      "status": {
+        "tone": "warn",
+        "label": "High"
+      }
+    },
+    {
+      "dep": "Cleaning",
+      "kind": "blue",
+      "icon": "box",
+      "title": "Supplies order £640 waiting for approval",
+      "by": "Tomasz Wójcik",
+      "note": "Orders & Stock · Supplier: Bunzl",
+      "status": {
+        "tone": "info",
+        "label": "Normal"
+      }
+    }
+  ]
+}

@@ -1,0 +1,101 @@
+{
+  "title": "Team Tasks",
+  "tasks": [
+    {
+      "initials": "DO",
+      "avatar": "av1",
+      "name": "Daniel Okafor",
+      "role": "Security Supervisor",
+      "task": "Patrol log check, Canary Wharf",
+      "ref": "TSK-1042",
+      "dept": "Security",
+      "priority": 2,
+      "due": "Today 3:00 PM",
+      "late": false,
+      "status": {
+        "tone": "ok",
+        "label": "Completed"
+      }
+    },
+    {
+      "initials": "GM",
+      "avatar": "av2",
+      "name": "Grace Mensah",
+      "role": "Cleaning Team Lead",
+      "task": "Deep clean photos, Riverside House",
+      "ref": "TSK-1038",
+      "dept": "Cleaning",
+      "priority": 3,
+      "due": "Today 12:00 PM",
+      "late": true,
+      "status": {
+        "tone": "info",
+        "label": "Submitted for review"
+      }
+    },
+    {
+      "initials": "PS",
+      "avatar": "av3",
+      "name": "Priya Shah",
+      "role": "HR & Recruitment",
+      "task": "Call back 4 shortlisted officers",
+      "ref": "TSK-1035",
+      "dept": "Security",
+      "priority": 2,
+      "due": "Tomorrow",
+      "late": false,
+      "status": {
+        "tone": "warn",
+        "label": "In progress"
+      }
+    },
+    {
+      "initials": "TW",
+      "avatar": "av4",
+      "name": "Tomasz Wójcik",
+      "role": "Stock Coordinator",
+      "task": "Chase delivery of floor cleaner",
+      "ref": "TSK-1031",
+      "dept": "Cleaning",
+      "priority": 1,
+      "due": "Yesterday",
+      "late": true,
+      "status": {
+        "tone": "bad",
+        "label": "Blocked"
+      }
+    },
+    {
+      "initials": "AK",
+      "avatar": "av5",
+      "name": "Amara Kone",
+      "role": "Cleaning Operative",
+      "task": "Restock washrooms, Floor 3",
+      "ref": "TSK-1029",
+      "dept": "Cleaning",
+      "priority": 1,
+      "due": "Today 5:00 PM",
+      "late": false,
+      "status": {
+        "tone": "mute",
+        "label": "Not started"
+      }
+    },
+    {
+      "initials": "MH",
+      "avatar": "av6",
+      "name": "Marcus Hill",
+      "role": "Security Officer",
+      "task": "Upload incident report, Shoreditch",
+      "ref": "TSK-1027",
+      "dept": "Security",
+      "priority": 3,
+      "due": "Today 1:00 PM",
+      "late": true,
+      "status": {
+        "tone": "warn",
+        "label": "Changes requested"
+      }
+    }
+  ]
+}

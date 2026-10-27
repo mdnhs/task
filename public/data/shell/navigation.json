@@ -1,0 +1,103 @@
+{
+  "menu": [
+    {
+      "href": "/",
+      "icon": "grid",
+      "label": "Dashboard"
+    },
+    {
+      "href": "/tasks",
+      "icon": "task",
+      "label": "Tasks",
+      "badge": {
+        "text": "14"
+      },
+      "description": "Create, assign and track tasks with owners, deadlines, priority and evidence.",
+      "srs": "SRS §3.3"
+    },
+    {
+      "href": "/daily-reports",
+      "icon": "report",
+      "label": "Daily Reports",
+      "description": "The ten-section end-of-day report, submitted by 5:30 PM and reviewed by managers.",
+      "srs": "SRS §3.4–3.5"
+    },
+    {
+      "href": "/manager-attention",
+      "icon": "flag",
+      "label": "Manager Attention",
+      "badge": {
+        "text": "4",
+        "alert": true
+      },
+      "description": "Escalations and decisions waiting for a manager, with follow-up actions.",
+      "srs": "SRS §3.5, §3.14"
+    },
+    {
+      "href": "/staff-rosters",
+      "icon": "roster",
+      "label": "Staff & Rosters",
+      "description": "Staff records, attendance incidents, rosters and coverage gaps.",
+      "srs": "SRS §3.6, §3.8"
+    },
+    {
+      "href": "/recruitment",
+      "icon": "userplus",
+      "label": "Recruitment",
+      "description": "Track candidates through each recruitment stage with next actions.",
+      "srs": "SRS §3.9"
+    },
+    {
+      "href": "/files",
+      "icon": "folder",
+      "label": "Employee & Client Files",
+      "description": "Employee and client documents with expiry tracking and controlled access.",
+      "srs": "SRS §3.10–3.11"
+    },
+    {
+      "href": "/payroll-issues",
+      "icon": "wallet",
+      "label": "Payroll Issues",
+      "lock": true,
+      "description": "Log and resolve payroll issues. Restricted to payroll users.",
+      "srs": "SRS §3.12"
+    },
+    {
+      "href": "/orders-stock",
+      "icon": "box",
+      "label": "Orders & Stock",
+      "description": "Stock requests, supplier orders, approvals and delivery status.",
+      "srs": "SRS §3.13"
+    }
+  ],
+  "general": [
+    {
+      "href": "/settings",
+      "icon": "gear",
+      "label": "Settings",
+      "description": "Workspace settings: departments, report deadline, timezone, members and billing.",
+      "srs": "SRS §3.2, §3.20"
+    },
+    {
+      "href": "/audit-log",
+      "icon": "history",
+      "label": "Audit Log",
+      "description": "A tamper-resistant history of sign-ins, changes, exports and approvals.",
+      "srs": "SRS §3.19"
+    }
+  ],
+  "departments": [
+    {
+      "dep": "all",
+      "label": "All"
+    },
+    {
+      "dep": "Security",
+      "label": "Security"
+    },
+    {
+      "dep": "Cleaning",
+      "label": "Cleaning"
+    }
+  ]
+}

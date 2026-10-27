@@ -1,0 +1,253 @@
+{
+  "title": "Tasks Closed",
+  "subtitle": "Last 7 days · hover for on-time rate, click for details",
+  "days": [
+    {
+      "d": "W",
+      "n": 18,
+      "on": 94,
+      "t": "s1",
+      "date": "Wednesday, 14 October 2026",
+      "byDept": {
+        "security": 10,
+        "cleaning": 8
+      },
+      "late": 1,
+      "avgHours": 3.4,
+      "topCloser": {
+        "name": "Daniel Okafor",
+        "count": 5
+      },
+      "tasks": [
+        {
+          "ref": "TSK-0988",
+          "title": "Patrol log check, Canary Wharf",
+          "dept": "Security",
+          "by": "Daniel Okafor"
+        },
+        {
+          "ref": "TSK-0991",
+          "title": "Washroom restock, Riverside House",
+          "dept": "Cleaning",
+          "by": "Amara Kone"
+        },
+        {
+          "ref": "TSK-0993",
+          "title": "Key handover audit, Shoreditch",
+          "dept": "Security",
+          "by": "Marcus Hill"
+        }
+      ]
+    },
+    {
+      "d": "T",
+      "n": 22,
+      "on": 91,
+      "t": "s2",
+      "date": "Thursday, 15 October 2026",
+      "byDept": {
+        "security": 11,
+        "cleaning": 11
+      },
+      "late": 2,
+      "avgHours": 3.1,
+      "topCloser": {
+        "name": "Grace Mensah",
+        "count": 6
+      },
+      "tasks": [
+        {
+          "ref": "TSK-0997",
+          "title": "Deep clean, Floor 2 kitchen",
+          "dept": "Cleaning",
+          "by": "Grace Mensah"
+        },
+        {
+          "ref": "TSK-0999",
+          "title": "CCTV fault reported to client",
+          "dept": "Security",
+          "by": "Marcus Hill"
+        },
+        {
+          "ref": "TSK-1001",
+          "title": "Supplies count, main store",
+          "dept": "Cleaning",
+          "by": "Tomasz Wójcik"
+        }
+      ]
+    },
+    {
+      "d": "F",
+      "n": 25,
+      "on": 88,
+      "t": "s1",
+      "date": "Friday, 16 October 2026",
+      "byDept": {
+        "security": 13,
+        "cleaning": 12
+      },
+      "late": 3,
+      "avgHours": 3.6,
+      "topCloser": {
+        "name": "Daniel Okafor",
+        "count": 7
+      },
+      "tasks": [
+        {
+          "ref": "TSK-1004",
+          "title": "Weekend rota confirmed",
+          "dept": "Security",
+          "by": "Daniel Okafor"
+        },
+        {
+          "ref": "TSK-1006",
+          "title": "Carpet clean, reception",
+          "dept": "Cleaning",
+          "by": "Amara Kone"
+        },
+        {
+          "ref": "TSK-1008",
+          "title": "Visitor log review, Canary Wharf",
+          "dept": "Security",
+          "by": "Priya Shah"
+        }
+      ]
+    },
+    {
+      "d": "S",
+      "n": 9,
+      "on": 100,
+      "t": "weekend",
+      "date": "Saturday, 17 October 2026",
+      "byDept": {
+        "security": 6,
+        "cleaning": 3
+      },
+      "late": 0,
+      "avgHours": 2.2,
+      "topCloser": {
+        "name": "Marcus Hill",
+        "count": 3
+      },
+      "tasks": [
+        {
+          "ref": "TSK-1011",
+          "title": "Weekend patrol, Shoreditch",
+          "dept": "Security",
+          "by": "Marcus Hill"
+        },
+        {
+          "ref": "TSK-1012",
+          "title": "Bin rounds, Riverside House",
+          "dept": "Cleaning",
+          "by": "Amara Kone"
+        }
+      ]
+    },
+    {
+      "d": "S",
+      "n": 7,
+      "on": 86,
+      "t": "weekend",
+      "date": "Sunday, 18 October 2026",
+      "byDept": {
+        "security": 5,
+        "cleaning": 2
+      },
+      "late": 1,
+      "avgHours": 2.8,
+      "topCloser": {
+        "name": "Marcus Hill",
+        "count": 3
+      },
+      "tasks": [
+        {
+          "ref": "TSK-1014",
+          "title": "Alarm test, Canary Wharf",
+          "dept": "Security",
+          "by": "Marcus Hill"
+        },
+        {
+          "ref": "TSK-1015",
+          "title": "Lobby floor polish",
+          "dept": "Cleaning",
+          "by": "Grace Mensah"
+        }
+      ]
+    },
+    {
+      "d": "M",
+      "n": 20,
+      "on": 90,
+      "t": "s2",
+      "date": "Monday, 19 October 2026",
+      "byDept": {
+        "security": 9,
+        "cleaning": 11
+      },
+      "late": 2,
+      "avgHours": 3.3,
+      "topCloser": {
+        "name": "Grace Mensah",
+        "count": 6
+      },
+      "tasks": [
+        {
+          "ref": "TSK-1019",
+          "title": "Monday handover notes",
+          "dept": "Security",
+          "by": "Daniel Okafor"
+        },
+        {
+          "ref": "TSK-1021",
+          "title": "Window clean, Floor 5",
+          "dept": "Cleaning",
+          "by": "Grace Mensah"
+        },
+        {
+          "ref": "TSK-1023",
+          "title": "Shortlist calls, 2 officers",
+          "dept": "Security",
+          "by": "Priya Shah"
+        }
+      ]
+    },
+    {
+      "d": "T",
+      "n": 16,
+      "on": 82,
+      "t": "today",
+      "date": "Tuesday, 20 October 2026 (today)",
+      "byDept": {
+        "security": 7,
+        "cleaning": 9
+      },
+      "late": 3,
+      "avgHours": 3.9,
+      "topCloser": {
+        "name": "Daniel Okafor",
+        "count": 4
+      },
+      "tasks": [
+        {
+          "ref": "TSK-1042",
+          "title": "Patrol log check, Canary Wharf",
+          "dept": "Security",
+          "by": "Daniel Okafor"
+        },
+        {
+          "ref": "TSK-1025",
+          "title": "Restock, Floor 1 washrooms",
+          "dept": "Cleaning",
+          "by": "Amara Kone"
+        },
+        {
+          "ref": "TSK-1026",
+          "title": "Spill kit check",
+          "dept": "Cleaning",
+          "by": "Tomasz Wójcik"
+        }
+      ]
+    }
+  ]
+}

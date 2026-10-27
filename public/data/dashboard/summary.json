@@ -1,0 +1,42 @@
+{
+  "stats": [
+    {
+      "title": "Open Tasks",
+      "ariaLabel": "View open tasks",
+      "value": "48",
+      "hero": true,
+      "note": {
+        "tone": "up",
+        "highlight": "+6",
+        "text": " assigned since yesterday"
+      }
+    },
+    {
+      "title": "Overdue Tasks",
+      "ariaLabel": "View overdue tasks",
+      "value": "7",
+      "note": {
+        "tone": "down",
+        "highlight": "3 blocked",
+        "text": " · reason required"
+      }
+    },
+    {
+      "title": "Awaiting Review",
+      "ariaLabel": "View tasks awaiting review",
+      "value": "9",
+      "note": {
+        "text": "Evidence submitted, not yet approved"
+      }
+    },
+    {
+      "title": "Reports Today",
+      "ariaLabel": "View daily reports",
+      "value": "1",
+      "valueSuffix": "/2",
+      "note": {
+        "text": "Cleaning report still in draft"
+      }
+    }
+  ]
+}

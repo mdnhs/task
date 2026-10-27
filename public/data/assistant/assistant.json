@@ -1,0 +1,49 @@
+{
+  "title": "OpsDesk AI",
+  "subtitle": "Ask about tasks, reports and coverage",
+  "greeting": "Hi Lilianna, I can summarise today's work, spot risks and draft reminders. What do you need?",
+  "suggestions": [
+    "Summarise overdue tasks",
+    "Draft a reminder to the Cleaning lead",
+    "Which documents expire soon?",
+    "Any uncovered shifts?"
+  ],
+  "replies": [
+    {
+      "match": [
+        "overdue",
+        "late",
+        "blocked"
+      ],
+      "text": "There are 7 overdue tasks, 3 of them blocked. The most urgent is \"Chase delivery of floor cleaner\" (TSK-1031, Tomasz Wójcik), blocked since yesterday. Two others are late today: Riverside House deep-clean photos and the Shoreditch incident report."
+    },
+    {
+      "match": [
+        "remind",
+        "cleaning lead",
+        "draft"
+      ],
+      "text": "Draft: \"Hi Grace, the Cleaning daily report is still in draft (7 of 10 sections). Please complete and submit it before 5:30 PM London time. Thanks, Lilianna.\" Want me to send it?"
+    },
+    {
+      "match": [
+        "document",
+        "expire",
+        "licence",
+        "dbs"
+      ],
+      "text": "3 documents expire in the next 45 days: SIA licence for M. Haddad (12 days), Right to work for J. Silva (25 days) and DBS check for A. Kowalski (43 days). The SIA renewal has not started yet."
+    },
+    {
+      "match": [
+        "shift",
+        "cover",
+        "roster",
+        "gap"
+      ],
+      "text": "2 shifts are uncovered tomorrow: Canary Wharf 22:00 and Shoreditch 06:00. Next week has 5 gaps, mostly weekend cleaning rounds. 3 call-outs were covered today."
+    }
+  ],
+  "fallback": "This is a demo assistant with sample answers. Try asking about overdue tasks, reminders, expiring documents or shift coverage.",
+  "imageReply": "Got your image. In the live version I'd read it, for example checking a site photo against the cleaning checklist or pulling details from an incident snapshot. This demo can't analyse images yet."
+}

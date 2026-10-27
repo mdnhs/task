@@ -1,0 +1,37 @@
+{
+  "title": "Task Progress",
+  "percent": 62,
+  "label": "Completed this week",
+  "ariaLabel": "This week: 62% completed, 26% in progress, 12% blocked",
+  "legend": [
+    {
+      "key": "solid",
+      "label": "Completed",
+      "count": 74
+    },
+    {
+      "key": "deep",
+      "label": "In progress",
+      "count": 31
+    },
+    {
+      "key": "striped",
+      "label": "Blocked",
+      "count": 14
+    }
+  ],
+  "layers": [
+    {
+      "to": 1,
+      "fill": "url(#gauge-stripes)"
+    },
+    {
+      "to": 0.87,
+      "fill": "#3c7a4a"
+    },
+    {
+      "to": 0.6,
+      "fill": "var(--brand-2)"
+    }
+  ]
+}
