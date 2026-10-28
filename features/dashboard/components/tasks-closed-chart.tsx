@@ -49,9 +49,9 @@ const UPDATE_MS = Math.round(DUR.count * 1000)
 
 export function TasksClosedChart({ data }: { data: TasksClosedData }) {
   const dep = useDept()
-  // The topbar department filter shows that department's closed count per day (byDept); "all" is the total.
+  // The topbar department filter shows that department's closed count per day (byDept, 0 when absent); "all" is the total.
   const days = useMemo(
-    () => (dep === "all" ? data.days : data.days.map((d) => ({ ...d, n: d.byDept[dep.toLowerCase() as keyof Day["byDept"]] ?? d.n }))),
+    () => (dep === "all" ? data.days : data.days.map((d) => ({ ...d, n: d.byDept[dep] ?? 0 }))),
     [data.days, dep]
   )
   const last = days.length - 1

@@ -172,11 +172,11 @@ export function WhatsappView({
 
   function createTask(t: NewTask) {
     if (!dialog || !g.task.ok) return
-    const ref = nextTaskRef([...targets.task.map((x) => x.ref), ...createdRefs, ...taskInbox.knownRefs()])
+    const ref = nextTaskRef([...targets.task.map((x) => x.ref), ...createdRefs, ...taskInbox.knownRefs(scopeKey)])
     const at = now()
     const dept = stored.find((c) => c.id === dialog.convId)?.contact.dept ?? ""
     // Hand-off to /tasks (lib/task-inbox.ts): the task shows in the tasks list, not only in this thread.
-    taskInbox.push({ ref, title: t.title, description: t.description, dept, assignee: t.assignee, due: t.due.slice(0, 10), creator: actor, at, source: "WhatsApp" })
+    taskInbox.push({ tenantId: scopeKey, ref, title: t.title, description: t.description, dept, assignee: t.assignee, due: t.due.slice(0, 10), creator: actor, at, source: "WhatsApp" })
     setStored((p) => createTaskFromMessage(p, dialog.convId, dialog.msgId, { ref, title: t.title }, actor, at))
     toast.success(`${ref} created`, { description: `Assigned to ${t.assignee}` })
   }

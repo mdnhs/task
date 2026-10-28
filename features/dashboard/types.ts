@@ -25,7 +25,8 @@ export type TasksClosedData = {
     on: number
     t: "s1" | "s2" | "weekend" | "today"
     date: string
-    byDept: { security: number; cleaning: number }
+    /** Closed count per department, keyed by the tenant's department name (org.departments). */
+    byDept: Record<string, number>
     late: number
     avgHours: number
     topCloser: { name: string; count: number }

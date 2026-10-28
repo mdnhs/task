@@ -19,7 +19,11 @@ export function filterEvents(events: AuditEvent[], f: AuditFilters): AuditEvent[
   })
 }
 
-const csvCell = (s: string) => (/[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s)
+// A leading = + - @ (or tab/CR) would run as a formula in Excel; prefix it with ' so it stays text (CSV injection).
+const csvCell = (raw: string) => {
+  const s = /^[=+\-@\t\r]/.test(raw) ? `'${raw}` : raw
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
+}
 
 export function toCsv(events: AuditEvent[]): string {
   const head = ["Event", "Time", "Actor", "Action", "Record type", "Record", "IP", "Device", "Sensitive"]

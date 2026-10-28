@@ -1,10 +1,12 @@
 import { TasksView, getTaskSeed, getTemplates, taskCreator, ME_ID, parseFilters, parsePage } from "@/features/tasks"
-import { getUser } from "@/features/shell"
+import { AccessRestricted, getUser } from "@/features/shell"
 import { getOrg } from "@/lib/org"
+import { can } from "@/lib/permissions"
 import { canWrite, getSession } from "@/lib/session"
 
 export default async function Page({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const [sp, session, org, user] = await Promise.all([searchParams, getSession(), getOrg(), getUser()])
+  if (!can(session.role, "tasks")) return <AccessRestricted moduleLabel="Tasks" />
   const [{ people, staff, seed, scopeKey, refFloor }, templates] = await Promise.all([getTaskSeed(session), getTemplates()])
   const initialFilters = parseFilters(sp, people.map((p) => p.id))
   const page = parsePage(sp)

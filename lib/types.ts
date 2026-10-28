@@ -23,3 +23,20 @@ export type Tenant = {
 
 // The people cast (mock directory, see lib/people.ts). Shared by tasks, reports and dashboard.
 export type Person = { id: string; name: string; role: string; initials: string; avatar: "av1" | "av2" | "av3" | "av4" | "av5" | "av6"; dept: string }
+
+// Sidebar navigation (shell and platform console).
+export type NavItemData = {
+  href: string
+  icon: string
+  label: string
+  badge?: { text: string; alert?: boolean }
+  lock?: boolean
+  // Shown on the Coming soon page until the feature is built.
+  description?: string
+  srs?: string
+}
+export type NavigationData = {
+  menu: NavItemData[]
+  general: NavItemData[]
+  departments: { dep: Dept; label: string }[]
+}

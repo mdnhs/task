@@ -97,7 +97,9 @@ export function PrivacyPanel({
               </div>
             )}
           </div>
-          <button type="button" className="btn btn-outline" disabled={progress !== null} onClick={startExport}>{progress !== null ? `Exporting ${progress}%` : "Export all data"}</button>
+          {canWrite && (
+            <button type="button" className="btn btn-outline" disabled={progress !== null} onClick={startExport}>{progress !== null ? `Exporting ${progress}%` : "Export all data"}</button>
+          )}
         </div>
         {canWrite && (
           <div className="set-data">

@@ -34,6 +34,8 @@ export type SettingsCounts = {
   intervals: number
   integrations: number
   grants: number
+  /** Privacy actions (support grant, data export, deletion) are Tenant Owner only (FR-SET-08). Defaults to canWrite. */
+  owner?: boolean
   /** Seed text, so the skeleton wraps like the loaded panels. Everything is optional: without it the blocks are plain bars. */
   data?: SettingsSkeletonData
 }
@@ -554,7 +556,7 @@ function Privacy({ grants, canWrite, data }: { grants: number; canWrite: boolean
             <h3>{g("Export all data")}</h3>
             <p>{g("Tasks, reports, files and people as a single archive, emailed when ready.")}</p>
           </div>
-          <span className="btn btn-outline sk-ghost-btn">Export all data</span>
+          {canWrite && <span className="btn btn-outline sk-ghost-btn">Export all data</span>}
         </div>
         {canWrite && (
           <div className="set-data">
@@ -657,7 +659,7 @@ export function SettingsBodySkeleton({
     case "billing":
       return <>{billing}</>
     case "privacy":
-      return <Privacy grants={counts.grants} canWrite={canWrite} data={counts.data} />
+      return <Privacy grants={counts.grants} canWrite={canWrite && (counts.owner ?? true)} data={counts.data} />
   }
 }
 

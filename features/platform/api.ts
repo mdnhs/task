@@ -1,6 +1,6 @@
 import { getData } from "@/lib/data"
 import { getSupportAccess } from "@/lib/support-data"
-import type { NavigationData } from "@/features/shell"
+import type { NavigationData } from "@/lib/types"
 import type { AuditEntry, Plan, PlatformSeed, PlatformTenant} from "./types"
 
 export const getPlatformNav = () => getData<NavigationData>("platform/navigation.json")

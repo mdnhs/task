@@ -9,12 +9,16 @@ import type { TasksClosedData } from "../types"
 
 type Day = TasksClosedData["days"][number]
 
+// Segment tones cycle by department index (opsdesk.css .dd-split .t0-.t3); departments come from the data, never hard-coded.
+const TONES = 4
+
 const kindLabel: Record<Day["t"], string> = { s1: "Weekday", s2: "Weekday", weekend: "Weekend cover", today: "Today" }
 
 export function DayDetailsDialog({ day: current, onClose }: { day: Day | null; onClose: () => void }) {
   // Keep showing the last day while the close animation runs; otherwise the popup empties and collapses mid-fade.
   const [day, setDay] = useState(current)
   if (current && current !== day) setDay(current)
+  const depts = day ? Object.entries(day.byDept) : []
 
   return (
     <Dialog open={!!current} onOpenChange={(o) => !o && onClose()}>
@@ -43,13 +47,13 @@ export function DayDetailsDialog({ day: current, onClose }: { day: Day | null; o
 
             <div className="dd-sec">
               <div className="sec-title">By department</div>
-              <div className="dd-split" role="img" aria-label={`Security ${day.byDept.security}, Cleaning ${day.byDept.cleaning}`}>
-                <i className="sec" style={{ flex: day.byDept.security }} />
-                <i className="cln" style={{ flex: day.byDept.cleaning }} />
+              <div className="dd-split" role="img" aria-label={depts.map(([name, n]) => `${name} ${n}`).join(", ")}>
+                {depts.map(([name, n], i) => <i key={name} className={`t${i % TONES}`} style={{ flex: n }} />)}
               </div>
               <div className="dd-split-legend">
-                <span><i className="sw solid" />Security <b className="num">{day.byDept.security}</b></span>
-                <span><i className="sw light" />Cleaning <b className="num">{day.byDept.cleaning}</b></span>
+                {depts.map(([name, n], i) => (
+                  <span key={name}><i className={`sw t${i % TONES}`} />{name} <b className="num">{n}</b></span>
+                ))}
               </div>
             </div>
 

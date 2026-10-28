@@ -1,0 +1,12 @@
+[
+  {"path": "/platform", "status": 307, "cookies": {"od-auth": "out", "od-role": "platform"}},
+  {"path": "/platform/support", "status": 307, "cookies": {"od-auth": "out", "od-role": "platform"}},
+  {"path": "/data/shell/roles.json", "status": 404, "notExpect": ["\"roles\""]},
+  {"path": "/data/payroll/issues.json", "status": 404},
+  {"path": "/data/platform/tenants.json", "status": 404},
+  {"path": "/", "cookies": {"od-role": "platform"}, "expect": ["Access restricted"], "notExpect": ["Team Tasks", "TSK-1042"]},
+  {"path": "/tasks", "cookies": {"od-role": "platform"}, "expect": ["Access restricted"], "notExpect": ["TSK-1042"]},
+  {"path": "/tasks/TSK-1042", "cookies": {"od-role": "platform"}, "expect": ["Access restricted"], "notExpect": ["Patrol log check"]},
+  {"path": "/settings/privacy", "expect": ["Request deletion", "Export all data"]},
+  {"path": "/settings/privacy", "cookies": {"od-role": "admin"}, "expect": ["Support access"], "notExpect": ["Request deletion", "Exporting"]}
+]

@@ -107,7 +107,8 @@ export default async function Page({ params }: { params: Promise<{ tab: string }
             companyName={tenant.name}
             today={org.today}
             tzLabel={org.tzLabel}
-            canWrite={write}
+            // FR-SET-08 / FR-SAAS-15: support grants, full export and deletion are Tenant Owner only; others see the list read-only.
+            canWrite={write && session.role.id === "owner"}
           />
         )
       }

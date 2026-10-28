@@ -529,8 +529,10 @@ body{padding:0;background:#fff}
 .dd-sec .sec-title{margin:0 0 10px}
 .dd-split{display:flex;gap:4px;height:10px}
 .dd-split i{border-radius:var(--r-pill)}
-.dd-split .sec{background:var(--brand-2)}
-.dd-split .cln{background:var(--brand-3)}
+.dd-split .t0,.dd-split-legend .sw.t0{background:var(--brand-2)}
+.dd-split .t1,.dd-split-legend .sw.t1{background:var(--brand-3)}
+.dd-split .t2,.dd-split-legend .sw.t2{background:var(--brand-deep)}
+.dd-split .t3,.dd-split-legend .sw.t3{background:var(--brand-soft)}
 .dd-split-legend{display:flex;gap:16px;margin-top:10px;font-size:12px;color:var(--ink-2)}
 .dd-split-legend span{display:flex;align-items:center;gap:6px}
 .dd-split-legend .sw{width:10px;height:10px}

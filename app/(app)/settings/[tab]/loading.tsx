@@ -27,6 +27,7 @@ export default async function Loading() {
     intervals: notifications.intervals.length,
     integrations: integrations.length,
     grants: support.length,
+    owner: session.role.id === "owner",
     data: {
       tzLabel: org.tzLabel,
       today: org.today,

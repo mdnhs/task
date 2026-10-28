@@ -24,14 +24,17 @@ export function AuditView({
   today,
   tzLabel,
   user,
+  scopeKey,
 }: {
   events: AuditEvent[]
   today: string
   tzLabel: string
   /** Who is signed in: recorded as the actor of an export. */
   user: { name: string; role: string }
+  /** Tenant id: the store re-seeds when the company changes, so one tenant's events never show in another (FR-SAAS-02). */
+  scopeKey: string
 }) {
-  const [events, setEvents] = auditStore.useStore(seed, user.name)
+  const [events, setEvents] = auditStore.useStore(seed, scopeKey)
   const [filters, setFilters] = useState<AuditFilters>(EMPTY_FILTERS)
   const [page, setPage] = useState(1)
   const [open, setOpen] = useState<string | null>(null)

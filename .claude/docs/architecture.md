@@ -25,7 +25,7 @@ components/                shared, feature-agnostic UI
 app/styles/                per-feature CSS (shell.css, kit.css, <feature>.css), imported in app/layout.tsx after opsdesk.css
 hooks/                     shared hooks (use-dept = department filter context, use-mobile)
 lib/                       shared non-UI code: data.ts (getData), store.ts (createStore: per-feature in-memory store), types.ts (Tone, Status, Dept), utils.ts, motion.ts (motion tokens; see ui-rules.md → Motion)
-public/data/<feature>/     mock API JSON; folder name == feature name
+public/data/<feature>/     mock API JSON; folder name == feature name (read from disk by lib/data.ts; proxy.ts 404s /data/* over HTTP)
 ```
 
 ## Rules
@@ -39,7 +39,7 @@ public/data/<feature>/     mock API JSON; folder name == feature name
    - `lib/support-access.ts` + `hooks/use-support-access.ts` (`lib/support-data.ts` loads it on the server): one support-access list for the platform console and tenant Settings → Data & privacy.
    - `lib/notify.ts` (+ `lib/notify-data.ts` on the server) + `hooks/use-notify-feed.ts`: reminder schedule, due reminders, delivery records and previews. The hook owns the shell notification list store and the mock clock; Settings → Notifications and the shell bell both use it.
    - `lib/branding.ts` + `hooks/use-branding.ts`: logo validation, initials, and the in-memory tenant logo store. Settings → Branding writes it, the shell sidebar mark reads it.
-   - `lib/task-inbox.ts`: tasks created elsewhere (WhatsApp) are pushed here and merged into the tasks store by `useTasksStore`.
+   - `lib/task-inbox.ts`: tasks created elsewhere (WhatsApp) are pushed here with their tenant id and merged into that tenant's tasks store by `useTasksStore`.
    - `lib/money.ts`: `moneyFormatter(org.currency, org.locale)`. Never hard-code a currency.
 4. **Client components never import `api.ts` or the feature's `index.ts`.** `index.ts` re-exports `api.ts`, which uses `fs`, so that import would break the client bundle.
    Client components import siblings and `../types` directly.

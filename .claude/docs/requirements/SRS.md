@@ -524,7 +524,7 @@ Status: implemented in the frontend prototype (mock roles). Code: `lib/permissio
 | HR / Recruitment User (`hr`) | Staff | Write: recruitment, files. Read: dashboard, tasks. |
 | Payroll User (`payroll`) | Staff | Write: payroll. Read: dashboard, tasks. |
 | Read-only / Auditor (`auditor`) | Manager | Read on all 12 modules. |
-| Platform Super Admin (`platform`) | Manager | No tenant module access. Flagged `platform`; lands on the platform console (§3.25). |
+| Platform Super Admin (`platform`) | Manager | No tenant module access. Flagged `platform`; lands on the platform console (§3.25). Tenant pages, the dashboard and tasks included, show "Access restricted". |
 
 Changed v1.2: §2.3 gave the roles as "proposed". The matrix above is what the prototype implements. It was filled in by the delivery team for roles the SRS described only by intent (ops, supervisor, employee, hr, payroll, admin), so it still needs client sign-off (OC-10, OC-22). The Tenant Owner and Senior Management rows of §2.3 are merged into `owner`; "Lilianna / Designated Manager" is `manager`. There is no ghost account (FR-AUTH-08 holds).
 
@@ -604,7 +604,7 @@ Status: implemented as a frontend prototype; state is in-memory and resets on re
 
 **FR-PLAT-07** (MUST): Support access to tenant data follows a request flow: staff submit a request with a reason; its status is requested, granted, expired or revoked; a granted request has an expiry and shows a countdown; expired state is derived from the clock. Staff can start a support session under a granted request and revoke it; both are audited. Every platform action is recorded in the platform audit list (time, actor, action, target, detail).
 
-Open questions: OC-25. Frontend-only: platform requests and tenant grants are one shared mock list (`lib/support-access.ts`, `public/data/support/requests.json`). A request filed in the platform console shows in the tenant's Settings → Data & privacy, where an admin can approve (grant for the tenant's `grantHours`), decline or revoke it; the tenant only receives its own rows.
+Open questions: OC-25. Frontend-only: platform requests and tenant grants are one shared mock list (`lib/support-access.ts`, `public/data/support/requests.json`). A request filed in the platform console shows in the tenant's Settings → Data & privacy, where the Tenant Owner can approve (grant for the tenant's `grantHours`), decline or revoke it; other roles with settings access see the list read-only. The tenant only receives its own rows. Full data export and the deletion request are Owner-only too (FR-SET-08, FR-SAAS-15).
 
 ### 3.26 In-tenant billing (v1.2)
 
@@ -733,7 +733,7 @@ WhatsApp inbox (`/whatsapp`, `features/whatsapp/`, doc `.claude/docs/features/wh
 - **FR-WA-09** (v1.2): An in-app inbox with a conversation list (filters All, Unread, Linked, Unlinked, Voice), a thread and a context panel. An integration card shows provider, method, business number, status (pending, connected, disconnected), last sync, an error with reconnect when disconnected, the privacy and consent rules, and one tile per flow (alerts, inbound, outbound, task creation, voice), each enabled or pending.
 - **FR-WA-10** (v1.2): Messages can be linked to a user, task, issue or report. Voice notes show a transcript marked machine-generated until a user confirms it (FR-WA-05); a confidence value below a threshold shows a quality warning; transcripts can be edited, and failed or unsupported audio is shown with a reason (FR-WA-07).
 - **FR-WA-11** (v1.2): Sending needs the outbound flow enabled and a connected integration; task creation needs the task-creation flow and write access to tasks; confirming transcripts needs the voice flow; read-only roles and suspended tenants cannot send, link, create or confirm. Every link, task creation and transcript confirmation adds an event in the thread (FR-WA-04).
-- All of this is mock data. Which flows are enabled and the provider are open (FR-WA-01, FR-WA-08, OC-05). Tasks created from a message are handed to the tasks list through `lib/task-inbox.ts` and appear in /tasks (merged when a tasks screen mounts; staff only see their own).
+- All of this is mock data. Which flows are enabled and the provider are open (FR-WA-01, FR-WA-08, OC-05). Tasks created from a message are handed to the tasks list through `lib/task-inbox.ts` and appear in /tasks (merged when a tasks screen mounts, only into the same tenant; staff only see their own).
 
 Dashboards (`/`, `features/dashboard/`), extends §10.1, §10.2:
 - **FR-DASH-01** (v1.2): Manager-home roles see the manager dashboard: summary cards, tasks-closed chart, daily-report deadline with countdown and reminders, manager-attention list with a Decide dialog, task progress, team tasks table, and coverage and files. Staff-home roles see the staff dashboard: my tasks, evidence awaiting review, today's report, recent manager comments and stats. Quick actions (new task, start daily report, remind, view queue, decide) show only for roles with the needed write access. The report deadline and reminder times come from tenant data.
@@ -1172,10 +1172,10 @@ Requirement ID to route and implementing folder. Folders are under `features/` u
 
 The repository is a frontend prototype for client review. A future backend must replace the following. Nothing below is production behaviour.
 
-- All data is JSON under `public/data/<feature>/` read through `lib/data.ts`. Feature stores (`lib/store.ts`) hold edits in browser memory and reset on reload.
-- Session: cookies `od-role`, `od-tenant`, `od-auth` and `od-brand-<tenantId>` stand in for authentication, memberships and tenant settings. `proxy.ts` only checks the signed-out cookie. Server actions in `app/actions/session.ts`.
+- All data is JSON under `public/data/<feature>/` read through `lib/data.ts` (from disk). `proxy.ts` answers 404 to any `/data/*` request, so the files are never served over HTTP. Feature stores (`lib/store.ts`) hold edits in browser memory and reset on reload.
+- Session: cookies `od-role`, `od-tenant`, `od-auth` and `od-brand-<tenantId>` stand in for authentication, memberships and tenant settings. `proxy.ts` only checks the signed-out cookie (tenant pages and the platform console); both layouts also redirect signed-out visitors. Signing out deletes `od-role` and `od-tenant`. Server actions in `app/actions/session.ts`; the demo "View as" and "Switch company" actions only accept role and tenant ids from the seed lists. A real deployment must replace them with memberships.
 - Authorisation is enforced in server components (navigation filtering, data stripping, write checks), not by a backend. FR-AUTH-03 and NFR-SEC-01 still need a real server.
-- Tenant isolation (FR-SAAS-01, FR-SAAS-02, NFR-TEN-01) is not implemented; tenants are seed rows.
+- Tenant isolation (FR-SAAS-01, FR-SAAS-02, NFR-TEN-01) is not implemented; tenants are seed rows. Client stores are scoped by tenant id (store scope key), and WhatsApp-created tasks carry their tenant id, so switching company never shows another tenant's in-memory edits.
 - Billing, MFA, email verification, invites, password reset, data export and deletion requests only show toasts or local state.
 - Not built at all: real file upload and storage for evidence and documents, Google Drive access policy (FR-GDR), task dependencies (FR-TASK-10), subdomains and custom domains (FR-SAAS-12), per-tenant usage tracking beyond seeded numbers.
 - Notifications are a mock (FR-NOT-02, FR-NOT-03, FR-NOT-05): the schedule, due reminders, in-app items and delivery log work, but nothing is sent by email, WhatsApp or push. Real sending still needs a provider.

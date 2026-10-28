@@ -1,12 +1,15 @@
 import { Icon } from "@/components/icons"
 import { DashboardView, StaffDashboardView, getDashboard, getDashboardPerms, getStaffDashboard } from "@/features/dashboard"
-import { getUser } from "@/features/shell"
+import { AccessRestricted, getUser } from "@/features/shell"
 import { NewTaskButton, getTaskSeed, taskCreator } from "@/features/tasks"
 import { getOrg } from "@/lib/org"
+import { can } from "@/lib/permissions"
 import { getSession } from "@/lib/session"
 
 export default async function Page() {
   const session = await getSession()
+  // The platform role has no tenant module access (SRS §3.21), so no tenant data reaches it here.
+  if (!can(session.role, "dashboard")) return <AccessRestricted moduleLabel="Dashboard" />
   if (session.role.home === "staff") {
     const [data, org] = await Promise.all([getStaffDashboard(), getOrg()])
     return <StaffDashboardView data={data} org={org} />

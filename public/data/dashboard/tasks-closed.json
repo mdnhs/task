@@ -9,8 +9,8 @@
       "t": "s1",
       "date": "Wednesday, 14 October 2026",
       "byDept": {
-        "security": 10,
-        "cleaning": 8
+        "Security": 10,
+        "Cleaning": 8
       },
       "late": 1,
       "avgHours": 3.4,
@@ -46,8 +46,8 @@
       "t": "s2",
       "date": "Thursday, 15 October 2026",
       "byDept": {
-        "security": 11,
-        "cleaning": 11
+        "Security": 11,
+        "Cleaning": 11
       },
       "late": 2,
       "avgHours": 3.1,
@@ -83,8 +83,8 @@
       "t": "s1",
       "date": "Friday, 16 October 2026",
       "byDept": {
-        "security": 13,
-        "cleaning": 12
+        "Security": 13,
+        "Cleaning": 12
       },
       "late": 3,
       "avgHours": 3.6,
@@ -120,8 +120,8 @@
       "t": "weekend",
       "date": "Saturday, 17 October 2026",
       "byDept": {
-        "security": 6,
-        "cleaning": 3
+        "Security": 6,
+        "Cleaning": 3
       },
       "late": 0,
       "avgHours": 2.2,
@@ -151,8 +151,8 @@
       "t": "weekend",
       "date": "Sunday, 18 October 2026",
       "byDept": {
-        "security": 5,
-        "cleaning": 2
+        "Security": 5,
+        "Cleaning": 2
       },
       "late": 1,
       "avgHours": 2.8,
@@ -182,8 +182,8 @@
       "t": "s2",
       "date": "Monday, 19 October 2026",
       "byDept": {
-        "security": 9,
-        "cleaning": 11
+        "Security": 9,
+        "Cleaning": 11
       },
       "late": 2,
       "avgHours": 3.3,
@@ -219,8 +219,8 @@
       "t": "today",
       "date": "Tuesday, 20 October 2026 (today)",
       "byDept": {
-        "security": 7,
-        "cleaning": 9
+        "Security": 7,
+        "Cleaning": 9
       },
       "late": 3,
       "avgHours": 3.9,

@@ -26,6 +26,10 @@ describe("audit filters", () => {
   })
   it("quotes csv cells", () => {
     expect(toCsv([ev({ device: 'Chrome, "x"' })])).toContain('"Chrome, ""x"""')
+    // CSV injection: formula-leading cells stay text
+    const csv = toCsv([ev({ actor: "=HYPERLINK(1)", device: "@x,y" })])
+    expect(csv).toContain(",'=HYPERLINK(1),")
+    expect(csv).toContain(`"'@x,y"`)
   })
   it("exportEvent builds a sensitive export event with the next id", () => {
     const e = exportEvent(list, { actor: "Me", role: "Admin" }, "2026-10-28T09:00:00", 2, "audit-log-2026-10-28.csv")
