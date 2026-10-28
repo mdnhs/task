@@ -1,0 +1,368 @@
+{
+  "items": [
+    {
+      "id": "ATT-301",
+      "title": "Approve overtime for Canary Wharf night cover",
+      "summary": "Two night officers are off sick this week and the site contract requires full cover. Overtime for 4 shifts is needed from tonight.",
+      "impact": "Without cover the Canary Wharf contract is in breach from tonight and a penalty clause applies.",
+      "urgency": "critical",
+      "decision": "Approve up to 32 overtime hours at 1.5x for 4 night shifts",
+      "owner": "Daniel Okafor",
+      "due": "2026-10-20T18:00:00",
+      "dept": "Security",
+      "status": "open",
+      "source": "roster",
+      "history": [
+        {
+          "at": "2026-10-20T07:40:00",
+          "by": "Daniel Okafor",
+          "action": "Raised",
+          "note": "Roster gap found after two sickness calls overnight."
+        }
+      ]
+    },
+    {
+      "id": "ATT-302",
+      "title": "Complaint: missed washroom clean at Riverside House",
+      "summary": "The client reported the washrooms on floors 3 and 4 were not cleaned on Monday. They are waiting for a reply.",
+      "impact": "Client satisfaction at risk; the account is up for renewal next quarter.",
+      "urgency": "high",
+      "decision": "Approve a goodwill re-clean and a written reply to the client",
+      "owner": "Grace Mensah",
+      "due": "2026-10-21T12:00:00",
+      "dept": "Cleaning",
+      "status": "open",
+      "source": "client",
+      "history": [
+        {
+          "at": "2026-10-19T16:20:00",
+          "by": "Grace Mensah",
+          "action": "Raised",
+          "note": "Client email received at 15:50 on Monday."
+        }
+      ]
+    },
+    {
+      "id": "ATT-303",
+      "title": "SIA licences expiring for 2 officers in 12 days",
+      "summary": "M. Haddad and J. Silva hold SIA licences that expire on 1 Nov. Renewal has not been started.",
+      "impact": "Both officers cannot work licensed posts after expiry, which removes cover from two sites.",
+      "urgency": "high",
+      "decision": "Approve paying the renewal fees and booking time off for the course",
+      "owner": "Priya Shah",
+      "due": "2026-10-23T17:00:00",
+      "dept": "Security",
+      "status": "open",
+      "source": "staff",
+      "history": [
+        {
+          "at": "2026-10-19T11:05:00",
+          "by": "Priya Shah",
+          "action": "Raised",
+          "note": "Flagged by the weekly compliance check."
+        }
+      ]
+    },
+    {
+      "id": "ATT-304",
+      "title": "Supplies order £640 waiting for approval",
+      "summary": "Monthly cleaning supplies order from Bunzl. Stock of bin liners and floor chemicals is below the reorder level.",
+      "impact": "Stock runs out in about 5 days if the order is not placed this week.",
+      "urgency": "medium",
+      "decision": "Approve the £640 order with Bunzl",
+      "owner": "Tomasz Wójcik",
+      "due": "2026-10-22T17:00:00",
+      "dept": "Cleaning",
+      "status": "open",
+      "source": "stock",
+      "history": [
+        {
+          "at": "2026-10-19T09:30:00",
+          "by": "Tomasz Wójcik",
+          "action": "Raised",
+          "note": "Quote attached to the order request."
+        }
+      ]
+    },
+    {
+      "id": "ATT-290",
+      "title": "Extra supervisor for Canary Wharf handover",
+      "summary": "Handover week needs a second supervisor on days.",
+      "impact": "Handover errors would reflect on the contract.",
+      "urgency": "high",
+      "decision": "Approve one extra supervisor day shift for 3 days",
+      "owner": "Daniel Okafor",
+      "due": "2026-10-16T17:00:00",
+      "dept": "Security",
+      "status": "resolved",
+      "source": "roster",
+      "history": [
+        {
+          "at": "2026-10-14T08:00:00",
+          "by": "Daniel Okafor",
+          "action": "Raised"
+        },
+        {
+          "at": "2026-10-14T10:15:00",
+          "by": "Lilianna Novak",
+          "action": "Approved",
+          "note": "Approved for Wed to Fri."
+        },
+        {
+          "at": "2026-10-16T17:00:00",
+          "by": "Daniel Okafor",
+          "action": "Resolved",
+          "note": "Completed and confirmed on site."
+        }
+      ],
+      "decisionRecord": {
+        "by": "Lilianna Novak",
+        "at": "2026-10-14T10:15:00",
+        "outcome": "approved",
+        "note": "Approved for Wed to Fri."
+      }
+    },
+    {
+      "id": "ATT-291",
+      "title": "Replace broken floor scrubber at Riverside House",
+      "summary": "Main scrubber failed; hire cost is rising weekly.",
+      "impact": "Cleaning times double without it.",
+      "urgency": "medium",
+      "decision": "Approve purchase of a replacement scrubber (£1,150)",
+      "owner": "Grace Mensah",
+      "due": "2026-10-18T17:00:00",
+      "dept": "Cleaning",
+      "status": "in_progress",
+      "source": "stock",
+      "history": [
+        {
+          "at": "2026-10-15T08:10:00",
+          "by": "Grace Mensah",
+          "action": "Raised"
+        },
+        {
+          "at": "2026-10-15T09:40:00",
+          "by": "Lilianna Novak",
+          "action": "Approved",
+          "note": "Order placed, delivery due Thursday."
+        },
+        {
+          "at": "2026-10-19T14:00:00",
+          "by": "Grace Mensah",
+          "action": "Started",
+          "note": "Work under way."
+        }
+      ],
+      "decisionRecord": {
+        "by": "Lilianna Novak",
+        "at": "2026-10-15T09:40:00",
+        "outcome": "approved",
+        "note": "Order placed, delivery due Thursday."
+      }
+    },
+    {
+      "id": "ATT-292",
+      "title": "Uniform order for new starters",
+      "summary": "Three new officers start next week with no uniform.",
+      "impact": "Late kit delays first deployments.",
+      "urgency": "medium",
+      "decision": "Approve uniform order of £420",
+      "owner": "Priya Shah",
+      "due": "2026-10-17T12:00:00",
+      "dept": "Security",
+      "status": "resolved",
+      "source": "staff",
+      "history": [
+        {
+          "at": "2026-10-13T11:00:00",
+          "by": "Priya Shah",
+          "action": "Raised"
+        },
+        {
+          "at": "2026-10-13T15:30:00",
+          "by": "Lilianna Novak",
+          "action": "Approved",
+          "note": "Approved, within the onboarding budget."
+        },
+        {
+          "at": "2026-10-17T12:00:00",
+          "by": "Priya Shah",
+          "action": "Resolved",
+          "note": "Completed and confirmed on site."
+        }
+      ],
+      "decisionRecord": {
+        "by": "Lilianna Novak",
+        "at": "2026-10-13T15:30:00",
+        "outcome": "approved",
+        "note": "Approved, within the onboarding budget."
+      }
+    },
+    {
+      "id": "ATT-293",
+      "title": "Client request for weekend deep clean",
+      "summary": "Client asked for an extra weekend deep clean at short notice.",
+      "impact": "Revenue opportunity but needs overtime.",
+      "urgency": "low",
+      "decision": "Approve weekend overtime for 4 cleaners",
+      "owner": "Grace Mensah",
+      "due": "2026-10-15T17:00:00",
+      "dept": "Cleaning",
+      "status": "decided",
+      "source": "client",
+      "history": [
+        {
+          "at": "2026-10-13T13:20:00",
+          "by": "Grace Mensah",
+          "action": "Raised"
+        },
+        {
+          "at": "2026-10-13T16:45:00",
+          "by": "Lilianna Novak",
+          "action": "Rejected",
+          "note": "Not enough notice to roster safely. Offer the following weekend."
+        }
+      ],
+      "decisionRecord": {
+        "by": "Lilianna Novak",
+        "at": "2026-10-13T16:45:00",
+        "outcome": "rejected",
+        "note": "Not enough notice to roster safely. Offer the following weekend."
+      }
+    },
+    {
+      "id": "ATT-294",
+      "title": "Late report escalation: Security, 12 Oct",
+      "summary": "Security report was submitted four hours late.",
+      "impact": "Repeat lateness breaks the review schedule.",
+      "urgency": "low",
+      "decision": "Decide whether to issue a formal reminder",
+      "owner": "Daniel Okafor",
+      "due": "2026-10-14T17:00:00",
+      "dept": "Security",
+      "status": "decided",
+      "source": "report",
+      "history": [
+        {
+          "at": "2026-10-12T19:00:00",
+          "by": "Daniel Okafor",
+          "action": "Raised"
+        },
+        {
+          "at": "2026-10-13T09:10:00",
+          "by": "Lilianna Novak",
+          "action": "Deferred",
+          "note": "Hold until the next occurrence; check again Friday."
+        }
+      ],
+      "decisionRecord": {
+        "by": "Lilianna Novak",
+        "at": "2026-10-13T09:10:00",
+        "outcome": "deferred",
+        "note": "Hold until the next occurrence; check again Friday."
+      }
+    },
+    {
+      "id": "ATT-295",
+      "title": "Pay rise request for night supervisor",
+      "summary": "Request from the night supervisor following added duties.",
+      "impact": "Retention risk.",
+      "urgency": "medium",
+      "decision": "Approve a 4% rise from next month",
+      "owner": "Daniel Okafor",
+      "due": "2026-10-12T17:00:00",
+      "dept": "Security",
+      "status": "decided",
+      "source": "staff",
+      "history": [
+        {
+          "at": "2026-10-09T10:00:00",
+          "by": "Daniel Okafor",
+          "action": "Raised"
+        },
+        {
+          "at": "2026-10-10T14:00:00",
+          "by": "Lilianna Novak",
+          "action": "Approved",
+          "note": "Approved, effective 1 November."
+        }
+      ],
+      "decisionRecord": {
+        "by": "Lilianna Novak",
+        "at": "2026-10-10T14:00:00",
+        "outcome": "approved",
+        "note": "Approved, effective 1 November."
+      }
+    },
+    {
+      "id": "ATT-296",
+      "title": "Subcontract window cleaning at Canary Wharf",
+      "summary": "Quote received to subcontract the external window clean.",
+      "impact": "Cost 12% over budget.",
+      "urgency": "low",
+      "decision": "Approve subcontractor quote of £880",
+      "owner": "Grace Mensah",
+      "due": "2026-10-11T17:00:00",
+      "dept": "Cleaning",
+      "status": "resolved",
+      "source": "task",
+      "history": [
+        {
+          "at": "2026-10-08T09:00:00",
+          "by": "Grace Mensah",
+          "action": "Raised"
+        },
+        {
+          "at": "2026-10-08T11:30:00",
+          "by": "Lilianna Novak",
+          "action": "Approved",
+          "note": "Approved after a second quote matched."
+        },
+        {
+          "at": "2026-10-11T17:00:00",
+          "by": "Grace Mensah",
+          "action": "Resolved",
+          "note": "Completed and confirmed on site."
+        }
+      ],
+      "decisionRecord": {
+        "by": "Lilianna Novak",
+        "at": "2026-10-08T11:30:00",
+        "outcome": "approved",
+        "note": "Approved after a second quote matched."
+      }
+    },
+    {
+      "id": "ATT-297",
+      "title": "Roster swap request across two sites",
+      "summary": "Two officers asked to swap sites for a month.",
+      "impact": "Neutral cost, needs client sign-off.",
+      "urgency": "low",
+      "decision": "Approve the swap",
+      "owner": "Daniel Okafor",
+      "due": "2026-10-09T17:00:00",
+      "dept": "Security",
+      "status": "decided",
+      "source": "roster",
+      "history": [
+        {
+          "at": "2026-10-07T09:45:00",
+          "by": "Daniel Okafor",
+          "action": "Raised"
+        },
+        {
+          "at": "2026-10-07T13:15:00",
+          "by": "Lilianna Novak",
+          "action": "Rejected",
+          "note": "One site needs the SIA-trained officer; revisit in November."
+        }
+      ],
+      "decisionRecord": {
+        "by": "Lilianna Novak",
+        "at": "2026-10-07T13:15:00",
+        "outcome": "rejected",
+        "note": "One site needs the SIA-trained officer; revisit in November."
+      }
+    }
+  ]
+}

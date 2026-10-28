@@ -1,0 +1,12 @@
+[
+  { "id": "n1", "type": "assigned", "title": "A payroll issue was assigned to you", "at": "2026-10-20T08:40:00", "read": false, "href": "/payroll-issues" },
+  { "id": "n2", "type": "deadline", "title": "The daily report deadline is today", "at": "2026-10-20T08:15:00", "read": false, "href": "/daily-reports" },
+  { "id": "n3", "type": "report-returned", "title": "A daily report was returned for changes", "at": "2026-10-19T16:20:00", "read": false, "href": "/daily-reports" },
+  { "id": "n4", "type": "reassigned", "title": "A task was reassigned to another person", "at": "2026-10-19T11:05:00", "read": true, "href": "/tasks" },
+  { "id": "n5", "type": "evidence", "title": "Evidence was added to a task", "at": "2026-10-18T14:30:00", "read": true, "href": "/files" },
+  { "id": "n6", "type": "manager-action", "title": "A manager action needs your attention", "at": "2026-10-17T10:00:00", "read": true, "href": "/manager-attention" },
+  { "id": "n7", "type": "reminder", "title": "Reminder: you have tasks due soon", "at": "2026-10-16T09:00:00", "read": true, "href": "/tasks" },
+  { "id": "n8", "type": "assigned", "title": "A task was assigned to you", "at": "2026-10-15T13:45:00", "read": true, "href": "/tasks" },
+  { "id": "n9", "type": "deadline", "title": "A task deadline is approaching", "at": "2026-10-14T15:00:00", "read": true, "href": "/tasks" },
+  { "id": "n10", "type": "evidence", "title": "Evidence was requested for a task", "at": "2026-10-13T12:10:00", "read": true, "href": "/files" }
+]

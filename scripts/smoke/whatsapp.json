@@ -1,0 +1,7 @@
+[
+  {"path": "/whatsapp", "expect": ["WhatsApp integration", "Awaiting client confirmation", "Machine-generated — not confirmed", "Daniel Okafor", "Privacy and consent"], "notExpect": ["is being built"]},
+  {"path": "/whatsapp", "cookies": {"od-tenant": "t3"}, "expect": ["WhatsApp is disconnected", "Reconnect"]},
+  {"path": "/whatsapp", "cookies": {"od-tenant": "t2"}, "expect": ["Outbound replies aren&#x27;t enabled yet"]},
+  {"path": "/whatsapp", "cookies": {"od-role": "auditor"}, "expect": ["You have read-only access to WhatsApp"], "notExpect": ["Reconnect"]},
+  {"path": "/whatsapp", "cookies": {"od-role": "employee"}, "expect": ["Access restricted"], "notExpect": ["WhatsApp integration", "Machine-generated"]}
+]

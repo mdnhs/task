@@ -1,0 +1,988 @@
+{
+  "events": [
+    {
+      "id": "AUD-4995",
+      "at": "2026-10-20T17:05:00",
+      "actor": "Lilianna Novak",
+      "actorRole": "Operations Manager",
+      "action": "sign_in",
+      "recordType": "Session",
+      "recordRef": "SES-4105",
+      "ip": "86.14.200.31",
+      "device": "Firefox on Linux",
+      "sensitive": false,
+      "meta": {
+        "Method": "Password",
+        "Result": "Success"
+      }
+    },
+    {
+      "id": "AUD-4998",
+      "at": "2026-10-20T16:26:00",
+      "actor": "J. Silva",
+      "actorRole": "Security Officer",
+      "action": "status_change",
+      "recordType": "Task",
+      "recordRef": "TSK-1032",
+      "ip": "194.168.4.100",
+      "device": "Firefox on Linux",
+      "sensitive": false,
+      "meta": {
+        "From": "In progress",
+        "To": "Submitted"
+      }
+    },
+    {
+      "id": "AUD-4996",
+      "at": "2026-10-20T13:52:00",
+      "actor": "Tomasz Wójcik",
+      "actorRole": "Stock Coordinator",
+      "action": "billing",
+      "recordType": "Invoice",
+      "recordRef": "INV-2604",
+      "ip": "217.138.222.7",
+      "device": "Chrome on macOS",
+      "sensitive": true,
+      "meta": {
+        "Change": "Payment method updated",
+        "Provider": "Stripe"
+      }
+    },
+    {
+      "id": "AUD-4999",
+      "at": "2026-10-20T12:13:00",
+      "actor": "Priya Shah",
+      "actorRole": "HR & Recruitment",
+      "action": "role_change",
+      "recordType": "User",
+      "recordRef": "USR-21",
+      "ip": "5.148.40.66",
+      "device": "Chrome on macOS",
+      "sensitive": true,
+      "meta": {
+        "From": "Employee",
+        "To": "Supervisor",
+        "Approved by": "Lilianna Novak"
+      }
+    },
+    {
+      "id": "AUD-4997",
+      "at": "2026-10-20T09:39:00",
+      "actor": "Daniel Okafor",
+      "actorRole": "Security Supervisor",
+      "action": "report_returned",
+      "recordType": "Report",
+      "recordRef": "RPT-2026-10-13",
+      "ip": "151.231.18.204",
+      "device": "Chrome on Windows",
+      "sensitive": false,
+      "meta": {
+        "Outcome": "Returned",
+        "Reason": "Missing evidence on the incident section"
+      }
+    },
+    {
+      "id": "AUD-5000",
+      "at": "2026-10-20T08:00:00",
+      "actor": "Lilianna Novak",
+      "actorRole": "Operations Manager",
+      "action": "sign_in",
+      "recordType": "Session",
+      "recordRef": "SES-4100",
+      "ip": "81.2.69.142",
+      "device": "Chrome on Windows",
+      "sensitive": false,
+      "meta": {
+        "Method": "Password",
+        "Result": "Success"
+      }
+    },
+    {
+      "id": "AUD-4992",
+      "at": "2026-10-19T18:44:00",
+      "actor": "Daniel Okafor",
+      "actorRole": "Security Supervisor",
+      "action": "status_change",
+      "recordType": "Task",
+      "recordRef": "TSK-1038",
+      "ip": "81.2.69.142",
+      "device": "Firefox on Linux",
+      "sensitive": false,
+      "meta": {
+        "From": "In progress",
+        "To": "Submitted"
+      }
+    },
+    {
+      "id": "AUD-4990",
+      "at": "2026-10-19T15:10:00",
+      "actor": "Lilianna Novak",
+      "actorRole": "Operations Manager",
+      "action": "failed_sign_in",
+      "recordType": "Session",
+      "recordRef": "SES-4110",
+      "ip": "194.168.4.100",
+      "device": "Chrome on macOS",
+      "sensitive": true,
+      "meta": {
+        "Method": "Password",
+        "Result": "Wrong password",
+        "Attempt": "3 of 5",
+        "Lockout": "Not triggered"
+      }
+    },
+    {
+      "id": "AUD-4993",
+      "at": "2026-10-19T14:31:00",
+      "actor": "J. Silva",
+      "actorRole": "Security Officer",
+      "action": "export",
+      "recordType": "Export",
+      "recordRef": "EXP-307",
+      "ip": "82.132.230.18",
+      "device": "Chrome on macOS",
+      "sensitive": true,
+      "meta": {
+        "Format": "CSV",
+        "Rows": "128",
+        "Scope": "Daily reports"
+      }
+    },
+    {
+      "id": "AUD-4991",
+      "at": "2026-10-19T11:57:00",
+      "actor": "Tomasz Wójcik",
+      "actorRole": "Stock Coordinator",
+      "action": "report_reviewed",
+      "recordType": "Report",
+      "recordRef": "RPT-2026-10-19",
+      "ip": "5.148.40.66",
+      "device": "Chrome on Windows",
+      "sensitive": false,
+      "meta": {
+        "Outcome": "Accepted",
+        "Comment": "No issues"
+      }
+    },
+    {
+      "id": "AUD-4994",
+      "at": "2026-10-19T10:18:00",
+      "actor": "Priya Shah",
+      "actorRole": "HR & Recruitment",
+      "action": "deactivation",
+      "recordType": "User",
+      "recordRef": "USR-31",
+      "ip": "90.196.12.5",
+      "device": "Chrome on Windows",
+      "sensitive": true,
+      "meta": {
+        "Reason": "Left the company",
+        "Sessions revoked": "2"
+      }
+    },
+    {
+      "id": "AUD-4989",
+      "at": "2026-10-19T08:23:00",
+      "actor": "Priya Shah",
+      "actorRole": "HR & Recruitment",
+      "action": "decision",
+      "recordType": "Attention item",
+      "recordRef": "ATT-3",
+      "ip": "151.231.18.204",
+      "device": "Firefox on Linux",
+      "sensitive": false,
+      "meta": {
+        "Decision": "Approved",
+        "Note": "Cover agreed for the night shift"
+      }
+    },
+    {
+      "id": "AUD-4984",
+      "at": "2026-10-18T17:28:00",
+      "actor": "Priya Shah",
+      "actorRole": "HR & Recruitment",
+      "action": "export",
+      "recordType": "Export",
+      "recordRef": "EXP-316",
+      "ip": "81.2.69.142",
+      "device": "Chrome on macOS",
+      "sensitive": true,
+      "meta": {
+        "Format": "CSV",
+        "Rows": "128",
+        "Scope": "Daily reports"
+      }
+    },
+    {
+      "id": "AUD-4987",
+      "at": "2026-10-18T16:49:00",
+      "actor": "Daniel Okafor",
+      "actorRole": "Security Supervisor",
+      "action": "report_submitted",
+      "recordType": "Report",
+      "recordRef": "RPT-2026-10-13",
+      "ip": "86.14.200.31",
+      "device": "Chrome on macOS",
+      "sensitive": false,
+      "meta": {
+        "Type": "Daily report",
+        "Sections": "6 of 6"
+      }
+    },
+    {
+      "id": "AUD-4985",
+      "at": "2026-10-18T13:15:00",
+      "actor": "Lilianna Novak",
+      "actorRole": "Operations Manager",
+      "action": "failed_sign_in",
+      "recordType": "Session",
+      "recordRef": "SES-4115",
+      "ip": "82.132.230.18",
+      "device": "Chrome on Windows",
+      "sensitive": true,
+      "meta": {
+        "Method": "Password",
+        "Result": "Wrong password",
+        "Attempt": "3 of 5",
+        "Lockout": "Not triggered"
+      }
+    },
+    {
+      "id": "AUD-4988",
+      "at": "2026-10-18T12:36:00",
+      "actor": "J. Silva",
+      "actorRole": "Security Officer",
+      "action": "report_returned",
+      "recordType": "Report",
+      "recordRef": "RPT-2026-10-12",
+      "ip": "217.138.222.7",
+      "device": "Chrome on Windows",
+      "sensitive": false,
+      "meta": {
+        "Outcome": "Returned",
+        "Reason": "Missing evidence on the incident section"
+      }
+    },
+    {
+      "id": "AUD-4983",
+      "at": "2026-10-18T10:41:00",
+      "actor": "J. Silva",
+      "actorRole": "Security Officer",
+      "action": "sign_in",
+      "recordType": "Session",
+      "recordRef": "SES-4117",
+      "ip": "5.148.40.66",
+      "device": "Firefox on Linux",
+      "sensitive": false,
+      "meta": {
+        "Method": "Password",
+        "Result": "Success"
+      }
+    },
+    {
+      "id": "AUD-4986",
+      "at": "2026-10-18T09:02:00",
+      "actor": "Tomasz Wójcik",
+      "actorRole": "Stock Coordinator",
+      "action": "invite",
+      "recordType": "User",
+      "recordRef": "USR-42",
+      "ip": "90.196.12.5",
+      "device": "Firefox on Linux",
+      "sensitive": false,
+      "meta": {
+        "Role": "Employee",
+        "Sent to": "new.starter@example.com"
+      }
+    },
+    {
+      "id": "AUD-4981",
+      "at": "2026-10-17T18:07:00",
+      "actor": "Tomasz Wójcik",
+      "actorRole": "Stock Coordinator",
+      "action": "status_change",
+      "recordType": "Task",
+      "recordRef": "TSK-1049",
+      "ip": "151.231.18.204",
+      "device": "Chrome on macOS",
+      "sensitive": false,
+      "meta": {
+        "From": "In progress",
+        "To": "Submitted"
+      }
+    },
+    {
+      "id": "AUD-4979",
+      "at": "2026-10-17T15:33:00",
+      "actor": "Priya Shah",
+      "actorRole": "HR & Recruitment",
+      "action": "billing",
+      "recordType": "Invoice",
+      "recordRef": "INV-2603",
+      "ip": "86.14.200.31",
+      "device": "Chrome on Windows",
+      "sensitive": true,
+      "meta": {
+        "Change": "Payment method updated",
+        "Provider": "Stripe"
+      }
+    },
+    {
+      "id": "AUD-4982",
+      "at": "2026-10-17T14:54:00",
+      "actor": "Daniel Okafor",
+      "actorRole": "Security Supervisor",
+      "action": "role_change",
+      "recordType": "User",
+      "recordRef": "USR-22",
+      "ip": "194.168.4.100",
+      "device": "Chrome on Windows",
+      "sensitive": true,
+      "meta": {
+        "From": "Employee",
+        "To": "Supervisor",
+        "Approved by": "Lilianna Novak"
+      }
+    },
+    {
+      "id": "AUD-4977",
+      "at": "2026-10-17T12:59:00",
+      "actor": "Daniel Okafor",
+      "actorRole": "Security Supervisor",
+      "action": "deactivation",
+      "recordType": "User",
+      "recordRef": "USR-33",
+      "ip": "82.132.230.18",
+      "device": "Firefox on Linux",
+      "sensitive": true,
+      "meta": {
+        "Reason": "Left the company",
+        "Sessions revoked": "2"
+      }
+    },
+    {
+      "id": "AUD-4980",
+      "at": "2026-10-17T11:20:00",
+      "actor": "Lilianna Novak",
+      "actorRole": "Operations Manager",
+      "action": "decision",
+      "recordType": "Attention item",
+      "recordRef": "ATT-3",
+      "ip": "217.138.222.7",
+      "device": "Firefox on Linux",
+      "sensitive": false,
+      "meta": {
+        "Decision": "Approved",
+        "Note": "Cover agreed for the night shift"
+      }
+    },
+    {
+      "id": "AUD-4978",
+      "at": "2026-10-17T08:46:00",
+      "actor": "J. Silva",
+      "actorRole": "Security Officer",
+      "action": "sign_in",
+      "recordType": "Session",
+      "recordRef": "SES-4122",
+      "ip": "90.196.12.5",
+      "device": "Chrome on macOS",
+      "sensitive": false,
+      "meta": {
+        "Method": "Password",
+        "Result": "Success"
+      }
+    },
+    {
+      "id": "AUD-4973",
+      "at": "2026-10-16T17:51:00",
+      "actor": "J. Silva",
+      "actorRole": "Security Officer",
+      "action": "failed_sign_in",
+      "recordType": "Session",
+      "recordRef": "SES-4127",
+      "ip": "151.231.18.204",
+      "device": "Chrome on Windows",
+      "sensitive": true,
+      "meta": {
+        "Method": "Password",
+        "Result": "Wrong password",
+        "Attempt": "3 of 5",
+        "Lockout": "Not triggered"
+      }
+    },
+    {
+      "id": "AUD-4976",
+      "at": "2026-10-16T16:12:00",
+      "actor": "Tomasz Wójcik",
+      "actorRole": "Stock Coordinator",
+      "action": "failed_sign_in",
+      "recordType": "Session",
+      "recordRef": "SES-4124",
+      "ip": "81.2.69.142",
+      "device": "Chrome on Windows",
+      "sensitive": true,
+      "meta": {
+        "Method": "Password",
+        "Result": "Wrong password",
+        "Attempt": "3 of 5",
+        "Lockout": "Not triggered"
+      }
+    },
+    {
+      "id": "AUD-4971",
+      "at": "2026-10-16T14:17:00",
+      "actor": "Tomasz Wójcik",
+      "actorRole": "Stock Coordinator",
+      "action": "report_returned",
+      "recordType": "Report",
+      "recordRef": "RPT-2026-10-19",
+      "ip": "86.14.200.31",
+      "device": "Firefox on Linux",
+      "sensitive": false,
+      "meta": {
+        "Outcome": "Returned",
+        "Reason": "Missing evidence on the incident section"
+      }
+    },
+    {
+      "id": "AUD-4974",
+      "at": "2026-10-16T13:38:00",
+      "actor": "Priya Shah",
+      "actorRole": "HR & Recruitment",
+      "action": "report_reviewed",
+      "recordType": "Report",
+      "recordRef": "RPT-2026-10-16",
+      "ip": "194.168.4.100",
+      "device": "Firefox on Linux",
+      "sensitive": false,
+      "meta": {
+        "Outcome": "Accepted",
+        "Comment": "No issues"
+      }
+    },
+    {
+      "id": "AUD-4972",
+      "at": "2026-10-16T10:04:00",
+      "actor": "Daniel Okafor",
+      "actorRole": "Security Supervisor",
+      "action": "status_change",
+      "recordType": "Task",
+      "recordRef": "TSK-1038",
+      "ip": "217.138.222.7",
+      "device": "Chrome on macOS",
+      "sensitive": false,
+      "meta": {
+        "From": "In progress",
+        "To": "Submitted"
+      }
+    },
+    {
+      "id": "AUD-4975",
+      "at": "2026-10-16T09:25:00",
+      "actor": "Lilianna Novak",
+      "actorRole": "Operations Manager",
+      "action": "status_change",
+      "recordType": "Task",
+      "recordRef": "TSK-1035",
+      "ip": "5.148.40.66",
+      "device": "Chrome on macOS",
+      "sensitive": false,
+      "meta": {
+        "From": "In progress",
+        "To": "Submitted"
+      }
+    },
+    {
+      "id": "AUD-4970",
+      "at": "2026-10-15T18:30:00",
+      "actor": "Lilianna Novak",
+      "actorRole": "Operations Manager",
+      "action": "report_submitted",
+      "recordType": "Report",
+      "recordRef": "RPT-2026-10-10",
+      "ip": "90.196.12.5",
+      "device": "Chrome on Windows",
+      "sensitive": false,
+      "meta": {
+        "Type": "Daily report",
+        "Sections": "6 of 6"
+      }
+    },
+    {
+      "id": "AUD-4965",
+      "at": "2026-10-15T16:35:00",
+      "actor": "Lilianna Novak",
+      "actorRole": "Operations Manager",
+      "action": "role_change",
+      "recordType": "User",
+      "recordRef": "USR-23",
+      "ip": "151.231.18.204",
+      "device": "Firefox on Linux",
+      "sensitive": true,
+      "meta": {
+        "From": "Employee",
+        "To": "Supervisor",
+        "Approved by": "Lilianna Novak"
+      }
+    },
+    {
+      "id": "AUD-4968",
+      "at": "2026-10-15T15:56:00",
+      "actor": "J. Silva",
+      "actorRole": "Security Officer",
+      "action": "deactivation",
+      "recordType": "User",
+      "recordRef": "USR-32",
+      "ip": "81.2.69.142",
+      "device": "Firefox on Linux",
+      "sensitive": true,
+      "meta": {
+        "Reason": "Left the company",
+        "Sessions revoked": "2"
+      }
+    },
+    {
+      "id": "AUD-4966",
+      "at": "2026-10-15T12:22:00",
+      "actor": "Tomasz Wójcik",
+      "actorRole": "Stock Coordinator",
+      "action": "sign_in",
+      "recordType": "Session",
+      "recordRef": "SES-4134",
+      "ip": "194.168.4.100",
+      "device": "Chrome on macOS",
+      "sensitive": false,
+      "meta": {
+        "Method": "Password",
+        "Result": "Success"
+      }
+    },
+    {
+      "id": "AUD-4969",
+      "at": "2026-10-15T11:43:00",
+      "actor": "Priya Shah",
+      "actorRole": "HR & Recruitment",
+      "action": "invite",
+      "recordType": "User",
+      "recordRef": "USR-41",
+      "ip": "82.132.230.18",
+      "device": "Chrome on macOS",
+      "sensitive": false,
+      "meta": {
+        "Role": "Employee",
+        "Sent to": "new.starter@example.com"
+      }
+    },
+    {
+      "id": "AUD-4967",
+      "at": "2026-10-15T08:09:00",
+      "actor": "Daniel Okafor",
+      "actorRole": "Security Supervisor",
+      "action": "export",
+      "recordType": "Export",
+      "recordRef": "EXP-333",
+      "ip": "5.148.40.66",
+      "device": "Chrome on Windows",
+      "sensitive": true,
+      "meta": {
+        "Format": "CSV",
+        "Rows": "128",
+        "Scope": "Daily reports"
+      }
+    },
+    {
+      "id": "AUD-4959",
+      "at": "2026-10-14T18:53:00",
+      "actor": "Priya Shah",
+      "actorRole": "HR & Recruitment",
+      "action": "failed_sign_in",
+      "recordType": "Session",
+      "recordRef": "SES-4141",
+      "ip": "5.148.40.66",
+      "device": "Firefox on Linux",
+      "sensitive": true,
+      "meta": {
+        "Method": "Password",
+        "Result": "Wrong password",
+        "Attempt": "3 of 5",
+        "Lockout": "Not triggered"
+      }
+    },
+    {
+      "id": "AUD-4962",
+      "at": "2026-10-14T17:14:00",
+      "actor": "Daniel Okafor",
+      "actorRole": "Security Supervisor",
+      "action": "billing",
+      "recordType": "Invoice",
+      "recordRef": "INV-2602",
+      "ip": "90.196.12.5",
+      "device": "Firefox on Linux",
+      "sensitive": true,
+      "meta": {
+        "Change": "Payment method updated",
+        "Provider": "Stripe"
+      }
+    },
+    {
+      "id": "AUD-4960",
+      "at": "2026-10-14T14:40:00",
+      "actor": "Lilianna Novak",
+      "actorRole": "Operations Manager",
+      "action": "invite",
+      "recordType": "User",
+      "recordRef": "USR-44",
+      "ip": "81.2.69.142",
+      "device": "Chrome on macOS",
+      "sensitive": false,
+      "meta": {
+        "Role": "Employee",
+        "Sent to": "new.starter@example.com"
+      }
+    },
+    {
+      "id": "AUD-4963",
+      "at": "2026-10-14T13:01:00",
+      "actor": "J. Silva",
+      "actorRole": "Security Officer",
+      "action": "decision",
+      "recordType": "Attention item",
+      "recordRef": "ATT-2",
+      "ip": "86.14.200.31",
+      "device": "Chrome on macOS",
+      "sensitive": false,
+      "meta": {
+        "Decision": "Approved",
+        "Note": "Cover agreed for the night shift"
+      }
+    },
+    {
+      "id": "AUD-4961",
+      "at": "2026-10-14T10:27:00",
+      "actor": "Tomasz Wójcik",
+      "actorRole": "Stock Coordinator",
+      "action": "sign_in",
+      "recordType": "Session",
+      "recordRef": "SES-4139",
+      "ip": "82.132.230.18",
+      "device": "Chrome on Windows",
+      "sensitive": false,
+      "meta": {
+        "Method": "Password",
+        "Result": "Success"
+      }
+    },
+    {
+      "id": "AUD-4964",
+      "at": "2026-10-14T09:48:00",
+      "actor": "Priya Shah",
+      "actorRole": "HR & Recruitment",
+      "action": "failed_sign_in",
+      "recordType": "Session",
+      "recordRef": "SES-4136",
+      "ip": "217.138.222.7",
+      "device": "Chrome on Windows",
+      "sensitive": true,
+      "meta": {
+        "Method": "Password",
+        "Result": "Wrong password",
+        "Attempt": "3 of 5",
+        "Lockout": "Not triggered"
+      }
+    },
+    {
+      "id": "AUD-4954",
+      "at": "2026-10-13T16:58:00",
+      "actor": "Priya Shah",
+      "actorRole": "HR & Recruitment",
+      "action": "report_returned",
+      "recordType": "Report",
+      "recordRef": "RPT-2026-10-16",
+      "ip": "90.196.12.5",
+      "device": "Chrome on macOS",
+      "sensitive": false,
+      "meta": {
+        "Outcome": "Returned",
+        "Reason": "Missing evidence on the incident section"
+      }
+    },
+    {
+      "id": "AUD-4957",
+      "at": "2026-10-13T15:19:00",
+      "actor": "Daniel Okafor",
+      "actorRole": "Security Supervisor",
+      "action": "report_reviewed",
+      "recordType": "Report",
+      "recordRef": "RPT-2026-10-13",
+      "ip": "151.231.18.204",
+      "device": "Chrome on macOS",
+      "sensitive": false,
+      "meta": {
+        "Outcome": "Accepted",
+        "Comment": "No issues"
+      }
+    },
+    {
+      "id": "AUD-4955",
+      "at": "2026-10-13T12:45:00",
+      "actor": "Lilianna Novak",
+      "actorRole": "Operations Manager",
+      "action": "status_change",
+      "recordType": "Task",
+      "recordRef": "TSK-1035",
+      "ip": "86.14.200.31",
+      "device": "Chrome on Windows",
+      "sensitive": false,
+      "meta": {
+        "From": "In progress",
+        "To": "Submitted"
+      }
+    },
+    {
+      "id": "AUD-4958",
+      "at": "2026-10-13T11:06:00",
+      "actor": "J. Silva",
+      "actorRole": "Security Officer",
+      "action": "status_change",
+      "recordType": "Task",
+      "recordRef": "TSK-1032",
+      "ip": "194.168.4.100",
+      "device": "Chrome on Windows",
+      "sensitive": false,
+      "meta": {
+        "From": "In progress",
+        "To": "Submitted"
+      }
+    },
+    {
+      "id": "AUD-4953",
+      "at": "2026-10-13T09:11:00",
+      "actor": "J. Silva",
+      "actorRole": "Security Officer",
+      "action": "report_submitted",
+      "recordType": "Report",
+      "recordRef": "RPT-2026-10-17",
+      "ip": "82.132.230.18",
+      "device": "Firefox on Linux",
+      "sensitive": false,
+      "meta": {
+        "Type": "Daily report",
+        "Sections": "6 of 6"
+      }
+    },
+    {
+      "id": "AUD-4956",
+      "at": "2026-10-13T08:32:00",
+      "actor": "Tomasz Wójcik",
+      "actorRole": "Stock Coordinator",
+      "action": "role_change",
+      "recordType": "User",
+      "recordRef": "USR-24",
+      "ip": "217.138.222.7",
+      "device": "Firefox on Linux",
+      "sensitive": true,
+      "meta": {
+        "From": "Employee",
+        "To": "Supervisor",
+        "Approved by": "Lilianna Novak"
+      }
+    },
+    {
+      "id": "AUD-4948",
+      "at": "2026-10-12T18:16:00",
+      "actor": "J. Silva",
+      "actorRole": "Security Officer",
+      "action": "report_reviewed",
+      "recordType": "Report",
+      "recordRef": "RPT-2026-10-12",
+      "ip": "217.138.222.7",
+      "device": "Chrome on macOS",
+      "sensitive": false,
+      "meta": {
+        "Outcome": "Accepted",
+        "Comment": "No issues"
+      }
+    },
+    {
+      "id": "AUD-4951",
+      "at": "2026-10-12T17:37:00",
+      "actor": "Tomasz Wójcik",
+      "actorRole": "Stock Coordinator",
+      "action": "deactivation",
+      "recordType": "User",
+      "recordRef": "USR-34",
+      "ip": "5.148.40.66",
+      "device": "Chrome on macOS",
+      "sensitive": true,
+      "meta": {
+        "Reason": "Left the company",
+        "Sessions revoked": "2"
+      }
+    },
+    {
+      "id": "AUD-4949",
+      "at": "2026-10-12T14:03:00",
+      "actor": "Priya Shah",
+      "actorRole": "HR & Recruitment",
+      "action": "sign_in",
+      "recordType": "Session",
+      "recordRef": "SES-4151",
+      "ip": "151.231.18.204",
+      "device": "Chrome on Windows",
+      "sensitive": false,
+      "meta": {
+        "Method": "Password",
+        "Result": "Success"
+      }
+    },
+    {
+      "id": "AUD-4952",
+      "at": "2026-10-12T13:24:00",
+      "actor": "Daniel Okafor",
+      "actorRole": "Security Supervisor",
+      "action": "sign_in",
+      "recordType": "Session",
+      "recordRef": "SES-4148",
+      "ip": "81.2.69.142",
+      "device": "Chrome on Windows",
+      "sensitive": false,
+      "meta": {
+        "Method": "Password",
+        "Result": "Success"
+      }
+    },
+    {
+      "id": "AUD-4947",
+      "at": "2026-10-12T11:29:00",
+      "actor": "Daniel Okafor",
+      "actorRole": "Security Supervisor",
+      "action": "failed_sign_in",
+      "recordType": "Session",
+      "recordRef": "SES-4153",
+      "ip": "86.14.200.31",
+      "device": "Firefox on Linux",
+      "sensitive": true,
+      "meta": {
+        "Method": "Password",
+        "Result": "Wrong password",
+        "Attempt": "3 of 5",
+        "Lockout": "Not triggered"
+      }
+    },
+    {
+      "id": "AUD-4950",
+      "at": "2026-10-12T10:50:00",
+      "actor": "Lilianna Novak",
+      "actorRole": "Operations Manager",
+      "action": "export",
+      "recordType": "Export",
+      "recordRef": "EXP-350",
+      "ip": "194.168.4.100",
+      "device": "Firefox on Linux",
+      "sensitive": true,
+      "meta": {
+        "Format": "CSV",
+        "Rows": "128",
+        "Scope": "Daily reports"
+      }
+    },
+    {
+      "id": "AUD-4943",
+      "at": "2026-10-11T16:21:00",
+      "actor": "J. Silva",
+      "actorRole": "Security Officer",
+      "action": "invite",
+      "recordType": "User",
+      "recordRef": "USR-43",
+      "ip": "5.148.40.66",
+      "device": "Chrome on Windows",
+      "sensitive": false,
+      "meta": {
+        "Role": "Employee",
+        "Sent to": "new.starter@example.com"
+      }
+    },
+    {
+      "id": "AUD-4946",
+      "at": "2026-10-11T15:42:00",
+      "actor": "Tomasz Wójcik",
+      "actorRole": "Stock Coordinator",
+      "action": "decision",
+      "recordType": "Attention item",
+      "recordRef": "ATT-1",
+      "ip": "90.196.12.5",
+      "device": "Chrome on Windows",
+      "sensitive": false,
+      "meta": {
+        "Decision": "Approved",
+        "Note": "Cover agreed for the night shift"
+      }
+    },
+    {
+      "id": "AUD-4941",
+      "at": "2026-10-11T13:47:00",
+      "actor": "Tomasz Wójcik",
+      "actorRole": "Stock Coordinator",
+      "action": "status_change",
+      "recordType": "Task",
+      "recordRef": "TSK-1049",
+      "ip": "151.231.18.204",
+      "device": "Firefox on Linux",
+      "sensitive": false,
+      "meta": {
+        "From": "In progress",
+        "To": "Submitted"
+      }
+    },
+    {
+      "id": "AUD-4944",
+      "at": "2026-10-11T12:08:00",
+      "actor": "Priya Shah",
+      "actorRole": "HR & Recruitment",
+      "action": "report_submitted",
+      "recordType": "Report",
+      "recordRef": "RPT-2026-10-16",
+      "ip": "81.2.69.142",
+      "device": "Firefox on Linux",
+      "sensitive": false,
+      "meta": {
+        "Type": "Daily report",
+        "Sections": "6 of 6"
+      }
+    },
+    {
+      "id": "AUD-4942",
+      "at": "2026-10-11T09:34:00",
+      "actor": "Daniel Okafor",
+      "actorRole": "Security Supervisor",
+      "action": "failed_sign_in",
+      "recordType": "Session",
+      "recordRef": "SES-4158",
+      "ip": "194.168.4.100",
+      "device": "Chrome on macOS",
+      "sensitive": true,
+      "meta": {
+        "Method": "Password",
+        "Result": "Wrong password",
+        "Attempt": "3 of 5",
+        "Lockout": "Not triggered"
+      }
+    },
+    {
+      "id": "AUD-4945",
+      "at": "2026-10-11T08:55:00",
+      "actor": "Lilianna Novak",
+      "actorRole": "Operations Manager",
+      "action": "billing",
+      "recordType": "Invoice",
+      "recordRef": "INV-2601",
+      "ip": "82.132.230.18",
+      "device": "Chrome on macOS",
+      "sensitive": true,
+      "meta": {
+        "Change": "Payment method updated",
+        "Provider": "Stripe"
+      }
+    }
+  ]
+}

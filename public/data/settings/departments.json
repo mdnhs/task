@@ -1,0 +1,34 @@
+{
+ "departments": [
+  {
+   "id": "dep-sec",
+   "name": "Security",
+   "active": true,
+   "sites": [
+    "Canary Wharf",
+    "Riverside House"
+   ],
+   "teams": [
+    "Day patrol",
+    "Night patrol",
+    "Control room"
+   ],
+   "reportOwner": "Daniel Okafor"
+  },
+  {
+   "id": "dep-cle",
+   "name": "Cleaning",
+   "active": true,
+   "sites": [
+    "Riverside House",
+    "Canary Wharf",
+    "Millbank Court"
+   ],
+   "teams": [
+    "Day crew",
+    "Evening crew"
+   ],
+   "reportOwner": "Grace Mensah"
+  }
+ ]
+}

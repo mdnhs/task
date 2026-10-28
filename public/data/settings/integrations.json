@@ -1,0 +1,44 @@
+{
+ "integrations": [
+  {
+   "id": "drive",
+   "name": "Google Drive",
+   "icon": "folder",
+   "description": "Store evidence and employee or client files in your company Drive.",
+   "status": "connected",
+   "lastEvent": "Synced 14 files",
+   "lastEventAt": "2026-10-20T07:45:00",
+   "policy": "Office PCs only · blocked on Android"
+  },
+  {
+   "id": "whatsapp",
+   "name": "WhatsApp Business",
+   "icon": "chat",
+   "description": "Send reminders and receive staff updates by WhatsApp.",
+   "status": "not_connected",
+   "lastEvent": "Awaiting client confirmation of WhatsApp flows (OC-05)",
+   "lastEventAt": "2026-10-19T18:20:00",
+   "policy": "Only approved templates are sent. Previews hide sensitive details."
+  },
+  {
+   "id": "email",
+   "name": "Email sender",
+   "icon": "mail",
+   "description": "Send invites, reminders and exports from your own sender address.",
+   "status": "connected",
+   "lastEvent": "Sent 3 reminders",
+   "lastEventAt": "2026-10-20T08:30:00",
+   "policy": "Uses the verified company sender domain."
+  },
+  {
+   "id": "transcription",
+   "name": "Transcription",
+   "icon": "phone",
+   "description": "Turn voice notes into report text.",
+   "status": "not_connected",
+   "lastEvent": "No events yet",
+   "lastEventAt": null,
+   "policy": "Audio is deleted after transcription. Usage counts against your plan minutes."
+  }
+ ]
+}

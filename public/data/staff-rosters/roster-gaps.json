@@ -1,0 +1,290 @@
+{
+  "gaps": [
+    {
+      "id": "GAP-501",
+      "when": "today",
+      "shiftStart": "2026-10-20T07:00:00",
+      "time": "07:00–15:00",
+      "site": "Riverside House",
+      "client": "Riverside Property",
+      "role": "Security Officer",
+      "dept": "Security",
+      "assigned": "Marcus Bell",
+      "coverage": "covered",
+      "owner": "Daniel Okafor",
+      "nextAction": "None, covers J. Silva call-out",
+      "notes": "Cover for INC-3001.",
+      "history": [
+        {
+          "at": "2026-10-20T08:00:00",
+          "by": "Daniel Okafor",
+          "action": "Gap logged"
+        }
+      ]
+    },
+    {
+      "id": "GAP-502",
+      "when": "today",
+      "shiftStart": "2026-10-20T06:00:00",
+      "time": "06:00–14:00",
+      "site": "Canary Wharf",
+      "client": "Wharf Offices Ltd",
+      "role": "Cleaner",
+      "dept": "Cleaning",
+      "assigned": "Hannah Price",
+      "coverage": "covered",
+      "owner": "Grace Mensah",
+      "nextAction": "None, covers Ines Duarte call-out",
+      "notes": "Cover for INC-3002.",
+      "history": [
+        {
+          "at": "2026-10-20T08:00:00",
+          "by": "Grace Mensah",
+          "action": "Gap logged"
+        }
+      ]
+    },
+    {
+      "id": "GAP-503",
+      "when": "today",
+      "shiftStart": "2026-10-20T18:00:00",
+      "time": "18:00–02:00",
+      "site": "Docklands Plaza",
+      "client": "Docklands Estates",
+      "role": "Security Officer",
+      "dept": "Security",
+      "assigned": "Oliver Grant",
+      "coverage": "covered",
+      "owner": "Daniel Okafor",
+      "nextAction": "Brief Oliver on site access",
+      "notes": "Cover for INC-3003.",
+      "history": [
+        {
+          "at": "2026-10-20T08:00:00",
+          "by": "Daniel Okafor",
+          "action": "Gap logged"
+        }
+      ]
+    },
+    {
+      "id": "GAP-504",
+      "when": "today",
+      "shiftStart": "2026-10-20T17:00:00",
+      "time": "17:00–21:00",
+      "site": "Riverside House",
+      "client": "Riverside Property",
+      "role": "Cleaner (2 needed)",
+      "dept": "Cleaning",
+      "assigned": "Grace Mensah",
+      "coverage": "partial",
+      "owner": "Grace Mensah",
+      "nextAction": "Ask Sofia Reyes for the second place",
+      "notes": "One of two places filled.",
+      "history": [
+        {
+          "at": "2026-10-20T08:00:00",
+          "by": "Grace Mensah",
+          "action": "Gap logged"
+        }
+      ]
+    },
+    {
+      "id": "GAP-511",
+      "when": "tomorrow",
+      "shiftStart": "2026-10-21T22:00:00",
+      "time": "22:00–06:00",
+      "site": "Canary Wharf",
+      "client": "Wharf Offices Ltd",
+      "role": "Security Officer",
+      "dept": "Security",
+      "assigned": "",
+      "coverage": "uncovered",
+      "owner": "Daniel Okafor",
+      "nextAction": "Offer to bank staff, then agency by 14:00",
+      "notes": "Client requires SIA-licensed cover.",
+      "history": [
+        {
+          "at": "2026-10-20T08:00:00",
+          "by": "Daniel Okafor",
+          "action": "Gap logged"
+        }
+      ]
+    },
+    {
+      "id": "GAP-512",
+      "when": "tomorrow",
+      "shiftStart": "2026-10-21T06:00:00",
+      "time": "06:00–14:00",
+      "site": "Shoreditch",
+      "client": "Hoxton Works",
+      "role": "Cleaner",
+      "dept": "Cleaning",
+      "assigned": "",
+      "coverage": "uncovered",
+      "owner": "Grace Mensah",
+      "nextAction": "Message the cleaning group, escalate at 16:00",
+      "notes": "Kamal Rahman on leave.",
+      "history": [
+        {
+          "at": "2026-10-20T08:00:00",
+          "by": "Grace Mensah",
+          "action": "Gap logged"
+        }
+      ]
+    },
+    {
+      "id": "GAP-513",
+      "when": "tomorrow",
+      "shiftStart": "2026-10-21T14:00:00",
+      "time": "14:00–22:00",
+      "site": "Riverside House",
+      "client": "Riverside Property",
+      "role": "Cleaner (2 needed)",
+      "dept": "Cleaning",
+      "assigned": "Hannah Price",
+      "coverage": "partial",
+      "owner": "Grace Mensah",
+      "nextAction": "Find one more cleaner",
+      "notes": "One of two places filled.",
+      "history": [
+        {
+          "at": "2026-10-20T08:00:00",
+          "by": "Grace Mensah",
+          "action": "Gap logged"
+        }
+      ]
+    },
+    {
+      "id": "GAP-514",
+      "when": "tomorrow",
+      "shiftStart": "2026-10-21T07:00:00",
+      "time": "07:00–15:00",
+      "site": "Docklands Plaza",
+      "client": "Docklands Estates",
+      "role": "Security Officer",
+      "dept": "Security",
+      "assigned": "Marcus Bell",
+      "coverage": "covered",
+      "owner": "Daniel Okafor",
+      "nextAction": "None",
+      "notes": "Confirmed by text.",
+      "history": [
+        {
+          "at": "2026-10-20T08:00:00",
+          "by": "Daniel Okafor",
+          "action": "Gap logged"
+        }
+      ]
+    },
+    {
+      "id": "GAP-521",
+      "when": "next_week",
+      "shiftStart": "2026-10-31T08:00:00",
+      "time": "08:00–16:00",
+      "site": "Canary Wharf",
+      "client": "Wharf Offices Ltd",
+      "role": "Cleaner",
+      "dept": "Cleaning",
+      "assigned": "",
+      "coverage": "uncovered",
+      "owner": "Grace Mensah",
+      "nextAction": "Open weekend overtime to the team",
+      "notes": "Weekend deep-clean round.",
+      "history": [
+        {
+          "at": "2026-10-20T08:00:00",
+          "by": "Grace Mensah",
+          "action": "Gap logged"
+        }
+      ]
+    },
+    {
+      "id": "GAP-522",
+      "when": "next_week",
+      "shiftStart": "2026-10-31T10:00:00",
+      "time": "10:00–18:00",
+      "site": "Riverside House",
+      "client": "Riverside Property",
+      "role": "Cleaner",
+      "dept": "Cleaning",
+      "assigned": "",
+      "coverage": "uncovered",
+      "owner": "Grace Mensah",
+      "nextAction": "Open weekend overtime to the team",
+      "notes": "Weekend cleaning round.",
+      "history": [
+        {
+          "at": "2026-10-20T08:00:00",
+          "by": "Grace Mensah",
+          "action": "Gap logged"
+        }
+      ]
+    },
+    {
+      "id": "GAP-523",
+      "when": "next_week",
+      "shiftStart": "2026-11-01T08:00:00",
+      "time": "08:00–16:00",
+      "site": "Shoreditch",
+      "client": "Hoxton Works",
+      "role": "Cleaner",
+      "dept": "Cleaning",
+      "assigned": "",
+      "coverage": "uncovered",
+      "owner": "Grace Mensah",
+      "nextAction": "Ask Kamal Rahman once back from leave",
+      "notes": "Weekend cleaning round.",
+      "history": [
+        {
+          "at": "2026-10-20T08:00:00",
+          "by": "Grace Mensah",
+          "action": "Gap logged"
+        }
+      ]
+    },
+    {
+      "id": "GAP-524",
+      "when": "next_week",
+      "shiftStart": "2026-11-01T10:00:00",
+      "time": "10:00–18:00",
+      "site": "Canary Wharf",
+      "client": "Wharf Offices Ltd",
+      "role": "Cleaner (2 needed)",
+      "dept": "Cleaning",
+      "assigned": "Ines Duarte",
+      "coverage": "partial",
+      "owner": "Grace Mensah",
+      "nextAction": "Find a second cleaner",
+      "notes": "One of two places filled.",
+      "history": [
+        {
+          "at": "2026-10-20T08:00:00",
+          "by": "Grace Mensah",
+          "action": "Gap logged"
+        }
+      ]
+    },
+    {
+      "id": "GAP-525",
+      "when": "next_week",
+      "shiftStart": "2026-10-28T22:00:00",
+      "time": "22:00–06:00",
+      "site": "Docklands Plaza",
+      "client": "Docklands Estates",
+      "role": "Security Officer",
+      "dept": "Security",
+      "assigned": "A. Kowalski",
+      "coverage": "partial",
+      "owner": "Daniel Okafor",
+      "nextAction": "Second officer needed for client event",
+      "notes": "Client event, two officers required.",
+      "history": [
+        {
+          "at": "2026-10-20T08:00:00",
+          "by": "Daniel Okafor",
+          "action": "Gap logged"
+        }
+      ]
+    }
+  ]
+}

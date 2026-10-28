@@ -1,0 +1,91 @@
+/* ===== Shell: subscription banner + access restricted (features/shell/components) ===== */
+.sub-banner{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 18px;border-radius:var(--r-lg);font-size:13.5px;font-weight:600;background:var(--brand-soft);color:var(--brand-deep);margin-bottom:18px}
+.sub-banner a{margin-left:auto;text-decoration:underline;text-underline-offset:3px;font-weight:700}
+.sub-banner[data-tone="warn"]{background:var(--warn-bg);color:var(--warn)}
+.sub-banner[data-tone="danger"]{background:var(--bad-bg);color:var(--bad)}
+:root[data-theme="dark"] .sub-banner:not([data-tone]){color:var(--brand-3)}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]) .sub-banner:not([data-tone]){color:var(--brand-3)}
+}
+.od-menu .od-check{margin-left:auto;color:var(--brand)}
+.od-menu-sub-hint{font-size:11px;color:var(--ink-3);padding:4px 10px 6px}
+
+/* ===== Notifications panel (popover, re-skinned like .od-menu) ===== */
+.od-notif{background:var(--card);color:var(--ink);border:0;border-radius:var(--r-lg);box-shadow:var(--shadow),0 16px 40px rgba(16,40,24,.12);padding:8px;gap:6px;width:360px;max-width:calc(100vw - 24px);outline:none !important;--tw-ring-shadow:0 0 #0000;animation-duration:var(--dur);animation-fill-mode:both;transition-duration:var(--dur-slow);transition-timing-function:var(--ease)}
+:root[data-theme="dark"] .od-notif{box-shadow:0 12px 32px rgba(0,0,0,.5)}
+.od-notif-head{display:flex;align-items:center;justify-content:space-between;padding:4px 10px}
+.od-notif-mark{font-size:12px;font-weight:700;color:var(--brand-deep);border-radius:var(--r-pill);padding:4px 10px;cursor:pointer;transition:background var(--dur-fast)}
+.od-notif-mark:hover:not(:disabled){background:var(--brand-soft)}
+.od-notif-mark:disabled{color:var(--ink-3);cursor:default}
+.od-notif-tabs{display:flex;gap:4px;padding:0 4px}
+.od-notif-tabs button{border-radius:var(--r-pill);padding:6px 12px;font-size:12.5px;font-weight:600;color:var(--ink-2);cursor:pointer;transition:background var(--dur-fast)}
+.od-notif-tabs button:hover{background:var(--brand-soft)}
+.od-notif-tabs button[aria-pressed="true"]{background:var(--brand-soft);color:var(--brand-deep)}
+.od-notif-tabs button[aria-pressed="true"]:hover{background:var(--line)}
+.od-notif-list{display:flex;flex-direction:column;gap:2px;max-height:min(420px,60vh);overflow-y:auto}
+.od-notif-row{display:flex;align-items:flex-start;gap:10px;padding:8px 10px;border-radius:var(--r-pill);color:var(--ink-2);transition:background var(--dur-fast)}
+.od-notif-row:hover,.od-notif-row:focus-visible{background:var(--brand-soft);color:var(--brand-deep);outline:none}
+.od-notif-ico{flex:none;display:grid;place-items:center;width:28px;height:28px;border-radius:50%;background:var(--mute-bg);color:var(--ink-3)}
+.od-notif-row:hover .od-notif-ico{color:var(--brand)}
+.od-notif-body{display:flex;flex-direction:column;min-width:0;flex:1}
+.od-notif-title{font-size:13px;font-weight:600;line-height:1.35}
+.od-notif-row.unread .od-notif-title{font-weight:700;color:var(--ink)}
+.od-notif-row:hover .od-notif-title{color:inherit}
+.od-notif-pip{flex:none;align-self:center;width:8px;height:8px;border-radius:50%;background:var(--brand)}
+/* Dark: --brand-deep is near-black green, so hovered/selected text uses --brand-3 (as .od-menu) */
+:root[data-theme="dark"] .od-notif :is(.od-notif-row:hover,.od-notif-row:focus-visible,.od-notif-tabs button[aria-pressed="true"],.od-notif-mark){color:var(--brand-3)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .od-notif :is(.od-notif-row:hover,.od-notif-row:focus-visible,.od-notif-tabs button[aria-pressed="true"],.od-notif-mark){color:var(--brand-3)}}
+/* Phones: full width, no horizontal overflow */
+@media (max-width:639px){.od-notif{width:calc(100vw - 24px)}}
+
+/* ---------- Department filter carousel (more than SEG_MAX pills) ---------- */
+/* Same pill track as .seg; the viewport shows about four pills, arrows sit inside the pill */
+.seg-carousel{display:flex;align-items:center;gap:2px;flex:0 1 360px;min-width:0}
+.seg-carousel [data-slot="carousel-content"]{flex:1;min-width:0;border-radius:var(--r-pill)}
+.seg-track{margin-left:0;gap:2px}
+.seg-item{flex:0 0 auto;padding-left:0;display:flex}
+/* .seg button sets position:relative, so reset the shadcn -left/-right offsets too */
+.seg-carousel .seg-nav{position:static;inset:auto;flex:none;width:30px;height:30px;padding:0;margin:0;border:0;border-radius:50%;background:transparent;color:var(--ink-3);box-shadow:none;transition:background var(--dur-fast) var(--ease),color var(--dur-fast) var(--ease)}
+.seg-carousel .seg-nav:hover:not(:disabled){background:var(--brand-soft);color:var(--brand-deep)}
+.seg-carousel .seg-nav:disabled{opacity:.35}
+.seg-carousel .seg-nav svg{width:16px;height:16px}
+:root[data-theme="dark"] .seg-carousel .seg-nav:hover:not(:disabled){color:var(--brand-3)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .seg-carousel .seg-nav:hover:not(:disabled){color:var(--brand-3)}}
+
+/* Notifications panel grows out of the bell (same language as the global search): no scale, a clip-path that starts
+   at the bell's footprint (50px, top-right corner: the popover is end-aligned under it) and opens to the full panel.
+   The end clip is pushed 64px outside the box (radius 64px + --r-lg, concentric with the panel's own corners), so the
+   shadow is not cut and the last frame equals the resting panel: no blink. Content fades + rises from halfway through;
+   on close it fades first and the clip shrinks back into the bell. Reduced motion: the global rule (instant). */
+[data-slot="popover-content"].od-notif[data-open]{animation:od-notif-grow var(--dur-slow) var(--ease) both}
+[data-slot="popover-content"].od-notif[data-closed]{animation:od-notif-shrink var(--dur) var(--ease-in-out) both}
+@keyframes od-notif-grow{
+  from{clip-path:inset(0 0 calc(100% - 50px) calc(100% - 50px) round 25px)}
+  to{clip-path:inset(-64px round calc(64px + var(--r-lg)))}}
+@keyframes od-notif-shrink{
+  from{clip-path:inset(-64px round calc(64px + var(--r-lg)))}
+  to{clip-path:inset(0 0 calc(100% - 50px) calc(100% - 50px) round 25px)}}
+.od-notif[data-open]>*{animation:od-notif-content var(--dur) var(--ease) calc(var(--dur-slow) / 3) both}
+.od-notif[data-closed]>*{animation:od-fade-out var(--dur-fast) var(--ease-in-out) both}
+@keyframes od-notif-content{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+
+/* ---------- Phone department row (DeptRow): full width under the search, ≤640px only ---------- */
+.dept-row,.sk-dept-row{display:none}
+@media (max-width:640px){
+  .dept-row{order:4;flex:1 1 100%;min-width:0;display:flex;gap:2px;padding:4px;background:var(--card);border-radius:var(--r-pill);
+    overflow-x:auto;overscroll-behavior-x:contain;scroll-snap-type:x mandatory;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+  .dept-row::-webkit-scrollbar{display:none}
+  .dept-row button{position:relative;flex:none;display:inline-flex;align-items:center;height:44px;min-width:44px;justify-content:center;padding:0 18px;border-radius:var(--r-pill);
+    font-size:13px;font-weight:600;white-space:nowrap;color:var(--ink-2);scroll-snap-align:center;transition:color var(--dur) var(--ease)}
+  .dept-row button[aria-pressed="true"]{color:var(--on-brand)}
+  .sk-dept-row{display:block;order:4;flex:1 1 100%;width:100%;height:52px}
+}
+
+/* ---------- Sidebar badges in the icon-collapsed rail: same counts, pinned to the icon's top-right corner ---------- */
+@media (min-width:1081px){
+  .app.collapsed .nav a .badge{display:block;position:absolute;top:2px;right:8px;margin:0;min-width:18px;padding:1px 5px;text-align:center;font-size:10px;line-height:14px;border-radius:8px}
+}
+
+/* ===== Tenant logo mark (FR-SAAS-11): same 38px box as the brand icon, logo contain-fit on a neutral chip ===== */
+.logo-mark.has-logo{background:var(--card);padding:4px;overflow:hidden}
+.logo-mark.has-logo img{width:100%;height:100%;object-fit:contain;display:block}

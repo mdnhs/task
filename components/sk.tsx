@@ -14,7 +14,8 @@ export function Sk({
   className,
   style,
 }: {
-  w?: number | string
+  /** `null` = no inline width, so a responsive width from the className applies (inline styles beat classes). */
+  w?: number | string | null
   h?: number | string
   r?: number | "pill" | "circle"
   lh?: number
@@ -34,7 +35,7 @@ export function Sk({
       aria-hidden="true"
       className={cn("sk", className)}
       style={{
-        width: w,
+        width: w ?? undefined,
         height: h,
         borderRadius: r === "pill" ? 999 : r === "circle" ? "50%" : r,
         ...style,

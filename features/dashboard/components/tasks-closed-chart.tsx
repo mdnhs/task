@@ -1,10 +1,13 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 import { useInView, useReducedMotion } from "motion/react"
+import { Bar, BarChart, Cell, ResponsiveContainer, XAxis } from "recharts"
+
+import { useDept } from "@/hooks/use-dept"
+import { DUR } from "@/lib/motion"
 import { DayDetailsDialog } from "./day-details-dialog"
 import type { TasksClosedData } from "../types"
-import { Bar, BarChart, Cell, ResponsiveContainer, XAxis } from "recharts"
 
 type Day = TasksClosedData["days"][number]
 
@@ -18,42 +21,89 @@ const fills: Record<Day["t"], string> = {
 type ShapeProps = { x?: number; y?: number; width?: number; height?: number; fill?: string; index?: number }
 
 // Full pill (radius = half the width). No minimum height, so the entrance animation starts from 0.
-// The on-time tip for the active bar is drawn right above it, like the original.
-function PillBar({ x = 0, y = 0, width = 0, height = 0, fill, index = 0, active, showTip, days }: ShapeProps & { active: number; showTip: boolean; days: Day[] }) {
+// `data-bar` lets the tip find the bar it sits on.
+function PillBar({ x = 0, y = 0, width = 0, height = 0, fill, index = 0 }: ShapeProps) {
   const w = Math.min(width, 72)
   const h = Math.max(height, 0)
   const left = x + (width - w) / 2
   const top = y + height - h
-  const d = days[index]
   return (
     <g style={{ cursor: "pointer" }}>
-      <rect x={left} y={top} width={w} height={h} rx={Math.min(w, h) / 2} fill={fill} />
-      {index === active && showTip && (
-        <foreignObject x={left + w / 2 - 80} y={top - 46} width={160} height={40} style={{ overflow: "visible" }}>
-          <div className="tip-wrap">
-            <span className="tip tip-static num">{d.n} · {d.on}% on time</span>
-          </div>
-        </foreignObject>
-      )}
+      <rect data-bar={index} x={left} y={top} width={w} height={h} rx={Math.min(w, h) / 2} fill={fill} />
     </g>
   )
 }
 
+// Puts the tip's anchor on the top centre of bar `i` (the tip itself is offset above it in CSS).
+function placeTip(wrap: HTMLElement, tip: HTMLElement, i: number) {
+  const bar = wrap.querySelector(`[data-bar="${i}"]`)
+  if (!bar) return
+  const b = bar.getBoundingClientRect()
+  const w = wrap.getBoundingClientRect()
+  tip.style.transform = `translate(${b.left - w.left + b.width / 2}px,${b.top - w.top}px)`
+}
+
+const ENTER_MS = 900
+// Department switch: bars ease to their new heights (Recharts animates data changes).
+const UPDATE_MS = Math.round(DUR.count * 1000)
+
 export function TasksClosedChart({ data }: { data: TasksClosedData }) {
-  const days = data.days
+  const dep = useDept()
+  // The topbar department filter shows that department's closed count per day (byDept); "all" is the total.
+  const days = useMemo(
+    () => (dep === "all" ? data.days : data.days.map((d) => ({ ...d, n: d.byDept[dep.toLowerCase() as keyof Day["byDept"]] ?? d.n }))),
+    [data.days, dep]
+  )
   const last = days.length - 1
   const [active, setActive] = useState(last)
   const [ready, setReady] = useState(false)
   const [selected, setSelected] = useState<number | null>(null)
   // Bars mount (and so grow) only once the chart scrolls into view (ui-rules.md rule 20); the tip waits for them.
   const ref = useRef<HTMLDivElement>(null)
+  const tipRef = useRef<HTMLDivElement>(null)
   const inView = useInView(ref, { once: true, margin: "0px 0px -10% 0px" })
   const reduce = useReducedMotion()
   useEffect(() => {
     if (!inView) return
-    const t = setTimeout(() => setReady(true), reduce ? 0 : 900)
+    const t = setTimeout(() => setReady(true), reduce ? 0 : ENTER_MS)
     return () => clearTimeout(t)
   }, [inView, reduce])
+
+  // One tip for the whole chart, moved with a transform: hovering another bar glides it there (CSS transition)
+  // instead of re-creating it. While bars animate (entrance, department switch) it tracks the bar top every frame.
+  const activeRef = useRef(active)
+  useLayoutEffect(() => {
+    activeRef.current = active
+    if (ref.current && tipRef.current) placeTip(ref.current, tipRef.current, active)
+  }, [active])
+  useLayoutEffect(() => {
+    const wrap = ref.current
+    const tip = tipRef.current
+    if (!wrap || !tip || !inView) return
+    const place = () => placeTip(wrap, tip, activeRef.current)
+    place()
+    let raf = 0
+    const until = performance.now() + (reduce ? 0 : ENTER_MS)
+    const follow = () => {
+      place()
+      if (performance.now() < until) raf = requestAnimationFrame(follow)
+      else delete tip.dataset.follow
+    }
+    if (!reduce) {
+      tip.dataset.follow = ""
+      raf = requestAnimationFrame(follow)
+    }
+    const ro = new ResizeObserver(place)
+    ro.observe(wrap)
+    return () => {
+      cancelAnimationFrame(raf)
+      delete tip.dataset.follow
+      ro.disconnect()
+    }
+    // `days` re-runs it after a department switch, so the tip rides the bars to their new heights.
+  }, [days, inView, reduce])
+
+  const d = days[active]
   return (
     <div className="card chart-card">
       <div className="card-head">
@@ -68,6 +118,9 @@ export function TasksClosedChart({ data }: { data: TasksClosedData }) {
         </div>
       </div>
       <div className="rc-bars" ref={ref}>
+        <div ref={tipRef} className="rc-tip" data-show={inView && (ready || active !== last) ? "" : undefined} aria-hidden="true">
+          <span className="tip tip-static num">{d.n} · {d.on}% on time</span>
+        </div>
         <ResponsiveContainer width="100%" height="100%">
           <BarChart accessibilityLayer={false} data={days} margin={{ top: 44, right: 8, bottom: 0, left: 8 }} barCategoryGap="14%">
             <defs>
@@ -89,9 +142,9 @@ export function TasksClosedChart({ data }: { data: TasksClosedData }) {
             />
             {inView && <Bar
               dataKey="n"
-              shape={(p: ShapeProps) => <PillBar {...p} days={days} active={active} showTip={ready || active !== last} />}
+              shape={(p: ShapeProps) => <PillBar {...p} />}
               isAnimationActive={!reduce}
-              animationDuration={900}
+              animationDuration={ready ? UPDATE_MS : ENTER_MS}
               animationEasing="ease-out"
               onMouseEnter={(_, i) => setActive(i)}
               onMouseLeave={() => setActive(last)}

@@ -20,6 +20,13 @@ Do them in numeric order; 00 and 01 block everything else.
 | 08 | coverage-and-files |
 | 09 | install-android-card |
 
+Feature docs for the later full-UI pages live in `features/<feature>.md`:
+
+| Doc | Feature |
+|-----|---------|
+| `features/whatsapp.md` | WhatsApp inbox `/whatsapp` (SRS §3.17): integration status, voice-note transcripts, link/create task, gates |
+| `search/brief.md` | Global topbar search (FR-AUD-01): one-surface clip-path panel, lazy role-filtered index, shortcuts |
+
 Layout grid (desktop, content area): 4 stat cards row → [chart 2/3 | deadline 1/3] → [attention 2/3 | progress 1/3] → [team tasks 2/3 | coverage 1/3].
 
 ## Source of truth (updated)
@@ -31,7 +38,7 @@ Hex values listed in the per-feature briefs are superseded by the CSS variables 
 ## Must read before any new UI
 - `architecture.md`: feature-based folder structure (`features/<feature>/`), import rules, how to add a feature.
 - `00-design-system/ui-rules.md`: how to skin shadcn components with OpsDesk tokens (popover/dropdown mistake) and where mock data lives (`public/data`).
-- `requirements/SRS.md`: full project requirements. It is SRS v1.1: the v1.0 `.docx` plus the SaaS/multi-tenant and Stripe billing additions (§3.20).
+- `requirements/SRS.md`: full project requirements. It is SRS v1.2: the v1.0 `.docx`, the SaaS/multi-tenant and Stripe billing additions (§3.20), and v1.2 alignment with the built prototype (§3.21 to §3.31, route map §5.3, traceability Appendix A, mock status Appendix B).
 
 Note: the per-feature `plan.md` files below are historical build plans. The file paths in them (`components/*.tsx`) predate the
 feature-based move. Current locations: dashboard widgets are in `features/dashboard/components/`, and the sidebar, topbar and NavUser are in `features/shell/components/`.

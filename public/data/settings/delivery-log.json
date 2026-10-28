@@ -1,0 +1,254 @@
+[
+ {
+  "id": "dl1",
+  "at": "2026-10-20T08:30",
+  "event": "Task assigned or overdue",
+  "recipient": "Tomasz Wójcik",
+  "channel": "email",
+  "status": "delivered",
+  "reason": null
+ },
+ {
+  "id": "dl2",
+  "at": "2026-10-20T08:30",
+  "event": "Task assigned or overdue",
+  "recipient": "Tomasz Wójcik",
+  "channel": "inapp",
+  "status": "delivered",
+  "reason": null
+ },
+ {
+  "id": "dl3",
+  "at": "2026-10-20T08:12",
+  "event": "Report returned for changes",
+  "recipient": "Grace Mensah",
+  "channel": "email",
+  "status": "sent",
+  "reason": null
+ },
+ {
+  "id": "dl4",
+  "at": "2026-10-20T08:12",
+  "event": "Report returned for changes",
+  "recipient": "Grace Mensah",
+  "channel": "inapp",
+  "status": "delivered",
+  "reason": null
+ },
+ {
+  "id": "dl5",
+  "at": "2026-10-20T07:45",
+  "event": "New Manager Attention item",
+  "recipient": "Lilianna Novak",
+  "channel": "whatsapp",
+  "status": "skipped",
+  "reason": "Integration not connected"
+ },
+ {
+  "id": "dl6",
+  "at": "2026-10-20T07:45",
+  "event": "New Manager Attention item",
+  "recipient": "Lilianna Novak",
+  "channel": "inapp",
+  "status": "delivered",
+  "reason": null
+ },
+ {
+  "id": "dl7",
+  "at": "2026-10-20T07:45",
+  "event": "New Manager Attention item",
+  "recipient": "Amara Bello",
+  "channel": "whatsapp",
+  "status": "skipped",
+  "reason": "Integration not connected"
+ },
+ {
+  "id": "dl8",
+  "at": "2026-10-20T07:45",
+  "event": "New Manager Attention item",
+  "recipient": "Amara Bello",
+  "channel": "inapp",
+  "status": "delivered",
+  "reason": null
+ },
+ {
+  "id": "dl9",
+  "at": "2026-10-19T17:45",
+  "event": "New Manager Attention item",
+  "recipient": "Amara Bello",
+  "channel": "inapp",
+  "status": "delivered",
+  "reason": null
+ },
+ {
+  "id": "dl10",
+  "at": "2026-10-19T17:45",
+  "event": "New Manager Attention item",
+  "recipient": "Lilianna Novak",
+  "channel": "inapp",
+  "status": "delivered",
+  "reason": null
+ },
+ {
+  "id": "dl11",
+  "at": "2026-10-19T17:45",
+  "event": "New Manager Attention item",
+  "recipient": "Lilianna Novak",
+  "channel": "whatsapp",
+  "status": "skipped",
+  "reason": "Integration not connected"
+ },
+ {
+  "id": "dl12",
+  "at": "2026-10-19T17:20",
+  "event": "Daily report deadline reminder",
+  "recipient": "Daniel Okafor",
+  "channel": "email",
+  "status": "delivered",
+  "reason": null
+ },
+ {
+  "id": "dl13",
+  "at": "2026-10-19T17:20",
+  "event": "Daily report deadline reminder",
+  "recipient": "Daniel Okafor",
+  "channel": "inapp",
+  "status": "delivered",
+  "reason": null
+ },
+ {
+  "id": "dl14",
+  "at": "2026-10-19T17:20",
+  "event": "Daily report deadline reminder",
+  "recipient": "Grace Mensah",
+  "channel": "email",
+  "status": "skipped",
+  "reason": "User opted out"
+ },
+ {
+  "id": "dl15",
+  "at": "2026-10-19T17:20",
+  "event": "Daily report deadline reminder",
+  "recipient": "Grace Mensah",
+  "channel": "inapp",
+  "status": "delivered",
+  "reason": null
+ },
+ {
+  "id": "dl16",
+  "at": "2026-10-19T17:00",
+  "event": "Daily report deadline reminder",
+  "recipient": "Daniel Okafor",
+  "channel": "email",
+  "status": "delivered",
+  "reason": null
+ },
+ {
+  "id": "dl17",
+  "at": "2026-10-19T17:00",
+  "event": "Daily report deadline reminder",
+  "recipient": "Grace Mensah",
+  "channel": "email",
+  "status": "skipped",
+  "reason": "User opted out"
+ },
+ {
+  "id": "dl18",
+  "at": "2026-10-19T16:30",
+  "event": "Daily report deadline reminder",
+  "recipient": "Daniel Okafor",
+  "channel": "email",
+  "status": "failed",
+  "reason": "Mailbox full (bounced)"
+ },
+ {
+  "id": "dl19",
+  "at": "2026-10-19T16:30",
+  "event": "Daily report deadline reminder",
+  "recipient": "Daniel Okafor",
+  "channel": "inapp",
+  "status": "delivered",
+  "reason": null
+ },
+ {
+  "id": "dl20",
+  "at": "2026-10-19T16:30",
+  "event": "Daily report deadline reminder",
+  "recipient": "Grace Mensah",
+  "channel": "inapp",
+  "status": "delivered",
+  "reason": null
+ },
+ {
+  "id": "dl21",
+  "at": "2026-10-19T16:30",
+  "event": "Daily report deadline reminder",
+  "recipient": "Grace Mensah",
+  "channel": "whatsapp",
+  "status": "skipped",
+  "reason": "Channel is off for this event"
+ },
+ {
+  "id": "dl22",
+  "at": "2026-10-19T16:20",
+  "event": "Report returned for changes",
+  "recipient": "Daniel Okafor",
+  "channel": "email",
+  "status": "delivered",
+  "reason": null
+ },
+ {
+  "id": "dl23",
+  "at": "2026-10-19T11:05",
+  "event": "Task assigned or overdue",
+  "recipient": "M. Haddad",
+  "channel": "email",
+  "status": "queued",
+  "reason": null
+ },
+ {
+  "id": "dl24",
+  "at": "2026-10-19T10:15",
+  "event": "Payroll issue raised",
+  "recipient": "Sofia Marin",
+  "channel": "email",
+  "status": "delivered",
+  "reason": null
+ },
+ {
+  "id": "dl25",
+  "at": "2026-10-19T10:15",
+  "event": "Payroll issue raised",
+  "recipient": "Sofia Marin",
+  "channel": "inapp",
+  "status": "delivered",
+  "reason": null
+ },
+ {
+  "id": "dl26",
+  "at": "2026-10-18T09:30",
+  "event": "Billing and subscription notices",
+  "recipient": "Amara Bello",
+  "channel": "email",
+  "status": "delivered",
+  "reason": null
+ },
+ {
+  "id": "dl27",
+  "at": "2026-10-18T09:30",
+  "event": "Billing and subscription notices",
+  "recipient": "Rhys Edwards",
+  "channel": "email",
+  "status": "failed",
+  "reason": "Address rejected by the mail provider"
+ },
+ {
+  "id": "dl28",
+  "at": "2026-10-18T09:30",
+  "event": "Billing and subscription notices",
+  "recipient": "Rhys Edwards",
+  "channel": "inapp",
+  "status": "delivered",
+  "reason": null
+ }
+]

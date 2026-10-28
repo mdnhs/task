@@ -1,0 +1,224 @@
+"use client"
+
+import { useEffect, useMemo, useState } from "react"
+import { usePathname, useSearchParams } from "next/navigation"
+
+import { DataPagination } from "@/components/data-pagination"
+import { EmptyState } from "@/components/empty-state"
+import { FilterBar, FilterSearch, FilterSelect, FilterSeg } from "@/components/filter-bar"
+import { Icon } from "@/components/icons"
+import { PageHead } from "@/components/page-head"
+import { useDept } from "@/hooks/use-dept"
+import { paginate } from "@/lib/paginate"
+import { EMPTY_FILTERS, TASKS_PAGE_SIZE, matchesDue, matchesRepeat, matchesStatus } from "../filters"
+import { useTasksStore } from "../store"
+import { STATUS, STATUS_ORDER } from "../types"
+import type { Person, Task, TasksFilters, TaskTemplate } from "../types"
+import { NewTaskDialog } from "./new-task-dialog"
+import { TaskTable } from "./task-table"
+
+const PRIORITIES = [
+  { value: "all", label: "All priorities" },
+  { value: "3", label: "High" },
+  { value: "2", label: "Medium" },
+  { value: "1", label: "Low" },
+]
+const DUE = [
+  { value: "all", label: "Any due" },
+  { value: "today", label: "Today" },
+  { value: "overdue", label: "Overdue" },
+  { value: "week", label: "This week" },
+]
+const REPEAT = [
+  { value: "all", label: "All tasks" },
+  { value: "recurring", label: "Recurring" },
+]
+const STATUSES = [
+  { value: "all", label: "All statuses" },
+  { value: "open", label: "Open" },
+  { value: "stuck", label: "Overdue or blocked" },
+  ...STATUS_ORDER.map((s) => ({ value: s, label: STATUS[s].label })),
+]
+
+export function TasksView({
+  tasks,
+  people,
+  departments,
+  today,
+  tzLabel,
+  canCreate,
+  initialFilters = EMPTY_FILTERS,
+  initialPage = 1,
+  initialCreate = false,
+  onlyAssignee,
+  creator,
+  scopeKey,
+  refFloor,
+  templates,
+  canManageTemplates = false,
+}: {
+  tasks: Task[]
+  people: Person[]
+  departments: string[]
+  today: string
+  tzLabel: string
+  canCreate: boolean
+  initialFilters?: TasksFilters
+  /** ?page= from the URL. Filter and department changes reset it to 1. */
+  initialPage?: number
+  /** ?new=1 (command palette "New task"): open the New Task dialog on arrival. Ignored without create access. */
+  initialCreate?: boolean
+  /** Staff roles only see their own tasks: the Person.id they are limited to. */
+  onlyAssignee?: string
+  creator: { id: string; name: string }
+  /** Names what `tasks` was scoped for (tenant + role). When it changes, the in-memory store is reseeded. */
+  scopeKey: string
+  /** Highest task number in the full seed, so new refs never collide with tasks a staff user cannot see. */
+  refFloor: number
+  /** Seed for the New task dialog's template picker. */
+  templates?: TaskTemplate[]
+  canManageTemplates?: boolean
+}) {
+  const dept = useDept()
+  const [stored] = useTasksStore(tasks, scopeKey, people, { today, refFloor })
+  const [filters, setFilters] = useState<TasksFilters>(initialFilters)
+  const [creating, setCreating] = useState(!!initialCreate && canCreate)
+  const pathname = usePathname()
+  const search = useSearchParams()
+  const urlPage = Math.max(1, Number(search.get("page")) || 1)
+  const [page, setPage] = useState(initialPage)
+  const [seenPage, setSeenPage] = useState(urlPage)
+  const [seenDept, setSeenDept] = useState(dept)
+  // The URL is the source of truth for the page; a new ?page= (pager click, back button) lands here.
+  if (seenPage !== urlPage) {
+    setSeenPage(urlPage)
+    setPage(urlPage)
+  }
+  if (seenDept !== dept) {
+    setSeenDept(dept)
+    setPage(1)
+  }
+  const set = <K extends keyof TasksFilters>(k: K, v: TasksFilters[K]) => {
+    setFilters((f) => ({ ...f, [k]: v }))
+    setPage(1)
+  }
+  const pageHref = (p: number) => {
+    const q = new URLSearchParams(search.toString())
+    if (p > 1) q.set("page", String(p))
+    else q.delete("page")
+    const qs = q.toString()
+    return qs ? `${pathname}?${qs}` : pathname
+  }
+  // Shallow URL update: no server round-trip, so loading.tsx doesn't flash between pages.
+  const goTo = (p: number) => {
+    setPage(p)
+    window.history.pushState(null, "", pageHref(p))
+  }
+  // Drop the one-shot ?new=1 once it has opened the dialog, so a refresh or back doesn't reopen it.
+  useEffect(() => {
+    if (!search.has("new")) return
+    const q = new URLSearchParams(search.toString())
+    q.delete("new")
+    const qs = q.toString()
+    window.history.replaceState(null, "", qs ? `${pathname}?${qs}` : pathname)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+  // Back on page 1 after a filter or department change: drop the stale ?page= from the URL.
+  useEffect(() => {
+    if (page === 1 && search.has("page")) window.history.replaceState(null, "", pageHref(1))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page])
+
+  const scoped = useMemo(() => (onlyAssignee ? stored.filter((t) => t.assignee === onlyAssignee) : stored), [stored, onlyAssignee])
+  const peopleById = useMemo(() => new Map(people.map((p) => [p.id, p])), [people])
+  const rows = useMemo(() => {
+    const q = filters.q.trim().toLowerCase()
+    return scoped.filter(
+      (t) =>
+        (dept === "all" || t.dept === dept) &&
+        matchesStatus(t, filters.status, today) &&
+        matchesDue(t, filters.due, today) &&
+        matchesRepeat(t, filters.repeat) &&
+        (filters.priority === "all" || String(t.priority) === filters.priority) &&
+        (filters.assignee === "all" || t.assignee === filters.assignee) &&
+        (!q ||
+          [t.title, t.ref, t.client ?? "", peopleById.get(t.assignee)?.name ?? "", ...t.tags].some((s) => s.toLowerCase().includes(q))),
+    )
+  }, [scoped, dept, filters, today, peopleById])
+
+  const paged = paginate(rows, page, TASKS_PAGE_SIZE)
+
+  const filtered = filters.status !== "all" || filters.due !== "all" || filters.priority !== "all" || filters.assignee !== "all" || filters.repeat !== "all" || !!filters.q || dept !== "all"
+
+  return (
+    <>
+      <PageHead
+        title="Tasks"
+        subtitle={`${rows.length} of ${scoped.length} tasks`}
+        actions={
+          canCreate && (
+            <button type="button" className="btn btn-primary" onClick={() => setCreating(true)}>
+              <Icon name="plus" />
+              New task
+            </button>
+          )
+        }
+      />
+      <div className="card tasks-card">
+        <FilterBar>
+          <FilterSearch value={filters.q} onChange={(v) => set("q", v)} placeholder="Search tasks" />
+          <FilterSelect label="Status" value={filters.status} options={STATUSES} onChange={(v) => set("status", v)} />
+          <FilterSelect label="Priority" value={filters.priority} options={PRIORITIES} onChange={(v) => set("priority", v)} />
+          <FilterSelect label="Repeat" value={filters.repeat} options={REPEAT} onChange={(v) => set("repeat", v)} />
+          {!onlyAssignee && (
+            <FilterSelect
+              label="Assignee"
+              value={filters.assignee}
+              options={[{ value: "all", label: "All assignees" }, ...people.map((p) => ({ value: p.id, label: p.name }))]}
+              onChange={(v) => set("assignee", v)}
+            />
+          )}
+          <FilterSeg label="Due" value={filters.due} options={DUE} onChange={(v) => set("due", v)} />
+        </FilterBar>
+        {rows.length > 0 ? (
+          <>
+            <TaskTable tasks={paged.rows} page={paged.page} people={peopleById} today={today} tzLabel={tzLabel} />
+            <DataPagination page={paged.page} pageCount={paged.pageCount} total={paged.total} from={paged.from} to={paged.to} label="Tasks pages" href={pageHref} onPageChange={goTo} />
+          </>
+        ) : (
+          <EmptyState
+            icon="task"
+            title="No tasks match"
+            text={filtered ? "Try a different search or clear the filters." : "There are no tasks yet."}
+            action={
+              filtered ? (
+                <button type="button" className="btn btn-outline" onClick={() => {
+                    setFilters(EMPTY_FILTERS)
+                    setPage(1)
+                  }}>
+                  Clear filters
+                </button>
+              ) : undefined
+            }
+          />
+        )}
+      </div>
+      {canCreate && (
+        <NewTaskDialog
+          open={creating}
+          onOpenChange={setCreating}
+          people={onlyAssignee ? people.filter((p) => p.id === onlyAssignee) : people}
+          departments={departments}
+          defaultDept={dept !== "all" ? dept : (departments[0] ?? "")}
+          defaultAssignee={onlyAssignee}
+          creator={creator}
+          today={today}
+          refFloor={refFloor}
+          templates={templates}
+          canManageTemplates={canManageTemplates}
+          scopeKey={scopeKey}
+        />
+      )}
+    </>
+  )
+}

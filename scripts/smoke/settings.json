@@ -1,0 +1,16 @@
+[
+  {"path": "/settings", "expect": ["/settings/organisation"]},
+  {"path": "/settings/organisation", "expect": ["Report deadline", "Session timeout", "Weekend and holiday rule"]},
+  {"path": "/settings/departments", "expect": ["Security", "Cleaning", "Report owner"]},
+  {"path": "/settings/users", "expect": ["Invite", "Pending invites", "Showing 1–10 of 14"]},
+  {"path": "/settings/users", "cookies": {"od-role": "employee"}, "expect": ["Access restricted"], "notExpect": ["Pending invites", "amara.bello"]},
+  {"path": "/settings/users", "cookies": {"od-role": "auditor"}, "expect": ["Pending invites"], "notExpect": ["Invite user"]},
+  {"path": "/settings/users", "cookies": {"od-tenant": "t2"}, "expect": ["plan are in use"]},
+  {"path": "/settings/roles", "expect": ["Changes are audited", "Tenant Admin"]},
+  {"path": "/settings/template", "expect": ["Report template", "Staff / Attendance"]},
+  {"path": "/settings/notifications", "expect": ["Hide sensitive details in previews", "Deadline reminders"]},
+  {"path": "/settings/integrations", "expect": ["Google Drive", "WhatsApp Business", "Office PCs only · blocked on Android"]},
+  {"path": "/settings/branding", "expect": ["Brand colour"]},
+  {"path": "/settings/privacy", "expect": ["Export all data", "Request deletion", "Support access"]},
+  {"path": "/settings/nope", "status": 404}
+]

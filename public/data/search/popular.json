@@ -1,0 +1,11 @@
+{
+  "popular": [
+    { "term": "Canary Wharf", "module": "tasks" },
+    { "term": "Fire alarm", "module": "tasks" },
+    { "term": "SIA licence", "module": "files" },
+    { "term": "Overtime", "module": "attention" },
+    { "term": "Missed hours", "module": "payroll" },
+    { "term": "Supplies order", "module": "orders" },
+    { "term": "Docklands", "module": "staff" }
+  ]
+}

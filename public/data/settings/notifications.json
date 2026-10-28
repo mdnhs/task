@@ -1,0 +1,103 @@
+{
+ "intervals": [
+  60,
+  30,
+  10
+ ],
+ "intervalOptions": [
+  120,
+  90,
+  60,
+  45,
+  30,
+  15,
+  10,
+  5
+ ],
+ "channels": [
+  {
+   "id": "inapp",
+   "label": "In-app"
+  },
+  {
+   "id": "email",
+   "label": "Email",
+   "integration": "email"
+  },
+  {
+   "id": "whatsapp",
+   "label": "WhatsApp",
+   "integration": "whatsapp"
+  }
+ ],
+ "events": [
+  {
+   "id": "deadline",
+   "label": "Daily report deadline reminder",
+   "on": {
+    "inapp": true,
+    "email": true,
+    "whatsapp": false
+   },
+   "userEvent": "report-reminder"
+  },
+  {
+   "id": "returned",
+   "label": "Report returned for changes",
+   "on": {
+    "inapp": true,
+    "email": true,
+    "whatsapp": false
+   },
+   "userEvent": "report-reviewed"
+  },
+  {
+   "id": "attention",
+   "label": "New Manager Attention item",
+   "on": {
+    "inapp": true,
+    "email": false,
+    "whatsapp": true
+   }
+  },
+  {
+   "id": "task",
+   "label": "Task assigned or overdue",
+   "on": {
+    "inapp": true,
+    "email": true,
+    "whatsapp": false
+   },
+   "userEvent": "task-assigned"
+  },
+  {
+   "id": "payroll",
+   "label": "Payroll issue raised",
+   "on": {
+    "inapp": true,
+    "email": true,
+    "whatsapp": false
+   }
+  },
+  {
+   "id": "billing",
+   "label": "Billing and subscription notices",
+   "on": {
+    "inapp": true,
+    "email": true,
+    "whatsapp": false
+   }
+  }
+ ],
+ "hideSensitive": true,
+ "reminderEvent": "deadline",
+ "overdueEvent": "attention",
+ "overdueRoles": [
+  "owner",
+  "ops"
+ ],
+ "overdueAfter": [
+  0,
+  30
+ ]
+}

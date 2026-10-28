@@ -1,0 +1,8 @@
+{
+  "actions": [
+    { "id": "due-today", "label": "My tasks due today", "href": "/tasks?due=today", "icon": "task" },
+    { "id": "today-report", "label": "Today's daily report", "href": "/daily-reports", "icon": "report" },
+    { "id": "escalations", "label": "Open escalations", "href": "/manager-attention", "icon": "flag" },
+    { "id": "new-task", "label": "New task", "href": "/tasks?new=1", "icon": "plus", "write": true }
+  ]
+}

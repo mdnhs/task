@@ -1,0 +1,59 @@
+{
+ "timezones": [
+  {
+   "value": "Europe/London",
+   "label": "Europe/London (UK time)"
+  },
+  {
+   "value": "Europe/Dublin",
+   "label": "Europe/Dublin (Irish time)"
+  },
+  {
+   "value": "Europe/Paris",
+   "label": "Europe/Paris (Central European time)"
+  },
+  {
+   "value": "America/New_York",
+   "label": "America/New_York (US Eastern)"
+  }
+ ],
+ "weekendRule": "skip",
+ "weekendRules": [
+  {
+   "value": "skip",
+   "label": "No report on weekends or bank holidays"
+  },
+  {
+   "value": "required",
+   "label": "Report required every day"
+  },
+  {
+   "value": "nil",
+   "label": "Nil report allowed on weekends and bank holidays"
+  }
+ ],
+ "sessionTimeouts": [
+  {
+   "value": "15",
+   "label": "15 minutes"
+  },
+  {
+   "value": "30",
+   "label": "30 minutes"
+  },
+  {
+   "value": "60",
+   "label": "1 hour"
+  },
+  {
+   "value": "240",
+   "label": "4 hours"
+  },
+  {
+   "value": "480",
+   "label": "8 hours"
+  }
+ ],
+ "sessionTimeout": "60",
+ "domain": "opsdesk.app"
+}

@@ -1,7 +1,10 @@
-import { Icon } from "@/components/icons"
-import type { HeaderData } from "../types"
+import type { ReactNode } from "react"
+import Link from "next/link"
 
-export function PageHeader({ data }: { data: HeaderData }) {
+import { Icon } from "@/components/icons"
+import type { DashboardPerms, HeaderData } from "../types"
+
+export function PageHeader({ data, perms, newTask }: { data: HeaderData; perms: DashboardPerms; newTask: ReactNode }) {
   return (
     <div className="head">
       <div>
@@ -9,14 +12,13 @@ export function PageHeader({ data }: { data: HeaderData }) {
         <p>{data.subtitle}</p>
       </div>
       <div className="head-actions">
-        <button className="btn btn-primary">
-          <Icon name="plus" />
-          New Task
-        </button>
-        <button className="btn btn-outline">
-          <Icon name="report" />
-          Start Daily Report
-        </button>
+        {perms.tasks && newTask}
+        {perms.reports && (
+          <Link href="/daily-reports" className="btn btn-outline">
+            <Icon name="report" />
+            Start Daily Report
+          </Link>
+        )}
       </div>
     </div>
   )

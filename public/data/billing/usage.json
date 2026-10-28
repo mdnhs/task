@@ -1,0 +1,22 @@
+{
+ "tenants": {
+  "t1": {
+   "activeUsers": 12,
+   "storageGb": 18.4,
+   "messages": 2140,
+   "transcriptionMinutes": 212
+  },
+  "t2": {
+   "activeUsers": 10,
+   "storageGb": 2.1,
+   "messages": 310,
+   "transcriptionMinutes": 64
+  },
+  "t3": {
+   "activeUsers": 12,
+   "storageGb": 47.6,
+   "messages": 4620,
+   "transcriptionMinutes": 538
+  }
+ }
+}

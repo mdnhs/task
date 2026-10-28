@@ -1,0 +1,13 @@
+{
+  "today": "2026-10-20T09:00:00",
+  "timezone": "Europe/London",
+  "tzLabel": "UK time",
+  "currency": "GBP",
+  "locale": "en-GB",
+  "deadline": "17:30",
+  "reminders": ["16:30", "17:15"],
+  "departments": [
+    "Security",
+    "Cleaning"
+  ]
+}

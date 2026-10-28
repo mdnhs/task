@@ -1,10 +1,11 @@
 "use client"
 
-import { useEffect, useRef, useState, type ClipboardEvent, type DragEvent, type FormEvent } from "react"
+import { useCallback, useEffect, useRef, useState, type ClipboardEvent, type DragEvent, type FormEvent } from "react"
 import { ArrowUp, ImagePlus, Sparkles, X } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet"
+import { growInset } from "@/lib/motion"
 import type { AssistantData } from "../types"
 
 type Img = { url: string; name: string }
@@ -13,7 +14,7 @@ type Msg = { from: "ai" | "me"; text: string; images?: Img[] }
 const MAX_IMAGES = 4
 const MAX_BYTES = 5 * 1024 * 1024
 
-// Demo only: answers come from canned replies in public/data/layout/assistant.json.
+// Demo only: answers come from canned replies in public/data/assistant/assistant.json ({firstName}/{deadline}/{tz} filled by fillAssistant).
 function answer(data: AssistantData, q: string) {
   const l = q.toLowerCase()
   return data.replies.find((r) => r.match.some((m) => l.includes(m)))?.text ?? data.fallback
@@ -30,6 +31,21 @@ export function AiAssistant({ data }: { data: AssistantData }) {
   const end = useRef<HTMLDivElement>(null)
   const fileInput = useRef<HTMLInputElement>(null)
   const urls = useRef<string[]>([])
+  const trigger = useRef<HTMLButtonElement>(null)
+
+  // The panel grows out of the trigger: its clip-path starts (and ends, on close) at the button's footprint.
+  // Measured when the panel mounts, before paint; CSS (.ai-panel in opsdesk.css) does the transition.
+  const panelRef = useCallback((el: HTMLDivElement | null) => {
+    const btn = trigger.current
+    if (!el || !btn) return
+    // Measuring forces a style pass, so without `transition:none` the fallback clip → measured clip change would
+    // itself start a transition, and the open would grow from the fallback instead of the button.
+    el.style.transition = "none"
+    const i = growInset(btn.getBoundingClientRect(), el.getBoundingClientRect())
+    el.style.setProperty("--grow-clip", `inset(${i.top}px ${i.right}px ${i.bottom}px ${i.left}px round ${i.radius}px)`)
+    void getComputedStyle(el).clipPath
+    el.style.transition = ""
+  }, [])
 
   useEffect(() => {
     end.current?.scrollIntoView({ behavior: "smooth", block: "end" })
@@ -95,6 +111,7 @@ export function AiAssistant({ data }: { data: AssistantData }) {
   return (
     <>
       <Button
+        ref={trigger}
         variant="ghost"
         size="icon-lg"
         className="icon-btn ai-btn"
@@ -106,6 +123,7 @@ export function AiAssistant({ data }: { data: AssistantData }) {
       </Button>
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetContent
+          ref={panelRef}
           side="right"
           showCloseButton={false}
           className="ai-panel"

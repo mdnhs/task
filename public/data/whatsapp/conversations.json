@@ -1,0 +1,93 @@
+{
+  "conversations": [
+    {
+      "id": "wa-daniel",
+      "unread": 2,
+      "contact": { "name": "Daniel Okafor", "phone": "+44 7700 900123", "initials": "DO", "avatar": "av1", "role": "Security Officer · Canary Wharf", "dept": "Security", "userRef": "Daniel Okafor", "consent": "given" },
+      "messages": [
+        { "id": "wa-daniel-m1", "kind": "text", "dir": "in", "at": "2026-10-19T18:42:00", "text": "Evening patrol done. Gate 3 camera was offline for about 20 minutes, back now." },
+        { "id": "wa-daniel-m2", "kind": "text", "dir": "out", "at": "2026-10-19T18:50:00", "by": "Lilianna Novak", "delivery": "read", "text": "Thanks Daniel. Please add it to the incidents section of today's report." },
+        { "id": "wa-daniel-m3", "kind": "text", "dir": "in", "at": "2026-10-19T19:05:00", "text": "Done, added it.", "links": [{ "kind": "report", "ref": "RPT-1019 · Incidents", "label": "Daniel Okafor, 19 Oct: incidents section" }] },
+        { "id": "wa-daniel-m4", "kind": "event", "at": "2026-10-19T19:06:00", "by": "Lilianna Novak", "text": "Linked to RPT-1019 · Incidents by Lilianna Novak" },
+        { "id": "wa-daniel-m5", "kind": "text", "dir": "in", "at": "2026-10-20T07:48:00", "text": "Morning. Fire door on level 2 at Canary Wharf won't latch shut. Sending a voice note with the details." },
+        {
+          "id": "wa-daniel-m6", "kind": "voice", "dir": "in", "at": "2026-10-20T07:49:00", "durationSec": 23, "format": "ogg", "supported": true,
+          "transcript": { "state": "ready", "confidence": 0.92, "text": "It's the fire door by the east stairwell on level two. The latch is bent so it swings open on its own. I've propped a sign on it and told reception. It needs a contractor today if possible." }
+        }
+      ]
+    },
+    {
+      "id": "wa-grace",
+      "unread": 1,
+      "contact": { "name": "Grace Mensah", "phone": "+44 7700 900456", "initials": "GM", "avatar": "av2", "role": "Cleaning Supervisor · Aldgate", "dept": "Cleaning", "userRef": "Grace Mensah", "consent": "given" },
+      "messages": [
+        {
+          "id": "wa-grace-m1", "kind": "voice", "dir": "in", "at": "2026-10-20T08:31:00", "durationSec": 17, "format": "ogg", "supported": true,
+          "transcript": { "state": "ready", "confidence": 0.54, "text": "Hi, we're nearly out of blue roll and the, um, the green cleaning spray at Aldgate. Can we get some before Thursday? Also the floor machine is making a noise again." }
+        }
+      ]
+    },
+    {
+      "id": "wa-marcus",
+      "unread": 1,
+      "contact": { "name": "Marcus Hill", "phone": "+44 7700 900789", "initials": "MH", "avatar": "av3", "role": "Security Officer · Docklands", "dept": "Security", "userRef": "Marcus Hill", "consent": "given" },
+      "messages": [
+        { "id": "wa-marcus-m1", "kind": "text", "dir": "in", "at": "2026-10-20T08:52:00", "text": "Found the Docklands side gate open when I arrived. Nothing missing that I can see." },
+        {
+          "id": "wa-marcus-m2", "kind": "voice", "dir": "in", "at": "2026-10-20T08:53:00", "durationSec": 31, "format": "ogg", "supported": true,
+          "transcript": { "state": "transcribing", "result": { "text": "The padlock was hanging off the chain, not cut. Looks like whoever locked up last night didn't click it shut. I've locked it now and taken photos for the report.", "confidence": 0.88 } }
+        }
+      ]
+    },
+    {
+      "id": "wa-harriet",
+      "unread": 0,
+      "contact": { "name": "Harriet Cole", "phone": "+44 7700 900310", "initials": "HC", "avatar": "av4", "role": "Client · Canary Wharf facilities", "dept": "Cleaning", "consent": "given" },
+      "messages": [
+        { "id": "wa-harriet-m1", "kind": "text", "dir": "in", "at": "2026-10-19T14:12:00", "text": "Hi, there's a coffee spill by the reception lifts that's been there since lunch. Can someone deal with it?", "links": [{ "kind": "issue", "ref": "CI-208", "label": "Reception spill not cleared, Canary Wharf" }, { "kind": "task", "ref": "TSK-1004", "label": "Carpet spot treatment, Reception", "href": "/tasks/TSK-1004" }] },
+        { "id": "wa-harriet-m2", "kind": "event", "at": "2026-10-19T14:15:00", "by": "Lilianna Novak", "text": "Linked to CI-208 by Lilianna Novak" },
+        { "id": "wa-harriet-m3", "kind": "event", "at": "2026-10-19T14:16:00", "by": "Lilianna Novak", "text": "Linked to TSK-1004 by Lilianna Novak" },
+        { "id": "wa-harriet-m4", "kind": "text", "dir": "out", "at": "2026-10-19T14:18:00", "by": "Lilianna Novak", "delivery": "read", "text": "Sorry about that Harriet. Tomasz is on his way and we'll treat the carpet tonight." },
+        { "id": "wa-harriet-m5", "kind": "text", "dir": "in", "at": "2026-10-19T14:40:00", "text": "All cleared, thank you." }
+      ]
+    },
+    {
+      "id": "wa-tomasz",
+      "unread": 0,
+      "contact": { "name": "Tomasz Wójcik", "phone": "+44 7700 900555", "initials": "TW", "avatar": "av5", "role": "Cleaner · Canary Wharf", "dept": "Cleaning", "userRef": "Tomasz Wójcik", "consent": "given" },
+      "messages": [
+        { "id": "wa-tomasz-m1", "kind": "text", "dir": "in", "at": "2026-10-19T15:02:00", "text": "Spill done at reception. Carpet needs a proper treatment tonight." },
+        {
+          "id": "wa-tomasz-m2", "kind": "voice", "dir": "in", "at": "2026-10-19T15:04:00", "durationSec": 9, "format": "amr", "supported": false,
+          "transcript": { "state": "unsupported", "error": "This audio format (.amr) isn't supported. Ask the sender to record the note again in WhatsApp." }
+        },
+        { "id": "wa-tomasz-m3", "kind": "text", "dir": "out", "at": "2026-10-19T15:10:00", "by": "Lilianna Novak", "delivery": "failed", "text": "Your voice note didn't come through, can you type it or record it again?" }
+      ]
+    },
+    {
+      "id": "wa-amara",
+      "unread": 0,
+      "contact": { "name": "Amara Kone", "phone": "+44 7700 900642", "initials": "AK", "avatar": "av6", "role": "Cleaner · Riverside House", "dept": "Cleaning", "userRef": "Amara Kone", "consent": "given" },
+      "messages": [
+        {
+          "id": "wa-amara-m1", "kind": "voice", "dir": "in", "at": "2026-10-19T11:20:00", "durationSec": 12, "format": "ogg", "supported": true,
+          "transcript": { "state": "ready", "confidence": 0.95, "text": "Washrooms on the ground floor are done. The second floor ones are locked, I need the key from security.", "confirmedBy": "Lilianna Novak", "confirmedAt": "2026-10-19T11:30:00", "edited": false }
+        },
+        { "id": "wa-amara-m2", "kind": "event", "at": "2026-10-19T11:30:00", "by": "Lilianna Novak", "text": "Transcript confirmed by Lilianna Novak" },
+        {
+          "id": "wa-amara-m3", "kind": "voice", "dir": "in", "at": "2026-10-20T06:58:00", "durationSec": 26, "format": "ogg", "supported": true,
+          "transcript": { "state": "failed", "error": "The transcription service timed out.", "result": { "text": "Morning, the second floor washroom at Riverside still has no hand towels. I've put the last pack out downstairs.", "confidence": 0.81 } }
+        }
+      ]
+    },
+    {
+      "id": "wa-nadia",
+      "unread": 0,
+      "contact": { "name": "Nadia Rahman", "phone": "+44 7700 900871", "initials": "NR", "avatar": "av1", "role": "Cleaner · Shoreditch", "dept": "Cleaning", "userRef": "Nadia Rahman", "consent": "pending" },
+      "messages": [
+        { "id": "wa-nadia-m1", "kind": "text", "dir": "in", "at": "2026-10-17T07:05:00", "text": "Running 10 minutes late, bus is stuck on Old Street." },
+        { "id": "wa-nadia-m2", "kind": "text", "dir": "out", "at": "2026-10-17T07:08:00", "by": "Grace Mensah", "delivery": "delivered", "text": "No problem, thanks for letting us know." }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+[
+  {"path": "/settings/billing", "expect": ["Manage billing", "Invoices", "Stripe", "Current plan"]},
+  {"path": "/settings/billing", "cookies": {"od-tenant": "t3"}, "expect": ["Payment failed", "Manage billing"]},
+  {"path": "/settings/billing", "cookies": {"od-tenant": "t2"}, "expect": ["Trial ends", "No invoices yet"]},
+  {"path": "/settings/billing", "cookies": {"od-role": "auditor"}, "expect": ["Invoices"], "notExpect": ["Manage billing"]},
+  {"path": "/settings/billing", "cookies": {"od-role": "employee"}, "expect": ["Access restricted"], "notExpect": ["Invoices"]}
+]

@@ -1,0 +1,9 @@
+[
+  {"path": "/platform", "cookies": {"od-role": "platform"}, "expect": ["Tenants", "MRR", "Northgate Facility Services"]},
+  {"path": "/platform", "expect": ["Access restricted"], "notExpect": ["northgate.opsdesk.app", "Past due"]},
+  {"path": "/platform/tenants/t1", "cookies": {"od-role": "platform"}, "expect": ["Operational data hidden", "requires tenant-granted support access"]},
+  {"path": "/platform/tenants/t1", "expect": ["Access restricted"], "notExpect": ["Usage against limits"]},
+  {"path": "/platform/plans", "cookies": {"od-role": "platform"}, "expect": ["Business", "Enterprise"]},
+  {"path": "/platform/support", "cookies": {"od-role": "platform"}, "expect": ["Support access", "Platform audit trail"]},
+  {"path": "/platform/support", "cookies": {"od-role": "employee"}, "expect": ["Access restricted"], "notExpect": ["Platform audit trail"]}
+]

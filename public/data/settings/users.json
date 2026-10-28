@@ -1,0 +1,130 @@
+{
+ "users": [
+  {
+   "id": "u1",
+   "name": "Amara Bello",
+   "email": "amara.bello@opsdesk.co.uk",
+   "role": "owner",
+   "dept": "",
+   "status": "active",
+   "lastActive": "2026-10-20T08:12:00"
+  },
+  {
+   "id": "u2",
+   "name": "Rhys Edwards",
+   "email": "rhys.edwards@opsdesk.co.uk",
+   "role": "admin",
+   "dept": "",
+   "status": "active",
+   "lastActive": "2026-10-19T16:40:00"
+  },
+  {
+   "id": "u3",
+   "name": "Lilianna Novak",
+   "email": "lilianna.novak@opsdesk.co.uk",
+   "role": "ops",
+   "dept": "",
+   "status": "active",
+   "lastActive": "2026-10-20T08:55:00"
+  },
+  {
+   "id": "u4",
+   "name": "Daniel Okafor",
+   "email": "daniel.okafor@opsdesk.co.uk",
+   "role": "supervisor",
+   "dept": "Security",
+   "status": "active",
+   "lastActive": "2026-10-20T07:30:00"
+  },
+  {
+   "id": "u5",
+   "name": "Grace Mensah",
+   "email": "grace.mensah@opsdesk.co.uk",
+   "role": "supervisor",
+   "dept": "Cleaning",
+   "status": "active",
+   "lastActive": "2026-10-20T08:20:00"
+  },
+  {
+   "id": "u6",
+   "name": "Priya Shah",
+   "email": "priya.shah@opsdesk.co.uk",
+   "role": "hr",
+   "dept": "",
+   "status": "active",
+   "lastActive": "2026-10-19T17:05:00"
+  },
+  {
+   "id": "u7",
+   "name": "Tomasz Wójcik",
+   "email": "tomasz.wojcik@opsdesk.co.uk",
+   "role": "employee",
+   "dept": "Cleaning",
+   "status": "active",
+   "lastActive": "2026-10-18T12:15:00"
+  },
+  {
+   "id": "u8",
+   "name": "Sofia Marin",
+   "email": "sofia.marin@opsdesk.co.uk",
+   "role": "payroll",
+   "dept": "",
+   "status": "active",
+   "lastActive": "2026-10-17T15:45:00"
+  },
+  {
+   "id": "u9",
+   "name": "Ibrahim Khan",
+   "email": "ibrahim.khan@opsdesk.co.uk",
+   "role": "auditor",
+   "dept": "",
+   "status": "active",
+   "lastActive": "2026-10-15T10:00:00"
+  },
+  {
+   "id": "u10",
+   "name": "M. Haddad",
+   "email": "m.haddad@opsdesk.co.uk",
+   "role": "employee",
+   "dept": "Security",
+   "status": "active",
+   "lastActive": "2026-10-20T06:58:00"
+  },
+  {
+   "id": "u11",
+   "name": "J. Silva",
+   "email": "j.silva@opsdesk.co.uk",
+   "role": "employee",
+   "dept": "Security",
+   "status": "active",
+   "lastActive": "2026-10-19T22:10:00"
+  },
+  {
+   "id": "u12",
+   "name": "A. Kowalski",
+   "email": "a.kowalski@opsdesk.co.uk",
+   "role": "employee",
+   "dept": "Security",
+   "status": "active",
+   "lastActive": "2026-10-20T07:02:00"
+  },
+  {
+   "id": "u13",
+   "name": "Chloe Barnes",
+   "email": "chloe.barnes@opsdesk.co.uk",
+   "role": "employee",
+   "dept": "Cleaning",
+   "status": "deactivated",
+   "lastActive": "2026-09-30T14:00:00"
+  },
+  {
+   "id": "u14",
+   "name": "Marek Nowak",
+   "email": "marek.nowak@opsdesk.co.uk",
+   "role": "manager",
+   "dept": "Security",
+   "status": "deactivated",
+   "lastActive": "2026-09-12T09:30:00"
+  }
+ ]
+}

@@ -1,0 +1,88 @@
+{
+  "staff": [
+    {
+      "id": "s-haddad",
+      "name": "M. Haddad",
+      "role": "Security Officer",
+      "dept": "Security",
+      "contact": "07700 900101"
+    },
+    {
+      "id": "s-silva",
+      "name": "J. Silva",
+      "role": "Security Officer",
+      "dept": "Security",
+      "contact": "07700 900102"
+    },
+    {
+      "id": "s-kowalski",
+      "name": "A. Kowalski",
+      "role": "Security Officer",
+      "dept": "Security",
+      "contact": "07700 900103"
+    },
+    {
+      "id": "s-bell",
+      "name": "Marcus Bell",
+      "role": "Security Officer",
+      "dept": "Security",
+      "contact": "07700 900104"
+    },
+    {
+      "id": "s-grant",
+      "name": "Oliver Grant",
+      "role": "Security Officer",
+      "dept": "Security",
+      "contact": "07700 900105"
+    },
+    {
+      "id": "s-kowal",
+      "name": "Nadia Kowal",
+      "role": "Security Officer",
+      "dept": "Security",
+      "contact": "07700 900106"
+    },
+    {
+      "id": "s-daniel",
+      "name": "Daniel Okafor",
+      "role": "Security Supervisor",
+      "dept": "Security",
+      "contact": "07700 900107"
+    },
+    {
+      "id": "s-duarte",
+      "name": "Ines Duarte",
+      "role": "Cleaner",
+      "dept": "Cleaning",
+      "contact": "07700 900201"
+    },
+    {
+      "id": "s-price",
+      "name": "Hannah Price",
+      "role": "Cleaner",
+      "dept": "Cleaning",
+      "contact": "07700 900202"
+    },
+    {
+      "id": "s-rahman",
+      "name": "Kamal Rahman",
+      "role": "Cleaner",
+      "dept": "Cleaning",
+      "contact": "07700 900203"
+    },
+    {
+      "id": "s-reyes",
+      "name": "Sofia Reyes",
+      "role": "Cleaner",
+      "dept": "Cleaning",
+      "contact": "07700 900204"
+    },
+    {
+      "id": "s-grace",
+      "name": "Grace Mensah",
+      "role": "Cleaning Team Lead",
+      "dept": "Cleaning",
+      "contact": "07700 900205"
+    }
+  ]
+}

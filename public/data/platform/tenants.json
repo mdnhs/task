@@ -1,0 +1,469 @@
+{
+  "tenants": [
+    {
+      "id": "t1",
+      "name": "Northgate Facility Services",
+      "slug": "northgate",
+      "subdomain": "northgate.opsdesk.app",
+      "plan": "business",
+      "status": "active",
+      "users": 31,
+      "storageGb": 22.4,
+      "messages": 558,
+      "transcriptionMinutes": 62,
+      "createdAt": "2025-03-12T10:00:00",
+      "contacts": [
+        {
+          "role": "Owner",
+          "name": "Lilianna Novak",
+          "email": "lilianna.novak@northgate.example"
+        },
+        {
+          "role": "Billing",
+          "name": "Lilianna Novak",
+          "email": "lilianna.novak-billing@northgate.example"
+        }
+      ],
+      "billing": {
+        "paymentMethod": "Card ending 4000",
+        "renewsOn": "2026-11-02",
+        "lastInvoice": {
+          "id": "INV-2010",
+          "at": "2026-10-02T08:00:00",
+          "paid": true
+        }
+      }
+    },
+    {
+      "id": "t2",
+      "name": "Harbourline Cleaning Co",
+      "slug": "harbourline",
+      "subdomain": "harbourline.opsdesk.app",
+      "plan": "business",
+      "status": "trial",
+      "users": 8,
+      "storageGb": 2.1,
+      "messages": 200,
+      "transcriptionMinutes": 32,
+      "createdAt": "2026-10-06T10:00:00",
+      "contacts": [
+        {
+          "role": "Owner",
+          "name": "Grace Mensah",
+          "email": "grace.mensah@harbourline.example"
+        },
+        {
+          "role": "Billing",
+          "name": "Grace Mensah",
+          "email": "grace.mensah-billing@harbourline.example"
+        }
+      ],
+      "billing": {
+        "paymentMethod": "None on file",
+        "trialEndsOn": "2026-11-02"
+      }
+    },
+    {
+      "id": "t3",
+      "name": "Millbrook Security Group",
+      "slug": "millbrook",
+      "subdomain": "millbrook.opsdesk.app",
+      "plan": "business",
+      "status": "past_due",
+      "users": 36,
+      "storageGb": 41.8,
+      "messages": 1152,
+      "transcriptionMinutes": 216,
+      "createdAt": "2025-06-02T10:00:00",
+      "contacts": [
+        {
+          "role": "Owner",
+          "name": "Daniel Okafor",
+          "email": "daniel.okafor@millbrook.example"
+        },
+        {
+          "role": "Billing",
+          "name": "Daniel Okafor",
+          "email": "daniel.okafor-billing@millbrook.example"
+        }
+      ],
+      "billing": {
+        "paymentMethod": "Card ending 4274",
+        "graceEndsOn": "2026-10-27",
+        "renewsOn": "2026-11-06",
+        "lastInvoice": {
+          "id": "INV-2012",
+          "at": "2026-10-02T08:00:00",
+          "paid": false
+        }
+      }
+    },
+    {
+      "id": "t4",
+      "name": "Riverside Property Care",
+      "slug": "riverside",
+      "subdomain": "riverside.opsdesk.app",
+      "plan": "starter",
+      "status": "active",
+      "users": 9,
+      "storageGb": 6.3,
+      "messages": 351,
+      "transcriptionMinutes": 72,
+      "createdAt": "2025-09-18T10:00:00",
+      "contacts": [
+        {
+          "role": "Owner",
+          "name": "Anika Rahman",
+          "email": "anika.rahman@riverside.example"
+        },
+        {
+          "role": "Billing",
+          "name": "Anika Rahman",
+          "email": "anika.rahman-billing@riverside.example"
+        }
+      ],
+      "billing": {
+        "paymentMethod": "Card ending 4411",
+        "renewsOn": "2026-11-08",
+        "lastInvoice": {
+          "id": "INV-2013",
+          "at": "2026-10-02T08:00:00",
+          "paid": true
+        }
+      }
+    },
+    {
+      "id": "t5",
+      "name": "Canary Wharf Concierge",
+      "slug": "canary-wharf",
+      "subdomain": "canary-wharf.opsdesk.app",
+      "plan": "enterprise",
+      "status": "active",
+      "users": 118,
+      "storageGb": 170.2,
+      "messages": 5428,
+      "transcriptionMinutes": 236,
+      "createdAt": "2024-11-04T10:00:00",
+      "contacts": [
+        {
+          "role": "Owner",
+          "name": "Marcus Bell",
+          "email": "marcus.bell@canarywharf.example"
+        },
+        {
+          "role": "Billing",
+          "name": "Marcus Bell",
+          "email": "marcus.bell-billing@canarywharf.example"
+        }
+      ],
+      "billing": {
+        "paymentMethod": "Card ending 4548",
+        "renewsOn": "2026-11-10",
+        "lastInvoice": {
+          "id": "INV-2014",
+          "at": "2026-10-02T08:00:00",
+          "paid": true
+        }
+      }
+    },
+    {
+      "id": "t6",
+      "name": "Brightside Janitorial",
+      "slug": "brightside",
+      "subdomain": "brightside.opsdesk.app",
+      "plan": "starter",
+      "status": "trial",
+      "users": 4,
+      "storageGb": 0.8,
+      "messages": 72,
+      "transcriptionMinutes": 16,
+      "createdAt": "2026-10-12T10:00:00",
+      "contacts": [
+        {
+          "role": "Owner",
+          "name": "Sofia Marin",
+          "email": "sofia.marin@brightside.example"
+        },
+        {
+          "role": "Billing",
+          "name": "Sofia Marin",
+          "email": "sofia.marin-billing@brightside.example"
+        }
+      ],
+      "billing": {
+        "paymentMethod": "None on file",
+        "trialEndsOn": "2026-11-06"
+      }
+    },
+    {
+      "id": "t7",
+      "name": "Ironclad Guarding",
+      "slug": "ironclad",
+      "subdomain": "ironclad.opsdesk.app",
+      "plan": "business",
+      "status": "active",
+      "users": 27,
+      "storageGb": 18.9,
+      "messages": 675,
+      "transcriptionMinutes": 162,
+      "createdAt": "2025-01-27T10:00:00",
+      "contacts": [
+        {
+          "role": "Owner",
+          "name": "Tomasz Wójcik",
+          "email": "tomasz.wojcik@ironclad.example"
+        },
+        {
+          "role": "Billing",
+          "name": "Tomasz Wójcik",
+          "email": "tomasz.wojcik-billing@ironclad.example"
+        }
+      ],
+      "billing": {
+        "paymentMethod": "Card ending 4822",
+        "renewsOn": "2026-11-14",
+        "lastInvoice": {
+          "id": "INV-2016",
+          "at": "2026-10-02T08:00:00",
+          "paid": true
+        }
+      }
+    },
+    {
+      "id": "t8",
+      "name": "Kestrel Estates",
+      "slug": "kestrel",
+      "subdomain": "kestrel.opsdesk.app",
+      "plan": "starter",
+      "status": "suspended",
+      "users": 6,
+      "storageGb": 3.4,
+      "messages": 192,
+      "transcriptionMinutes": 48,
+      "createdAt": "2025-07-09T10:00:00",
+      "contacts": [
+        {
+          "role": "Owner",
+          "name": "Hannah Doyle",
+          "email": "hannah.doyle@kestrel.example"
+        },
+        {
+          "role": "Billing",
+          "name": "Hannah Doyle",
+          "email": "hannah.doyle-billing@kestrel.example"
+        }
+      ],
+      "billing": {
+        "paymentMethod": "Card ending 4959",
+        "lastInvoice": {
+          "id": "INV-2017",
+          "at": "2026-10-02T08:00:00",
+          "paid": true
+        }
+      },
+      "suspendedAt": "2026-09-30T14:20:00",
+      "suspendReason": "Non-payment after grace period"
+    },
+    {
+      "id": "t9",
+      "name": "Lantern Hospitality Services",
+      "slug": "lantern",
+      "subdomain": "lantern.opsdesk.app",
+      "plan": "business",
+      "status": "active",
+      "users": 39,
+      "storageGb": 48.5,
+      "messages": 1521,
+      "transcriptionMinutes": 78,
+      "createdAt": "2025-02-14T10:00:00",
+      "contacts": [
+        {
+          "role": "Owner",
+          "name": "Priya Shah",
+          "email": "priya.shah@lantern.example"
+        },
+        {
+          "role": "Billing",
+          "name": "Priya Shah",
+          "email": "priya.shah-billing@lantern.example"
+        }
+      ],
+      "billing": {
+        "paymentMethod": "Card ending 5096",
+        "renewsOn": "2026-11-18",
+        "lastInvoice": {
+          "id": "INV-2018",
+          "at": "2026-10-02T08:00:00",
+          "paid": true
+        }
+      }
+    },
+    {
+      "id": "t10",
+      "name": "Marlowe Facilities",
+      "slug": "marlowe",
+      "subdomain": "marlowe.opsdesk.app",
+      "plan": "enterprise",
+      "status": "past_due",
+      "users": 96,
+      "storageGb": 132.7,
+      "messages": 4416,
+      "transcriptionMinutes": 384,
+      "createdAt": "2024-08-30T10:00:00",
+      "contacts": [
+        {
+          "role": "Owner",
+          "name": "Owen Hargreaves",
+          "email": "owen.hargreaves@marlowe.example"
+        },
+        {
+          "role": "Billing",
+          "name": "Owen Hargreaves",
+          "email": "owen.hargreaves-billing@marlowe.example"
+        }
+      ],
+      "billing": {
+        "paymentMethod": "Card ending 5233",
+        "graceEndsOn": "2026-10-27",
+        "renewsOn": "2026-11-20",
+        "lastInvoice": {
+          "id": "INV-2019",
+          "at": "2026-10-02T08:00:00",
+          "paid": false
+        }
+      }
+    },
+    {
+      "id": "t11",
+      "name": "Oakhurst Cleaning",
+      "slug": "oakhurst",
+      "subdomain": "oakhurst.opsdesk.app",
+      "plan": "starter",
+      "status": "active",
+      "users": 10,
+      "storageGb": 9.6,
+      "messages": 180,
+      "transcriptionMinutes": 60,
+      "createdAt": "2025-10-01T10:00:00",
+      "contacts": [
+        {
+          "role": "Owner",
+          "name": "Ruth Adeyemi",
+          "email": "ruth.adeyemi@oakhurst.example"
+        },
+        {
+          "role": "Billing",
+          "name": "Ruth Adeyemi",
+          "email": "ruth.adeyemi-billing@oakhurst.example"
+        }
+      ],
+      "billing": {
+        "paymentMethod": "Card ending 5370",
+        "renewsOn": "2026-11-22",
+        "lastInvoice": {
+          "id": "INV-2020",
+          "at": "2026-10-02T08:00:00",
+          "paid": true
+        }
+      }
+    },
+    {
+      "id": "t12",
+      "name": "Pinnacle Site Security",
+      "slug": "pinnacle",
+      "subdomain": "pinnacle.opsdesk.app",
+      "plan": "business",
+      "status": "trial",
+      "users": 12,
+      "storageGb": 4.2,
+      "messages": 300,
+      "transcriptionMinutes": 96,
+      "createdAt": "2026-10-15T10:00:00",
+      "contacts": [
+        {
+          "role": "Owner",
+          "name": "Callum Reid",
+          "email": "callum.reid@pinnacle.example"
+        },
+        {
+          "role": "Billing",
+          "name": "Callum Reid",
+          "email": "callum.reid-billing@pinnacle.example"
+        }
+      ],
+      "billing": {
+        "paymentMethod": "None on file",
+        "trialEndsOn": "2026-11-04"
+      }
+    },
+    {
+      "id": "t13",
+      "name": "Quayside Maintenance",
+      "slug": "quayside",
+      "subdomain": "quayside.opsdesk.app",
+      "plan": "business",
+      "status": "active",
+      "users": 22,
+      "storageGb": 14.7,
+      "messages": 704,
+      "transcriptionMinutes": 44,
+      "createdAt": "2025-04-22T10:00:00",
+      "contacts": [
+        {
+          "role": "Owner",
+          "name": "Yusuf Karim",
+          "email": "yusuf.karim@quayside.example"
+        },
+        {
+          "role": "Billing",
+          "name": "Yusuf Karim",
+          "email": "yusuf.karim-billing@quayside.example"
+        }
+      ],
+      "billing": {
+        "paymentMethod": "Card ending 5644",
+        "renewsOn": "2026-11-26",
+        "lastInvoice": {
+          "id": "INV-2022",
+          "at": "2026-10-02T08:00:00",
+          "paid": true
+        }
+      }
+    },
+    {
+      "id": "t14",
+      "name": "Redwood Support Services",
+      "slug": "redwood",
+      "subdomain": "redwood.opsdesk.app",
+      "plan": "starter",
+      "status": "suspended",
+      "users": 5,
+      "storageGb": 1.9,
+      "messages": 195,
+      "transcriptionMinutes": 20,
+      "createdAt": "2025-12-05T10:00:00",
+      "contacts": [
+        {
+          "role": "Owner",
+          "name": "Elena Petrova",
+          "email": "elena.petrova@redwood.example"
+        },
+        {
+          "role": "Billing",
+          "name": "Elena Petrova",
+          "email": "elena.petrova-billing@redwood.example"
+        }
+      ],
+      "billing": {
+        "paymentMethod": "Card ending 5781",
+        "lastInvoice": {
+          "id": "INV-2023",
+          "at": "2026-10-02T08:00:00",
+          "paid": true
+        }
+      },
+      "suspendedAt": "2026-09-30T14:20:00",
+      "suspendReason": "Non-payment after grace period"
+    }
+  ]
+}

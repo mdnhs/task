@@ -1,6 +1,7 @@
 <!-- Converted from public/Office_Operations_SRS_v1.0.docx (v1.0, 16 Oct 2026).
      v1.1 (28 Oct 2026) adds the SaaS / multi-tenant requirements. These exist only in this markdown, not in the .docx.
-     Do not re-convert the .docx over this file without carrying the v1.1 additions across. Search "v1.1" to find them. -->
+     Do not re-convert the .docx over this file without carrying the v1.1 additions across. Search "v1.1" to find them.
+     v1.2 (28 Oct 2026) aligns this file with the built frontend prototype (§3.21-§3.31, Appendices A-B). Search "v1.2" to find the changes. -->
 
 # Software Requirements Specification
 
@@ -8,7 +9,7 @@
 
 A multi-tenant SaaS product for Security and Cleaning Operations
 
-Version 1.1 | Draft for Client Review
+Version 1.2 | Draft for Client Review
 28 October 2026
 
 Prepared as a development baseline from the requirements shared by the client. Items marked Pending Client Confirmation must be approved before the relevant feature is finalised.
@@ -19,7 +20,7 @@ Prepared as a development baseline from the requirements shared by the client. I
 |---|---|
 | Document title | Software Requirements Specification (SRS) |
 | System name | Office Operations, Task Management & Daily Reporting System (working title) |
-| Version | 1.1 – Draft for client review (adds SaaS / multi-tenancy) |
+| Version | 1.2 – Draft for client review (adds SaaS / multi-tenancy; aligned with the built frontend prototype) |
 | Product model | Multi-tenant SaaS: many client organisations (tenants) on one platform, each with isolated data |
 | Status | Requirements baseline; not yet client-approved |
 | Primary business areas | Security services and Cleaning services |
@@ -33,6 +34,7 @@ Prepared as a development baseline from the requirements shared by the client. I
 |---|---|---|
 | 1.0 | 16 October 2026 | Initial consolidated draft based on the two client messages. |
 | 1.1 | 28 October 2026 | Product is a SaaS. Adds multi-tenancy, onboarding, subscriptions and billing (Stripe now, behind a provider-agnostic module so more payment methods can be added later), and a platform admin console (§3.20). Also updates scope, roles, the data model, NFRs, phases, risks, open questions and architecture. |
+| 1.2 | 28 October 2026 | Aligned with the built frontend prototype so this file can be the source of truth for future work. Adds §3.21 to §3.31 (role and module access, global search, AI assistant, branding, platform console, in-tenant billing, account page, settings area, sign-up and onboarding, application shell, implementation notes for operations modules) and implementation notes for existing modules (FR-xxx-nn entries marked v1.2). Changes FR-AUD-01, FR-SAAS-03, FR-SAAS-07a, FR-SAAS-11 and §2.3 (see "Changed v1.2" notes). Adds §5.3 route map, §6.4 additional entities, Appendix A (traceability), Appendix B (mock / frontend-only status) and open questions OC-22 to OC-29. No existing requirement ID was renumbered or removed. |
 
 ### Approval
 
@@ -134,6 +136,8 @@ The platform is a central operational workspace rather than only a report form. 
 | Read-only / Auditor | View permitted records and audit history without editing. |
 | Ghost account | Not defined; do not implement until purpose, identity, visibility, authentication and audit expectations are approved. |
 
+Changed v1.2: the built prototype implements the role and module matrix in §3.21 (ids `owner`, `admin`, `manager`, `ops`, `supervisor`, `employee`, `hr`, `payroll`, `auditor`, `platform`). "Owner / Senior Management" is covered by Tenant Owner; "Lilianna / Designated Manager" is the tenant-configurable Designated Manager role. The matrix is a delivery-team proposal pending OC-22. Ghost account is still not implemented.
+
 ### 2.4 Supported environments
 
 - Desktop web browsers on the client's supported office PCs.
@@ -172,6 +176,8 @@ The platform is a central operational workspace rather than only a report form. 
 **FR-AUTH-03** (MUST): The system shall enforce server-side role and record-level access controls; hiding a button alone is not sufficient.
 
 **FR-AUTH-04** (SHOULD): The system should support multi-factor authentication where supported by the identity provider.
+
+v1.2 status: the sign-in flow has a six-digit code step and the account security tab can turn two-step verification on or off (§3.27, §3.29). Both are simulated; any six digits pass.
 
 **FR-AUTH-05** (MUST): Password reset or account recovery shall use a secure, verified process.
 
@@ -213,6 +219,8 @@ The platform is a central operational workspace rather than only a report form. 
 
 **FR-TASK-10** (SHOULD): Tasks should support recurring schedules, task templates, dependencies and tags.
 
+v1.2 status: tags, recurring tasks and task templates are built as a mock (FR-TASK-15). Dependencies are not built.
+
 **FR-TASK-11** (MUST): Completed tasks shall remain searchable according to the retention policy; deletion of business records should be restricted and auditable.
 
 **FR-TASK-12** (MUST): The system shall distinguish task submission from reviewer-approved completion.
@@ -245,7 +253,11 @@ The report is due by 5:30 PM every day. The timezone and whether the deadline ap
 
 **FR-REP-12** (SHOULD): The system should generate a printable/exportable PDF and spreadsheet-friendly report, subject to access permissions.
 
+v1.2 status: BUILT (mock data). Export menu (PDF or Excel) in the `/daily-reports` page head (staff: own report; reviewers and managers: the day's submission board), on the report history card (the filtered rows) and on the report page (that report). Files are made in the browser with jsPDF and ExcelJS, loaded only on click (`features/reports/export.ts`, rows in `export-rows.ts`). The header has the tenant name, the tenant-timezone date and the tenant brand colour. File names look like `daily-report-<dept>-<YYYY-MM-DD>`. Payroll is left out for roles that cannot read it. A toast confirms the download and the button shows a spinner while the file is made. Not built: logging the export in the audit trail (FR-AUD-05).
+
 **FR-REP-13** (SHOULD): The system should pre-fill linked information from tasks/rosters/recruitment records where feasible, with the report owner able to review it before submission.
+
+v1.2 status: BUILT for the owner's draft of today. The route `/daily-reports/[id]` reads tasks, staff rosters and recruitment through their feature barrels (only for modules the role may read) and maps them with the pure `lib/report-prefill.ts`. The report page shows a "Fill from linked records" banner with a Use suggestions button. Only fields with no answer are filled, each is marked Pre-filled until edited, and nothing is saved or submitted for the owner. Sources: department tasks that are open and due today or earlier (Outstanding), today's call-outs, no-shows, cover and staff issues, roster gaps for today, tomorrow and next week, and recruitment stage moves made today (counts). Fields with no source are left alone. Shared data layer between modules is still open (OC-27).
 
 **FR-REP-14** (MUST): The system shall support a report for each applicable date even when there are no incidents; users should be able to submit a nil/clear report.
 
@@ -361,11 +373,17 @@ The report is due by 5:30 PM every day. The timezone and whether the deadline ap
 
 **FR-NOT-02** (SHOULD): The system should send reminders before the 5:30 PM report deadline at client-approved intervals.
 
+v1.2 status: BUILT (mock). `lib/notify.ts` `reminderSchedule` turns the tenant offsets (Settings → Notifications), the report deadline from org data and the user's lead time (only when the tenant lists it as an allowed option, FR-ACC-03) into reminder times. Nothing is sent; real sending needs a provider.
+
 **FR-NOT-03** (SHOULD): The system should notify designated managers when a report is overdue or an urgent item is escalated.
+
+v1.2 status: BUILT (mock). `dueReminders` fires reminders for departments with no submitted report until the deadline, then overdue alerts to the designated manager roles (a tenant setting, matched against the users data). The shell bell shows them as "reminder" items through `hooks/use-notify-feed.ts`; the Settings → Notifications "Mock clock" menu moves the clock to try it. Urgent-item escalation is still the Manager Attention flow. Real sending needs a provider.
 
 **FR-NOT-04** (MUST): Notification channels and timing shall be configurable; the system shall avoid exposing sensitive details in notification previews.
 
 **FR-NOT-05** (MUST): The application shall record delivery/processing status where the notification provider supports it.
+
+v1.2 status: BUILT (mock). `deliveries` gives one record per channel (queued, sent, delivered, failed, skipped, with a reason for skipped and failed). Settings → Notifications has a Delivery log table (filter by channel and status, paged) seeded from `public/data/settings/delivery-log.json`. No provider reports status yet.
 
 ### 3.16 Google Drive access and restriction
 
@@ -415,11 +433,15 @@ FR-WA-08 (PENDING): Confirm whether WhatsApp is for notifications only, inbound/
 
 **FR-AUD-01** (MUST): Authorised users shall search reports, tasks and issues by date, department, owner, status and relevant record reference.
 
+Changed v1.2: implemented as the global search panel (§3.22, FR-SRCH-01 to 05), which covers eight record types and respects role access. Per-module list filters also exist.
+
 **FR-AUD-02** (MUST): The system shall record who created, updated, submitted, reviewed, approved, rejected or closed a record and when.
 
 **FR-AUD-03** (MUST): Audit records shall be protected from ordinary users editing or deleting them.
 
 **FR-AUD-04** (SHOULD): Authorised users should export reports to PDF and/or CSV/XLSX subject to access controls.
+
+v1.2 status: the audit log CSV export works (FR-AUD-07) and daily reports export to PDF and Excel (FR-REP-12). Other modules have no export.
 
 **FR-AUD-05** (MUST): Exports shall be logged when they contain sensitive employee, client or payroll data.
 
@@ -434,6 +456,8 @@ FR-WA-08 (PENDING): Confirm whether WhatsApp is for notifications only, inbound/
 - verify email;
 - pick a plan or start a trial;
 - go through guided setup: departments, timezone, report deadline, report template and inviting users.
+
+Changed v1.2: implemented as a four-step sign-up wizard plus a separate four-step onboarding wizard (§3.29). Email verification and invitations are simulated.
 
 **FR-SAAS-04** (MUST): A tenant shall be seeded with sensible defaults: Security and Cleaning departments, the ten-section daily report template, a 5:30 PM deadline and the standard roles. It can change all of these without platform-operator help.
 
@@ -451,6 +475,8 @@ The platform shall not store card data; Stripe holds it, keeping the platform ou
 
 **FR-SAAS-07a** (MUST): Billing shall sit behind a provider-agnostic billing module. The rest of the system talks only to the platform's own Plan and Subscription records, never to Stripe directly. Adding another payment method or provider later must not require changes to tenant, plan-limit or feature code. Examples of later additions: PayPal, bank transfer/direct debit, a regional gateway, or manual invoicing for enterprise tenants.
 
+Changed v1.2: implemented in the frontend as the `BillingProvider` interface with a mock Stripe implementation (§3.26, FR-BILL-05). Webhooks, idempotency and Integration Events (FR-SAAS-07b) are not built.
+
 **FR-SAAS-07b** (SHOULD): Stripe webhook events shall be verified by signature and processed idempotently. They should also be stored as Integration Events so subscription state can be audited and replayed.
 
 **FR-SAAS-07c** (COULD): Later phases could add payment methods Stripe itself supports, such as SEPA/BACS direct debit and wallets, by enabling them in Stripe. Non-Stripe providers come in through the FR-SAAS-07a adapter.
@@ -461,17 +487,256 @@ The platform shall not store card data; Stripe holds it, keeping the platform ou
 
 **FR-SAAS-10** (MUST): Platform support access to a tenant's data shall require the tenant's explicit, time-limited permission. It shall be fully audited and visible to the Tenant Owner.
 
+v1.2 status: implemented as mock UI in two places that are not yet connected: the tenant's grants list in settings (FR-SET-08) and the platform support requests (FR-PLAT-07). No tenant data is viewable.
+
 **FR-SAAS-11** (SHOULD): Tenants should be able to set their name, logo and brand colour. These appear in the app shell, emails and exported reports.
+
+Changed v1.2: name, logo and brand colour are implemented with a live preview (§3.24). The logo shows in the app shell. Branded emails and branded exports are not built.
 
 **FR-SAAS-12** (SHOULD): Each tenant should get its own subdomain (for example `acme.<product-domain>`). A custom domain COULD be offered on higher plans.
 
 **FR-SAAS-13** (SHOULD): A user should be able to belong to more than one tenant with a different role in each, and switch tenant without signing out.
+
+v1.2 status: a tenant switcher exists in the user menu (§3.30), driven by a mock tenant list and a cookie. Real memberships are not modelled.
 
 **FR-SAAS-14** (SHOULD): The platform should track per-tenant usage (active users, storage, messages, transcription minutes) for plan limits, billing and support.
 
 **FR-SAAS-15** (MUST): A Tenant Owner shall be able to export all of the tenant's data in a common format, and request full deletion when leaving.
 
 **FR-SAAS-16** (SHOULD): Integrations such as Google Drive, WhatsApp, email sender and transcription should be connected per tenant, using that tenant's own credentials or a platform account scoped to that tenant. One tenant's tokens shall never be used for another tenant.
+
+### 3.21 Role and module access (v1.2)
+
+Status: implemented in the frontend prototype (mock roles). Code: `lib/permissions.ts`, `lib/session.ts`, `lib/types.ts`, `public/data/shell/roles.json`, `proxy.ts`. Refines §2.3, FR-AUTH-03 and FR-STAFF-03.
+
+**FR-RBAC-01** (MUST): Access shall be defined per role and per module. The modules are: dashboard, tasks, reports, attention, staff (staff and rosters), recruitment, files, payroll, orders, settings, audit and whatsapp. Each role has one access level per module: none, read or write. Write implies read.
+
+**FR-RBAC-02** (MUST): The prototype ships these roles as tenant defaults. Each role also has a "home" that decides the dashboard it lands on (manager home or staff home).
+
+| Role (id) | Home | Module access (modules not listed = none) |
+|---|---|---|
+| Tenant Owner (`owner`) | Manager | Write on all 12 modules. |
+| Tenant Admin (`admin`) | Manager | Write: settings, audit. Read: dashboard, tasks, reports, attention, staff, recruitment, files, orders, whatsapp. No payroll. |
+| Designated Manager (`manager`) | Manager | Write: dashboard, tasks, reports, attention, staff, recruitment, files, orders, audit, whatsapp. Read: payroll, settings. |
+| Operations Manager / Report Owner (`ops`) | Manager | Write: dashboard, tasks, reports, attention, staff, recruitment, files, orders, whatsapp. Read: settings, audit. No payroll. |
+| Department Supervisor / Team Lead (`supervisor`) | Staff | Write: tasks, reports, staff, whatsapp. Read: dashboard. |
+| Employee / Staff Member (`employee`) | Staff | Write: tasks. Read: dashboard, reports. |
+| HR / Recruitment User (`hr`) | Staff | Write: recruitment, files. Read: dashboard, tasks. |
+| Payroll User (`payroll`) | Staff | Write: payroll. Read: dashboard, tasks. |
+| Read-only / Auditor (`auditor`) | Manager | Read on all 12 modules. |
+| Platform Super Admin (`platform`) | Manager | No tenant module access. Flagged `platform`; lands on the platform console (§3.25). |
+
+Changed v1.2: §2.3 gave the roles as "proposed". The matrix above is what the prototype implements. It was filled in by the delivery team for roles the SRS described only by intent (ops, supervisor, employee, hr, payroll, admin), so it still needs client sign-off (OC-10, OC-22). The Tenant Owner and Senior Management rows of §2.3 are merged into `owner`; "Lilianna / Designated Manager" is `manager`. There is no ghost account (FR-AUTH-08 holds).
+
+**FR-RBAC-03** (MUST): A role with no access to a module shall not see that module in navigation. The navigation list is filtered on the server so hidden modules never reach the browser. Opening such a route directly shall show an "access restricted" page, not data.
+
+**FR-RBAC-04** (MUST): A role with read-only access shall see the module's data but every create, edit, approve or delete control shall be disabled or omitted. A tenant whose status is `suspended` shall be read-only for every role (FR-SAAS-08).
+
+**FR-RBAC-05** (MUST): Report review actions (accept, return, comment, follow-up) require a manager-home role with write access to reports. Staff-home roles act as report owners and never review.
+
+**FR-RBAC-06** (MUST): Sensitive fields shall be removed on the server, not hidden in the browser, for roles without write access to the module. Implemented for staff incident and roster contact details and notes (FR-STAFF-03) and candidate contact details (FR-REC-03).
+
+**FR-RBAC-07** (MUST): Staff-home roles shall see only their own tasks and reports, in lists, in task detail (another person's task reference shows "not found") and in global search.
+
+**FR-RBAC-08** (MUST): Signed-out visitors shall be redirected to sign-in before any tenant page renders. Auth pages, the platform console and static files are excluded from that redirect.
+
+Open questions: OC-10, OC-22. Frontend-only: roles are mock JSON and the "current role" is a cookie set by a demo role switcher (§3.30).
+
+### 3.22 Global search and quick actions (v1.2)
+
+Status: implemented (mock data). Route: topbar on every `(app)` page. Code: `features/search/`, `public/data/search/*.json`, `.claude/docs/search/brief.md`. Implements and extends FR-AUD-01.
+
+**FR-SRCH-01** (MUST): A search field in the topbar shall search across record types: task, report, issue (manager-attention item), payroll issue, order, staff incident, candidate and file (client file or employee document). Each result carries id, type, title, reference, link, department, owner, status and date.
+
+**FR-SRCH-02** (MUST): Results shall be filtered by the signed-in role's module read access before they reach the browser. The index is loaded on demand through a server action, never embedded in page payloads. Staff-home roles see only their own tasks and reports.
+
+**FR-SRCH-03** (MUST): Results shall be grouped by type with counts and highlight the matched text. Filters: date range, department, type, owner and status. Active filters show as chips.
+
+**FR-SRCH-04** (SHOULD): The empty state shall show quick actions, the user's recent searches (stored in the browser, up to 6) and popular searches. Quick actions needing write access (for example "New task") appear only for roles with write access to that module.
+
+**FR-SRCH-05** (SHOULD): Keyboard: Cmd/Ctrl+K toggles the panel, `/` opens it when focus is not in an input, arrow keys move through items, Enter opens, Cmd/Ctrl+Enter opens in a new tab, Esc clears then closes, Alt+F opens filters, Backspace on an empty query removes the last filter chip.
+
+Changed v1.2: FR-AUD-01 asked for search by date, department, owner, status and reference. It is implemented as this global search panel rather than per-module search pages; individual list pages also have their own filters (tasks, reports, audit log, files, recruitment, orders, rosters).
+
+Open questions: none new. Search covers eight record types only; clients, WhatsApp messages and audit events are not indexed.
+
+### 3.23 AI assistant (v1.2)
+
+Status: DEMO ONLY. Route: floating button and side panel on every `(app)` page. Code: `features/assistant/`, `public/data/assistant/assistant.json`. Not in the original SRS.
+
+**FR-AI-01** (COULD): A signed-in user can open an assistant panel to ask about tasks, reports, coverage and documents, and to draft reminders. The panel shows a greeting, suggested prompts, a typing indicator and a chat history for the open session.
+
+**FR-AI-02** (COULD): The user can attach up to 4 images (maximum 5 MB each) by picking, pasting or dragging. Invalid files show an error.
+
+**FR-AI-03** (MUST, before any real model is connected): Replies in the prototype are canned keyword matches from mock data and are not generated from live tenant data. A real implementation shall respect tenant isolation (FR-SAAS-02) and the caller's module permissions (FR-RBAC), shall not send data from modules the role cannot read, and shall be treated as an AI feature needing a privacy review (NFR-PRIV-01).
+
+Open questions: OC-23 (provider, data handling, whether it is a paid-plan module). The greeting and replies use `{firstName}`, `{deadline}` and `{tz}` placeholders filled from the signed-in user and org settings (`fillAssistant`), so no tenant values are hard-coded.
+
+### 3.24 Tenant branding (v1.2)
+
+Status: implemented; persistence is a cookie (mock). Route: `/settings/branding`. Code: `features/settings/components/branding-panel.tsx`, `lib/brand.ts`, `lib/branding.ts`, `hooks/use-branding.ts`, `app/actions/session.ts` (`saveBranding`). Refines FR-SAAS-11.
+
+**FR-BRAND-01** (SHOULD): A user with write access to settings can set the tenant display name (2 to 60 characters) and a brand colour (a six-digit hex). Preset colours are tenant data; a colour picker is also offered.
+
+**FR-BRAND-02** (SHOULD): While editing, the app shows a live preview of the new colour across the shell. Leaving the panel without saving restores the saved branding. Saving applies the colour to the whole app for that tenant, in light and dark themes, and updates the initials shown for the tenant.
+
+**FR-BRAND-04** (SHOULD): A user with write access can upload a logo (PNG, JPG, SVG or WebP, up to 512 KB) by click or drag and drop, see it in the live preview, and remove it. The type and size are checked and an inline error is shown. The saved logo shows in the sidebar header, the collapsed rail and the mobile drawer, fitted inside the same box as the default mark on a neutral chip so it works in dark mode. Without a logo the default mark shows. Mock: the file is read in the browser as a data URL and kept in memory (`hooks/use-branding.ts`), so it resets on reload.
+
+**FR-BRAND-03** (MUST): Branding is per tenant and shall never leak between tenants. The save action shall check settings write access on the server and reject invalid input.
+
+Changed v1.2: FR-SAAS-11 listed name, logo and brand colour. Name, colour and logo upload are implemented (logo is in memory only). Emails and exported reports taking the branding are not built. See OC-24.
+
+### 3.25 Platform console (v1.2)
+
+Status: implemented as a frontend prototype; state is in-memory and resets on reload. Routes: `/platform`, `/platform/tenants/[id]`, `/platform/plans`, `/platform/support`. Code: `features/platform/`, `public/data/platform/*.json`. Implements FR-SAAS-09, FR-SAAS-10 and FR-SAAS-14.
+
+**FR-PLAT-01** (MUST): Only the Platform Super Admin role may open the console. Other roles see an "access restricted" page.
+
+**FR-PLAT-02** (MUST): The overview shows platform totals computed from the tenant list and plans (tenant counts by status and monthly recurring revenue from active and past-due tenants) and the platform audit list.
+
+**FR-PLAT-03** (MUST): The tenant list shall show name, subdomain, plan, status (trial, active, past due, suspended), users, storage, messages and transcription minutes. It shall be filterable by text, status and plan.
+
+**FR-PLAT-04** (MUST): The tenant detail page shows contacts, billing summary (payment method, trial end, grace end, renewal, last invoice) and usage against the plan limits (active users, storage in GB, messages, transcription minutes). It shall state that operational data is hidden and requires tenant-granted support access.
+
+**FR-PLAT-05** (MUST): Staff can suspend a tenant (with a reason) or reactivate it, after a confirmation that asks them to type the tenant slug. Suspension sets the tenant read-only for its users (FR-SAAS-08). Suspending and reactivating shall write a platform audit entry.
+
+**FR-PLAT-06** (MUST): Staff can edit an existing plan's price, limits and enabled modules; the change applies to every tenant on that plan and is recorded in the audit trail. Creating or deleting plans is not implemented.
+
+**FR-PLAT-07** (MUST): Support access to tenant data follows a request flow: staff submit a request with a reason; its status is requested, granted, expired or revoked; a granted request has an expiry and shows a countdown; expired state is derived from the clock. Staff can start a support session under a granted request and revoke it; both are audited. Every platform action is recorded in the platform audit list (time, actor, action, target, detail).
+
+Open questions: OC-25. Frontend-only: platform requests and tenant grants are one shared mock list (`lib/support-access.ts`, `public/data/support/requests.json`). A request filed in the platform console shows in the tenant's Settings → Data & privacy, where an admin can approve (grant for the tenant's `grantHours`), decline or revoke it; the tenant only receives its own rows.
+
+### 3.26 In-tenant billing (v1.2)
+
+Status: implemented with a mock Stripe provider (fake ids and URLs, no network or keys). Route: `/settings/billing`. Code: `features/billing/` (`providers/`), `public/data/billing/*.json`. Implements the tenant-facing side of FR-SAAS-06, FR-SAAS-07 and FR-SAAS-07a.
+
+**FR-BILL-01** (MUST): The billing tab shows the current plan, tenant status, renewal date, price, and the saved card's last four digits when one exists.
+
+**FR-BILL-02** (MUST): Usage is shown against the plan limits for active users, storage, messages and transcription minutes. When a limit is full the tab says so and points to changing plan. The seat limit is also read by the users panel (FR-SAAS-05/06).
+
+**FR-BILL-03** (MUST): The tab lists every plan (price, trial days, limits, enabled modules) and allows "Change plan" (starts provider checkout) and "Manage billing" (opens the provider customer portal).
+
+**FR-BILL-04** (SHOULD): An invoice list shows number, date, amount, status (paid, failed, open) and description, paginated, with a download action per invoice.
+
+**FR-BILL-05** (MUST): The UI shall talk only to a `BillingProvider` interface: create checkout session, open customer portal, cancel subscription, resume subscription, list payment methods. A provider is selected by the tenant billing record's `provider` value. Stripe is the only registered provider. Adding another provider means registering a new implementation; no component changes.
+
+Changed v1.2: FR-SAAS-07a is implemented as the interface in FR-BILL-05. Webhook handling (FR-SAAS-07b), trials/proration/dunning logic and real card handling are NOT implemented in the frontend and remain backend work. The tenant status drives the subscription banner (§3.30) and read-only mode.
+
+Open questions: OC-16, OC-17 (tax), OC-26 (currency: orders format money with the tenant currency and locale from org settings, `lib/money.ts`; the platform's own plan prices are in pounds).
+
+### 3.27 Account page (v1.2)
+
+Status: implemented (mock). Routes: `/account` (redirects to a tab), `/account/profile`, `/account/security`, `/account/notifications`. Code: `features/account/`, `public/data/account/*.json`. Implements FR-AUTH-04, FR-AUTH-05, FR-AUTH-06 and FR-NOT-04 for the signed-in user.
+
+**FR-ACC-01** (MUST): Profile: the user can edit only their display name (length limits come from data). Email, role, department and timezone are shown but come from the session and organisation.
+
+**FR-ACC-02** (SHOULD): Security: turn two-step verification on or off (with confirmation); request a password reset link (the link lifetime is shown); list signed-in devices, marking the current one; sign out one device or all other devices; a recent security activity list. Each action adds an activity entry.
+
+**FR-ACC-03** (SHOULD): Notifications: per user, choose which events notify on which channels, and a lead time for the report-deadline reminder. Channels and events are data driven.
+
+### 3.28 Settings area (v1.2)
+
+Status: implemented (mock, in-memory). Routes: `/settings` redirects to `/settings/[tab]` for `organisation`, `departments`, `users`, `roles`, `template`, `notifications`, `integrations`, `branding`, `billing`, `privacy`. Access: settings module (read to view, write to change). Code: `features/settings/`. Implements FR-ORG-01/02/04, FR-AUTH-02, FR-SAAS-04/05/15 and FR-NOT-04.
+
+**FR-SET-01** (MUST) Organisation: shows tenant name, slug, timezone, report deadline and tenant domain; and sets the weekend rule and session timeout from option lists (FR-AUTH-07).
+
+**FR-SET-02** (MUST) Departments: add, edit, deactivate and reactivate departments, each with sites, teams and a reporting owner.
+
+**FR-SET-03** (MUST) Users and invites: list users (name, email, role, department, status, last active); deactivate and reactivate; send, resend and revoke email invites with a role and department. Invites expire after 7 days. The number of seats is limited by the plan (FR-BILL-02).
+
+**FR-SET-04** (MUST) Roles: a matrix of roles by module where write users change a role's access (none, read, write). Each change shows a confirmation toast saying it is recorded in the audit log.
+
+**FR-SET-05** (SHOULD) Report template: per department, turn the ten sections on or off and see each section's fields and which are required (FR-ORG-04, FR-SAAS-04).
+
+**FR-SET-06** (SHOULD) Notifications: tenant reminder times before the deadline, channels, events per channel, and a switch to hide sensitive details in previews (FR-NOT-04).
+
+v1.2 status: BUILT (mock). Also shows the next reminder time and channels, the mock clock and the delivery log (FR-NOT-02/03/05). Preview text honours the hide-sensitive switch through `preview()` (FR-NOT-04).
+
+**FR-SET-07** (SHOULD) Integrations: one card per integration (Google Drive, WhatsApp Business and others in data) with status (connected, not connected, error), last event and the access policy text; connect and disconnect with confirmation. The WhatsApp card in the seed is "not connected, awaiting client confirmation (OC-05)".
+
+**FR-SET-08** (MUST) Data and privacy: (a) support access: the Tenant Owner can grant platform support time-limited access (default 24 hours), see the list of grants and revoke one (FR-SAAS-10); (b) request a full data export, delivered by emailed link (FR-SAAS-15); (c) request tenant deletion, with a 30-day cancel window (FR-SAAS-08/15).
+
+Changed v1.2: FR-SAAS-15 asks for export and deletion; this is delivered only as these two requests in the privacy tab, with no real file produced.
+
+### 3.29 Sign-up, sign-in and onboarding (v1.2)
+
+Status: implemented (mock; nothing is persisted). Routes: `/sign-in`, `/sign-up`, `/forgot-password`, `/onboarding`. Code: `features/auth/`, `public/data/auth/onboarding-defaults.json`. Implements FR-SAAS-03, FR-SAAS-04, FR-AUTH-01/04/05.
+
+**FR-ONB-01** (MUST): Sign-in is three steps: email and password (minimum 8 characters), a six-digit authenticator code, then "Continue as" a role. In the prototype any six digits pass and the role chooser is a demo aid; a real build replaces it with the user's real memberships.
+
+**FR-ONB-02** (MUST): Sign-up is four steps: Organisation (company name 2 to 80 characters, country, timezone), Owner account (name, email, password meeting listed rules), Verify email, Plan (default plan and trial length come from data; the copy says no card is needed for the trial). The stepper allows moving forward only while earlier steps validate.
+
+**FR-ONB-03** (MUST): Forgot password sends a reset link and shows a neutral message that does not reveal whether the account exists; the link expires after 60 minutes.
+
+**FR-ONB-04** (MUST): First-run onboarding is four steps: Departments, Timezone and deadline, Report template (the ten sections), Invite users. Every step can be revisited. Defaults (departments, deadline, countries, timezones, sections, invite roles) come from tenant-configurable data (FR-SAAS-04, NFR-CONF-01). Finishing signs in as the owner.
+
+Changed v1.2: FR-SAAS-03 listed "verify email, pick a plan or start a trial, guided setup". The prototype splits it into the sign-up wizard and a separate onboarding wizard as above. Email verification and invitations are simulated.
+
+### 3.30 Application shell (v1.2)
+
+Status: implemented. Code: `features/shell/`, `app/(app)/layout.tsx`, `app/(platform)/layout.tsx`, `public/data/shell/*.json`. Supports FR-SAAS-13, FR-NOT-01 and FR-MOB-02.
+
+**FR-SHELL-01** (MUST): The shell has a sidebar (menu and general groups, with optional badges), a topbar with global search (§3.22), the notification bell, the assistant (§3.23), the messages link (opens `/whatsapp`) and a user menu. The sidebar collapses to icons and becomes a drawer on small screens.
+
+**FR-SHELL-02** (MUST): A department switcher in the topbar filters dashboards and lists by department ("All" or one tenant department). When there are more than four departments it becomes a carousel. Departments come from tenant data.
+
+**FR-SHELL-03** (MUST): The notification panel lists notifications with type (assigned, reassigned, deadline, evidence, report returned, manager action, reminder), time, read state and a link to the record (FR-NOT-01).
+
+**FR-SHELL-04** (MUST): A banner shows above every page for tenants in trial (trial end date, link to choose a plan), past due (grace date, link to billing) and suspended (read-only notice, export still allowed) (FR-SAAS-08).
+
+**FR-SHELL-05** (SHOULD): The user menu offers tenant switching for users with more than one tenant (FR-SAAS-13), role switching (demo only), a link to the account page and sign-out. Switching tenant or role refreshes the session and navigation.
+
+**FR-SHELL-06** (SHOULD): A card in the sidebar offers installing the app on Android ("Take OpsDesk on site"); it is hidden when the sidebar is collapsed (FR-MOB-01/02).
+
+**FR-SHELL-07** (MUST): Every page and component has a loading skeleton that matches its final layout, and the interface supports light and dark themes with the tenant brand colour (§3.24).
+
+**FR-SHELL-08** (MUST): Footer note for the prototype: "Prototype for client review · sample data · all times shown in London time (GMT)". This is prototype copy, not a product requirement; times shall be shown in the tenant timezone (§5.2).
+
+### 3.31 Implementation notes for operations modules (v1.2)
+
+These add to the existing sections. Unless stated, the data is mock JSON and edits live in an in-memory per-feature store that resets on reload (`lib/store.ts`).
+
+Tasks (`/tasks`, `/tasks/[ref]`, `features/tasks/`), extends §3.3:
+- **FR-TASK-13** (v1.2): The task list filters by status, due date, priority (1 to 3), assignee and text, is paginated, and a `?new=1` link opens the create dialog. Task references look like TSK-1001 and are unique within a tenant. The detail page shows notes, evidence, timeline and any overdue record.
+- **FR-TASK-14** (v1.2): Evidence kinds are image, file, link and note. Review outcomes are pending, accepted, rejected and information requested; a reason is kept for rejections and information requests.
+- **FR-TASK-15** (v1.2): Tags are stored per task. A task can carry a repeat rule (`repeat`: daily, weekdays, weekly on chosen days, or monthly on day N, with an optional end date). `materialiseRecurring` adds a new Not Started copy (`seriesId` = the series task's ref) for each occurrence date up to the org's today, once per series and date, so running it again adds nothing. A day-of-month rule that does not exist in a month (for example 31) uses that month's last day. The task list shows a repeat badge and has a Recurring filter; the detail page shows the rule and managers can change it. Task templates (title, description, department, optional assignee, priority, tags, evidence flag, due offset in days and time) are listed in the New task dialog under "Use template"; managers with write access can save the form as a template and delete templates. Templates are held in memory only. Dependencies (FR-TASK-10) are NOT implemented.
+
+Daily reports (`/daily-reports`, `/daily-reports/[id]`, `features/reports/`), extends §3.4, §3.5, §4:
+- **FR-REP-15** (v1.2): The list page has today's report card, a submission board by department and owner, a review queue, and a history filtered by date range, owner and status. History export writes the filtered rows to PDF or Excel (FR-REP-12).
+- **FR-REP-16** (v1.2): The template comes from tenant data (sections, fields, entry type text, count or structured, required flags). A section can be marked restricted (the payroll section). Each field supports a state (no issues, action required, not applicable, details provided) and multiple entries.
+- **FR-REP-17** (v1.2): Each report carries a version history, comments (optionally tied to a section), and the original submission time never changes on resubmission. Only the report owner edits a draft or returned report; managers review. Nil reports are explicit.
+
+Manager attention (`/manager-attention`, `features/attention/`), extends §3.5, §3.14:
+- **FR-REV-07** (v1.2): An attention item has title, summary, impact, urgency (low, medium, high, critical), requested decision, owner, due date, department, source (report, task, client, staff, roster, stock), status (awaiting decision, decided, in progress, resolved) and a history. Deciding records outcome (approved, rejected, deferred), a required note, decision maker and time. A deferred item stays open.
+- **FR-OUT-06** (v1.2): The page also lists outstanding items (reason, owner, priority 1 to 3, next action, target date, date first carried forward). Closing one needs a resolution note (FR-OUT-05).
+
+Staff and rosters (`/staff-rosters`, `features/staff-rosters/`), extends §3.6, §3.8:
+- **FR-STAFF-05** (v1.2): Attendance incidents have type (call-out, no-show, cover, staff issue), staff member, shift, site, client, cover person, owner, action, status (open, covered, escalated, resolved) and history. Roster gaps have when (today, tomorrow, next week), shift time, site, client, role, assigned person, coverage (covered, partial, uncovered), owner and next action. Dialogs exist to log an incident, arrange cover and log a gap. Contact details and notes are removed on the server for roles without staff write access (FR-RBAC-06).
+
+Recruitment (`/recruitment`, `features/recruitment/`), extends §3.9:
+- **FR-REC-05** (v1.2): Candidates move through stages applied, reviewed, contacted, interview, offer, starter and rejected, in a kanban pipeline (drag and drop) or a list. Every stage change is recorded in the candidate's history. Candidate email and phone are removed on the server for roles without recruitment write access (FR-REC-03).
+
+Files (`/files`, `features/files/`), extends §3.10, §3.11:
+- **FR-EFILE-06** (v1.2): Employee documents have status valid, expiring, expired, missing or unverified. Confirming a document sets its status from its expiry date and records who confirmed it (FR-EFILE-05). Opening a secure link is logged. Client files list contacts, contract reference, document status (complete, incomplete, review), outstanding paperwork and an access history.
+
+Payroll issues (`/payroll-issues`, `features/payroll/`), extends §3.12:
+- **FR-PAY-05** (v1.2): Issue types are missed hours, overtime, deduction, bank details and other. Statuses are open, information needed, correction required and resolved; resolving requires a resolution note. References look like PAY-1001. Write access is limited to the payroll role and the Tenant Owner; the Designated Manager has read access only (FR-RBAC-02).
+
+Orders and stock (`/orders-stock`, `features/orders/`), extends §3.13:
+- **FR-STOCK-05** (v1.2): Tabs: waiting approval, orders, deliveries. An order has reference (ORD-n), item, quantity, supplier, requester, department, amount, approval (pending, approved, rejected), delivery (not ordered, ordered, partial, delivered), expected date and history. Rejection requires a reason. An order can be marked ordered only after approval. Deliveries may be partial; receiving more than the remaining quantity is refused.
+
+Audit log (`/audit-log`, `features/audit/`), extends §3.19:
+- **FR-AUD-06** (v1.2): Each event shows time, actor and role, action, record type and reference, IP, device, a sensitive flag and expandable metadata. Action types: sign-in, failed sign-in, role change, deactivation, export, status change, report submitted, reviewed, returned, decision, invite and billing. Filters: text, actor, action, record type and date range.
+- **FR-AUD-07** (v1.2): "Export CSV" downloads the filtered rows and appends an export event (actor, row count, file name) to the log (FR-AUD-05).
+
+WhatsApp inbox (`/whatsapp`, `features/whatsapp/`, doc `.claude/docs/features/whatsapp.md`), extends §3.17:
+- **FR-WA-09** (v1.2): An in-app inbox with a conversation list (filters All, Unread, Linked, Unlinked, Voice), a thread and a context panel. An integration card shows provider, method, business number, status (pending, connected, disconnected), last sync, an error with reconnect when disconnected, the privacy and consent rules, and one tile per flow (alerts, inbound, outbound, task creation, voice), each enabled or pending.
+- **FR-WA-10** (v1.2): Messages can be linked to a user, task, issue or report. Voice notes show a transcript marked machine-generated until a user confirms it (FR-WA-05); a confidence value below a threshold shows a quality warning; transcripts can be edited, and failed or unsupported audio is shown with a reason (FR-WA-07).
+- **FR-WA-11** (v1.2): Sending needs the outbound flow enabled and a connected integration; task creation needs the task-creation flow and write access to tasks; confirming transcripts needs the voice flow; read-only roles and suspended tenants cannot send, link, create or confirm. Every link, task creation and transcript confirmation adds an event in the thread (FR-WA-04).
+- All of this is mock data. Which flows are enabled and the provider are open (FR-WA-01, FR-WA-08, OC-05). Tasks created from a message are handed to the tasks list through `lib/task-inbox.ts` and appear in /tasks (merged when a tasks screen mounts; staff only see their own).
+
+Dashboards (`/`, `features/dashboard/`), extends §10.1, §10.2:
+- **FR-DASH-01** (v1.2): Manager-home roles see the manager dashboard: summary cards, tasks-closed chart, daily-report deadline with countdown and reminders, manager-attention list with a Decide dialog, task progress, team tasks table, and coverage and files. Staff-home roles see the staff dashboard: my tasks, evidence awaiting review, today's report, recent manager comments and stats. Quick actions (new task, start daily report, remind, view queue, decide) show only for roles with the needed write access. The report deadline and reminder times come from tenant data.
 
 ## 4. Daily Report Template and Field Requirements
 
@@ -538,6 +803,29 @@ The following is the proposed digital equivalent of the client's supplied report
 - Confirm destructive actions such as cancelling tasks or removing records.
 - Show timezone next to all deadlines and timestamps.
 
+### 5.3 Route map (v1.2)
+
+All routes are Next.js App Router pages. `(app)` routes need a signed-in session and module access (§3.21). Each has a `loading.tsx` skeleton.
+
+| Route | Screen | Module | Feature folder |
+|---|---|---|---|
+| `/` | Role-based dashboard (manager or staff) | dashboard | `features/dashboard` |
+| `/tasks`, `/tasks/[ref]` | Task list and detail | tasks | `features/tasks` |
+| `/daily-reports`, `/daily-reports/[id]` | Daily reports, board, queue, history, report form and review | reports | `features/reports` |
+| `/manager-attention` | Attention queue and outstanding items | attention | `features/attention` |
+| `/staff-rosters` | Attendance incidents and roster gaps | staff | `features/staff-rosters` |
+| `/recruitment` | Candidate pipeline and list | recruitment | `features/recruitment` |
+| `/files` | Employee documents and client files | files | `features/files` |
+| `/payroll-issues` | Payroll issue tracker | payroll | `features/payroll` |
+| `/orders-stock` | Orders, approvals, deliveries | orders | `features/orders` |
+| `/whatsapp` | WhatsApp inbox and integration card | whatsapp | `features/whatsapp` |
+| `/audit-log` | Audit history and CSV export | audit | `features/audit` |
+| `/settings`, `/settings/[tab]` | Settings (10 tabs; billing tab uses `features/billing`) | settings | `features/settings`, `features/billing` |
+| `/account`, `/account/[tab]` | Own profile, security, notifications | any signed-in role | `features/account` |
+| `/sign-in`, `/sign-up`, `/forgot-password`, `/onboarding` | Auth and onboarding | public | `features/auth` |
+| `/platform`, `/platform/tenants/[id]`, `/platform/plans`, `/platform/support` | Platform console | platform role | `features/platform` |
+| (topbar, all `(app)` pages) | Global search, assistant, shell | n/a | `features/search`, `features/assistant`, `features/shell` |
+
 ## 6. Data Requirements and Conceptual Model
 
 ### 6.1 Core entities
@@ -550,7 +838,7 @@ The following is the proposed digital equivalent of the client's supplied report
 | User | id, name, email/login, active status, role, department/team | Assigned tasks; owns reports; submits evidence; audit actor. |
 | Role / Permission | role id, permission keys, scope | Assigned to users; controls records/actions. |
 | Department / Site | id, name, type, active status | Owns tasks, reports, roster items and client operations. |
-| Task | id, title, description, owner, creator, department, priority, status, due date, completion date | May link to report, client, roster, evidence and issue. |
+| Task | id, title, description, owner, creator, department, priority, status, due date, completion date, repeat rule, series id | May link to report, client, roster, evidence and issue. |
 | Evidence | id, task/report/issue reference, file/link, uploader, timestamp, review status | Belongs to a parent record; access inherits restrictions. |
 | Daily Report | id, date, department, owner, status, submission timestamp, version | Contains section entries and linked tasks/issues. |
 | Report Entry | id, report id, section, field, text/structured value, status | Belongs to one report; may link to a task or issue. |
@@ -577,6 +865,32 @@ The following is the proposed digital equivalent of the client's supplied report
 ### 6.3 Retention and deletion
 
 Retention periods for reports, employee documents, candidate data, client files, payroll issue records, audio and transcripts are not provided by the client. The client must approve a retention schedule and any legal/compliance requirements before production use. The system shall support controlled deletion/anonymisation where required and retain audit records according to the approved policy.
+
+### 6.4 Additional entities in the prototype (v1.2)
+
+Indicative shapes taken from `features/<feature>/types.ts`. The §6.1 entities still apply.
+
+| **Entity** | **Key fields** | **Notes** |
+|---|---|---|
+| Role (access matrix) | id, label, home (manager or staff), access per module (none, read, write), platform flag | Mock `shell/roles.json`. |
+| Tenant (session) | id, name, slug, initials, brand colour, status (trial, active, past_due, suspended), plan, trialEndsOn, graceEndsOn | Branding overrides held in a per-tenant cookie. |
+| Platform tenant | tenant fields plus subdomain, users, storageGb, messages, transcriptionMinutes, contacts, billing summary, suspendedAt, suspendReason | `platform/tenants.json`. |
+| Plan | id, name, priceMonthly, currency, trialDays, limits (activeUsers, storageGb, messages, transcriptionMinutes), modules | `billing/plans.json`. |
+| Invoice | id, number, date, amount, currency, status (paid, failed, open), description | `billing/invoices.json`. |
+| Support request | id, tenantId, requester, reason, status (requested, granted, expired, revoked), requestedAt, expiresAt, grantedBy | Platform side. |
+| Support grant | id, who, reason, grantedAt, expiresAt | Tenant side (privacy tab). |
+| Platform audit entry | id, at, actor, action, target, detail | |
+| Search item | id, type, title, ref, href, dept, owner, status, date | Built per request, role filtered. |
+| Notification | id, type, title, at, read, href | Seven types (§3.30). |
+| Attention item / Outstanding item | see FR-REV-07, FR-OUT-06 | |
+| Incident / Roster gap | see FR-STAFF-05 | |
+| Candidate | id, name, role, dept, stage, contact (restricted), lastContact, nextAction, owner, applied, history | |
+| Employee document / Client file | see FR-EFILE-06 | storageRef instead of a file in the prototype. |
+| Order | ref, item, qty, supplier, requester, dept, approval, delivery, expected, amount, received, rejectReason, history | Amount in the tenant currency (org `currency`/`locale`, OC-26). |
+| Payroll issue | ref, staff, dept, type, description, owner, target, status, resolution, history | |
+| WhatsApp conversation, message, transcript, integration | see FR-WA-09 to 11 and `features/whatsapp/types.ts` | |
+| Audit event | id, at, actor, actorRole, action, recordType, recordRef, ip, device, sensitive, meta | |
+| Device session / security state | id, device, kind, location, lastActive, current; mfa flag | Account page. |
 
 ## 7. Non-Functional Requirements
 
@@ -771,7 +1085,7 @@ NFR-LEGAL-01 (v1.1): The platform shall publish Terms of Service, a Privacy Poli
 | OC-11 | Are existing task, roster, recruitment, payroll, client or stock tools in use? | Potential integrations and migration scope. | Client – Pending |
 | OC-12 | What data retention periods, hosting/data region and privacy rules apply? | Storage, compliance and operating cost. | Client – Pending |
 | OC-13 | Are PDF/Excel exports required? Who may export sensitive data? | Reporting implementation and permissions. | Client – Pending |
-| OC-14 | What reminder schedule should be used before/after 5:30 PM? | Notification rules. | Client – Pending |
+| OC-14 | What reminder schedule should be used before/after 5:30 PM? | Notification rules. | Client – Pending. The offsets (before) and overdue checkpoints (after) are data in `settings/notifications.json`, so the answer is a data change, not code. |
 | OC-15 | Is the expected product a responsive web app/PWA or a native Android app? | Delivery estimate and platform scope. | Client – Proposed web app; confirm |
 | OC-16 (v1.1) | Pricing model: per user, per site, or flat tiers? Is there a free trial, and how long? | Plan limits and billing design. | Product owner – Pending |
 | OC-17 (v1.1) | Payment provider: **Stripe** for now; other methods may be added later (FR-SAAS-07a). Still open: currencies, and VAT/tax handling (Stripe Tax or manual). | Billing integration and tax. | Product owner – Provider decided (Stripe); tax pending |
@@ -779,6 +1093,14 @@ NFR-LEGAL-01 (v1.1): The platform shall publish Terms of Service, a Privacy Poli
 | OC-19 (v1.1) | Isolation model: shared database with row-level security, schema per tenant, or database per tenant? | Cost, scaling and compliance. | Tech lead – Pending |
 | OC-20 (v1.1) | Hosting data region(s); do some tenants need a specific region? | Compliance (for example UK/EU GDPR) and infrastructure. | Product owner – Pending |
 | OC-21 (v1.1) | Subdomains and custom domains: on which plans? | Routing, TLS and branding. | Product owner – Pending |
+| OC-22 (v1.2) | Sign off the role and module access matrix in §3.21 (it was filled in by the delivery team). Which roles may write payroll, files, audit and settings? | Permissions, UAT-01 and UAT-11. | Client – Pending |
+| OC-23 (v1.2) | Is the AI assistant wanted? Which provider, what tenant data may it read, is it a paid-plan module, and are prompts and images retained? | Privacy, cost and scope. Today it is canned demo replies. | Product owner – Pending |
+| OC-24 (v1.2) | Branding scope: branded emails and exported reports, where the logo is stored for real, and who may change branding. | FR-SAAS-11 is partly built: logo upload is built (in memory); emails and exports are not. | Product owner – Pending |
+| OC-25 (v1.2) | After a tenant grants support access, what may platform staff see and do? Who approves a platform request, and how do the tenant's grants list and the platform request list connect? | FR-SAAS-10 and audit design. | Product owner – Pending |
+| OC-26 (v1.2) | Currency and tax per tenant. Orders use the tenant currency from org settings; platform plan prices are in pounds; are other currencies and VAT needed? | Data model and billing. | Product owner – Pending |
+| OC-27 (v1.2) | How should records be shared between modules (tasks created from WhatsApp, report pre-fill from tasks, rosters and recruitment)? | FR-REP-13, FR-WA-02, cross-module links need a shared data layer. v1.2: report pre-fill is done in the route with `lib/report-prefill.ts`; a real shared layer is still open. | Tech lead – Pending |
+| OC-28 (v1.2) | Real authentication: identity provider, MFA method, email verification, and removal of the demo role and tenant switchers. | FR-AUTH-01 to 07, FR-SAAS-03. | Tech lead – Pending |
+| OC-29 (v1.2) | Which exports are required (reports PDF/XLSX, audit CSV, tenant data export) and who may run them? | FR-REP-12, FR-AUD-04, FR-SAAS-15 (partly OC-13). | Client – Pending |
 
 ## 16. Proposed Technical Architecture (Non-binding)
 
@@ -813,3 +1135,50 @@ By approving this SRS, the client confirms that the requirements, scope boundari
 |  |  |  |  |
 |  |  |  |  |
 
+## Appendix A. Traceability (v1.2)
+
+Requirement ID to route and implementing folder. Folders are under `features/` unless stated. "Mock" means the data is a JSON file under `public/data/<feature>/` and edits live in memory (see Appendix B).
+
+| Requirement IDs | Route(s) | Folder | Build status |
+|---|---|---|---|
+| FR-AUTH-01, FR-AUTH-04, FR-AUTH-05, FR-ONB-01 to 04, FR-SAAS-03, FR-SAAS-04 | `/sign-in`, `/sign-up`, `/forgot-password`, `/onboarding` | `auth` | Mock |
+| FR-AUTH-01 (redirect) , FR-RBAC-08 | all `(app)` routes | `proxy.ts` | Cookie based |
+| FR-RBAC-01 to 07 | all `(app)` routes | `lib/permissions.ts`, `lib/session.ts`, `shell` | Mock roles |
+| FR-ORG-01 to 04, FR-AUTH-02, FR-AUTH-07, FR-SET-01 to 08, FR-SAAS-05, FR-SAAS-15 | `/settings/[tab]` | `settings` | Mock |
+| FR-SAAS-06, FR-SAAS-07, FR-SAAS-07a, FR-BILL-01 to 05 | `/settings/billing` | `billing` | Mock Stripe |
+| FR-SAAS-11, FR-BRAND-01 to 04 | `/settings/branding` | `settings`, `lib/brand.ts`, `lib/branding.ts`, `hooks/use-branding.ts` | Cookie (name, colour); memory (logo) |
+| FR-SAAS-08, FR-SAAS-13, FR-SHELL-01 to 08, FR-NOT-01 | all `(app)` routes | `shell` | Mock |
+| FR-NOT-02, FR-NOT-03, FR-NOT-05, FR-SET-06 | `/settings/notifications`, shell bell | `settings`, `shell`; `lib/notify.ts`, `hooks/use-notify-feed.ts` | Mock (no provider) |
+| FR-SAAS-09, FR-SAAS-10, FR-SAAS-14, FR-PLAT-01 to 07 | `/platform/**` | `platform` | Mock |
+| FR-AUD-01, FR-SRCH-01 to 05 | topbar | `search` | Mock |
+| FR-AI-01 to 03 | topbar | `assistant` | Demo |
+| FR-AUTH-04 to 06, FR-ACC-01 to 03 | `/account/[tab]` | `account` | Mock |
+| FR-TASK-01 to 15 | `/tasks`, `/tasks/[ref]` | `tasks` | Mock |
+| FR-REP-01 to 17, section 4 | `/daily-reports`, `/daily-reports/[id]` (FR-REP-12 export, FR-REP-13 pre-fill via `lib/report-prefill.ts`) | `reports` | Mock |
+| FR-REV-01 to 07, FR-OUT-01 to 06 | `/manager-attention` | `attention` | Mock |
+| FR-STAFF-01 to 05, FR-ROSTER-01 to 03 | `/staff-rosters` | `staff-rosters` | Mock |
+| FR-CLIENT-01 to 04 | no dedicated screen (client issues are an attention source and a report section) | `reports`, `attention` | Partial |
+| FR-REC-01 to 05 | `/recruitment` | `recruitment` | Mock |
+| FR-EFILE-01 to 06, FR-CFILE-01 to 03 | `/files` | `files` | Mock |
+| FR-PAY-01 to 05 | `/payroll-issues` | `payroll` | Mock |
+| FR-STOCK-01 to 05 | `/orders-stock` | `orders` | Mock |
+| FR-WA-01 to 11 | `/whatsapp`, `/settings/integrations` | `whatsapp`, `settings` | Mock (OC-05) |
+| FR-AUD-02, FR-AUD-05, FR-AUD-06, FR-AUD-07 | `/audit-log` | `audit` | Mock, CSV export works |
+| FR-DASH-01, section 10 | `/` | `dashboard` | Mock |
+| FR-GDR-01 to 06 | `/settings/integrations` (status card only) | `settings` | Not implemented beyond a status card |
+| FR-MOB-01 to 05 | all | responsive CSS, `shell` install card | Partial |
+
+## Appendix B. Frontend-only and mocked behaviour (v1.2)
+
+The repository is a frontend prototype for client review. A future backend must replace the following. Nothing below is production behaviour.
+
+- All data is JSON under `public/data/<feature>/` read through `lib/data.ts`. Feature stores (`lib/store.ts`) hold edits in browser memory and reset on reload.
+- Session: cookies `od-role`, `od-tenant`, `od-auth` and `od-brand-<tenantId>` stand in for authentication, memberships and tenant settings. `proxy.ts` only checks the signed-out cookie. Server actions in `app/actions/session.ts`.
+- Authorisation is enforced in server components (navigation filtering, data stripping, write checks), not by a backend. FR-AUTH-03 and NFR-SEC-01 still need a real server.
+- Tenant isolation (FR-SAAS-01, FR-SAAS-02, NFR-TEN-01) is not implemented; tenants are seed rows.
+- Billing, MFA, email verification, invites, password reset, data export and deletion requests only show toasts or local state.
+- Not built at all: real file upload and storage for evidence and documents, Google Drive access policy (FR-GDR), task dependencies (FR-TASK-10), subdomains and custom domains (FR-SAAS-12), per-tenant usage tracking beyond seeded numbers.
+- Notifications are a mock (FR-NOT-02, FR-NOT-03, FR-NOT-05): the schedule, due reminders, in-app items and delivery log work, but nothing is sent by email, WhatsApp or push. Real sending still needs a provider.
+- Daily report export (FR-REP-12) is real but client-side: files are built in the browser from data already on the page, so a backend must redo it to log exports and enforce access (FR-AUD-05). Report pre-fill (FR-REP-13) suggests from seeded tasks, rosters and recruitment rows.
+- WhatsApp, voice transcription and the AI assistant return canned or seeded data. WhatsApp awaits client confirmation (OC-05).
+- Tenant-specific names in mock data (company names, people, departments such as Security and Cleaning, the 17:30 deadline and 16:30 and 17:15 reminders, the London timezone) are seed values in `public/data`. They must stay tenant configuration (NFR-CONF-01) and must not be treated as platform constants.

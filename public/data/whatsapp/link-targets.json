@@ -1,0 +1,30 @@
+{
+  "user": [
+    { "kind": "user", "ref": "Daniel Okafor", "label": "Security Officer" },
+    { "kind": "user", "ref": "Grace Mensah", "label": "Cleaning Supervisor" },
+    { "kind": "user", "ref": "Priya Shah", "label": "Security Officer" },
+    { "kind": "user", "ref": "Tomasz Wójcik", "label": "Cleaner" },
+    { "kind": "user", "ref": "Amara Kone", "label": "Cleaner" },
+    { "kind": "user", "ref": "Marcus Hill", "label": "Security Officer" },
+    { "kind": "user", "ref": "Nadia Rahman", "label": "Cleaner" }
+  ],
+  "task": [
+    { "kind": "task", "ref": "TSK-1002", "label": "Deep clean kitchen areas, Floor 1", "href": "/tasks/TSK-1002" },
+    { "kind": "task", "ref": "TSK-1004", "label": "Carpet spot treatment, Reception", "href": "/tasks/TSK-1004" },
+    { "kind": "task", "ref": "TSK-1007", "label": "CCTV footage export for client request", "href": "/tasks/TSK-1007" },
+    { "kind": "task", "ref": "TSK-1014", "label": "Door entry system audit, Docklands", "href": "/tasks/TSK-1014" },
+    { "kind": "task", "ref": "TSK-1033", "label": "Incident report: gate tailgating", "href": "/tasks/TSK-1033" },
+    { "kind": "task", "ref": "TSK-1042", "label": "Patrol log check, Canary Wharf", "href": "/tasks/TSK-1042" },
+    { "kind": "task", "ref": "TSK-1060", "label": "Plan weekend cover, Shoreditch", "href": "/tasks/TSK-1060" }
+  ],
+  "issue": [
+    { "kind": "issue", "ref": "CI-204", "label": "Missed washroom clean, Riverside House" },
+    { "kind": "issue", "ref": "CI-208", "label": "Reception spill not cleared, Canary Wharf" },
+    { "kind": "issue", "ref": "CI-211", "label": "Gate left open overnight, Docklands" }
+  ],
+  "report": [
+    { "kind": "report", "ref": "RPT-1019 · Incidents", "label": "Daniel Okafor, 19 Oct: incidents section" },
+    { "kind": "report", "ref": "RPT-1019 · Supplies", "label": "Grace Mensah, 19 Oct: supplies section" },
+    { "kind": "report", "ref": "RPT-1020 · Attendance", "label": "Marcus Hill, 20 Oct: attendance section" }
+  ]
+}

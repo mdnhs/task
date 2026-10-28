@@ -1,0 +1,5 @@
+[
+  {"path": "/orders-stock", "expect": ["Orders &amp; Stock", "Waiting approval", "Supplies order"]},
+  {"path": "/orders-stock", "cookies": {"od-role": "auditor"}, "expect": ["Waiting approval", "Supplies order"], "notExpect": ["New request"]},
+  {"path": "/orders-stock", "cookies": {"od-role": "employee"}, "expect": ["Access restricted"], "notExpect": ["Supplies order", "Bunzl"]}
+]

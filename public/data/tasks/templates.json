@@ -1,0 +1,40 @@
+{
+  "templates": [
+    {
+      "id": "TPL-1",
+      "name": "Site fire alarm test",
+      "title": "Fire alarm test",
+      "description": "Test every call point on site. Follow the site checklist and record anything unusual.",
+      "dept": "Security",
+      "priority": 3,
+      "tags": ["fire", "weekly"],
+      "evidenceRequired": true,
+      "dueOffset": 0,
+      "dueTime": "17:00"
+    },
+    {
+      "id": "TPL-2",
+      "name": "Deep clean of a floor",
+      "title": "Deep clean of a floor",
+      "description": "Deep clean the floor, restock supplies and photograph the finished areas.",
+      "dept": "Cleaning",
+      "priority": 2,
+      "tags": ["deep-clean"],
+      "evidenceRequired": true,
+      "dueOffset": 2,
+      "dueTime": "12:00"
+    },
+    {
+      "id": "TPL-3",
+      "name": "Supplies stock check",
+      "title": "Supplies stock check",
+      "description": "Count stock, note what is low and send the reorder list to the manager.",
+      "dept": "Cleaning",
+      "priority": 1,
+      "tags": ["stock"],
+      "evidenceRequired": false,
+      "dueOffset": 1,
+      "dueTime": "16:00"
+    }
+  ]
+}

@@ -1,8 +1,9 @@
 "use client"
 
-import { useEffect, useState, type MouseEvent } from "react"
+import { useSyncExternalStore, useTransition, type MouseEvent } from "react"
+import Link from "next/link"
 import { flushSync } from "react-dom"
-import { BadgeCheck, Bell, ChevronsUpDown, CircleHelp, LogOut, Moon, Settings } from "lucide-react"
+import { BadgeCheck, Bell, Building2, Check, ChevronsUpDown, CircleHelp, LogOut, Moon, Settings, UserCog } from "lucide-react"
 import { useTheme } from "next-themes"
 
 import {
@@ -12,15 +13,23 @@ import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import type { UserData } from "../types"
+import { setRole, setTenant, signOut } from "@/app/actions/session"
+import type { ShellSession, UserData } from "../types"
 
-export function NavUser({ user }: { user: UserData }) {
+const noop = () => () => {}
+
+export function NavUser({ user, session }: { user: UserData; session: ShellSession }) {
   const { resolvedTheme, setTheme } = useTheme()
   // resolvedTheme is unknown on the server; wait for mount to avoid a hydration mismatch.
-  const [mounted, setMounted] = useState(false)
-  useEffect(() => setMounted(true), [])
+  const mounted = useSyncExternalStore(noop, () => true, () => false)
+  const [, startTransition] = useTransition()
+  // The default owner keeps the signed-in person's own title; other roles show the previewed role.
+  const roleLine = session.role.id === "owner" ? user.role : session.role.label
   const dark = mounted && resolvedTheme === "dark"
 
   // Circular reveal from the click point via the View Transitions API.
@@ -51,9 +60,9 @@ export function NavUser({ user }: { user: UserData }) {
         render={<button type="button" className="user user-trigger" aria-label="Account menu" />}
       >
         <span className="avatar av1">{user.initials}</span>
-        <span className="who">
+        <span className="who" title={`${user.name} · ${roleLine}`}>
           <b>{user.name}</b>
-          <small>{user.role}</small>
+          <small>{roleLine}</small>
         </span>
         <ChevronsUpDown className="user-chevron" />
       </DropdownMenuTrigger>
@@ -71,15 +80,15 @@ export function NavUser({ user }: { user: UserData }) {
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <DropdownMenuGroup>
-          <DropdownMenuItem>
+          <DropdownMenuItem render={<Link href="/account/profile" />}>
             <BadgeCheck />
             Account
           </DropdownMenuItem>
-          <DropdownMenuItem>
+          <DropdownMenuItem render={<Link href="/account/notifications" />}>
             <Bell />
             Notifications
           </DropdownMenuItem>
-          <DropdownMenuItem>
+          <DropdownMenuItem render={<Link href="/settings" />}>
             <Settings />
             Settings
           </DropdownMenuItem>
@@ -95,11 +104,41 @@ export function NavUser({ user }: { user: UserData }) {
           </DropdownMenuItem>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger>
+            <UserCog />
+            View as (preview)
+          </DropdownMenuSubTrigger>
+          <DropdownMenuSubContent className="od-menu min-w-56">
+            <div className="od-menu-sub-hint">Demo preview of each role</div>
+            {session.roles.map((r) => (
+              <DropdownMenuItem key={r.id} onClick={() => startTransition(() => setRole(r.id))}>
+                {r.label}
+                {r.id === session.role.id && <Check className="od-check" />}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuSubContent>
+        </DropdownMenuSub>
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger>
+            <Building2 />
+            Switch company
+          </DropdownMenuSubTrigger>
+          <DropdownMenuSubContent className="od-menu min-w-56">
+            {session.tenants.map((t) => (
+              <DropdownMenuItem key={t.id} onClick={() => startTransition(() => setTenant(t.id))}>
+                {t.name}
+                {t.id === session.tenant.id && <Check className="od-check" />}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuSubContent>
+        </DropdownMenuSub>
+        <DropdownMenuSeparator />
         <DropdownMenuItem>
           <CircleHelp />
           Help
         </DropdownMenuItem>
-        <DropdownMenuItem>
+        <DropdownMenuItem onClick={() => startTransition(() => signOut())}>
           <LogOut />
           Log out
         </DropdownMenuItem>

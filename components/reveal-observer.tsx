@@ -3,6 +3,7 @@
 import { useEffect } from "react"
 
 // Elements whose enter animation should wait until they scroll into view. Add selectors here, not per component.
+// Each matching element needs `suppressHydrationWarning`: this may mark it before its (streamed) page has hydrated.
 const REVEAL = ".progress"
 
 // Mounted once in AppShell. Marks REVEAL elements with [data-inview] the first time they enter the viewport;

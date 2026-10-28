@@ -1,0 +1,40 @@
+{
+  "staff": [
+    {
+      "name": "Daniel Okafor",
+      "dept": "Security"
+    },
+    {
+      "name": "Grace Mensah",
+      "dept": "Cleaning"
+    },
+    {
+      "name": "Priya Shah",
+      "dept": "Security"
+    },
+    {
+      "name": "Tomasz Wójcik",
+      "dept": "Cleaning"
+    },
+    {
+      "name": "M. Haddad",
+      "dept": "Security"
+    },
+    {
+      "name": "J. Silva",
+      "dept": "Security"
+    },
+    {
+      "name": "A. Kowalski",
+      "dept": "Security"
+    },
+    {
+      "name": "Lilianna Novak",
+      "dept": "Security"
+    }
+  ],
+  "owners": [
+    "Priya Shah",
+    "Lilianna Novak"
+  ]
+}

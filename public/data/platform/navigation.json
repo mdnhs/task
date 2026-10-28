@@ -1,0 +1,21 @@
+{
+  "menu": [
+    {
+      "href": "/platform",
+      "icon": "grid",
+      "label": "Tenants"
+    },
+    {
+      "href": "/platform/plans",
+      "icon": "wallet",
+      "label": "Plans"
+    },
+    {
+      "href": "/platform/support",
+      "icon": "help",
+      "label": "Support access"
+    }
+  ],
+  "general": [],
+  "departments": []
+}

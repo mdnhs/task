@@ -1,0 +1,314 @@
+{
+  "issues": [
+    {
+      "ref": "PAY-1001",
+      "staff": "M. Haddad",
+      "dept": "Security",
+      "type": "missed_hours",
+      "description": "Four night-shift hours at Canary Wharf on 12 Oct missing from the timesheet.",
+      "owner": "Priya Shah",
+      "target": "2026-10-22T17:00:00",
+      "status": "open",
+      "createdAt": "2026-10-12T10:00:00",
+      "history": [
+        {
+          "at": "2026-10-12T10:00:00",
+          "by": "Lilianna Novak",
+          "action": "Issue logged"
+        }
+      ]
+    },
+    {
+      "ref": "PAY-1002",
+      "staff": "J. Silva",
+      "dept": "Security",
+      "type": "overtime",
+      "description": "Overtime for the 14 Oct double shift not showing against the roster.",
+      "owner": "Priya Shah",
+      "target": "2026-10-23T17:00:00",
+      "status": "open",
+      "createdAt": "2026-10-15T10:00:00",
+      "history": [
+        {
+          "at": "2026-10-15T10:00:00",
+          "by": "Lilianna Novak",
+          "action": "Issue logged"
+        }
+      ]
+    },
+    {
+      "ref": "PAY-1003",
+      "staff": "A. Kowalski",
+      "dept": "Security",
+      "type": "deduction",
+      "description": "Unexpected uniform deduction on the October slip; officer says it was already returned.",
+      "owner": "Lilianna Novak",
+      "target": "2026-10-21T17:00:00",
+      "status": "info_needed",
+      "createdAt": "2026-10-09T10:00:00",
+      "history": [
+        {
+          "at": "2026-10-09T10:00:00",
+          "by": "Lilianna Novak",
+          "action": "Issue logged"
+        },
+        {
+          "at": "2026-10-10T11:30:00",
+          "by": "Lilianna Novak",
+          "action": "Status: Info needed",
+          "note": "Waiting for the payslip and timesheet copy."
+        }
+      ]
+    },
+    {
+      "ref": "PAY-1004",
+      "staff": "Grace Mensah",
+      "dept": "Cleaning",
+      "type": "bank_details",
+      "description": "New bank account details submitted but the old account was still used last month.",
+      "owner": "Priya Shah",
+      "target": "2026-10-20T17:00:00",
+      "status": "correction_required",
+      "createdAt": "2026-10-06T10:00:00",
+      "history": [
+        {
+          "at": "2026-10-06T10:00:00",
+          "by": "Lilianna Novak",
+          "action": "Issue logged"
+        },
+        {
+          "at": "2026-10-07T14:00:00",
+          "by": "Priya Shah",
+          "action": "Status: Correction required",
+          "note": "Confirmed an error; correction goes in the next run."
+        }
+      ]
+    },
+    {
+      "ref": "PAY-1005",
+      "staff": "Tomasz Wójcik",
+      "dept": "Cleaning",
+      "type": "missed_hours",
+      "description": "Stock count overtime on 5 Oct not recorded.",
+      "owner": "Priya Shah",
+      "target": "2026-10-16T17:00:00",
+      "status": "resolved",
+      "createdAt": "2026-10-02T10:00:00",
+      "history": [
+        {
+          "at": "2026-10-02T10:00:00",
+          "by": "Lilianna Novak",
+          "action": "Issue logged"
+        },
+        {
+          "at": "2026-10-03T16:00:00",
+          "by": "Priya Shah",
+          "action": "Resolved",
+          "note": "Hours added to the October run and confirmed with the employee."
+        }
+      ],
+      "resolution": "Hours added to the October run and confirmed with the employee."
+    },
+    {
+      "ref": "PAY-1006",
+      "staff": "Daniel Okafor",
+      "dept": "Security",
+      "type": "other",
+      "description": "Query about holiday pay accrual after moving to the supervisor role.",
+      "owner": "Lilianna Novak",
+      "target": "2026-10-25T17:00:00",
+      "status": "open",
+      "createdAt": "2026-10-16T10:00:00",
+      "history": [
+        {
+          "at": "2026-10-16T10:00:00",
+          "by": "Lilianna Novak",
+          "action": "Issue logged"
+        }
+      ]
+    },
+    {
+      "ref": "PAY-1007",
+      "staff": "M. Haddad",
+      "dept": "Security",
+      "type": "overtime",
+      "description": "Bank holiday uplift not applied to the 26 Aug shift.",
+      "owner": "Priya Shah",
+      "target": "2026-10-14T17:00:00",
+      "status": "resolved",
+      "createdAt": "2026-10-01T10:00:00",
+      "history": [
+        {
+          "at": "2026-10-01T10:00:00",
+          "by": "Lilianna Novak",
+          "action": "Issue logged"
+        },
+        {
+          "at": "2026-10-02T16:00:00",
+          "by": "Priya Shah",
+          "action": "Resolved",
+          "note": "Uplift applied as a correction in the October payment."
+        }
+      ],
+      "resolution": "Uplift applied as a correction in the October payment."
+    },
+    {
+      "ref": "PAY-1008",
+      "staff": "Grace Mensah",
+      "dept": "Cleaning",
+      "type": "deduction",
+      "description": "Double deduction for parking permit across two pay periods.",
+      "owner": "Lilianna Novak",
+      "target": "2026-10-22T17:00:00",
+      "status": "info_needed",
+      "createdAt": "2026-10-13T10:00:00",
+      "history": [
+        {
+          "at": "2026-10-13T10:00:00",
+          "by": "Lilianna Novak",
+          "action": "Issue logged"
+        },
+        {
+          "at": "2026-10-14T11:30:00",
+          "by": "Lilianna Novak",
+          "action": "Status: Info needed",
+          "note": "Waiting for the payslip and timesheet copy."
+        }
+      ]
+    },
+    {
+      "ref": "PAY-1009",
+      "staff": "J. Silva",
+      "dept": "Security",
+      "type": "missed_hours",
+      "description": "Late arrival coded in error; officer was on an approved swap.",
+      "owner": "Priya Shah",
+      "target": "2026-10-21T17:00:00",
+      "status": "correction_required",
+      "createdAt": "2026-10-14T10:00:00",
+      "history": [
+        {
+          "at": "2026-10-14T10:00:00",
+          "by": "Lilianna Novak",
+          "action": "Issue logged"
+        },
+        {
+          "at": "2026-10-15T14:00:00",
+          "by": "Priya Shah",
+          "action": "Status: Correction required",
+          "note": "Confirmed an error; correction goes in the next run."
+        }
+      ]
+    },
+    {
+      "ref": "PAY-1010",
+      "staff": "Tomasz Wójcik",
+      "dept": "Cleaning",
+      "type": "bank_details",
+      "description": "Sort code typo in payroll records.",
+      "owner": "Priya Shah",
+      "target": "2026-10-19T17:00:00",
+      "status": "resolved",
+      "createdAt": "2026-10-08T10:00:00",
+      "history": [
+        {
+          "at": "2026-10-08T10:00:00",
+          "by": "Lilianna Novak",
+          "action": "Issue logged"
+        },
+        {
+          "at": "2026-10-09T16:00:00",
+          "by": "Priya Shah",
+          "action": "Resolved",
+          "note": "Sort code corrected and a test payment confirmed."
+        }
+      ],
+      "resolution": "Sort code corrected and a test payment confirmed."
+    },
+    {
+      "ref": "PAY-1011",
+      "staff": "A. Kowalski",
+      "dept": "Security",
+      "type": "other",
+      "description": "Request for a payslip copy for a mortgage application.",
+      "owner": "Lilianna Novak",
+      "target": "2026-10-27T17:00:00",
+      "status": "open",
+      "createdAt": "2026-10-17T10:00:00",
+      "history": [
+        {
+          "at": "2026-10-17T10:00:00",
+          "by": "Lilianna Novak",
+          "action": "Issue logged"
+        }
+      ]
+    },
+    {
+      "ref": "PAY-1012",
+      "staff": "Daniel Okafor",
+      "dept": "Security",
+      "type": "overtime",
+      "description": "Callout overtime on 9 Oct approved but not paid.",
+      "owner": "Priya Shah",
+      "target": "2026-10-18T17:00:00",
+      "status": "resolved",
+      "createdAt": "2026-10-03T10:00:00",
+      "history": [
+        {
+          "at": "2026-10-03T10:00:00",
+          "by": "Lilianna Novak",
+          "action": "Issue logged"
+        },
+        {
+          "at": "2026-10-04T16:00:00",
+          "by": "Priya Shah",
+          "action": "Resolved",
+          "note": "Paid in the October run; employee notified."
+        }
+      ],
+      "resolution": "Paid in the October run; employee notified."
+    },
+    {
+      "ref": "PAY-1013",
+      "staff": "Priya Shah",
+      "dept": "Security",
+      "type": "missed_hours",
+      "description": "Training day on 7 Oct recorded as unpaid.",
+      "owner": "Lilianna Novak",
+      "target": "2026-10-24T17:00:00",
+      "status": "open",
+      "createdAt": "2026-10-17T10:00:00",
+      "history": [
+        {
+          "at": "2026-10-17T10:00:00",
+          "by": "Lilianna Novak",
+          "action": "Issue logged"
+        }
+      ]
+    },
+    {
+      "ref": "PAY-1014",
+      "staff": "M. Haddad",
+      "dept": "Security",
+      "type": "deduction",
+      "description": "Query on tax code change on the latest slip.",
+      "owner": "Priya Shah",
+      "target": "2026-10-26T17:00:00",
+      "status": "info_needed",
+      "createdAt": "2026-10-18T10:00:00",
+      "history": [
+        {
+          "at": "2026-10-18T10:00:00",
+          "by": "Lilianna Novak",
+          "action": "Issue logged"
+        },
+        {
+          "at": "2026-10-19T11:30:00",
+          "by": "Priya Shah",
+          "action": "Status: Info needed",
+          "note": "Waiting for the payslip and timesheet copy."
+        }
+      ]
+    }
+  ]
+}

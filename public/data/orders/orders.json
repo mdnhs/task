@@ -1,0 +1,495 @@
+{
+  "orders": [
+    {
+      "ref": "ORD-2041",
+      "item": "Supplies order",
+      "qty": 24,
+      "supplier": "Bunzl",
+      "requester": "Tomasz Wójcik",
+      "dept": "Cleaning",
+      "approval": "pending",
+      "delivery": "not_ordered",
+      "expected": "2026-10-26",
+      "amount": 640,
+      "received": 0,
+      "requested": "2026-10-19T16:20:00",
+      "history": [
+        {
+          "at": "2026-10-19T16:20:00",
+          "by": "Tomasz Wójcik",
+          "action": "Requested",
+          "note": "24 x Supplies order from Bunzl"
+        }
+      ]
+    },
+    {
+      "ref": "ORD-2040",
+      "item": "High-vis jackets",
+      "qty": 12,
+      "supplier": "Arco",
+      "requester": "Daniel Okafor",
+      "dept": "Security",
+      "approval": "pending",
+      "delivery": "not_ordered",
+      "expected": "2026-10-27",
+      "amount": 312,
+      "received": 0,
+      "requested": "2026-10-19T14:05:00",
+      "history": [
+        {
+          "at": "2026-10-19T14:05:00",
+          "by": "Daniel Okafor",
+          "action": "Requested",
+          "note": "12 x High-vis jackets from Arco"
+        }
+      ]
+    },
+    {
+      "ref": "ORD-2039",
+      "item": "Torch batteries (AA)",
+      "qty": 60,
+      "supplier": "RS Components",
+      "requester": "Daniel Okafor",
+      "dept": "Security",
+      "approval": "pending",
+      "delivery": "not_ordered",
+      "expected": "2026-10-25",
+      "amount": 96,
+      "received": 0,
+      "requested": "2026-10-20T08:10:00",
+      "history": [
+        {
+          "at": "2026-10-20T08:10:00",
+          "by": "Daniel Okafor",
+          "action": "Requested",
+          "note": "60 x Torch batteries (AA) from RS Components"
+        }
+      ]
+    },
+    {
+      "ref": "ORD-2026",
+      "item": "Key cabinet",
+      "qty": 1,
+      "supplier": "Viking",
+      "requester": "Daniel Okafor",
+      "dept": "Security",
+      "approval": "pending",
+      "delivery": "not_ordered",
+      "expected": "2026-10-30",
+      "amount": 260,
+      "received": 0,
+      "requested": "2026-10-17T11:30:00",
+      "history": [
+        {
+          "at": "2026-10-17T11:30:00",
+          "by": "Daniel Okafor",
+          "action": "Requested",
+          "note": "1 x Key cabinet from Viking"
+        }
+      ]
+    },
+    {
+      "ref": "ORD-2038",
+      "item": "Microfibre cloths",
+      "qty": 200,
+      "supplier": "Bunzl",
+      "requester": "Grace Mensah",
+      "dept": "Cleaning",
+      "approval": "approved",
+      "delivery": "ordered",
+      "expected": "2026-10-22",
+      "amount": 184,
+      "received": 0,
+      "requested": "2026-10-16T09:00:00",
+      "history": [
+        {
+          "at": "2026-10-16T09:00:00",
+          "by": "Grace Mensah",
+          "action": "Requested",
+          "note": "200 x Microfibre cloths from Bunzl"
+        },
+        {
+          "at": "2026-10-17T17:00:00",
+          "by": "Lilianna Novak",
+          "action": "Approved"
+        },
+        {
+          "at": "2026-10-18T09:30:00",
+          "by": "Tomasz Wójcik",
+          "action": "Marked ordered"
+        }
+      ]
+    },
+    {
+      "ref": "ORD-2037",
+      "item": "Floor scrubber pads",
+      "qty": 30,
+      "supplier": "Bunzl",
+      "requester": "Grace Mensah",
+      "dept": "Cleaning",
+      "approval": "approved",
+      "delivery": "partial",
+      "expected": "2026-10-21",
+      "amount": 270,
+      "received": 18,
+      "requested": "2026-10-14T10:15:00",
+      "history": [
+        {
+          "at": "2026-10-14T10:15:00",
+          "by": "Grace Mensah",
+          "action": "Requested",
+          "note": "30 x Floor scrubber pads from Bunzl"
+        },
+        {
+          "at": "2026-10-15T17:00:00",
+          "by": "Lilianna Novak",
+          "action": "Approved"
+        },
+        {
+          "at": "2026-10-16T09:30:00",
+          "by": "Tomasz Wójcik",
+          "action": "Marked ordered"
+        },
+        {
+          "at": "2026-10-19T11:00:00",
+          "by": "Tomasz Wójcik",
+          "action": "Delivery received",
+          "note": "18 of 30 received"
+        }
+      ]
+    },
+    {
+      "ref": "ORD-2036",
+      "item": "Radio earpieces",
+      "qty": 10,
+      "supplier": "Arco",
+      "requester": "Daniel Okafor",
+      "dept": "Security",
+      "approval": "approved",
+      "delivery": "ordered",
+      "expected": "2026-10-23",
+      "amount": 215,
+      "received": 0,
+      "requested": "2026-10-15T13:40:00",
+      "history": [
+        {
+          "at": "2026-10-15T13:40:00",
+          "by": "Daniel Okafor",
+          "action": "Requested",
+          "note": "10 x Radio earpieces from Arco"
+        },
+        {
+          "at": "2026-10-16T17:00:00",
+          "by": "Lilianna Novak",
+          "action": "Approved"
+        },
+        {
+          "at": "2026-10-17T09:30:00",
+          "by": "Tomasz Wójcik",
+          "action": "Marked ordered"
+        }
+      ]
+    },
+    {
+      "ref": "ORD-2035",
+      "item": "Disinfectant 5L",
+      "qty": 48,
+      "supplier": "Bunzl",
+      "requester": "Grace Mensah",
+      "dept": "Cleaning",
+      "approval": "approved",
+      "delivery": "delivered",
+      "expected": "2026-10-15",
+      "amount": 432,
+      "received": 48,
+      "requested": "2026-10-08T09:30:00",
+      "history": [
+        {
+          "at": "2026-10-08T09:30:00",
+          "by": "Grace Mensah",
+          "action": "Requested",
+          "note": "48 x Disinfectant 5L from Bunzl"
+        },
+        {
+          "at": "2026-10-09T17:00:00",
+          "by": "Lilianna Novak",
+          "action": "Approved"
+        },
+        {
+          "at": "2026-10-10T09:30:00",
+          "by": "Tomasz Wójcik",
+          "action": "Marked ordered"
+        },
+        {
+          "at": "2026-10-15T10:00:00",
+          "by": "Tomasz Wójcik",
+          "action": "Delivery received",
+          "note": "48 of 48 received"
+        }
+      ]
+    },
+    {
+      "ref": "ORD-2034",
+      "item": "Patrol notebooks",
+      "qty": 25,
+      "supplier": "Viking",
+      "requester": "Daniel Okafor",
+      "dept": "Security",
+      "approval": "approved",
+      "delivery": "delivered",
+      "expected": "2026-10-14",
+      "amount": 58,
+      "received": 25,
+      "requested": "2026-10-07T15:00:00",
+      "history": [
+        {
+          "at": "2026-10-07T15:00:00",
+          "by": "Daniel Okafor",
+          "action": "Requested",
+          "note": "25 x Patrol notebooks from Viking"
+        },
+        {
+          "at": "2026-10-08T17:00:00",
+          "by": "Lilianna Novak",
+          "action": "Approved"
+        },
+        {
+          "at": "2026-10-09T09:30:00",
+          "by": "Tomasz Wójcik",
+          "action": "Marked ordered"
+        },
+        {
+          "at": "2026-10-14T10:00:00",
+          "by": "Tomasz Wójcik",
+          "action": "Delivery received",
+          "note": "25 of 25 received"
+        }
+      ]
+    },
+    {
+      "ref": "ORD-2033",
+      "item": "Body-worn cameras",
+      "qty": 4,
+      "supplier": "Arco",
+      "requester": "Daniel Okafor",
+      "dept": "Security",
+      "approval": "rejected",
+      "delivery": "not_ordered",
+      "expected": "2026-10-24",
+      "amount": 1480,
+      "received": 0,
+      "rejectReason": "Over budget this quarter. Request a quote for refurbished units.",
+      "requested": "2026-10-13T10:00:00",
+      "history": [
+        {
+          "at": "2026-10-13T10:00:00",
+          "by": "Daniel Okafor",
+          "action": "Requested",
+          "note": "4 x Body-worn cameras from Arco"
+        },
+        {
+          "at": "2026-10-14T17:00:00",
+          "by": "Lilianna Novak",
+          "action": "Rejected",
+          "note": "Over budget this quarter. Request a quote for refurbished units."
+        }
+      ]
+    },
+    {
+      "ref": "ORD-2032",
+      "item": "Mop heads",
+      "qty": 40,
+      "supplier": "Bunzl",
+      "requester": "Grace Mensah",
+      "dept": "Cleaning",
+      "approval": "approved",
+      "delivery": "not_ordered",
+      "expected": "2026-10-27",
+      "amount": 120,
+      "received": 0,
+      "requested": "2026-10-19T09:45:00",
+      "history": [
+        {
+          "at": "2026-10-19T09:45:00",
+          "by": "Grace Mensah",
+          "action": "Requested",
+          "note": "40 x Mop heads from Bunzl"
+        },
+        {
+          "at": "2026-10-20T17:00:00",
+          "by": "Lilianna Novak",
+          "action": "Approved"
+        }
+      ]
+    },
+    {
+      "ref": "ORD-2031",
+      "item": "Bin liners 100L (rolls)",
+      "qty": 20,
+      "supplier": "Bunzl",
+      "requester": "Tomasz Wójcik",
+      "dept": "Cleaning",
+      "approval": "approved",
+      "delivery": "ordered",
+      "expected": "2026-10-21",
+      "amount": 96,
+      "received": 0,
+      "requested": "2026-10-13T11:20:00",
+      "history": [
+        {
+          "at": "2026-10-13T11:20:00",
+          "by": "Tomasz Wójcik",
+          "action": "Requested",
+          "note": "20 x Bin liners 100L (rolls) from Bunzl"
+        },
+        {
+          "at": "2026-10-14T17:00:00",
+          "by": "Lilianna Novak",
+          "action": "Approved"
+        },
+        {
+          "at": "2026-10-15T09:30:00",
+          "by": "Tomasz Wójcik",
+          "action": "Marked ordered"
+        }
+      ]
+    },
+    {
+      "ref": "ORD-2030",
+      "item": "First aid kits",
+      "qty": 6,
+      "supplier": "Arco",
+      "requester": "Daniel Okafor",
+      "dept": "Security",
+      "approval": "approved",
+      "delivery": "delivered",
+      "expected": "2026-10-12",
+      "amount": 84,
+      "received": 6,
+      "requested": "2026-10-05T12:00:00",
+      "history": [
+        {
+          "at": "2026-10-05T12:00:00",
+          "by": "Daniel Okafor",
+          "action": "Requested",
+          "note": "6 x First aid kits from Arco"
+        },
+        {
+          "at": "2026-10-06T17:00:00",
+          "by": "Lilianna Novak",
+          "action": "Approved"
+        },
+        {
+          "at": "2026-10-07T09:30:00",
+          "by": "Tomasz Wójcik",
+          "action": "Marked ordered"
+        },
+        {
+          "at": "2026-10-12T10:00:00",
+          "by": "Tomasz Wójcik",
+          "action": "Delivery received",
+          "note": "6 of 6 received"
+        }
+      ]
+    },
+    {
+      "ref": "ORD-2029",
+      "item": "Nitrile gloves (boxes)",
+      "qty": 10,
+      "supplier": "Bunzl",
+      "requester": "Grace Mensah",
+      "dept": "Cleaning",
+      "approval": "rejected",
+      "delivery": "not_ordered",
+      "expected": "2026-10-16",
+      "amount": 210,
+      "received": 0,
+      "rejectReason": "Duplicate of ORD-2035, which is already delivered.",
+      "requested": "2026-10-09T08:50:00",
+      "history": [
+        {
+          "at": "2026-10-09T08:50:00",
+          "by": "Grace Mensah",
+          "action": "Requested",
+          "note": "10 x Nitrile gloves (boxes) from Bunzl"
+        },
+        {
+          "at": "2026-10-10T17:00:00",
+          "by": "Lilianna Novak",
+          "action": "Rejected",
+          "note": "Duplicate of ORD-2035, which is already delivered."
+        }
+      ]
+    },
+    {
+      "ref": "ORD-2028",
+      "item": "Uniform shirts",
+      "qty": 15,
+      "supplier": "Arco",
+      "requester": "Daniel Okafor",
+      "dept": "Security",
+      "approval": "approved",
+      "delivery": "ordered",
+      "expected": "2026-10-25",
+      "amount": 375,
+      "received": 0,
+      "requested": "2026-10-12T14:10:00",
+      "history": [
+        {
+          "at": "2026-10-12T14:10:00",
+          "by": "Daniel Okafor",
+          "action": "Requested",
+          "note": "15 x Uniform shirts from Arco"
+        },
+        {
+          "at": "2026-10-13T17:00:00",
+          "by": "Lilianna Novak",
+          "action": "Approved"
+        },
+        {
+          "at": "2026-10-14T09:30:00",
+          "by": "Tomasz Wójcik",
+          "action": "Marked ordered"
+        }
+      ]
+    },
+    {
+      "ref": "ORD-2027",
+      "item": "Window squeegees",
+      "qty": 12,
+      "supplier": "Bunzl",
+      "requester": "Grace Mensah",
+      "dept": "Cleaning",
+      "approval": "approved",
+      "delivery": "delivered",
+      "expected": "2026-10-10",
+      "amount": 78,
+      "received": 12,
+      "requested": "2026-10-03T10:30:00",
+      "history": [
+        {
+          "at": "2026-10-03T10:30:00",
+          "by": "Grace Mensah",
+          "action": "Requested",
+          "note": "12 x Window squeegees from Bunzl"
+        },
+        {
+          "at": "2026-10-04T17:00:00",
+          "by": "Lilianna Novak",
+          "action": "Approved"
+        },
+        {
+          "at": "2026-10-05T09:30:00",
+          "by": "Tomasz Wójcik",
+          "action": "Marked ordered"
+        },
+        {
+          "at": "2026-10-10T10:00:00",
+          "by": "Tomasz Wójcik",
+          "action": "Delivery received",
+          "note": "12 of 12 received"
+        }
+      ]
+    }
+  ]
+}

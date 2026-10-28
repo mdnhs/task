@@ -1,0 +1,96 @@
+{
+  "default": {
+    "provider": null,
+    "method": "Not chosen",
+    "businessNumber": null,
+    "status": "pending",
+    "note": "The client hasn't chosen a WhatsApp integration method or confirmed which flows they need (OC-05).",
+    "flows": [
+      { "id": "alerts", "label": "Alerts", "description": "Deadline and escalation alerts sent to staff", "state": "pending" },
+      { "id": "inbound", "label": "Inbound messages", "description": "Staff and client messages arrive in this inbox", "state": "pending" },
+      { "id": "outbound", "label": "Outbound replies", "description": "Reply from OpsDesk to the sender", "state": "pending" },
+      { "id": "task_creation", "label": "Task creation", "description": "Create a task from a message", "state": "pending" },
+      { "id": "voice", "label": "Voice transcription", "description": "Voice notes transcribed for review", "state": "pending" }
+    ],
+    "privacy": {
+      "audioRetentionDays": 30,
+      "transcriptRetentionDays": 90,
+      "storage": "Audio and transcripts are stored in the workspace's own region and deleted automatically after the retention period.",
+      "transcription": "Approved transcription service, processed under the workspace's data processing agreement.",
+      "consent": "Only messages from contacts who have given WhatsApp consent are stored. Contacts can ask for their audio and transcripts to be deleted."
+    }
+  },
+  "tenants": {
+    "t1": {
+      "provider": "WhatsApp Business Platform (proposed)",
+      "method": "Cloud API via a Business Solution Provider",
+      "businessNumber": "+44 20 7946 0321",
+      "status": "pending",
+      "note": "Pilot on the proposed number. The client hasn't confirmed the provider, the business number or the final message flows yet (FR-WA-08, OC-05).",
+      "lastSyncAt": "2026-10-20T08:58:00",
+      "flows": [
+        { "id": "alerts", "label": "Alerts", "description": "Deadline and escalation alerts sent to staff", "state": "pending" },
+        { "id": "inbound", "label": "Inbound messages", "description": "Staff and client messages arrive in this inbox", "state": "enabled" },
+        { "id": "outbound", "label": "Outbound replies", "description": "Reply from OpsDesk to the sender", "state": "enabled" },
+        { "id": "task_creation", "label": "Task creation", "description": "Create a task from a message", "state": "enabled" },
+        { "id": "voice", "label": "Voice transcription", "description": "Voice notes transcribed for review", "state": "enabled" }
+      ],
+      "privacy": {
+        "audioRetentionDays": 30,
+        "transcriptRetentionDays": 90,
+        "storage": "Audio and transcripts are stored in the UK and deleted automatically after the retention period.",
+        "transcription": "Approved transcription service, processed under the workspace's data processing agreement.",
+        "consent": "Only messages from contacts who have given WhatsApp consent are stored. Contacts can ask for their audio and transcripts to be deleted."
+      }
+    },
+    "t2": {
+      "provider": null,
+      "method": "Not chosen",
+      "businessNumber": null,
+      "status": "pending",
+      "note": "Trial workspace: inbound messages only. Replies, task creation and transcription stay off until the client confirms the flows (OC-05).",
+      "lastSyncAt": "2026-10-20T08:40:00",
+      "flows": [
+        { "id": "alerts", "label": "Alerts", "description": "Deadline and escalation alerts sent to staff", "state": "pending" },
+        { "id": "inbound", "label": "Inbound messages", "description": "Staff and client messages arrive in this inbox", "state": "enabled" },
+        { "id": "outbound", "label": "Outbound replies", "description": "Reply from OpsDesk to the sender", "state": "pending" },
+        { "id": "task_creation", "label": "Task creation", "description": "Create a task from a message", "state": "pending" },
+        { "id": "voice", "label": "Voice transcription", "description": "Voice notes transcribed for review", "state": "pending" }
+      ],
+      "privacy": {
+        "audioRetentionDays": 14,
+        "transcriptRetentionDays": 30,
+        "storage": "Audio and transcripts are stored in the workspace's own region and deleted automatically after the retention period.",
+        "transcription": "No transcription service approved yet.",
+        "consent": "Only messages from contacts who have given WhatsApp consent are stored. Contacts can ask for their audio and transcripts to be deleted."
+      }
+    },
+    "t3": {
+      "provider": "WhatsApp Business Platform",
+      "method": "Cloud API via a Business Solution Provider",
+      "businessNumber": "+44 161 496 0754",
+      "status": "disconnected",
+      "note": "Flows confirmed by the client on 2 Oct 2026.",
+      "lastSyncAt": "2026-10-19T22:14:00",
+      "error": {
+        "title": "WhatsApp is disconnected",
+        "detail": "The provider rejected the access token. New messages aren't arriving and replies can't be sent. Messages already here are safe.",
+        "since": "2026-10-19T22:14:00"
+      },
+      "flows": [
+        { "id": "alerts", "label": "Alerts", "description": "Deadline and escalation alerts sent to staff", "state": "enabled" },
+        { "id": "inbound", "label": "Inbound messages", "description": "Staff and client messages arrive in this inbox", "state": "enabled" },
+        { "id": "outbound", "label": "Outbound replies", "description": "Reply from OpsDesk to the sender", "state": "enabled" },
+        { "id": "task_creation", "label": "Task creation", "description": "Create a task from a message", "state": "enabled" },
+        { "id": "voice", "label": "Voice transcription", "description": "Voice notes transcribed for review", "state": "enabled" }
+      ],
+      "privacy": {
+        "audioRetentionDays": 30,
+        "transcriptRetentionDays": 90,
+        "storage": "Audio and transcripts are stored in the UK and deleted automatically after the retention period.",
+        "transcription": "Approved transcription service, processed under the workspace's data processing agreement.",
+        "consent": "Only messages from contacts who have given WhatsApp consent are stored. Contacts can ask for their audio and transcripts to be deleted."
+      }
+    }
+  }
+}

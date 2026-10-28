@@ -1,0 +1,154 @@
+{
+  "requests": [
+    {
+      "id": "SUP-101",
+      "tenantId": "t1",
+      "requester": "Daniel Okafor (Platform Support)",
+      "reason": "Investigate missing evidence thumbnails on closed tasks",
+      "status": "granted",
+      "requestedAt": "2026-10-19T09:10:00",
+      "expiresAt": "2026-10-21T09:10:00",
+      "grantedBy": "Lilianna Novak"
+    },
+    {
+      "id": "SUP-102",
+      "tenantId": "t3",
+      "requester": "Daniel Okafor (Platform Support)",
+      "reason": "Payment retry failed twice, confirm billing contact is correct",
+      "status": "requested",
+      "requestedAt": "2026-10-20T08:40:00",
+      "expiresAt": null,
+      "grantedBy": null
+    },
+    {
+      "id": "SUP-103",
+      "tenantId": "t5",
+      "requester": "Priya Shah (Platform Support)",
+      "reason": "Roster export times out for the Canary Wharf site",
+      "status": "granted",
+      "requestedAt": "2026-10-20T07:55:00",
+      "expiresAt": "2026-10-20T23:30:00",
+      "grantedBy": "Marcus Bell"
+    },
+    {
+      "id": "SUP-104",
+      "tenantId": "t7",
+      "requester": "Daniel Okafor (Platform Support)",
+      "reason": "Staff import skipped 14 rows",
+      "status": "expired",
+      "requestedAt": "2026-10-14T11:00:00",
+      "expiresAt": "2026-10-15T11:00:00",
+      "grantedBy": "Tomasz W\u00f3jcik"
+    },
+    {
+      "id": "SUP-105",
+      "tenantId": "t9",
+      "requester": "Priya Shah (Platform Support)",
+      "reason": "Notification emails not arriving for two managers",
+      "status": "revoked",
+      "requestedAt": "2026-10-16T13:20:00",
+      "expiresAt": "2026-10-17T13:20:00",
+      "grantedBy": "Priya Shah"
+    },
+    {
+      "id": "SUP-106",
+      "tenantId": "t10",
+      "requester": "Daniel Okafor (Platform Support)",
+      "reason": "Plan upgrade did not apply the new storage limit",
+      "status": "requested",
+      "requestedAt": "2026-10-20T08:05:00",
+      "expiresAt": null,
+      "grantedBy": null
+    },
+    {
+      "id": "SUP-107",
+      "tenantId": "t2",
+      "requester": "Priya Shah (Platform Support)",
+      "reason": "Onboarding checklist stuck on departments step",
+      "status": "granted",
+      "requestedAt": "2026-10-20T08:15:00",
+      "expiresAt": "2026-10-21T08:15:00",
+      "grantedBy": "Grace Mensah"
+    },
+    {
+      "id": "SUP-108",
+      "tenantId": "t4",
+      "requester": "Daniel Okafor (Platform Support)",
+      "reason": "Daily report deadline shows the wrong timezone label",
+      "status": "expired",
+      "requestedAt": "2026-10-10T09:00:00",
+      "expiresAt": "2026-10-11T09:00:00",
+      "grantedBy": "Anika Rahman"
+    },
+    {
+      "id": "SUP-109",
+      "tenantId": "t11",
+      "requester": "Priya Shah (Platform Support)",
+      "reason": "User cannot reset password",
+      "status": "requested",
+      "requestedAt": "2026-10-19T16:45:00",
+      "expiresAt": null,
+      "grantedBy": null
+    },
+    {
+      "id": "SUP-110",
+      "tenantId": "t13",
+      "requester": "Daniel Okafor (Platform Support)",
+      "reason": "Duplicate tasks appear after a bulk reassign",
+      "status": "revoked",
+      "requestedAt": "2026-10-12T10:30:00",
+      "expiresAt": "2026-10-13T10:30:00",
+      "grantedBy": "Yusuf Karim"
+    },
+    {
+      "id": "SUP-111",
+      "tenantId": "t12",
+      "requester": "Priya Shah (Platform Support)",
+      "reason": "Trial extension request, help with data import",
+      "status": "granted",
+      "requestedAt": "2026-10-20T08:50:00",
+      "expiresAt": "2026-10-20T20:00:00",
+      "grantedBy": "Callum Reid"
+    },
+    {
+      "id": "SUP-112",
+      "tenantId": "t6",
+      "requester": "Daniel Okafor (Platform Support)",
+      "reason": "Evidence upload fails above 8 MB",
+      "status": "expired",
+      "requestedAt": "2026-10-08T14:00:00",
+      "expiresAt": "2026-10-09T14:00:00",
+      "grantedBy": "Sofia Marin"
+    },
+    {
+      "id": "SUP-201",
+      "tenantId": "t1",
+      "requester": "OpsDesk Support (R. Clarke)",
+      "reason": "Investigating report export error",
+      "status": "granted",
+      "requestedAt": "2026-10-19T14:00:00",
+      "expiresAt": "2026-10-20T14:00:00",
+      "grantedBy": "Lilianna Novak"
+    },
+    {
+      "id": "SUP-202",
+      "tenantId": "t1",
+      "requester": "OpsDesk Support (M. Ortiz)",
+      "reason": "Help with roster import",
+      "status": "granted",
+      "requestedAt": "2026-10-18T09:30:00",
+      "expiresAt": "2026-10-19T09:30:00",
+      "grantedBy": "Lilianna Novak"
+    },
+    {
+      "id": "SUP-203",
+      "tenantId": "t1",
+      "requester": "OpsDesk Support (R. Clarke)",
+      "reason": "Plan upgrade check",
+      "status": "granted",
+      "requestedAt": "2026-10-15T11:00:00",
+      "expiresAt": "2026-10-16T11:00:00",
+      "grantedBy": "Lilianna Novak"
+    }
+  ]
+}

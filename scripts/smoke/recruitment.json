@@ -1,0 +1,5 @@
+[
+  {"path": "/recruitment", "expect": ["Recruitment", "Pipeline", "Ines Carvalho", "Add candidate"], "notExpect": ["Access restricted"]},
+  {"path": "/recruitment", "cookies": {"od-role": "employee"}, "expect": ["Access restricted"], "notExpect": ["Ines Carvalho", "Pipeline"]},
+  {"path": "/recruitment", "cookies": {"od-role": "auditor"}, "expect": ["Pipeline", "Ines Carvalho"], "notExpect": ["Add candidate", "example.com", "07700"]}
+]

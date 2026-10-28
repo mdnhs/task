@@ -1,0 +1,23 @@
+{
+ "provider": "Stripe",
+ "tenants": {
+  "t1": {
+   "planId": "business",
+   "status": "active",
+   "renewsOn": "2026-11-14",
+   "cardLast4": "4242"
+  },
+  "t2": {
+   "planId": "starter",
+   "status": "trial",
+   "renewsOn": "2026-11-03",
+   "cardLast4": null
+  },
+  "t3": {
+   "planId": "business",
+   "status": "past_due",
+   "renewsOn": "2026-10-14",
+   "cardLast4": "0341"
+  }
+ }
+}

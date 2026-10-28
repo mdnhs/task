@@ -1,0 +1,84 @@
+{
+  "people": [
+    {
+      "id": "p-daniel",
+      "name": "Daniel Okafor",
+      "role": "Security Supervisor",
+      "initials": "DO",
+      "avatar": "av1",
+      "dept": "Security"
+    },
+    {
+      "id": "p-grace",
+      "name": "Grace Mensah",
+      "role": "Cleaning Team Lead",
+      "initials": "GM",
+      "avatar": "av2",
+      "dept": "Cleaning"
+    },
+    {
+      "id": "p-priya",
+      "name": "Priya Shah",
+      "role": "HR & Recruitment",
+      "initials": "PS",
+      "avatar": "av3",
+      "dept": "Security"
+    },
+    {
+      "id": "p-tomasz",
+      "name": "Tomasz Wójcik",
+      "role": "Stock Coordinator",
+      "initials": "TW",
+      "avatar": "av4",
+      "dept": "Cleaning"
+    },
+    {
+      "id": "p-amara",
+      "name": "Amara Kone",
+      "role": "Cleaning Operative",
+      "initials": "AK",
+      "avatar": "av5",
+      "dept": "Cleaning"
+    },
+    {
+      "id": "p-marcus",
+      "name": "Marcus Hill",
+      "role": "Security Officer",
+      "initials": "MH",
+      "avatar": "av6",
+      "dept": "Security"
+    },
+    {
+      "id": "p-leo",
+      "name": "Leo Fernandez",
+      "role": "Security Officer",
+      "initials": "LF",
+      "avatar": "av2",
+      "dept": "Security"
+    },
+    {
+      "id": "p-nadia",
+      "name": "Nadia Rahman",
+      "role": "Cleaning Operative",
+      "initials": "NR",
+      "avatar": "av3",
+      "dept": "Cleaning"
+    },
+    {
+      "id": "p-owen",
+      "name": "Owen Price",
+      "role": "Site Supervisor",
+      "initials": "OP",
+      "avatar": "av4",
+      "dept": "Cleaning"
+    },
+    {
+      "id": "p-lilianna",
+      "name": "Lilianna Novak",
+      "role": "Operations Manager",
+      "initials": "LN",
+      "avatar": "av1",
+      "dept": "Security"
+    }
+  ]
+}

@@ -1,0 +1,116 @@
+{
+  "outstanding": [
+    {
+      "id": "OUT-501",
+      "title": "Missing evidence on Riverside House deep-clean task",
+      "reason": "Photos not uploaded after two reminders.",
+      "owner": "Grace Mensah",
+      "priority": 2,
+      "nextAction": "Ask the team lead to upload before Wednesday",
+      "target": "2026-10-21T17:00:00",
+      "carriedFrom": "2026-10-15",
+      "status": "open"
+    },
+    {
+      "id": "OUT-502",
+      "title": "Overdue SIA renewals for new starters",
+      "reason": "Paperwork incomplete with the licensing body.",
+      "owner": "Priya Shah",
+      "priority": 1,
+      "nextAction": "Chase the licensing body and confirm dates",
+      "target": "2026-10-22T12:00:00",
+      "carriedFrom": "2026-10-14",
+      "status": "open"
+    },
+    {
+      "id": "OUT-503",
+      "title": "Canary Wharf site induction records",
+      "reason": "Three induction forms are unsigned.",
+      "owner": "Daniel Okafor",
+      "priority": 2,
+      "nextAction": "Collect signatures at the next shift change",
+      "target": "2026-10-21T10:00:00",
+      "carriedFrom": "2026-10-16",
+      "status": "open"
+    },
+    {
+      "id": "OUT-504",
+      "title": "Chemical store stock count",
+      "reason": "Last count was 3 weeks ago.",
+      "owner": "Tomasz Wójcik",
+      "priority": 3,
+      "nextAction": "Schedule a stock count for Thursday",
+      "target": "2026-10-23T15:00:00",
+      "carriedFrom": "2026-10-17",
+      "status": "open"
+    },
+    {
+      "id": "OUT-505",
+      "title": "Client feedback form for Riverside House",
+      "reason": "Quarterly feedback not yet sent.",
+      "owner": "Grace Mensah",
+      "priority": 3,
+      "nextAction": "Send the form and set a reminder",
+      "target": "2026-10-24T17:00:00",
+      "carriedFrom": "2026-10-19",
+      "status": "open"
+    },
+    {
+      "id": "OUT-506",
+      "title": "Pending payroll query for night shift",
+      "reason": "Two officers query their hours for September.",
+      "owner": "Priya Shah",
+      "priority": 1,
+      "nextAction": "Reconcile the clocking records with payroll",
+      "target": "2026-10-21T17:00:00",
+      "carriedFrom": "2026-10-13",
+      "status": "open"
+    },
+    {
+      "id": "OUT-507",
+      "title": "Fire marshal training expiry",
+      "reason": "Four marshals are due a refresher.",
+      "owner": "Daniel Okafor",
+      "priority": 2,
+      "nextAction": "Book the refresher course",
+      "target": "2026-10-27T12:00:00",
+      "carriedFrom": "2026-10-16",
+      "status": "open"
+    },
+    {
+      "id": "OUT-508",
+      "title": "Supplier price review with Bunzl",
+      "reason": "Prices rose 6% since the last review.",
+      "owner": "Tomasz Wójcik",
+      "priority": 3,
+      "nextAction": "Request a revised quote",
+      "target": "2026-10-28T17:00:00",
+      "carriedFrom": "2026-10-12",
+      "status": "open"
+    },
+    {
+      "id": "OUT-509",
+      "title": "Uniform sizing for new officers",
+      "reason": "Sizes missing for two starters.",
+      "owner": "Priya Shah",
+      "priority": 3,
+      "nextAction": "Get sizes at orientation",
+      "target": "2026-10-19T17:00:00",
+      "carriedFrom": "2026-10-17",
+      "status": "closed",
+      "resolution": "Sizes collected and order updated."
+    },
+    {
+      "id": "OUT-510",
+      "title": "Spare keys audit at Riverside House",
+      "reason": "Key register out of date.",
+      "owner": "Grace Mensah",
+      "priority": 2,
+      "nextAction": "Walk the site with the register",
+      "target": "2026-10-18T17:00:00",
+      "carriedFrom": "2026-10-15",
+      "status": "closed",
+      "resolution": "Audit done, register corrected."
+    }
+  ]
+}

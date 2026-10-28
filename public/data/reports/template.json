@@ -1,0 +1,310 @@
+{
+ "sections": [
+  {
+   "id": "staff",
+   "n": 1,
+   "title": "Staff / Attendance",
+   "fields": [
+    {
+     "id": "call-outs",
+     "label": "Call-outs",
+     "required": true,
+     "entry": "structured",
+     "columns": [
+      "Staff",
+      "Shift",
+      "Notes"
+     ]
+    },
+    {
+     "id": "no-shows",
+     "label": "No-shows",
+     "required": true,
+     "entry": "structured",
+     "columns": [
+      "Staff",
+      "Shift",
+      "Notes"
+     ]
+    },
+    {
+     "id": "cover-arranged",
+     "label": "Cover arranged",
+     "required": true,
+     "entry": "text"
+    },
+    {
+     "id": "outstanding-staff-issues",
+     "label": "Outstanding staff issues",
+     "required": true,
+     "entry": "text"
+    }
+   ]
+  },
+  {
+   "id": "clients",
+   "n": 2,
+   "title": "Client Issues",
+   "fields": [
+    {
+     "id": "client-contacted",
+     "label": "Client contacted",
+     "required": true,
+     "entry": "text"
+    },
+    {
+     "id": "complaints",
+     "label": "Complaints",
+     "required": true,
+     "entry": "structured",
+     "columns": [
+      "Client / site",
+      "Details",
+      "Urgency"
+     ]
+    },
+    {
+     "id": "requests",
+     "label": "Requests",
+     "required": true,
+     "entry": "text"
+    },
+    {
+     "id": "outstanding-issues",
+     "label": "Outstanding issues",
+     "required": true,
+     "entry": "text"
+    }
+   ]
+  },
+  {
+   "id": "rosters",
+   "n": 3,
+   "title": "Rosters",
+   "fields": [
+    {
+     "id": "todays-issues",
+     "label": "Today's issues",
+     "required": true,
+     "entry": "text"
+    },
+    {
+     "id": "tomorrows-cover",
+     "label": "Tomorrow's cover",
+     "required": true,
+     "entry": "text"
+    },
+    {
+     "id": "next-weeks-gaps",
+     "label": "Next week's gaps",
+     "required": false,
+     "entry": "text"
+    }
+   ]
+  },
+  {
+   "id": "recruitment",
+   "n": 4,
+   "title": "Recruitment",
+   "fields": [
+    {
+     "id": "applications-reviewed",
+     "label": "Applications reviewed",
+     "required": true,
+     "entry": "count"
+    },
+    {
+     "id": "candidates-contacted",
+     "label": "Candidates contacted",
+     "required": true,
+     "entry": "count"
+    },
+    {
+     "id": "interviews-arranged",
+     "label": "Interviews arranged",
+     "required": true,
+     "entry": "count"
+    },
+    {
+     "id": "new-starters",
+     "label": "New starters",
+     "required": true,
+     "entry": "count"
+    },
+    {
+     "id": "outstanding-candidates",
+     "label": "Outstanding candidates",
+     "required": false,
+     "entry": "text"
+    }
+   ]
+  },
+  {
+   "id": "employee-files",
+   "n": 5,
+   "title": "Employee Files",
+   "fields": [
+    {
+     "id": "files-updated",
+     "label": "Files updated",
+     "required": true,
+     "entry": "text"
+    },
+    {
+     "id": "documents-received",
+     "label": "Documents received",
+     "required": true,
+     "entry": "text"
+    },
+    {
+     "id": "missing-documents",
+     "label": "Missing documents",
+     "required": true,
+     "entry": "text"
+    },
+    {
+     "id": "expiring-documents",
+     "label": "Expiring licences/documents",
+     "required": true,
+     "entry": "text"
+    }
+   ]
+  },
+  {
+   "id": "client-files",
+   "n": 6,
+   "title": "Client Files",
+   "fields": [
+    {
+     "id": "files-updated",
+     "label": "Files updated",
+     "required": true,
+     "entry": "text"
+    },
+    {
+     "id": "contracts",
+     "label": "Contracts",
+     "required": true,
+     "entry": "text"
+    },
+    {
+     "id": "contact-details",
+     "label": "Contact details",
+     "required": true,
+     "entry": "text"
+    },
+    {
+     "id": "outstanding-paperwork",
+     "label": "Outstanding paperwork",
+     "required": true,
+     "entry": "text"
+    }
+   ]
+  },
+  {
+   "id": "payroll",
+   "n": 7,
+   "title": "Payroll",
+   "restricted": true,
+   "fields": [
+    {
+     "id": "issues-identified",
+     "label": "Issues identified",
+     "required": true,
+     "entry": "text"
+    },
+    {
+     "id": "corrections-required",
+     "label": "Corrections required",
+     "required": true,
+     "entry": "text"
+    },
+    {
+     "id": "outstanding-information",
+     "label": "Outstanding information",
+     "required": true,
+     "entry": "text"
+    }
+   ]
+  },
+  {
+   "id": "orders",
+   "n": 8,
+   "title": "Orders / Stock",
+   "fields": [
+    {
+     "id": "orders-placed",
+     "label": "Orders placed",
+     "required": true,
+     "entry": "text"
+    },
+    {
+     "id": "deliveries-received",
+     "label": "Deliveries received",
+     "required": true,
+     "entry": "text"
+    },
+    {
+     "id": "items-required",
+     "label": "Items required",
+     "required": true,
+     "entry": "text"
+    },
+    {
+     "id": "waiting-for-approval",
+     "label": "Waiting for approval",
+     "required": true,
+     "entry": "text"
+    }
+   ]
+  },
+  {
+   "id": "outstanding",
+   "n": 9,
+   "title": "Outstanding",
+   "fields": [
+    {
+     "id": "tasks-not-completed",
+     "label": "Tasks not completed today",
+     "required": true,
+     "entry": "structured",
+     "columns": [
+      "Task",
+      "Owner",
+      "Target date"
+     ]
+    },
+    {
+     "id": "reason",
+     "label": "Reason",
+     "required": false,
+     "entry": "text"
+    },
+    {
+     "id": "action-required",
+     "label": "Action required",
+     "required": false,
+     "entry": "text"
+    }
+   ]
+  },
+  {
+   "id": "attention",
+   "n": 10,
+   "title": "Manager Attention Required",
+   "fields": [
+    {
+     "id": "decision-needed",
+     "label": "Anything needing Lilianna's decision/action",
+     "required": true,
+     "entry": "structured",
+     "columns": [
+      "Summary",
+      "Decision requested",
+      "Urgency"
+     ]
+    }
+   ]
+  }
+ ]
+}

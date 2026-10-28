@@ -1,0 +1,9 @@
+{
+  "title": "Evidence",
+  "subtitle": "Awaiting review or returned to you",
+  "items": [
+    {"ref": "TSK-1028", "title": "Client walk-round notes, Canary Wharf", "state": "returned", "at": "2026-10-19T16:40:00", "reviewer": "Lilianna Novak", "reason": "Photo is unclear, please re-upload.", "status": {"tone": "warn", "label": "Returned"}},
+    {"ref": "TSK-1033", "title": "Incident report: gate tailgating", "state": "review", "at": "2026-10-20T08:15:00", "reviewer": "Lilianna Novak", "status": {"tone": "info", "label": "Awaiting review"}},
+    {"ref": "TSK-1036", "title": "Key audit, Riverside House", "state": "review", "at": "2026-10-19T17:30:00", "reviewer": "Lilianna Novak", "status": {"tone": "info", "label": "Awaiting review"}}
+  ]
+}

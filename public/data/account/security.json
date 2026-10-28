@@ -1,0 +1,14 @@
+{
+  "mfa": false,
+  "resetLinkMinutes": 30,
+  "sessions": [
+    { "id": "s1", "device": "Chrome on macOS", "kind": "laptop", "location": "London, UK", "lastActive": "2026-10-20T09:00:00", "current": true },
+    { "id": "s2", "device": "Safari on iPhone", "kind": "phone", "location": "London, UK", "lastActive": "2026-10-19T18:12:00", "current": false },
+    { "id": "s3", "device": "Edge on Windows", "kind": "laptop", "location": "Manchester, UK", "lastActive": "2026-10-16T11:40:00", "current": false }
+  ],
+  "activity": [
+    { "id": "a3", "text": "Signed in from Chrome on macOS", "at": "2026-10-20T08:55:00" },
+    { "id": "a2", "text": "Signed in from Safari on iPhone", "at": "2026-10-19T18:12:00" },
+    { "id": "a1", "text": "Password changed", "at": "2026-09-30T14:05:00" }
+  ]
+}

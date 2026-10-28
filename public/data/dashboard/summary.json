@@ -3,39 +3,103 @@
     {
       "title": "Open Tasks",
       "ariaLabel": "View open tasks",
+      "href": "/tasks?status=open",
       "value": "48",
       "hero": true,
       "note": {
         "tone": "up",
         "highlight": "+6",
         "text": " assigned since yesterday"
+      },
+      "byDept": {
+        "Security": {
+          "value": "27",
+          "note": {
+            "tone": "up",
+            "highlight": "+4",
+            "text": " assigned since yesterday"
+          }
+        },
+        "Cleaning": {
+          "value": "21",
+          "note": {
+            "tone": "up",
+            "highlight": "+2",
+            "text": " assigned since yesterday"
+          }
+        }
       }
     },
     {
       "title": "Overdue Tasks",
       "ariaLabel": "View overdue tasks",
+      "href": "/tasks?due=overdue",
       "value": "7",
       "note": {
         "tone": "down",
         "highlight": "3 blocked",
         "text": " · reason required"
+      },
+      "byDept": {
+        "Security": {
+          "value": "4",
+          "note": {
+            "tone": "down",
+            "highlight": "2 blocked",
+            "text": " · reason required"
+          }
+        },
+        "Cleaning": {
+          "value": "3",
+          "note": {
+            "tone": "down",
+            "highlight": "1 blocked",
+            "text": " · reason required"
+          }
+        }
       }
     },
     {
       "title": "Awaiting Review",
       "ariaLabel": "View tasks awaiting review",
+      "href": "/tasks?status=submitted",
       "value": "9",
       "note": {
         "text": "Evidence submitted, not yet approved"
+      },
+      "byDept": {
+        "Security": {
+          "value": "5"
+        },
+        "Cleaning": {
+          "value": "4"
+        }
       }
     },
     {
       "title": "Reports Today",
       "ariaLabel": "View daily reports",
+      "href": "/daily-reports",
       "value": "1",
       "valueSuffix": "/2",
       "note": {
         "text": "Cleaning report still in draft"
+      },
+      "byDept": {
+        "Security": {
+          "value": "1",
+          "valueSuffix": "/1",
+          "note": {
+            "text": "Security report submitted"
+          }
+        },
+        "Cleaning": {
+          "value": "0",
+          "valueSuffix": "/1",
+          "note": {
+            "text": "Cleaning report still in draft"
+          }
+        }
       }
     }
   ]

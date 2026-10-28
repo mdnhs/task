@@ -7,3 +7,8 @@ Files: rewrite `components/app-sidebar.tsx`, `components/site-header.tsx`, `comp
    Keep `SidebarTrigger` (place left of search or inside sidebar header) so collapse still works.
 4. Wrap main in `SidebarInset` with padding; ensure content panel radius/bg per 00.
 5. Mobile: sidebar becomes sheet (shadcn default); top bar search shrinks, chips scroll.
+
+## Addendum: phone department row, collapsed badges, platform skeleton
+- ≤640px: `DeptSeg` is hidden and `DeptRow` (features/shell/components/dept-row.tsx) sits under the search: full width, scroll-snap, no scrollbar, 44px pills, active pill (layoutId `dept-row-active`) centred on change. Skeleton: `.sk-dept-row` (52px) in `AppShellSkeleton`.
+- Sidebar badges come from `navigation.json` (`badge`); in the icon-collapsed rail they stay visible, pinned top-right of the icon (shell.css).
+- `AppShellSkeleton departments={false}` renders no department filter (platform console).

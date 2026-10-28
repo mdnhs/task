@@ -1,0 +1,4 @@
+[
+  {"path": "/payroll-issues", "expect": ["PAY-", "Issue tracking only"], "notExpect": ["is being built", "Access restricted"]},
+  {"path": "/payroll-issues", "cookies": {"od-role": "employee"}, "expect": ["Access restricted"], "notExpect": ["PAY-"]}
+]

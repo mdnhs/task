@@ -1,12 +1,22 @@
+"use client"
+
 import { Icon } from "@/components/icons"
+import { useTenantLogo } from "@/hooks/use-branding"
 
 // Static sidebar pieces, shared by AppShell and AppShellSkeleton so the skeleton matches exactly.
 
-export function Logo() {
+// The mark is a fixed 38px box. A saved tenant logo (FR-SAAS-11) sits contain-fit on a neutral chip; without one, the brand icon shows.
+export function Logo({ tenantId }: { tenantId?: string }) {
+  const [logo] = useTenantLogo(tenantId)
   return (
     <div className="logo">
-      <span className="logo-mark">
-        <Icon name="brand" />
+      <span className={logo ? "logo-mark has-logo" : "logo-mark"}>
+        {logo ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={logo} alt="" />
+        ) : (
+          <Icon name="brand" />
+        )}
       </span>
       <span className="lbl">OpsDesk</span>
     </div>

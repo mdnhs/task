@@ -1,0 +1,6 @@
+[
+  {"path": "/staff-rosters", "expect": ["Staff &amp; Rosters", "Roster gaps", "Attendance", "INC-3003", "Uncovered tomorrow", "Log incident"]},
+  {"path": "/staff-rosters", "expect": ["Showing 1–10 of 12"]},
+  {"path": "/staff-rosters", "cookies": {"od-role": "employee"}, "expect": ["Access restricted"], "notExpect": ["INC-3003", "Roster gaps"]},
+  {"path": "/staff-rosters", "cookies": {"od-role": "auditor"}, "expect": ["Roster gaps", "INC-3003"], "notExpect": ["Log incident", "07700 900"]}
+]

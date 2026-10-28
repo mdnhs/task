@@ -1,0 +1,33 @@
+{
+  "tenants": [
+    {
+      "id": "t1",
+      "name": "Northgate Facility Services",
+      "slug": "northgate",
+      "initials": "NF",
+      "brand": "#1a8a3a",
+      "status": "active",
+      "plan": "Business"
+    },
+    {
+      "id": "t2",
+      "name": "Harbourline Cleaning Co",
+      "slug": "harbourline",
+      "initials": "HC",
+      "brand": "#3b5bdb",
+      "status": "trial",
+      "plan": "Trial",
+      "trialEndsOn": "2026-11-03"
+    },
+    {
+      "id": "t3",
+      "name": "Millbrook Security Group",
+      "slug": "millbrook",
+      "initials": "MS",
+      "brand": "#c2410c",
+      "status": "past_due",
+      "plan": "Business",
+      "graceEndsOn": "2026-10-27"
+    }
+  ]
+}

@@ -1,0 +1,35 @@
+/* account feature styles: profile identity row, MFA row, sessions, activity. Tab shell reuses .set-layout / .set-tab from settings.css. */
+
+/* ---------- Profile ---------- */
+.acc-id{display:flex;align-items:center;gap:16px;margin-bottom:18px}
+.acc-avatar{width:56px;height:56px;font-size:19px}
+.acc-id-text{display:flex;flex-direction:column;gap:2px;min-width:0}
+.acc-id-text b{font-size:16px;font-weight:700;letter-spacing:-.01em;line-height:24px}
+.acc-id-text span{font-size:13px;color:var(--ink-2);line-height:20px}
+/* Read-only inputs stay readable, say not-allowed */
+.acc-id ~ .set-form input[readonly]{cursor:not-allowed;color:var(--ink)}
+.set-card .btn-primary:disabled{opacity:.5;cursor:not-allowed}
+
+/* ---------- Security ---------- */
+.acc-mfa{align-items:center;padding-top:4px}
+.acc-mfa-text{display:flex;flex-direction:column;gap:2px;min-width:0}
+.acc-mfa-text .tm{font-size:12px;font-weight:500;color:var(--ink-3);line-height:16px}
+.acc-sess{display:flex;align-items:center;gap:14px;padding:14px 18px;border-radius:var(--r-lg);background:var(--shell)}
+.acc-sess-ico{display:grid;place-items:center;width:40px;height:40px;border-radius:12px;background:var(--card);color:var(--ink-2);flex:none}
+.acc-sess-ico .ico{width:20px;height:20px}
+.acc-sess-main{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1}
+.acc-sess-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap;line-height:22px}
+.acc-sess-top b{font-size:14px;font-weight:700}
+.acc-sess-top .sk-line{width:auto}
+.acc-sess .tm,.acc-act .tm{font-size:12px;color:var(--ink-3);line-height:16px}
+.acc-sess .btn{flex:none}
+.acc-act{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:10px 0;font-size:13.5px;line-height:20px}
+.acc-act-text{color:var(--ink);font-weight:600;min-width:0}
+.acc-act .tm{flex:none}
+.acc-hint{display:block;margin-top:2px}
+.set-card .card-head .btn:disabled{opacity:.5;cursor:not-allowed}
+@media (max-width:640px){
+  .acc-sess{flex-wrap:wrap}
+  .acc-sess .btn{margin-left:54px}
+  .acc-act{flex-direction:column;align-items:flex-start;gap:2px}
+}

@@ -68,6 +68,13 @@
       "label": "Orders & Stock",
       "description": "Stock requests, supplier orders, approvals and delivery status.",
       "srs": "SRS §3.13"
+    },
+    {
+      "href": "/whatsapp",
+      "icon": "chat",
+      "label": "WhatsApp",
+      "description": "Staff and client WhatsApp messages and voice notes, linked to tasks, client issues and report items.",
+      "srs": "SRS §3.17"
     }
   ],
   "general": [

@@ -1,0 +1,68 @@
+{
+  "entries": [
+    {
+      "id": "PAU-8",
+      "at": "2026-10-20T08:50:00",
+      "actor": "Priya Shah (Platform Support)",
+      "action": "support.requested",
+      "target": "Pinnacle Site Security",
+      "detail": "Support access requested: trial extension request"
+    },
+    {
+      "id": "PAU-7",
+      "at": "2026-10-20T08:15:00",
+      "actor": "Grace Mensah",
+      "action": "support.granted",
+      "target": "Harbourline Cleaning Co",
+      "detail": "Granted support access until 21 Oct 08:15"
+    },
+    {
+      "id": "PAU-6",
+      "at": "2026-10-20T07:55:00",
+      "actor": "Marcus Bell",
+      "action": "support.granted",
+      "target": "Canary Wharf Concierge",
+      "detail": "Granted support access until 20 Oct 23:30"
+    },
+    {
+      "id": "PAU-5",
+      "at": "2026-10-19T09:10:00",
+      "actor": "Lilianna Novak",
+      "action": "support.granted",
+      "target": "Northgate Facility Services",
+      "detail": "Granted support access until 21 Oct 09:10"
+    },
+    {
+      "id": "PAU-4",
+      "at": "2026-10-17T13:20:00",
+      "actor": "Priya Shah",
+      "action": "support.revoked",
+      "target": "Lantern Hospitality Services",
+      "detail": "Support access revoked by the tenant"
+    },
+    {
+      "id": "PAU-3",
+      "at": "2026-10-15T11:00:00",
+      "actor": "System",
+      "action": "support.expired",
+      "target": "Ironclad Guarding",
+      "detail": "Support access expired"
+    },
+    {
+      "id": "PAU-2",
+      "at": "2026-10-02T08:00:00",
+      "actor": "System",
+      "action": "billing.past_due",
+      "target": "Millbrook Security Group",
+      "detail": "Invoice payment failed, grace period started"
+    },
+    {
+      "id": "PAU-1",
+      "at": "2026-09-30T14:20:00",
+      "actor": "Platform Super Admin",
+      "action": "tenant.suspended",
+      "target": "Kestrel Estates",
+      "detail": "Suspended: non-payment after grace period"
+    }
+  ]
+}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { daysBetween, formatDate, formatDue, formatTime, isOverdue } from "./dates"
+import { daysBetween, formatDate, formatDue, formatTime, isOverdue, nowInTz } from "./dates"
 
 describe("dates", () => {
   const today = "2026-10-20T09:00:00"
@@ -24,5 +24,16 @@ describe("dates", () => {
   it("daysBetween", () => {
     expect(daysBetween("2026-11-01T00:00:00", "2026-10-20T00:00:00")).toBe(12)
     expect(daysBetween("2026-10-20T00:00:00", "2026-10-21T23:00:00")).toBe(-1)
+  })
+})
+
+describe("nowInTz", () => {
+  it("renders the instant in the given timezone on the org date", () => {
+    const now = new Date("2026-10-20T16:52:07Z") // BST (UTC+1) in London, UTC+9 in Tokyo
+    expect(nowInTz("2026-10-20T09:00:00", "Europe/London", now)).toBe("2026-10-20T17:52:07")
+    expect(nowInTz("2026-10-20", "Asia/Tokyo", now)).toBe("2026-10-20T01:52:07")
+  })
+  it("uses a 24-hour clock around midnight", () => {
+    expect(nowInTz("2026-10-20", "Europe/London", new Date("2026-10-20T23:00:00Z"))).toBe("2026-10-20T00:00:00")
   })
 })

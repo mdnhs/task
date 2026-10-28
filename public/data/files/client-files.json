@@ -1,0 +1,131 @@
+{
+  "clients": [
+    {
+      "id": "CLT-01",
+      "client": "Canary Wharf Estates",
+      "site": "Canary Wharf",
+      "dept": "Security",
+      "contacts": [
+        {
+          "name": "Helen Marsh",
+          "role": "Facilities Manager",
+          "phone": "020 7946 0112"
+        },
+        {
+          "name": "Owen Pryce",
+          "role": "Security Liaison",
+          "phone": "020 7946 0145"
+        }
+      ],
+      "contractRef": "CTR-2201",
+      "docStatus": "complete",
+      "outstanding": [],
+      "updated": "2026-10-02T11:00:00",
+      "storageRef": "vault://clients/ctr-2201/pack.pdf"
+    },
+    {
+      "id": "CLT-02",
+      "client": "Riverside House Management",
+      "site": "Riverside House",
+      "dept": "Cleaning",
+      "contacts": [
+        {
+          "name": "Sandra Obi",
+          "role": "Building Manager",
+          "phone": "020 7946 0230"
+        }
+      ],
+      "contractRef": "CTR-2188",
+      "docStatus": "incomplete",
+      "outstanding": [
+        "Signed service schedule (rev 3)",
+        "Updated insurance certificate"
+      ],
+      "updated": "2026-10-14T16:30:00",
+      "storageRef": "vault://clients/ctr-2188/pack.pdf"
+    },
+    {
+      "id": "CLT-03",
+      "client": "Harbour Point Retail",
+      "site": "Harbour Point",
+      "dept": "Security",
+      "contacts": [
+        {
+          "name": "Marcus Lee",
+          "role": "Centre Manager",
+          "phone": "020 7946 0321"
+        }
+      ],
+      "contractRef": "CTR-2175",
+      "docStatus": "review",
+      "outstanding": [
+        "Contract renewal sign-off"
+      ],
+      "updated": "2026-10-17T09:45:00",
+      "storageRef": "vault://clients/ctr-2175/pack.pdf"
+    },
+    {
+      "id": "CLT-04",
+      "client": "Northgate Offices",
+      "site": "Northgate Plaza",
+      "dept": "Cleaning",
+      "contacts": [
+        {
+          "name": "Aisha Rahman",
+          "role": "Operations Lead",
+          "phone": "020 7946 0408"
+        },
+        {
+          "name": "Paul Vance",
+          "role": "Accounts",
+          "phone": "020 7946 0411"
+        }
+      ],
+      "contractRef": "CTR-2150",
+      "docStatus": "complete",
+      "outstanding": [],
+      "updated": "2026-09-22T13:20:00",
+      "storageRef": "vault://clients/ctr-2150/pack.pdf"
+    },
+    {
+      "id": "CLT-05",
+      "client": "St Clement's Clinic",
+      "site": "St Clement's Clinic",
+      "dept": "Cleaning",
+      "contacts": [
+        {
+          "name": "Dr Ines Costa",
+          "role": "Practice Manager",
+          "phone": "020 7946 0560"
+        }
+      ],
+      "contractRef": "CTR-2203",
+      "docStatus": "incomplete",
+      "outstanding": [
+        "Infection-control addendum",
+        "Site access agreement",
+        "COSHH register copy"
+      ],
+      "updated": "2026-10-15T10:10:00",
+      "storageRef": "vault://clients/ctr-2203/pack.pdf"
+    },
+    {
+      "id": "CLT-06",
+      "client": "Meridian Logistics",
+      "site": "Meridian Park",
+      "dept": "Security",
+      "contacts": [
+        {
+          "name": "Gareth Hill",
+          "role": "Site Director",
+          "phone": "020 7946 0677"
+        }
+      ],
+      "contractRef": "CTR-2167",
+      "docStatus": "complete",
+      "outstanding": [],
+      "updated": "2026-08-30T15:00:00",
+      "storageRef": "vault://clients/ctr-2167/pack.pdf"
+    }
+  ]
+}

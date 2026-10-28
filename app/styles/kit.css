@@ -1,0 +1,356 @@
+/* ===== Shared UI kit (Task 5): components reused across features ===== */
+/* Unlayered, so these beat Tailwind utilities on shadcn primitives. Dark text on --brand-soft uses --brand-3. */
+
+/* ---------- Filter bar ---------- */
+.od-filters{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.od-filter-search{flex:1 1 220px;max-width:320px;display:flex;align-items:center;gap:10px;background:var(--mute-bg);border-radius:var(--r-pill);padding:10px 14px;color:var(--ink-3);transition:box-shadow var(--dur-fast) var(--ease)}
+.od-filter-search:focus-within{box-shadow:0 0 0 2px var(--brand)}
+.od-filter-search input{flex:1;min-width:0;background:transparent;border:0;outline:none;font:inherit;font-size:13.5px;color:var(--ink)}
+.od-filter-search input::placeholder{color:var(--placeholder)}
+.od-filter-search .ico{width:18px;height:18px}
+.od-filters [data-slot="select-trigger"].od-filter-select{height:auto;min-width:140px;padding:10px 14px;border:0;border-radius:var(--r-pill);background:var(--mute-bg);color:var(--ink);font-size:13.5px;font-weight:600;box-shadow:none}
+.od-filters [data-slot="select-trigger"].od-filter-select:focus-visible{box-shadow:0 0 0 2px var(--brand);outline:none}
+/* The topbar hides .seg on phones; a filter pill group must stay visible and scroll instead */
+.od-filters .seg.od-seg{display:flex;background:var(--mute-bg);max-width:100%;overflow-x:auto;scrollbar-width:none}
+.od-filters .seg.od-seg::-webkit-scrollbar{display:none}
+.od-filters .seg.od-seg button{white-space:nowrap}
+@media (max-width:640px){.od-filter-search{max-width:none;flex-basis:100%}}
+
+/* ---------- Select popup (shared by every shadcn Select given .od-menu) ---------- */
+.od-menu[data-slot="select-content"]{animation-duration:var(--dur);animation-fill-mode:both}
+.od-menu [data-slot="select-item"]{border-radius:var(--r-pill);padding:8px 10px;font-size:13px;font-weight:600;color:var(--ink-2);cursor:pointer}
+.od-menu [data-slot="select-item"]:is(:hover,[data-highlighted]){background:var(--brand-soft);color:var(--brand-deep)}
+:root[data-theme="dark"] .od-menu [data-slot="select-item"]:is(:hover,[data-highlighted]){color:var(--brand-3)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .od-menu [data-slot="select-item"]:is(:hover,[data-highlighted]){color:var(--brand-3)}}
+
+/* ---------- Dialog (alert dialog + dialog) ---------- */
+[data-slot="alert-dialog-overlay"]{animation-duration:var(--dur);animation-fill-mode:both;background:rgba(10,20,14,.35)}
+.od-dialog{background:var(--card);color:var(--ink);border:0;border-radius:var(--r-xl);padding:28px;gap:20px;width:min(440px,calc(100vw - 24px));max-width:none;box-shadow:0 24px 60px rgba(16,40,24,.18);--tw-ring-shadow:0 0 #0000;outline:none;animation-duration:var(--dur);animation-fill-mode:both;font-family:var(--font)}
+:root[data-theme="dark"] .od-dialog{box-shadow:0 24px 60px rgba(0,0,0,.55)}
+.od-dialog [data-slot="alert-dialog-title"]{margin:0;font-size:20px;font-weight:700;letter-spacing:-.01em;color:var(--ink)}
+.od-dialog [data-slot="alert-dialog-description"]{margin:6px 0 0;font-size:14px;line-height:1.5;color:var(--ink-2)}
+.od-dialog [data-slot="alert-dialog-header"]{display:block;text-align:left}
+.od-dialog [data-slot="alert-dialog-footer"]{display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap;margin:0;padding:0;background:transparent;border:0}
+.od-dialog .btn{justify-content:center;padding:11px 20px;cursor:pointer;border:1.6px solid transparent}
+.od-dialog .btn-outline{border-color:var(--brand)}
+.btn-danger{background:var(--bad);color:#fff}
+.btn-danger:hover{filter:brightness(.92)}
+@media (max-width:640px){.od-dialog{padding:22px}.od-dialog [data-slot="alert-dialog-footer"] .btn{flex:1}}
+
+/* ---------- Detail sheet (right panel; bottom sheet on phones) ---------- */
+.od-sheet{top:18px;bottom:18px;right:18px;height:auto;width:min(480px,calc(100vw - 24px));max-width:none;border:0;border-radius:var(--r-xl);background:var(--shell);color:var(--ink);padding:0;gap:0;overflow:hidden;box-shadow:0 24px 60px rgba(16,40,24,.18);font-family:var(--font);transition-duration:var(--dur-slow);transition-timing-function:var(--ease)}
+.od-sheet:focus-visible{outline:none}
+.od-sheet-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:24px 24px 16px}
+.od-sheet-head [data-slot="sheet-title"]{margin:0;font-size:20px;font-weight:700;letter-spacing:-.01em;color:var(--ink)}
+.od-sheet-head [data-slot="sheet-description"]{margin:4px 0 0;font-size:13px;color:var(--ink-2)}
+.od-sheet-x{flex:none;display:grid;place-items:center;width:34px;height:34px;border-radius:50%;color:var(--ink-3);cursor:pointer;transition:background var(--dur-fast)}
+.od-sheet-x:hover{background:var(--brand-soft);color:var(--brand-deep)}
+.od-sheet-x svg{width:18px;height:18px}
+.od-sheet-body{flex:1;min-height:0;overflow-y:auto;padding:4px 24px 24px;display:flex;flex-direction:column;gap:16px}
+.od-sheet-foot{display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap;padding:16px 24px;background:var(--card)}
+:root[data-theme="dark"] .od-sheet-x:hover{color:var(--brand-3)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .od-sheet-x:hover{color:var(--brand-3)}}
+@media (max-width:720px){
+  .od-sheet[data-side="right"]{top:auto;left:12px;right:12px;bottom:12px;width:auto;height:auto;max-height:85dvh;border-radius:var(--r-xl)}
+  .od-sheet[data-side="right"][data-starting-style],.od-sheet[data-side="right"][data-ending-style]{translate:0 2.5rem}
+}
+
+/* ---------- Form fields ---------- */
+.od-field{display:flex;flex-direction:column;gap:6px;min-width:0}
+.od-field>label{font-size:12.5px;font-weight:700;color:var(--ink-2)}
+.od-req{color:var(--bad)}
+.od-field :is(input,select,textarea,[data-slot="select-trigger"],[data-slot="input"],[data-slot="textarea"]){width:100%;min-height:44px;background:var(--mute-bg);color:var(--ink);border:0;border-radius:var(--r-md);padding:11px 14px;font:inherit;font-size:14px;box-shadow:none;outline:none;transition:box-shadow var(--dur-fast) var(--ease)}
+.od-field textarea{min-height:96px;resize:vertical}
+.od-field :is(input,select,textarea,[data-slot="select-trigger"]):focus-visible{box-shadow:0 0 0 2px var(--brand);outline:none}
+.od-field :is(input,textarea)::placeholder{color:var(--placeholder)}
+.od-field[data-invalid] :is(input,select,textarea,[data-slot="select-trigger"]){box-shadow:0 0 0 2px var(--bad)}
+.od-field-hint{margin:0;font-size:12px;color:var(--ink-3)}
+.od-field-err{margin:0;font-size:12px;font-weight:600;color:var(--bad)}
+
+/* ---------- Toast (sonner) ---------- */
+.od-toast{background:var(--card);color:var(--ink);border:0;border-radius:var(--r-lg);box-shadow:var(--shadow),0 16px 40px rgba(16,40,24,.12);padding:14px 16px;gap:10px;font-family:var(--font);font-size:13.5px;font-weight:600}
+:root[data-theme="dark"] .od-toast{box-shadow:0 12px 32px rgba(0,0,0,.5)}
+.od-toast [data-description]{font-weight:500;color:var(--ink-2)}
+.od-toast[data-type="success"] [data-icon]{color:var(--ok)}
+.od-toast[data-type="error"] [data-icon]{color:var(--bad)}
+.od-toast[data-type="warning"] [data-icon]{color:var(--warn)}
+.od-toast[data-type="info"] [data-icon]{color:var(--info)}
+
+/* ---------- Empty state ---------- */
+.od-empty{display:flex;flex-direction:column;align-items:center;text-align:center;gap:8px;padding:48px 20px;color:var(--ink-2)}
+.od-empty-ico{display:grid;place-items:center;width:56px;height:56px;border-radius:50%;background:var(--brand-soft);color:var(--brand);margin-bottom:6px}
+.od-empty-ico .ico{width:26px;height:26px}
+.od-empty h2{margin:0;font-size:18px;font-weight:700;color:var(--ink)}
+.od-empty p{margin:0;max-width:380px;font-size:14px;line-height:1.5}
+.od-empty .btn{margin-top:10px}
+
+/* ---------- When ---------- */
+.od-tz{color:var(--ink-3);font-size:.9em}
+
+/* ---------- Responsive table: <table class="rtable"> with data-label on each td ---------- */
+@media (max-width:720px){
+  .rtable,.rtable tbody,.rtable tr,.rtable td{display:block;width:100%}
+  .rtable thead{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+  .rtable tr{background:var(--card);border-radius:var(--r-lg);padding:12px 16px;margin-bottom:10px}
+  .rtable td{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:8px 0;border:0;text-align:right}
+  .rtable td::before{content:attr(data-label);flex:none;font-size:11.5px;font-weight:700;letter-spacing:.02em;color:var(--ink-3);text-align:left}
+  .rtable td:not([data-label])::before{content:none}
+}
+/* Skeleton rows in the stacked layout (browser-measured at 390): the dept tag is a blockified flex item whose box grows to 21.9px;
+   .sk-2l / .sk-2s mark a 18.84px / 16px text line that the seed wraps to 2 lines there (the right-hand column is narrow) */
+@media (max-width:720px){
+  .rtable .sk-dep{height:21.9px !important}
+  .rtable .sk-line:has(> .sk-2l){height:37.7px !important}
+  .rtable .sk-line:has(> .sk-2s){height:32px !important}
+}
+
+/* ---------- Re-skinned shadcn primitives (ui-rules 1-5): borderless, OpsDesk tokens ---------- */
+[data-slot="textarea"]{background:var(--mute-bg);color:var(--ink);border:0;border-radius:var(--r-md);box-shadow:none}
+[data-slot="textarea"]:focus-visible{box-shadow:0 0 0 2px var(--brand);outline:none}
+[data-slot="switch"]{border:0;background:color-mix(in oklab,var(--ink-3) 45%,transparent);transition:background var(--dur) var(--ease)}
+[data-slot="switch"][data-checked]{background:var(--brand)}
+[data-slot="switch"]:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+[data-slot="switch-thumb"]{background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.2)}
+[data-slot="radio-group-item"]{border:0;background:var(--mute-bg);box-shadow:inset 0 0 0 1.5px var(--ink-3)}
+[data-slot="radio-group-item"][data-checked]{background:var(--brand);box-shadow:none;color:#fff}
+[data-slot="radio-group-item"]:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+[data-slot="accordion-item"]{border:0;border-radius:var(--r-lg);background:var(--card);margin-bottom:8px;padding:0 16px}
+[data-slot="accordion-trigger"]{color:var(--ink);font-weight:700;border-radius:var(--r-md)}
+[data-slot="accordion-trigger"]:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+[data-slot="accordion-content"]{color:var(--ink-2)}
+[data-slot="progress-track"]{background:var(--mute-bg);border-radius:var(--r-pill);height:6px}
+[data-slot="progress-indicator"]{background:var(--brand);border-radius:var(--r-pill)}
+[data-slot="scroll-area-scrollbar"]{border:0}
+[data-slot="scroll-area-thumb"]{background:var(--line);border-radius:var(--r-pill)}
+[data-slot="command"]{background:var(--card);color:var(--ink);border-radius:var(--r-lg)}
+[data-slot="command-input-wrapper"]{border:0}
+[data-slot="radio-group-indicator"] span{background:var(--on-brand)}
+[data-slot="command-item"]{border-radius:var(--r-pill);color:var(--ink-2);font-weight:600}
+[data-slot="command-item"][data-selected="true"]{background:var(--brand-soft);color:var(--brand-deep)}
+:root[data-theme="dark"] [data-slot="command-item"][data-selected="true"]{color:var(--brand-3)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) [data-slot="command-item"][data-selected="true"]{color:var(--brand-3)}}
+[data-slot="calendar"]{background:var(--card);color:var(--ink);border-radius:var(--r-lg)}
+/* The month grid is a <table>: undo the app's data-table defaults (opsdesk.css table/th/td), which blow the cells up */
+[data-slot="calendar"] table{min-width:0}
+[data-slot="calendar"] :is(th,td){padding:0;border:0;font-size:inherit;letter-spacing:normal;text-transform:none}
+[data-slot="calendar"] .rdp-day button:hover:not(:disabled),[data-slot="calendar"] .rdp-button_previous:hover,[data-slot="calendar"] .rdp-button_next:hover,[data-slot="calendar"] [data-slot="button"]:hover:not(:disabled){background:var(--brand-soft);color:var(--brand-deep)}
+:root[data-theme="dark"] [data-slot="calendar"] :is(.rdp-day button,.rdp-button_previous,.rdp-button_next,[data-slot="button"]):hover{color:var(--brand-3)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) [data-slot="calendar"] :is(.rdp-day button,.rdp-button_previous,.rdp-button_next,[data-slot="button"]):hover{color:var(--brand-3)}}
+[data-slot="calendar"] .rdp-weekday{color:var(--ink-3);font-weight:700}
+[data-slot="calendar"] .rdp-selected button,[data-slot="calendar"] [data-selected-single="true"]{background:var(--brand);color:var(--on-brand);border-radius:var(--r-md)}
+/* Selected days keep the brand fill on hover (beats the hover rules above) */
+[data-slot="calendar"] :is([data-selected-single="true"],[data-range-start="true"],[data-range-end="true"]):hover{background:var(--brand)!important;color:var(--on-brand)!important}
+
+/* ---------- Date picker (Calendar in a Popover) ---------- */
+.od-datepick-wrap{display:flex;gap:8px;min-width:0}
+.od-datepick{flex:1;min-width:0;display:flex;align-items:center;gap:10px;min-height:44px;padding:11px 14px;border:0;border-radius:var(--r-md);background:var(--mute-bg);color:var(--ink);font:inherit;font-size:14px;text-align:left;cursor:pointer;transition:box-shadow var(--dur-fast) var(--ease)}
+.od-datepick svg{width:18px;height:18px;flex:none;color:var(--ink-3)}
+.od-datepick-ph{color:var(--ink-3)}
+.od-datepick:focus-visible,.od-datepick[data-popup-open]{box-shadow:0 0 0 2px var(--brand);outline:none}
+.od-field[data-invalid] .od-datepick{box-shadow:0 0 0 2px var(--bad)}
+.od-datepick-wrap .od-timepick{flex:none;width:auto;min-width:132px}
+.od-timepick:disabled{opacity:.5;cursor:not-allowed}
+
+/* Quick picks under the calendar: 3 + 2 rows, each row fills the calendar's width */
+.od-pop [data-slot="calendar"]{--cell-size:32px}
+/* width:0 + min-width:100% → the row never widens the popup; it takes the calendar's width */
+.od-date-presets{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;width:0;min-width:100%;box-sizing:border-box;margin-top:8px;padding-top:10px;border-top:1px solid var(--line)}
+.od-date-preset{grid-column:span 2;min-width:0;min-height:34px;padding:6px 4px;border:0;border-radius:var(--r-md);background:var(--mute-bg);color:var(--ink);font:inherit;font-size:13px;font-weight:600;white-space:nowrap;cursor:pointer;transition:background var(--dur-fast) var(--ease),color var(--dur-fast) var(--ease)}
+.od-date-preset:nth-child(n+4){grid-column:span 3}
+.od-date-preset:hover{background:var(--brand-soft);color:var(--brand-deep)}
+:root[data-theme="dark"] .od-date-preset:hover{color:var(--brand-3)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .od-date-preset:hover{color:var(--brand-3)}}
+.od-date-preset[aria-pressed="true"],.od-date-preset[aria-pressed="true"]:hover{background:var(--brand);color:var(--on-brand)}
+.od-date-preset:disabled{opacity:.45;cursor:not-allowed;background:var(--mute-bg);color:var(--ink-3)}
+.od-date-preset:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+
+/* ---------- Time picker (hour / minute / AM-PM columns in a Popover) ---------- */
+.od-time{display:flex;gap:6px}
+.od-time-col{display:flex;flex-direction:column;gap:2px;width:56px;max-height:224px;overflow-y:auto;scrollbar-width:none;overscroll-behavior:contain}
+.od-time-col::-webkit-scrollbar{display:none}
+.od-time-ampm{max-height:none}
+.od-time-cell{flex:none;height:36px;border:0;border-radius:var(--r-md);background:transparent;color:var(--ink);font:inherit;font-size:14px;font-weight:600;font-variant-numeric:tabular-nums;cursor:pointer;transition:background var(--dur-fast) var(--ease),color var(--dur-fast) var(--ease)}
+.od-time-cell:hover{background:var(--brand-soft);color:var(--brand-deep)}
+:root[data-theme="dark"] .od-time-cell:hover{color:var(--brand-3)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .od-time-cell:hover{color:var(--brand-3)}}
+.od-time-cell[aria-selected="true"],.od-time-cell[aria-selected="true"]:hover{background:var(--brand);color:var(--on-brand)}
+.od-time-cell:focus-visible{outline:2px solid var(--brand);outline-offset:-2px}
+.od-pop[data-slot="popover-content"]{width:auto;padding:10px;background:var(--card);color:var(--ink);border:0;border-radius:var(--r-lg);--tw-ring-shadow:0 0 #0000;box-shadow:0 16px 40px rgba(16,40,24,.18);animation-duration:var(--dur);animation-fill-mode:both;font-family:var(--font)}
+:root[data-theme="dark"] .od-pop[data-slot="popover-content"]{box-shadow:0 16px 40px rgba(0,0,0,.55)}
+
+/* Form dialogs (Dialog primitive wearing .od-dialog): tasks, reports, dashboard */
+.od-form-dialog{width:min(600px,calc(100vw - 24px));max-height:calc(100dvh - 32px);overflow-y:auto;overscroll-behavior:contain}
+.od-form-dialog [data-slot="dialog-header"]{display:block;text-align:left}
+.od-form-dialog [data-slot="dialog-title"]{margin:0;font-size:20px;font-weight:700;letter-spacing:-.01em;color:var(--ink)}
+.od-form-dialog [data-slot="dialog-description"]{margin:6px 0 0;font-size:14px;line-height:1.5;color:var(--ink-2)}
+.od-form{display:flex;flex-direction:column;gap:16px}
+.od-row2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.od-row3{display:grid;grid-template-columns:1.3fr 1.3fr 1fr;gap:14px}
+.od-form-foot{display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap}
+.od-form-foot .btn{justify-content:center;padding:11px 20px;cursor:pointer;border:1.6px solid transparent}
+.od-form-foot .btn-outline{border-color:var(--brand)}
+.od-form-dialog [data-slot="switch"]{align-self:flex-start;width:40px;height:24px;min-height:0;padding:0}
+.od-form-dialog [data-slot="switch-thumb"]{width:18px;height:18px}
+:root[data-theme="dark"] .od-form-dialog input{color-scheme:dark}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .od-form-dialog input{color-scheme:dark}}
+@media (max-width:640px){.od-row2,.od-row3{grid-template-columns:1fr}.od-form-foot .btn{flex:1}}
+
+/* ---------- Choice pills: a RadioGroup whose items are <label class="od-choice"> (hover changes text colour only) ---------- */
+.od-choices{display:flex;flex-wrap:wrap;gap:8px;width:auto}
+.od-choice{display:inline-flex;align-items:center;gap:8px;padding:9px 14px;border-radius:var(--r-pill);background:var(--mute-bg);font-size:13px;font-weight:600;color:var(--ink-2);cursor:pointer;transition:color var(--dur-fast) var(--ease)}
+.od-choice:not(:has([data-disabled])):hover{color:var(--brand-deep)}
+.od-choice[data-checked]{background:var(--brand-soft);color:var(--brand-deep)}
+:root[data-theme="dark"] .od-choice:is(:not(:has([data-disabled])):hover,[data-checked]){color:var(--brand-3)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .od-choice:is(:not(:has([data-disabled])):hover,[data-checked]){color:var(--brand-3)}}
+.od-choice:has(:focus-visible){outline:2px solid var(--brand);outline-offset:2px}
+.od-choice [data-slot="radio-group-item"]{border-color:var(--ink-3);background:transparent}
+.od-choice [data-slot="radio-group-item"][data-checked]{background:var(--brand);border-color:var(--brand)}
+.od-choice:has([data-disabled]),.od-choice:has([data-disabled]) *{cursor:not-allowed}
+.od-choice:has([data-disabled]) [data-slot="radio-group-item"]{opacity:1}
+.od-choice:has([data-disabled]):not([data-checked]){background:var(--mute-bg);color:var(--ink-3)}
+.od-choice:has([data-disabled]):not([data-checked]) [data-slot="radio-group-item"]{opacity:.6}
+
+/* ---------- Pager (components/data-pagination.tsx): borderless 36px circles, active = brand, hover = text colour only ---------- */
+.od-pager{display:flex;align-items:center;justify-content:space-between;gap:12px 16px;margin-top:16px}
+.od-pager-sum{margin:0;font-size:13px;font-weight:500;color:var(--ink-2)}
+.od-pager .od-pager-nav{width:auto;margin:0;justify-content:flex-end}
+.od-pager [data-slot="pagination-content"]{gap:4px}
+.od-pager [data-slot="pagination-ellipsis"]{width:36px;height:36px;color:var(--ink-3)}
+.od-pager [data-slot="button"]{box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;gap:4px;min-width:36px;height:36px;padding:0;border:0;border-radius:var(--r-pill);background:transparent;box-shadow:none;color:var(--ink-2);font:inherit;font-size:13px;font-weight:600;font-variant-numeric:tabular-nums;cursor:pointer;transition:color var(--dur-fast) var(--ease)}
+.od-pager [data-slot="button"] svg{width:16px;height:16px;flex:none}
+.od-pager [data-slot="button"]:not(:disabled,[aria-current]):hover{background:transparent;color:var(--brand-deep)}
+:root[data-theme="dark"] .od-pager [data-slot="button"]:not(:disabled,[aria-current]):hover{color:var(--brand-3)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .od-pager [data-slot="button"]:not(:disabled,[aria-current]):hover{color:var(--brand-3)}}
+.od-pager [data-slot="button"][aria-current="page"]{background:var(--brand);color:var(--on-brand)}
+.od-pager [data-slot="button"]:active{transform:none}
+.od-pager [data-slot="button"].od-pager-step{padding:0 12px}
+.od-pager [data-slot="button"]:disabled{opacity:.45;cursor:not-allowed;pointer-events:auto}
+.od-pager [data-slot="button"]:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+@media (max-width:640px){
+  .od-pager{flex-direction:column;justify-content:center;text-align:center}
+  .od-pager .od-pager-nav{justify-content:center}
+  .od-pager-txt{display:none}
+  .od-pager [data-slot="button"].od-pager-step{padding:0}
+  .od-pager [data-slot="pagination-content"]{gap:2px}
+}
+.od-pager > .sk-line{width:auto}
+.od-pager-sk-list{display:flex;align-items:center;gap:4px;margin:0;padding:0;list-style:none}
+@media (max-width:640px){.od-pager-sk-step{width:36px!important}.od-pager-sk-list{gap:2px}.od-pager > .sk-line{justify-content:center}}
+
+/* ---------- Colour picker ---------- */
+.cp{display:block;min-width:0}
+.cp-control{display:block}
+.cp-trigger{display:flex;align-items:center;gap:10px;width:100%;min-height:44px;background:var(--mute-bg);color:var(--ink);border:0;border-radius:var(--r-md);padding:8px 14px;font:inherit;font-size:14px;text-align:left;cursor:pointer;outline:none;transition:box-shadow var(--dur-fast) var(--ease)}
+.cp-trigger:focus-visible,.cp-trigger[data-state="open"]{box-shadow:0 0 0 2px var(--brand)}
+.cp-trigger[data-invalid]{box-shadow:0 0 0 2px var(--bad)}
+.cp-trigger[data-disabled]{cursor:not-allowed}
+.cp-trigger[data-readonly]{cursor:default}
+.cp-chip{flex:none;width:26px;height:26px;border-radius:var(--r-pill);box-shadow:inset 0 0 0 1px rgba(0,0,0,.12)}
+.cp-hex{font-variant-numeric:tabular-nums;letter-spacing:.02em}
+.cp-positioner{z-index:60}
+.cp-pop{width:268px;display:flex;flex-direction:column;gap:12px;background:var(--card);color:var(--ink);border:0;border-radius:var(--r-lg);box-shadow:var(--shadow),0 16px 40px rgba(16,40,24,.12);padding:12px;outline:none;transform-origin:var(--transform-origin,top left)}
+:root[data-theme="dark"] .cp-pop{box-shadow:0 12px 32px rgba(0,0,0,.5)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .cp-pop{box-shadow:0 12px 32px rgba(0,0,0,.5)}}
+.cp-pop[data-state="open"]{animation:cp-in var(--dur) var(--ease) both}
+.cp-pop[data-state="closed"]{animation:cp-out var(--dur-fast) var(--ease-in-out) both}
+@keyframes cp-in{from{opacity:0;transform:translateY(-4px) scale(.97)}to{opacity:1;transform:none}}
+@keyframes cp-out{from{opacity:1;transform:none}to{opacity:0;transform:translateY(-4px) scale(.97)}}
+.cp-area{position:relative;height:156px;border-radius:var(--r-md);cursor:crosshair;touch-action:none}
+.cp-area-bg{height:100%;border-radius:var(--r-md)}
+.cp-thumb{width:18px;height:18px;border-radius:50%;box-shadow:0 0 0 3px #fff,0 1px 4px rgba(0,0,0,.45);outline:none}
+.cp-thumb:focus-visible{box-shadow:0 0 0 3px #fff,0 0 0 5px var(--brand)}
+.cp-thumb-sm{width:16px;height:16px;transform:translate(-50%,-50%)}
+.cp-row{display:flex;align-items:center;gap:10px}
+.cp-slider{flex:1;min-width:0;position:relative;height:16px;display:flex;align-items:center}
+.cp-track{flex:1;height:10px;border-radius:var(--r-pill)}
+.cp-icon-btn{flex:none;display:grid;place-items:center;width:34px;height:34px;border-radius:50%;background:transparent;color:var(--ink-2);cursor:pointer;transition:background var(--dur-fast) var(--ease),color var(--dur-fast) var(--ease)}
+.cp-icon-btn:hover{background:var(--brand-soft);color:var(--brand-deep)}
+:root[data-theme="dark"] .cp-icon-btn:hover{color:var(--brand-3)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .cp-icon-btn:hover{color:var(--brand-3)}}
+.cp-icon-btn:focus-visible,.cp-mode:focus-visible,.cp-swatch:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+.cp-modes{display:flex;gap:4px;background:var(--mute-bg);border-radius:var(--r-pill);padding:3px}
+.cp-mode{flex:1;padding:6px 0;border-radius:var(--r-pill);font-size:12px;font-weight:700;color:var(--ink-2);background:transparent;cursor:pointer;transition:background var(--dur-fast) var(--ease),color var(--dur-fast) var(--ease)}
+.cp-mode:hover{color:var(--ink)}
+.cp-mode[aria-pressed="true"]{background:var(--card);color:var(--ink)}
+.cp-chans{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.cp-chan{display:flex;flex-direction:column;align-items:center;gap:4px;min-width:0}
+.cp-chan-l{font-size:11px;font-weight:700;color:var(--ink-3)}
+.cp-chan-hex{align-items:stretch}
+.cp-input{width:100%;min-height:38px;background:var(--mute-bg);color:var(--ink);border:0;border-radius:var(--r-md);padding:8px 10px;font:inherit;font-size:13.5px;text-align:center;font-variant-numeric:tabular-nums;outline:none;box-shadow:none;transition:box-shadow var(--dur-fast) var(--ease)}
+.cp-input:focus-visible{box-shadow:0 0 0 2px var(--brand)}
+.cp-input:read-only{cursor:default}
+.cp-input:disabled{cursor:not-allowed;opacity:1;color:var(--ink-2)}
+.cp-swatches{display:flex;flex-wrap:wrap;gap:8px}
+.cp-swatch{position:relative;width:28px;height:28px;border-radius:50%;padding:0;cursor:pointer;background:transparent;transition:transform var(--dur-fast) var(--ease)}
+.cp-swatch:hover{transform:scale(1.1)}
+.cp-swatch-fill{position:relative;display:block;width:100%;height:100%;border-radius:50%;box-shadow:inset 0 0 0 1px rgba(0,0,0,.12)}
+.cp-swatch[data-state="checked"],.cp-swatch[aria-checked="true"]{box-shadow:0 0 0 2px var(--card),0 0 0 4px var(--ink)}
+.cp-swatch-check{position:absolute;inset:0;display:grid;place-items:center;color:#fff;filter:drop-shadow(0 1px 1px rgba(0,0,0,.5));pointer-events:none}
+.cp-swatch-check[hidden]{display:none}
+@media (prefers-reduced-motion:reduce){.cp-pop[data-state],.cp-trigger,.cp-swatch,.cp-input,.cp-mode,.cp-icon-btn{animation:none!important;transition:none!important}.cp-swatch:hover{transform:none}}
+
+/* ---- Motion wave A (ui-rules.md → Motion) ---- */
+/* StatusPill (components/status-pill.tsx): brief ✓ in front of the label after a user-made change; draws its stroke. */
+.st-tick{flex:none;width:12px;height:12px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.st-tick path{stroke-dasharray:1;stroke-dashoffset:0;animation:od-draw var(--dur-slow) var(--ease) var(--dur-fast) backwards}
+@keyframes od-draw{from{stroke-dashoffset:1}}
+
+/* ActionButton (components/action-button.tsx): pending spinner → ✓ → label. The label stays in the box (invisible) so
+   the width is locked; spinner and ✓ sit centred on top. The ✓'s resting state is drawn, so reduced motion shows it. */
+.od-act{position:relative}
+.od-act-label{display:inline-flex;align-items:center;justify-content:center;gap:inherit;transition:opacity var(--dur-fast) var(--ease)}
+.od-act[data-phase] .od-act-label{opacity:0}
+.od-act[data-phase]{cursor:progress}
+.od-act[data-phase="done"]{cursor:default}
+.od-act-ico{position:absolute;inset:0;display:grid;place-items:center;pointer-events:none}
+.od-act-ico>*{animation:od-act-in var(--dur-fast) var(--ease) both}
+@keyframes od-act-in{from{opacity:0;transform:scale(.6)}}
+.od-spin{width:16px;height:16px;border-radius:50%;border:2px solid currentColor;border-right-color:transparent;animation:od-act-in var(--dur-fast) var(--ease) both,od-spin calc(var(--dur) * 3) linear infinite}
+@keyframes od-spin{to{transform:rotate(360deg)}}
+.od-act-ico svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.od-act-ico path{stroke-dasharray:1;stroke-dashoffset:0;animation:od-draw var(--dur-slow) var(--ease) backwards}
+
+/* Field errors (components/field.tsx): the invalid control shakes once, ~6px, when the error appears; a new message
+   row opens with grid rows 0fr→1fr (its 6px gap folded in with a negative margin) so the form below eases down. */
+.od-field[data-invalid]>label+*{animation:od-shake var(--dur-slow) var(--ease-in-out)}
+@keyframes od-shake{20%{transform:translateX(-6px)}45%{transform:translateX(5px)}70%{transform:translateX(-3px)}88%{transform:translateX(1px)}}
+.od-field-msg{display:grid;grid-template-rows:1fr}
+.od-field-msg>p{min-height:0;overflow:hidden}
+.od-field-msg.is-enter{animation:od-msg-in var(--dur) var(--ease) both}
+@keyframes od-msg-in{from{grid-template-rows:0fr;margin-top:-6px;opacity:0}}
+.od-field-msg:not(.is-enter) .od-field-err{animation:od-fade-in var(--dur) var(--ease) both}
+
+/* ---------- Shared (motion wave B): direction-aware slide ----------
+   Used by Settings/Account tab panels, Staff & Rosters + Files tabs, the auth wizards and paged table bodies (PagedBody).
+   `data-slide="next"` enters from the right, "prev" from the left; no attribute = no animation (first mount is the page enter).
+   Pure helper: slideDir() in lib/motion.ts; hook useSlideDir() in components/data-pagination.tsx. Reduced motion: global rule. */
+@keyframes od-slide{from{opacity:0;transform:translateX(var(--od-slide-x,0))}}
+.od-slide[data-slide]{animation:od-slide var(--dur) var(--ease) both}
+.od-slide[data-slide="next"]{--od-slide-x:14px}
+.od-slide[data-slide="prev"]{--od-slide-x:-14px}
+/* A sliding tbody must not widen the .table-wrap scroll area mid-animation (PagedBody drops data-slide on animationend;
+   with reduced motion nothing animates, so nothing is clipped either). */
+@media (prefers-reduced-motion:no-preference){table:has(>tbody.od-slide[data-slide]){overflow:clip}}
+
+/* ---------- Shared (motion wave B): detail sheet content stagger ----------
+   components/detail-sheet.tsx: the panel already slides in from the side (base-ui starting style + kit.css .od-sheet);
+   its head, body blocks and footer then rise in one after another. Plays on every open (the content mounts with the sheet). */
+.od-sheet>.od-sheet-head,.od-sheet-body>*,.od-sheet>.od-sheet-foot{animation:od-enter var(--dur-slow) var(--ease) both}
+.od-sheet>.od-sheet-head{animation-delay:60ms}
+.od-sheet-body>:nth-child(1){animation-delay:100ms}
+.od-sheet-body>:nth-child(2){animation-delay:140ms}
+.od-sheet-body>:nth-child(3){animation-delay:180ms}
+.od-sheet-body>:nth-child(n+4){animation-delay:220ms}
+.od-sheet>.od-sheet-foot{animation-delay:220ms}
+
+/* ConfirmDialog confirm button while confirmDisabled (type-to-confirm) */
+.od-confirm-btn:disabled{opacity:.45;cursor:not-allowed;pointer-events:auto}
+.od-confirm-btn:disabled:hover{filter:none}
+.od-confirm-btn.btn-primary:disabled:hover{background:var(--brand)}
+
+/* Ghost text for skeleton tables: the real text, transparent, on the skeleton tint. It wraps like the loaded text, so
+   table column widths and row heights match. .st / .dep-tag keep their own padding and pill shape. */
+.sk-ghost{color:transparent !important;background:color-mix(in srgb,var(--ink) 8%,transparent);border-radius:4px;-webkit-box-decoration-break:clone;box-decoration-break:clone;user-select:none}
+.st.sk-ghost,.dep-tag.sk-ghost{border-color:transparent;background:color-mix(in srgb,var(--ink) 8%,transparent)}
+.btn.sk-ghost-btn{color:transparent !important;pointer-events:none;background:color-mix(in srgb,var(--ink) 8%,transparent);border-color:transparent}
+.sk-ghost-btn .pf-count{border-color:transparent}

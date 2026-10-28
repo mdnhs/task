@@ -1,0 +1,9 @@
+{
+  "title": "Recent activity",
+  "subtitle": "Your submissions and manager comments",
+  "items": [
+    {"ref": "TSK-1028", "title": "Client walk-round notes, Canary Wharf", "kind": "comment", "by": "Lilianna Novak", "text": "The photo is blurred, so I cannot confirm the walk-round. Please retake it in daylight.", "at": "2026-10-19T16:40:00"},
+    {"ref": "TSK-1033", "title": "Incident report: gate tailgating", "kind": "submission", "by": "Daniel Okafor", "text": "Submitted the incident report with the gate camera stills and the officer statement attached.", "at": "2026-10-20T08:15:00"},
+    {"ref": "TSK-1051", "title": "Replace faulty CCTV unit, Level 2", "kind": "comment", "by": "Lilianna Novak", "text": "Chase the supplier for a delivery date today and log the answer here so the block reason is current.", "at": "2026-10-19T15:10:00"}
+  ]
+}

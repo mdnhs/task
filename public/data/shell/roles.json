@@ -1,0 +1,205 @@
+{
+  "roles": [
+    {
+      "id": "owner",
+      "label": "Tenant Owner",
+      "description": "Full control of the company workspace, billing and users.",
+      "home": "manager",
+      "access": {
+        "dashboard": "write",
+        "tasks": "write",
+        "reports": "write",
+        "attention": "write",
+        "staff": "write",
+        "recruitment": "write",
+        "files": "write",
+        "payroll": "write",
+        "orders": "write",
+        "settings": "write",
+        "audit": "write",
+        "whatsapp": "write"
+      }
+    },
+    {
+      "id": "admin",
+      "label": "Tenant Admin",
+      "description": "Manages settings, users and the audit trail.",
+      "home": "manager",
+      "access": {
+        "dashboard": "read",
+        "tasks": "read",
+        "reports": "read",
+        "attention": "read",
+        "staff": "read",
+        "recruitment": "read",
+        "files": "read",
+        "payroll": "none",
+        "orders": "read",
+        "settings": "write",
+        "audit": "write",
+        "whatsapp": "read"
+      }
+    },
+    {
+      "id": "manager",
+      "label": "Designated Manager",
+      "description": "Runs day-to-day operations; payroll and settings are read-only.",
+      "home": "manager",
+      "access": {
+        "dashboard": "write",
+        "tasks": "write",
+        "reports": "write",
+        "attention": "write",
+        "staff": "write",
+        "recruitment": "write",
+        "files": "write",
+        "payroll": "read",
+        "orders": "write",
+        "settings": "read",
+        "audit": "write",
+        "whatsapp": "write"
+      }
+    },
+    {
+      "id": "ops",
+      "label": "Operations Manager / Report Owner",
+      "description": "Owns daily reports and operations; no payroll access.",
+      "home": "manager",
+      "access": {
+        "dashboard": "write",
+        "tasks": "write",
+        "reports": "write",
+        "attention": "write",
+        "staff": "write",
+        "recruitment": "write",
+        "files": "write",
+        "payroll": "none",
+        "orders": "write",
+        "settings": "read",
+        "audit": "read",
+        "whatsapp": "write"
+      }
+    },
+    {
+      "id": "supervisor",
+      "label": "Department Supervisor / Team Lead",
+      "description": "Manages tasks, reports and rosters for their team.",
+      "home": "staff",
+      "access": {
+        "dashboard": "read",
+        "tasks": "write",
+        "reports": "write",
+        "attention": "none",
+        "staff": "write",
+        "recruitment": "none",
+        "files": "none",
+        "payroll": "none",
+        "orders": "none",
+        "settings": "none",
+        "audit": "none",
+        "whatsapp": "write"
+      }
+    },
+    {
+      "id": "employee",
+      "label": "Employee / Staff Member",
+      "description": "Works assigned tasks and reads reports.",
+      "home": "staff",
+      "access": {
+        "dashboard": "read",
+        "tasks": "write",
+        "reports": "read",
+        "attention": "none",
+        "staff": "none",
+        "recruitment": "none",
+        "files": "none",
+        "payroll": "none",
+        "orders": "none",
+        "settings": "none",
+        "audit": "none",
+        "whatsapp": "none"
+      }
+    },
+    {
+      "id": "hr",
+      "label": "HR / Recruitment User",
+      "description": "Handles recruitment and staff files.",
+      "home": "staff",
+      "access": {
+        "dashboard": "read",
+        "tasks": "read",
+        "reports": "none",
+        "attention": "none",
+        "staff": "none",
+        "recruitment": "write",
+        "files": "write",
+        "payroll": "none",
+        "orders": "none",
+        "settings": "none",
+        "audit": "none",
+        "whatsapp": "none"
+      }
+    },
+    {
+      "id": "payroll",
+      "label": "Payroll User",
+      "description": "Resolves payroll issues.",
+      "home": "staff",
+      "access": {
+        "dashboard": "read",
+        "tasks": "read",
+        "reports": "none",
+        "attention": "none",
+        "staff": "none",
+        "recruitment": "none",
+        "files": "none",
+        "payroll": "write",
+        "orders": "none",
+        "settings": "none",
+        "audit": "none",
+        "whatsapp": "none"
+      }
+    },
+    {
+      "id": "auditor",
+      "label": "Read-only / Auditor",
+      "description": "Read-only access to everything.",
+      "home": "manager",
+      "access": {
+        "dashboard": "read",
+        "tasks": "read",
+        "reports": "read",
+        "attention": "read",
+        "staff": "read",
+        "recruitment": "read",
+        "files": "read",
+        "payroll": "read",
+        "orders": "read",
+        "settings": "read",
+        "audit": "read",
+        "whatsapp": "read"
+      }
+    },
+    {
+      "id": "platform",
+      "label": "Platform Super Admin",
+      "description": "SaaS operator across all tenants.",
+      "home": "manager",
+      "platform": true,
+      "access": {
+        "dashboard": "none",
+        "tasks": "none",
+        "reports": "none",
+        "attention": "none",
+        "staff": "none",
+        "recruitment": "none",
+        "files": "none",
+        "payroll": "none",
+        "orders": "none",
+        "settings": "none",
+        "audit": "none",
+        "whatsapp": "none"
+      }
+    }
+  ]
+}

@@ -1,4 +1,4 @@
-import type { Dept } from "@/lib/types"
+import type { Dept, Role, Tenant } from "@/lib/types"
 
 export type NavItemData = {
   href: string
@@ -15,4 +15,17 @@ export type NavigationData = {
   general: NavItemData[]
   departments: { dep: Dept; label: string }[]
 }
-export type UserData = { name: string; role: string; email: string; initials: string; unreadNotifications: number }
+export type UserData = { name: string; role: string; email: string; initials: string }
+
+export type ShellSession = { role: Role; roles: Role[]; tenant: Tenant; tenants: Tenant[] }
+
+export type NotificationType =
+  | "assigned"
+  | "reassigned"
+  | "deadline"
+  | "evidence"
+  | "report-returned"
+  | "manager-action"
+  | "reminder"
+// Titles stay generic: no names, amounts or other sensitive details (FR-NOT-04).
+export type Notification = { id: string; type: NotificationType; title: string; at: string; read: boolean; href: string }

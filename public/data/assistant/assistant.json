@@ -1,7 +1,7 @@
 {
   "title": "OpsDesk AI",
   "subtitle": "Ask about tasks, reports and coverage",
-  "greeting": "Hi Lilianna, I can summarise today's work, spot risks and draft reminders. What do you need?",
+  "greeting": "Hi {firstName}, I can summarise today's work, spot risks and draft reminders. What do you need?",
   "suggestions": [
     "Summarise overdue tasks",
     "Draft a reminder to the Cleaning lead",
@@ -23,7 +23,7 @@
         "cleaning lead",
         "draft"
       ],
-      "text": "Draft: \"Hi Grace, the Cleaning daily report is still in draft (7 of 10 sections). Please complete and submit it before 5:30 PM London time. Thanks, Lilianna.\" Want me to send it?"
+      "text": "Draft: \"Hi Grace, the Cleaning daily report is still in draft (7 of 10 sections). Please complete and submit it before {deadline} {tz}. Thanks, {firstName}.\" Want me to send it?"
     },
     {
       "match": [

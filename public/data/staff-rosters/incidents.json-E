@@ -1,0 +1,366 @@
+{
+  "incidents": [
+    {
+      "id": "INC-3003",
+      "type": "callout",
+      "staff": "A. Kowalski",
+      "dept": "Security",
+      "shift": "18:00–02:00",
+      "site": "Docklands Plaza",
+      "client": "Docklands Estates",
+      "cover": "Oliver Grant",
+      "status": "covered",
+      "owner": "Daniel Okafor",
+      "action": "Cover confirmed, brief Oliver on site access",
+      "reportedAt": "2026-10-20T13:40:00",
+      "contact": "07700 900103",
+      "notes": "Reported sick by phone. Return to work check due on his next shift.",
+      "history": [
+        {
+          "at": "2026-10-20T13:40:00",
+          "by": "Daniel Okafor",
+          "action": "Call-out logged"
+        },
+        {
+          "at": "2026-10-20T14:05:00",
+          "by": "Daniel Okafor",
+          "action": "Cover recorded",
+          "note": "Oliver Grant accepted the shift"
+        }
+      ]
+    },
+    {
+      "id": "INC-3002",
+      "type": "callout",
+      "staff": "Ines Duarte",
+      "dept": "Cleaning",
+      "shift": "06:00–14:00",
+      "site": "Canary Wharf",
+      "client": "Wharf Offices Ltd",
+      "cover": "Hannah Price",
+      "status": "covered",
+      "owner": "Grace Mensah",
+      "action": "None, cover is on site",
+      "reportedAt": "2026-10-20T05:10:00",
+      "contact": "07700 900201",
+      "notes": "Childcare issue. Hannah swapped from the afternoon round.",
+      "history": [
+        {
+          "at": "2026-10-20T05:10:00",
+          "by": "Grace Mensah",
+          "action": "Call-out logged"
+        },
+        {
+          "at": "2026-10-20T05:25:00",
+          "by": "Grace Mensah",
+          "action": "Cover recorded",
+          "note": "Hannah Price swapped to the early round"
+        }
+      ]
+    },
+    {
+      "id": "INC-3001",
+      "type": "callout",
+      "staff": "J. Silva",
+      "dept": "Security",
+      "shift": "07:00–15:00",
+      "site": "Riverside House",
+      "client": "Riverside Property",
+      "cover": "Marcus Bell",
+      "status": "covered",
+      "owner": "Daniel Okafor",
+      "action": "None, handover done at 07:00",
+      "reportedAt": "2026-10-20T06:20:00",
+      "contact": "07700 900102",
+      "notes": "Transport strike. Expects to be back tomorrow.",
+      "history": [
+        {
+          "at": "2026-10-20T06:20:00",
+          "by": "Daniel Okafor",
+          "action": "Call-out logged"
+        },
+        {
+          "at": "2026-10-20T06:35:00",
+          "by": "Daniel Okafor",
+          "action": "Cover recorded",
+          "note": "Marcus Bell took the day shift"
+        }
+      ]
+    },
+    {
+      "id": "INC-3004",
+      "type": "staff_issue",
+      "staff": "M. Haddad",
+      "dept": "Security",
+      "shift": "Licence",
+      "site": "Canary Wharf",
+      "client": "Wharf Offices Ltd",
+      "cover": null,
+      "status": "escalated",
+      "owner": "Priya Shah",
+      "action": "Book SIA renewal before 1 Nov or remove from site roster",
+      "reportedAt": "2026-10-20T09:15:00",
+      "contact": "07700 900101",
+      "notes": "SIA licence expires in 12 days; renewal not yet submitted.",
+      "history": [
+        {
+          "at": "2026-10-20T09:15:00",
+          "by": "Priya Shah",
+          "action": "Issue logged"
+        },
+        {
+          "at": "2026-10-20T09:45:00",
+          "by": "Lilianna Novak",
+          "action": "Escalated",
+          "note": "Needs a renewal date this week"
+        }
+      ]
+    },
+    {
+      "id": "INC-2999",
+      "type": "staff_issue",
+      "staff": "Nadia Kowal",
+      "dept": "Security",
+      "shift": "Uniform",
+      "site": "Riverside House",
+      "client": "Riverside Property",
+      "cover": null,
+      "status": "open",
+      "owner": "Daniel Okafor",
+      "action": "Issue replacement jacket from stores",
+      "reportedAt": "1926-10-19T16:30:00",
+      "contact": "07700 900106",
+      "notes": "Jacket damaged on patrol. Wearing a spare in the meantime.",
+      "history": [
+        {
+          "at": "1926-10-19T16:30:00",
+          "by": "Daniel Okafor",
+          "action": "Issue logged"
+        }
+      ]
+    },
+    {
+      "id": "INC-2998",
+      "type": "noshow",
+      "staff": "Kamal Rahman",
+      "dept": "Cleaning",
+      "shift": "14:00–22:00",
+      "site": "Shoreditch",
+      "client": "Hoxton Works",
+      "cover": "Sofia Reyes",
+      "status": "resolved",
+      "owner": "Grace Mensah",
+      "action": "Attendance conversation held",
+      "reportedAt": "1926-10-19T14:20:00",
+      "contact": "07700 900203",
+      "notes": "Did not arrive and phone off. Contacted at 16:00, phone had died.",
+      "history": [
+        {
+          "at": "1926-10-19T14:20:00",
+          "by": "Grace Mensah",
+          "action": "No-show logged"
+        },
+        {
+          "at": "1926-10-19T15:00:00",
+          "by": "Grace Mensah",
+          "action": "Cover recorded",
+          "note": "Sofia Reyes covered from 15:00"
+        },
+        {
+          "at": "1926-10-19T18:00:00",
+          "by": "Grace Mensah",
+          "action": "Resolved",
+          "note": "Conversation held, no further action"
+        }
+      ]
+    },
+    {
+      "id": "INC-2995",
+      "type": "cover",
+      "staff": "Hannah Price",
+      "dept": "Cleaning",
+      "shift": "08:00–16:00",
+      "site": "Riverside House",
+      "client": "Riverside Property",
+      "cover": "Grace Mensah",
+      "status": "resolved",
+      "owner": "Grace Mensah",
+      "action": "None",
+      "reportedAt": "1726-10-17T07:00:00",
+      "contact": "07700 900202",
+      "notes": "Planned training day, team lead covered.",
+      "history": [
+        {
+          "at": "1726-10-17T07:00:00",
+          "by": "Grace Mensah",
+          "action": "Cover arranged"
+        },
+        {
+          "at": "1726-10-17T17:00:00",
+          "by": "Grace Mensah",
+          "action": "Resolved"
+        }
+      ]
+    },
+    {
+      "id": "INC-2993",
+      "type": "staff_issue",
+      "staff": "Oliver Grant",
+      "dept": "Security",
+      "shift": "Rota",
+      "site": "Docklands Plaza",
+      "client": "Docklands Estates",
+      "cover": null,
+      "status": "resolved",
+      "owner": "Daniel Okafor",
+      "action": "None",
+      "reportedAt": "1326-10-13T11:00:00",
+      "contact": "07700 900105",
+      "notes": "Asked to swap two night shifts. Agreed with Marcus Bell.",
+      "history": [
+        {
+          "at": "1326-10-13T11:00:00",
+          "by": "Daniel Okafor",
+          "action": "Issue logged"
+        },
+        {
+          "at": "1326-10-13T12:00:00",
+          "by": "Daniel Okafor",
+          "action": "Resolved",
+          "note": "Swap agreed"
+        }
+      ]
+    },
+    {
+      "id": "INC-2992",
+      "type": "callout",
+      "staff": "Sofia Reyes",
+      "dept": "Cleaning",
+      "shift": "06:00–14:00",
+      "site": "Canary Wharf",
+      "client": "Wharf Offices Ltd",
+      "cover": "Ines Duarte",
+      "status": "resolved",
+      "owner": "Grace Mensah",
+      "action": "None",
+      "reportedAt": "1426-10-14T05:00:00",
+      "contact": "07700 900204",
+      "notes": "Sick. Back on 16 Oct.",
+      "history": [
+        {
+          "at": "1426-10-14T05:00:00",
+          "by": "Grace Mensah",
+          "action": "Call-out logged"
+        },
+        {
+          "at": "1426-10-14T05:30:00",
+          "by": "Grace Mensah",
+          "action": "Cover recorded",
+          "note": "Ines Duarte covered"
+        },
+        {
+          "at": "1426-10-14T17:00:00",
+          "by": "Grace Mensah",
+          "action": "Resolved"
+        }
+      ]
+    },
+    {
+      "id": "INC-2991",
+      "type": "noshow",
+      "staff": "Marcus Bell",
+      "dept": "Security",
+      "shift": "22:00–06:00",
+      "site": "Shoreditch",
+      "client": "Hoxton Works",
+      "cover": "J. Silva",
+      "status": "resolved",
+      "owner": "Daniel Okafor",
+      "action": "Written warning issued",
+      "reportedAt": "1526-10-15T22:30:00",
+      "contact": "07700 900104",
+      "notes": "Did not attend night shift, no contact. Silva covered from 23:00.",
+      "history": [
+        {
+          "at": "1526-10-15T22:30:00",
+          "by": "Daniel Okafor",
+          "action": "No-show logged"
+        },
+        {
+          "at": "1526-10-15T23:00:00",
+          "by": "Daniel Okafor",
+          "action": "Cover recorded",
+          "note": "J. Silva covered"
+        },
+        {
+          "at": "1626-10-16T10:00:00",
+          "by": "Priya Shah",
+          "action": "Resolved",
+          "note": "Written warning issued"
+        }
+      ]
+    },
+    {
+      "id": "INC-2990",
+      "type": "callout",
+      "staff": "Daniel Okafor",
+      "dept": "Security",
+      "shift": "07:00–15:00",
+      "site": "Riverside House",
+      "client": "Riverside Property",
+      "cover": "A. Kowalski",
+      "status": "resolved",
+      "owner": "Lilianna Novak",
+      "action": "None",
+      "reportedAt": "1626-10-16T06:00:00",
+      "contact": "07700 900107",
+      "notes": "Short-notice illness.",
+      "history": [
+        {
+          "at": "1626-10-16T06:00:00",
+          "by": "Lilianna Novak",
+          "action": "Call-out logged"
+        },
+        {
+          "at": "1626-10-16T06:20:00",
+          "by": "Lilianna Novak",
+          "action": "Cover recorded",
+          "note": "A. Kowalski covered"
+        },
+        {
+          "at": "1626-10-16T16:00:00",
+          "by": "Lilianna Novak",
+          "action": "Resolved"
+        }
+      ]
+    },
+    {
+      "id": "INC-2989",
+      "type": "cover",
+      "staff": "Grace Mensah",
+      "dept": "Cleaning",
+      "shift": "18:00–22:00",
+      "site": "Shoreditch",
+      "client": "Hoxton Works",
+      "cover": "Kamal Rahman",
+      "status": "resolved",
+      "owner": "Grace Mensah",
+      "action": "None",
+      "reportedAt": "1226-10-12T09:00:00",
+      "contact": "07700 900205",
+      "notes": "Annual leave cover.",
+      "history": [
+        {
+          "at": "1226-10-12T09:00:00",
+          "by": "Grace Mensah",
+          "action": "Cover arranged"
+        },
+        {
+          "at": "1226-10-12T22:00:00",
+          "by": "Grace Mensah",
+          "action": "Resolved"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+[
+  {"path": "/account/profile", "expect": ["Account", "Display name", "Lilianna Novak", "UK time", "lilianna.novak@opsdesk.co.uk"]},
+  {"path": "/account/security", "expect": ["Change password", "Two-step verification", "Active sessions", "This device", "Sign out of all other sessions", "Security activity"]},
+  {"path": "/account/notifications", "expect": ["Task assigned to me", "Daily report reminder", "Comment mention", "In-app", "Email", "Remind me"]},
+  {"path": "/account/profile", "cookies": {"od-role": "employee"}, "expect": ["Display name", "Employee"], "notExpect": ["Access restricted"]},
+  {"path": "/account/security", "cookies": {"od-role": "auditor"}, "expect": ["Active sessions"], "notExpect": ["Access restricted"]},
+  {"path": "/account/nope", "status": 404},
+  {"path": "/account/profile", "cookies": {"od-auth": "out"}, "status": 307}
+]

@@ -1,0 +1,5 @@
+[
+  {"path": "/audit-log", "expect": ["Audit", "failed sign-in", "Audit records can&#x27;t be edited or deleted"]},
+  {"path": "/audit-log", "cookies": {"od-role": "auditor"}, "expect": ["Export CSV"]},
+  {"path": "/audit-log", "cookies": {"od-role": "employee"}, "expect": ["Access restricted"], "notExpect": ["AUD-", "Export CSV"]}
+]

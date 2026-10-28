@@ -1,0 +1,136 @@
+/* ---------- Global search (features/search) ---------- */
+/* ONE surface (Airbnb-style). .od-search stays in the topbar flow as a same-size placeholder with the original .search sizing
+   (flex 1 1 200px, max-width 280px, 50px tall like every topbar control). .od-search-surface is anchored at its top-left: closed it IS the pill
+   (--card, --r-pill, padding 10px 14px, 13px, --ink-3); open, global-search.tsx springs its width/height/radius into the
+   panel (--card, --shadow, --r-lg). Borderless: no focus ring anywhere (ui-rules 4/8); the caret shows focus. */
+.od-search.search{position:relative;display:block;height:50px;padding:0;background:transparent;z-index:40}
+/* Layer: anchored at the pill's top-left; global-search.tsx sets its width to the panel width while open/closing. */
+.od-search-layer{position:absolute;top:0;left:0;width:100%}
+.od-search-surface{position:relative;display:flex;flex-direction:column;overflow:hidden;background:var(--card);color:var(--ink);border-radius:var(--r-pill)}
+.od-search-layer:not([data-state="closed"]) .od-search-surface{border-radius:var(--r-lg)}
+/* Shadow on a sibling behind the clipped surface (clip-path would cut it off); fades in as the panel nears full size. */
+.od-search-shadow{position:absolute;inset:0;border-radius:var(--r-lg);box-shadow:var(--shadow),0 16px 40px rgba(16,40,24,.12);opacity:0;pointer-events:none;
+  transition:opacity var(--dur-fast) var(--ease)}
+.od-search-layer[data-state="open"] .od-search-shadow{opacity:1;transition:opacity var(--dur) var(--ease) calc(var(--dur) / 2)}
+:root[data-theme="dark"] .od-search-shadow{box-shadow:0 12px 32px rgba(0,0,0,.5)}
+.od-search :is(input,button):focus-visible,.od-search-surface:focus-visible{outline:none}
+.od-search input::-webkit-search-cancel-button{display:none}
+
+/* Top row: closed = the pill's own row; open = the full-width field (skin of .od-filter-search: --mute-bg, --r-pill).
+   The row's box never changes (no jump at either end of the morph); the field fill is a ::before that fades in. */
+.od-search-field{position:relative;isolation:isolate;flex:none;display:flex;align-items:center;gap:10px;min-width:0;height:50px;padding:0 14px;color:var(--ink-3)}
+/* Fill is centred on the 50px row: 6px above and below, 8px panel inset at the sides. */
+.od-search-field::before{content:"";position:absolute;inset:6px 8px;z-index:-1;border-radius:var(--r-pill);background:var(--mute-bg);opacity:0;transition:opacity var(--dur) var(--ease)}
+.od-search-layer[data-state="open"] .od-search-field::before{opacity:1}
+/* Shared gutter while open: panel inset 8px + item inset 10px = 18px for the field, headings, rows, chips and filters.
+   The pill row is 14px closed, so its contents slide 4px in with a transform (no layout change). */
+.od-search-field > *{transition:transform var(--dur) var(--ease)}
+.od-search-layer[data-state="open"] .od-search-field > :is(.ico,input){transform:translateX(4px)}
+.od-search-layer[data-state="open"] .od-search-field > :is(.od-search-clear,.od-search-kbd,.od-search-fbtn){transform:translateX(-4px)}
+.od-search-field > .ico{width:18px;height:18px;flex:none}
+.od-search-field input{flex:1;min-width:0;border:0;outline:0;background:transparent;font:inherit;font-size:13px;color:var(--ink);caret-color:var(--brand)}
+.od-search-field input::placeholder{color:var(--placeholder)}
+.od-search-kbd{flex:none;font:600 11px/1 var(--font);color:var(--ink-3);background:var(--mute-bg);border-radius:var(--r-pill);padding:4px 8px;white-space:nowrap;pointer-events:none}
+.od-search-fbtn{position:relative;flex:none;display:grid;place-items:center;width:28px;height:28px;margin-right:-6px;border-radius:50%;color:var(--ink-3);cursor:pointer;
+  transition:color var(--dur-fast) var(--ease),background-color var(--dur-fast) var(--ease)}
+.od-search-fbtn:hover,.od-search-fbtn[aria-expanded="true"]{color:var(--brand);background:var(--brand-soft)}
+.od-search-badge{position:absolute;top:-4px;right:-5px;min-width:16px;padding:0 4px;border-radius:var(--r-pill);background:var(--brand);color:var(--on-brand);font-size:10px;font-weight:700;line-height:16px;text-align:center;
+  animation:od-search-pop var(--dur) var(--ease) both}
+@keyframes od-search-pop{0%{transform:scale(.6)}60%{transform:scale(1.15)}100%{transform:scale(1)}}
+.od-search-clear{flex:none;display:grid;place-items:center;width:24px;height:24px;border-radius:50%;color:var(--ink-3);font-size:17px;line-height:1;cursor:pointer;
+  transition:color var(--dur-fast) var(--ease),background-color var(--dur-fast) var(--ease)}
+.od-search-clear:hover{color:var(--ink);background:var(--line)}
+
+/* Sections below the field (same padding / gap as the notifications popover). Fade + rise 80ms into the morph; fade out first on close. */
+.od-search-panel{display:flex;flex-direction:column;min-height:0;padding:4px 8px 8px}
+.od-search-panel[data-state="closed"]{pointer-events:none}
+/* Content starts ~40% into the expansion and finishes with it. */
+.od-search-inner{display:flex;flex-direction:column;gap:6px;min-height:0;animation:od-search-content var(--dur) var(--ease) calc(var(--dur) / 2) both}
+.od-search-panel[data-state="closed"] .od-search-inner{animation:od-search-content-out var(--dur-fast) var(--ease-in-out) both}
+@keyframes od-search-content{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+@keyframes od-search-content-out{from{opacity:1}to{opacity:0}}
+
+/* Suggestion sections stagger in on open (~30ms apart). Results never stagger (no per-keystroke replays). */
+.od-search-sec.is-stagger{animation:od-search-sec var(--dur) var(--ease) both;animation-delay:calc(var(--dur) / 2 + var(--i,0) * 30ms)}
+@keyframes od-search-sec{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+
+.od-search-body{position:relative;display:flex;flex-direction:column;gap:6px;max-height:min(460px,62vh);overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin}
+.od-search-sec{display:flex;flex-direction:column}
+.od-search-sec-h{display:flex;align-items:center;gap:8px;min-height:28px;padding:6px 10px 2px;font-size:11.5px;font-weight:700;color:var(--ink-3)}
+.od-search-sec-h .od-search-link{margin:-4px -10px -4px auto}
+.od-search-count{font-size:10.5px;font-weight:700;color:var(--ink-2);background:var(--mute-bg);border-radius:var(--r-pill);padding:1px 7px}
+
+/* Rows (.od-menu item padding/radius): identical geometry in every state. Active (keyboard or pointer) = a --brand-soft pill that slides
+   between rows (shared layoutId, user's choice: the panel sits on --card, so the fill never matches the page bg) + text/icon colour. */
+.od-search-pill{position:absolute;inset:0;z-index:-1;border-radius:inherit;background:var(--brand-soft);pointer-events:none}
+.od-search-li{position:relative}
+.od-search-row{position:relative;isolation:isolate;display:flex;align-items:center;gap:10px;width:100%;min-width:0;padding:8px 10px;border-radius:var(--r-pill);
+  color:var(--ink-2);text-align:left;cursor:pointer;outline:none;transition:color var(--dur-fast) var(--ease)}
+.od-search-row[data-active]{color:var(--brand-deep)}
+:root[data-theme="dark"] .od-search-row[data-active]{color:var(--brand-3)}
+.od-search-row > .ico{flex:none;width:16px;height:16px;color:var(--brand);opacity:0;transform:translateX(-2px);transition:opacity var(--dur-fast) var(--ease),transform var(--dur-fast) var(--ease)}
+.od-search-row[data-active] > .ico{opacity:1;transform:none}
+/* Icons as in .od-menu items: plain, --ink-3, turning --brand on the active row. */
+.od-search-ico{flex:none;display:grid;place-items:center;width:18px;height:18px;color:var(--ink-3);transition:color var(--dur-fast) var(--ease)}
+.od-search-ico .ico{width:16px;height:16px}
+.od-search-row[data-active] .od-search-ico{color:var(--brand)}
+.od-search-main{display:flex;flex-direction:column;min-width:0;flex:1}
+.od-search-title{font-size:13px;font-weight:600;line-height:1.35;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.od-search-meta{display:flex;gap:6px;min-width:0;font-size:11.5px;color:var(--ink-3);overflow:hidden;white-space:nowrap}
+.od-search-meta > span{overflow:hidden;text-overflow:ellipsis}
+.od-search-meta > span + span::before{content:"·";margin-right:6px}
+.od-search-status{flex:none;font-size:11.5px;font-weight:600;color:var(--ink-3);white-space:nowrap}
+.od-search-panel mark{background:none;color:var(--brand);font-weight:inherit}
+
+.od-search-recent{display:flex;align-items:center;gap:2px}
+.od-search-recent .od-search-row{flex:1}
+.od-search-x{flex:none;display:grid;place-items:center;width:26px;height:26px;margin-right:4px;border-radius:50%;color:var(--ink-3);font-size:16px;line-height:1;cursor:pointer;transition:color var(--dur-fast) var(--ease),background-color var(--dur-fast) var(--ease)}
+.od-search-x:hover{color:var(--bad);background:var(--bad-bg)}
+
+.od-search-chips{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:4px 10px}
+.od-search-chip{position:relative;isolation:isolate;display:inline-flex;align-items:center;gap:6px;max-width:100%;border-radius:var(--r-pill);padding:6px 12px;background:var(--mute-bg);color:var(--ink-2);font-size:12.5px;font-weight:600;cursor:pointer;outline:none;
+  transition:color var(--dur-fast) var(--ease),background-color var(--dur-fast) var(--ease),transform var(--dur-fast) var(--ease)}
+.od-search-chip:hover{transform:translateY(-1px)}
+.od-search-chip:hover,.od-search-chip[data-active]{color:var(--brand-deep)}
+.od-search-chip[data-active]{background:var(--brand-soft)}
+:root[data-theme="dark"] :is(.od-search-chip:hover,.od-search-chip[data-active]){color:var(--brand-3)}
+.od-search-chip-l{position:relative}
+.od-search-chip.is-filter{background:var(--brand-soft);color:var(--brand-deep);cursor:default;padding-right:6px}
+.od-search-chip.is-filter:hover{transform:none}
+:root[data-theme="dark"] .od-search-chip.is-filter{color:var(--brand-3)}
+.od-search-chip.is-filter button{display:grid;place-items:center;width:18px;height:18px;border-radius:50%;font-size:14px;line-height:1;cursor:pointer;transition:background-color var(--dur-fast) var(--ease)}
+.od-search-chip.is-filter button:hover{background:var(--card)}
+
+.od-search-link{font-size:12px;font-weight:700;color:var(--brand-deep);border-radius:var(--r-pill);padding:4px 10px;cursor:pointer;transition:background-color var(--dur-fast) var(--ease)}
+:root[data-theme="dark"] .od-search-link{color:var(--brand-3)}
+.od-search-link:hover:not(:disabled){background:var(--brand-soft)}
+.od-search-link:disabled{color:var(--ink-3);cursor:not-allowed}
+
+.od-search-empty{display:flex;flex-direction:column;align-items:center;gap:2px;padding:28px 16px;text-align:center}
+.od-search-empty > .ico{width:22px;height:22px;color:var(--ink-3);margin-bottom:6px}
+.od-search-empty-t{font-size:13.5px;font-weight:700;color:var(--ink);overflow-wrap:anywhere}
+.od-search-empty-s{font-size:12px;color:var(--ink-3)}
+
+/* Filters view: same controls as every other form (.od-field + shadcn Select / date-range popover). */
+.od-search-filters{display:flex;flex-direction:column;gap:12px;padding:6px 10px 2px}
+.od-search-frow{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.od-search-filters [data-slot="select-trigger"].od-search-ctl{height:auto;width:100%;justify-content:space-between;font-weight:500}
+.od-search-filters [data-slot="select-trigger"].od-search-ctl:hover:not(:disabled),.od-search-filters .od-datepick:hover{background-color:var(--line)}
+.od-search-filters [data-slot="select-trigger"].od-search-ctl:disabled{cursor:not-allowed;opacity:.55}
+.od-search-filters .od-datepick{width:100%;transition:box-shadow var(--dur-fast) var(--ease),background-color var(--dur-fast) var(--ease)}
+.od-search-factions{display:flex;justify-content:flex-end;align-items:center;gap:8px;padding-top:2px}
+.od-search-done{border-radius:var(--r-pill);background:var(--brand);color:var(--on-brand);font-size:12.5px;font-weight:700;padding:8px 16px;cursor:pointer;transition:background-color var(--dur-fast) var(--ease)}
+.od-search-done:hover{background:var(--brand-deep)}
+:root[data-theme="dark"] .od-search-done:hover{background:var(--brand-2)}
+
+@media (max-width:640px){
+  .od-search-kbd{display:none}
+  /* The pill is already full width here (order:3 row); the surface only grows downward. */
+  .od-search-body{max-height:min(420px,60vh)}
+  .od-search-frow{grid-template-columns:minmax(0,1fr)}
+  .od-search-status{display:none}
+}
+
+/* Loading state while the index loads on first open (same row geometry as results). */
+.od-search-loading{display:flex;flex-direction:column}
+.od-search-sk-row{display:flex;align-items:center;gap:10px;padding:10px}

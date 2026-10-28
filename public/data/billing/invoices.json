@@ -1,0 +1,180 @@
+{
+ "tenants": {
+  "t1": [
+   {
+    "id": "nf-0012",
+    "number": "INV-NF-2012",
+    "date": "2026-10-14",
+    "amount": 149,
+    "currency": "GBP",
+    "status": "paid",
+    "description": "Business plan, monthly"
+   },
+   {
+    "id": "nf-0011",
+    "number": "INV-NF-2011",
+    "date": "2026-09-14",
+    "amount": 149,
+    "currency": "GBP",
+    "status": "paid",
+    "description": "Business plan, monthly"
+   },
+   {
+    "id": "nf-0010",
+    "number": "INV-NF-2010",
+    "date": "2026-08-14",
+    "amount": 149,
+    "currency": "GBP",
+    "status": "paid",
+    "description": "Business plan, monthly"
+   },
+   {
+    "id": "nf-0009",
+    "number": "INV-NF-2009",
+    "date": "2026-07-14",
+    "amount": 149,
+    "currency": "GBP",
+    "status": "paid",
+    "description": "Business plan, monthly"
+   },
+   {
+    "id": "nf-0008",
+    "number": "INV-NF-2008",
+    "date": "2026-06-14",
+    "amount": 149,
+    "currency": "GBP",
+    "status": "paid",
+    "description": "Business plan, monthly"
+   },
+   {
+    "id": "nf-0007",
+    "number": "INV-NF-2007",
+    "date": "2026-05-14",
+    "amount": 149,
+    "currency": "GBP",
+    "status": "paid",
+    "description": "Business plan, monthly"
+   },
+   {
+    "id": "nf-0006",
+    "number": "INV-NF-2006",
+    "date": "2026-04-14",
+    "amount": 149,
+    "currency": "GBP",
+    "status": "paid",
+    "description": "Business plan, monthly"
+   },
+   {
+    "id": "nf-0005",
+    "number": "INV-NF-2005",
+    "date": "2026-03-14",
+    "amount": 149,
+    "currency": "GBP",
+    "status": "paid",
+    "description": "Business plan, monthly"
+   },
+   {
+    "id": "nf-0004",
+    "number": "INV-NF-2004",
+    "date": "2026-02-14",
+    "amount": 149,
+    "currency": "GBP",
+    "status": "paid",
+    "description": "Business plan, monthly"
+   },
+   {
+    "id": "nf-0003",
+    "number": "INV-NF-2003",
+    "date": "2026-01-14",
+    "amount": 149,
+    "currency": "GBP",
+    "status": "paid",
+    "description": "Business plan, monthly"
+   },
+   {
+    "id": "nf-0002",
+    "number": "INV-NF-2002",
+    "date": "2025-12-14",
+    "amount": 149,
+    "currency": "GBP",
+    "status": "paid",
+    "description": "Business plan, monthly"
+   },
+   {
+    "id": "nf-0001",
+    "number": "INV-NF-2001",
+    "date": "2025-11-14",
+    "amount": 149,
+    "currency": "GBP",
+    "status": "paid",
+    "description": "Business plan, monthly"
+   }
+  ],
+  "t2": [],
+  "t3": [
+   {
+    "id": "ms-0007",
+    "number": "INV-MS-2007",
+    "date": "2026-10-14",
+    "amount": 149,
+    "currency": "GBP",
+    "status": "failed",
+    "description": "Business plan, monthly"
+   },
+   {
+    "id": "ms-0006",
+    "number": "INV-MS-2006",
+    "date": "2026-09-14",
+    "amount": 149,
+    "currency": "GBP",
+    "status": "paid",
+    "description": "Business plan, monthly"
+   },
+   {
+    "id": "ms-0005",
+    "number": "INV-MS-2005",
+    "date": "2026-08-14",
+    "amount": 149,
+    "currency": "GBP",
+    "status": "paid",
+    "description": "Business plan, monthly"
+   },
+   {
+    "id": "ms-0004",
+    "number": "INV-MS-2004",
+    "date": "2026-07-14",
+    "amount": 149,
+    "currency": "GBP",
+    "status": "paid",
+    "description": "Business plan, monthly"
+   },
+   {
+    "id": "ms-0003",
+    "number": "INV-MS-2003",
+    "date": "2026-06-14",
+    "amount": 149,
+    "currency": "GBP",
+    "status": "paid",
+    "description": "Business plan, monthly"
+   },
+   {
+    "id": "ms-0002",
+    "number": "INV-MS-2002",
+    "date": "2026-05-14",
+    "amount": 149,
+    "currency": "GBP",
+    "status": "paid",
+    "description": "Business plan, monthly"
+   },
+   {
+    "id": "ms-0001",
+    "number": "INV-MS-2001",
+    "date": "2026-04-14",
+    "amount": 149,
+    "currency": "GBP",
+    "status": "paid",
+    "description": "Business plan, monthly"
+   }
+  ]
+ }
+}

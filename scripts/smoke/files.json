@@ -1,0 +1,5 @@
+[
+  {"path": "/files", "expect": ["Employee documents", "Client files", "SIA licence", "in 12 days", "Open file", "Confirm valid"]},
+  {"path": "/files", "cookies": {"od-role": "auditor"}, "expect": ["SIA licence", "Open file"], "notExpect": ["Confirm valid"]},
+  {"path": "/files", "cookies": {"od-role": "supervisor"}, "expect": ["Access restricted"], "notExpect": ["Employee documents", "Client files", "Confirm valid", "Open file"]}
+]

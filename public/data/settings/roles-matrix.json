@@ -1,0 +1,203 @@
+{
+ "modules": [
+  {
+   "id": "dashboard",
+   "label": "Dashboard"
+  },
+  {
+   "id": "tasks",
+   "label": "Tasks"
+  },
+  {
+   "id": "reports",
+   "label": "Daily Reports"
+  },
+  {
+   "id": "attention",
+   "label": "Manager Attention"
+  },
+  {
+   "id": "staff",
+   "label": "Staff & Rosters"
+  },
+  {
+   "id": "recruitment",
+   "label": "Recruitment"
+  },
+  {
+   "id": "files",
+   "label": "Files"
+  },
+  {
+   "id": "payroll",
+   "label": "Payroll Issues"
+  },
+  {
+   "id": "orders",
+   "label": "Orders & Stock"
+  },
+  {
+   "id": "settings",
+   "label": "Settings"
+  },
+  {
+   "id": "audit",
+   "label": "Audit Log"
+  }
+ ],
+ "roles": [
+  {
+   "id": "owner",
+   "label": "Tenant Owner",
+   "access": {
+    "dashboard": "write",
+    "tasks": "write",
+    "reports": "write",
+    "attention": "write",
+    "staff": "write",
+    "recruitment": "write",
+    "files": "write",
+    "payroll": "write",
+    "orders": "write",
+    "settings": "write",
+    "audit": "write"
+   }
+  },
+  {
+   "id": "admin",
+   "label": "Tenant Admin",
+   "access": {
+    "dashboard": "read",
+    "tasks": "read",
+    "reports": "read",
+    "attention": "read",
+    "staff": "read",
+    "recruitment": "read",
+    "files": "read",
+    "payroll": "none",
+    "orders": "read",
+    "settings": "write",
+    "audit": "write"
+   }
+  },
+  {
+   "id": "manager",
+   "label": "Designated Manager",
+   "access": {
+    "dashboard": "write",
+    "tasks": "write",
+    "reports": "write",
+    "attention": "write",
+    "staff": "write",
+    "recruitment": "write",
+    "files": "write",
+    "payroll": "read",
+    "orders": "write",
+    "settings": "read",
+    "audit": "write"
+   }
+  },
+  {
+   "id": "ops",
+   "label": "Operations Manager / Report Owner",
+   "access": {
+    "dashboard": "write",
+    "tasks": "write",
+    "reports": "write",
+    "attention": "write",
+    "staff": "write",
+    "recruitment": "write",
+    "files": "write",
+    "payroll": "none",
+    "orders": "write",
+    "settings": "read",
+    "audit": "read"
+   }
+  },
+  {
+   "id": "supervisor",
+   "label": "Department Supervisor / Team Lead",
+   "access": {
+    "dashboard": "read",
+    "tasks": "write",
+    "reports": "write",
+    "attention": "none",
+    "staff": "write",
+    "recruitment": "none",
+    "files": "none",
+    "payroll": "none",
+    "orders": "none",
+    "settings": "none",
+    "audit": "none"
+   }
+  },
+  {
+   "id": "employee",
+   "label": "Employee / Staff Member",
+   "access": {
+    "dashboard": "read",
+    "tasks": "write",
+    "reports": "read",
+    "attention": "none",
+    "staff": "none",
+    "recruitment": "none",
+    "files": "none",
+    "payroll": "none",
+    "orders": "none",
+    "settings": "none",
+    "audit": "none"
+   }
+  },
+  {
+   "id": "hr",
+   "label": "HR / Recruitment User",
+   "access": {
+    "dashboard": "read",
+    "tasks": "read",
+    "reports": "none",
+    "attention": "none",
+    "staff": "none",
+    "recruitment": "write",
+    "files": "write",
+    "payroll": "none",
+    "orders": "none",
+    "settings": "none",
+    "audit": "none"
+   }
+  },
+  {
+   "id": "payroll",
+   "label": "Payroll User",
+   "access": {
+    "dashboard": "read",
+    "tasks": "read",
+    "reports": "none",
+    "attention": "none",
+    "staff": "none",
+    "recruitment": "none",
+    "files": "none",
+    "payroll": "write",
+    "orders": "none",
+    "settings": "none",
+    "audit": "none"
+   }
+  },
+  {
+   "id": "auditor",
+   "label": "Read-only / Auditor",
+   "access": {
+    "dashboard": "read",
+    "tasks": "read",
+    "reports": "read",
+    "attention": "read",
+    "staff": "read",
+    "recruitment": "read",
+    "files": "read",
+    "payroll": "read",
+    "orders": "read",
+    "settings": "read",
+    "audit": "read"
+   }
+  }
+ ]
+}

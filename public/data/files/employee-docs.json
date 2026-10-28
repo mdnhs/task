@@ -1,0 +1,311 @@
+{
+  "documents": [
+    {
+      "id": "DOC-101",
+      "type": "SIA licence",
+      "staff": "M. Haddad",
+      "dept": "Security",
+      "received": "2025-11-03",
+      "expiry": "2026-11-01",
+      "status": "expiring",
+      "storageRef": "vault://staff/m-haddad/sia-licence.pdf",
+      "confirmedBy": "Priya Shah",
+      "history": [
+        {
+          "at": "2025-11-03T10:00:00",
+          "by": "Priya Shah",
+          "action": "Document received"
+        },
+        {
+          "at": "2025-11-03T14:00:00",
+          "by": "Priya Shah",
+          "action": "Confirmed valid"
+        }
+      ]
+    },
+    {
+      "id": "DOC-102",
+      "type": "Right to work",
+      "staff": "J. Silva",
+      "dept": "Security",
+      "received": "2024-11-14",
+      "expiry": "2026-11-14",
+      "status": "expiring",
+      "storageRef": "vault://staff/j-silva/right-to-work.pdf",
+      "confirmedBy": "Priya Shah",
+      "history": [
+        {
+          "at": "2024-11-14T10:00:00",
+          "by": "Priya Shah",
+          "action": "Document received"
+        },
+        {
+          "at": "2024-11-14T14:00:00",
+          "by": "Priya Shah",
+          "action": "Confirmed valid"
+        }
+      ]
+    },
+    {
+      "id": "DOC-103",
+      "type": "DBS check",
+      "staff": "A. Kowalski",
+      "dept": "Security",
+      "received": "2023-12-02",
+      "expiry": "2026-12-02",
+      "status": "expiring",
+      "storageRef": "vault://staff/a-kowalski/dbs-check.pdf",
+      "confirmedBy": "Priya Shah",
+      "history": [
+        {
+          "at": "2023-12-02T10:00:00",
+          "by": "Priya Shah",
+          "action": "Document received"
+        },
+        {
+          "at": "2023-12-02T14:00:00",
+          "by": "Priya Shah",
+          "action": "Confirmed valid"
+        }
+      ]
+    },
+    {
+      "id": "DOC-104",
+      "type": "SIA licence",
+      "staff": "Daniel Okafor",
+      "dept": "Security",
+      "received": "2024-07-01",
+      "expiry": "2027-06-30",
+      "status": "valid",
+      "storageRef": "vault://staff/daniel-okafor/sia-licence.pdf",
+      "confirmedBy": "Priya Shah",
+      "history": [
+        {
+          "at": "2024-07-01T10:00:00",
+          "by": "Priya Shah",
+          "action": "Document received"
+        },
+        {
+          "at": "2024-07-01T14:00:00",
+          "by": "Priya Shah",
+          "action": "Confirmed valid"
+        }
+      ]
+    },
+    {
+      "id": "DOC-105",
+      "type": "SIA licence",
+      "staff": "J. Silva",
+      "dept": "Security",
+      "received": "2024-03-13",
+      "expiry": "2027-03-12",
+      "status": "valid",
+      "storageRef": "vault://staff/j-silva/sia-licence.pdf",
+      "confirmedBy": "Priya Shah",
+      "history": [
+        {
+          "at": "2024-03-13T10:00:00",
+          "by": "Priya Shah",
+          "action": "Document received"
+        },
+        {
+          "at": "2024-03-13T14:00:00",
+          "by": "Priya Shah",
+          "action": "Confirmed valid"
+        }
+      ]
+    },
+    {
+      "id": "DOC-106",
+      "type": "DBS check",
+      "staff": "Daniel Okafor",
+      "dept": "Security",
+      "received": "2025-02-02",
+      "expiry": "2027-02-01",
+      "status": "valid",
+      "storageRef": "vault://staff/daniel-okafor/dbs-check.pdf",
+      "confirmedBy": "Lilianna Novak",
+      "history": [
+        {
+          "at": "2025-02-02T10:00:00",
+          "by": "Priya Shah",
+          "action": "Document received"
+        },
+        {
+          "at": "2025-02-02T14:00:00",
+          "by": "Lilianna Novak",
+          "action": "Confirmed valid"
+        }
+      ]
+    },
+    {
+      "id": "DOC-107",
+      "type": "Right to work",
+      "staff": "M. Haddad",
+      "dept": "Security",
+      "received": "2025-01-16",
+      "expiry": "2028-01-15",
+      "status": "valid",
+      "storageRef": "vault://staff/m-haddad/right-to-work.pdf",
+      "confirmedBy": "Priya Shah",
+      "history": [
+        {
+          "at": "2025-01-16T10:00:00",
+          "by": "Priya Shah",
+          "action": "Document received"
+        },
+        {
+          "at": "2025-01-16T14:00:00",
+          "by": "Priya Shah",
+          "action": "Confirmed valid"
+        }
+      ]
+    },
+    {
+      "id": "DOC-108",
+      "type": "Right to work",
+      "staff": "Grace Mensah",
+      "dept": "Cleaning",
+      "received": "2023-10-09",
+      "expiry": "2026-10-09",
+      "status": "expired",
+      "storageRef": "vault://staff/grace-mensah/right-to-work.pdf",
+      "confirmedBy": "Priya Shah",
+      "history": [
+        {
+          "at": "2023-10-09T10:00:00",
+          "by": "Priya Shah",
+          "action": "Document received"
+        },
+        {
+          "at": "2023-10-09T14:00:00",
+          "by": "Priya Shah",
+          "action": "Confirmed valid"
+        }
+      ]
+    },
+    {
+      "id": "DOC-109",
+      "type": "DBS check",
+      "staff": "Grace Mensah",
+      "dept": "Cleaning",
+      "received": "2025-09-02",
+      "expiry": "2027-09-01",
+      "status": "valid",
+      "storageRef": "vault://staff/grace-mensah/dbs-check.pdf",
+      "confirmedBy": "Priya Shah",
+      "history": [
+        {
+          "at": "2025-09-02T10:00:00",
+          "by": "Priya Shah",
+          "action": "Document received"
+        },
+        {
+          "at": "2025-09-02T14:00:00",
+          "by": "Priya Shah",
+          "action": "Confirmed valid"
+        }
+      ]
+    },
+    {
+      "id": "DOC-110",
+      "type": "Right to work",
+      "staff": "Tomasz Wójcik",
+      "dept": "Cleaning",
+      "received": "2026-10-19",
+      "expiry": "2027-05-20",
+      "status": "unverified",
+      "storageRef": "vault://staff/tomasz-wójcik/right-to-work.pdf",
+      "confirmedBy": null,
+      "history": [
+        {
+          "at": "2026-10-19T10:00:00",
+          "by": "Priya Shah",
+          "action": "Document received"
+        }
+      ]
+    },
+    {
+      "id": "DOC-111",
+      "type": "SIA licence",
+      "staff": "A. Kowalski",
+      "dept": "Security",
+      "received": null,
+      "expiry": null,
+      "status": "missing",
+      "storageRef": null,
+      "confirmedBy": null,
+      "history": [
+        {
+          "at": "2026-10-12T09:00:00",
+          "by": "Priya Shah",
+          "action": "Requested from employee"
+        }
+      ]
+    },
+    {
+      "id": "DOC-112",
+      "type": "DBS check",
+      "staff": "J. Silva",
+      "dept": "Security",
+      "received": "2026-10-16",
+      "expiry": "2027-08-02",
+      "status": "unverified",
+      "storageRef": "vault://staff/j-silva/dbs-check.pdf",
+      "confirmedBy": null,
+      "history": [
+        {
+          "at": "2026-10-16T10:00:00",
+          "by": "Priya Shah",
+          "action": "Document received"
+        }
+      ]
+    },
+    {
+      "id": "DOC-113",
+      "type": "Manual handling certificate",
+      "staff": "Grace Mensah",
+      "dept": "Cleaning",
+      "received": "2025-04-11",
+      "expiry": "2027-04-10",
+      "status": "valid",
+      "storageRef": "vault://staff/grace-mensah/manual-handling-certificate.pdf",
+      "confirmedBy": "Priya Shah",
+      "history": [
+        {
+          "at": "2025-04-11T10:00:00",
+          "by": "Priya Shah",
+          "action": "Document received"
+        },
+        {
+          "at": "2025-04-11T14:00:00",
+          "by": "Priya Shah",
+          "action": "Confirmed valid"
+        }
+      ]
+    },
+    {
+      "id": "DOC-114",
+      "type": "Right to work",
+      "staff": "Lilianna Novak",
+      "dept": "Security",
+      "received": "2025-06-01",
+      "expiry": "2029-06-01",
+      "status": "valid",
+      "storageRef": "vault://staff/lilianna-novak/right-to-work.pdf",
+      "confirmedBy": "Priya Shah",
+      "history": [
+        {
+          "at": "2025-06-01T10:00:00",
+          "by": "Priya Shah",
+          "action": "Document received"
+        },
+        {
+          "at": "2025-06-01T14:00:00",
+          "by": "Priya Shah",
+          "action": "Confirmed valid"
+        }
+      ]
+    }
+  ]
+}
