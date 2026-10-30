@@ -1,15 +1,16 @@
 "use client"
 
 import { useState } from "react"
+import { Building2, CalendarClock, ShieldCheck } from "lucide-react"
 import { toast } from "sonner"
 import { z } from "zod"
 
 import { ActionButton } from "@/components/action-button"
 import { Field } from "@/components/field"
 import { FilterSelect } from "@/components/filter-bar"
+import { FormSection } from "@/components/form-section"
 import { TimePicker, formatTime } from "@/components/time-picker"
 import { Input } from "@/components/ui/input"
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import type { OrganisationData } from "../types"
 
 const schema = z.object({
@@ -75,37 +76,42 @@ export function OrganisationForm({
         </div>
       </div>
       <form className="od-form set-form" onSubmit={save} noValidate>
-        <div className="od-row2">
-          <Field label="Company name" htmlFor="set-name" error={errors.name} required>
-            <Input id="set-name" value={form.name} readOnly={!canWrite} onChange={(e) => set("name", e.target.value)} />
-          </Field>
-          <Field label="Subdomain" htmlFor="set-slug" hint="Set when the workspace was created">
-            <Input id="set-slug" value={`${slug}.${data.domain}`} readOnly />
-          </Field>
-        </div>
-        <div className="od-row2">
-          <Field label="Timezone" htmlFor="set-tz" hint="Deadlines and timestamps use this timezone">
-            {pick("set-tz", "Timezone", "timezone", data.timezones)}
-          </Field>
-          <Field label="Report deadline" htmlFor="set-deadline" error={errors.deadline} hint={`Reports are due by this time, ${tzLabel}`}>
-            <TimePicker value={form.deadline} onChange={(v) => set("deadline", v)} disabled={!canWrite} label="Report deadline" step={5} />
-          </Field>
-        </div>
-        <fieldset className="set-fieldset" disabled={!canWrite}>
-          <legend>Weekend and holiday rule</legend>
-          <RadioGroup className="od-choices" aria-label="Weekend and holiday rule" value={form.weekendRule} disabled={!canWrite} onValueChange={(v) => set("weekendRule", v as string)}>
-            {data.weekendRules.map((r) => (
-              <label key={r.value} className="od-choice" data-checked={form.weekendRule === r.value ? "" : undefined}>
-                <RadioGroupItem value={r.value} aria-label={r.label} />
-                {r.label}
-              </label>
-            ))}
-          </RadioGroup>
-        </fieldset>
-        <div className="od-row2">
-          <Field label="Session timeout" htmlFor="set-timeout" hint="Signed-in users are logged out after this much inactivity">
-            {pick("set-timeout", "Session timeout", "sessionTimeout", data.sessionTimeouts)}
-          </Field>
+        <div className="od-form-cols">
+          <div className="od-form-col">
+            <FormSection icon={Building2} title="Company">
+              <Field label="Company name" htmlFor="set-name" error={errors.name} required>
+                <Input id="set-name" value={form.name} readOnly={!canWrite} onChange={(e) => set("name", e.target.value)} />
+              </Field>
+              <Field label="Subdomain" htmlFor="set-slug">
+                <Input id="set-slug" value={`${slug}.${data.domain}`} readOnly />
+              </Field>
+            </FormSection>
+            <FormSection icon={ShieldCheck} title="Security">
+              <Field label="Session timeout" htmlFor="set-timeout" hint="Idle time before sign-out">
+                {pick("set-timeout", "Session timeout", "sessionTimeout", data.sessionTimeouts)}
+              </Field>
+            </FormSection>
+          </div>
+          <div className="od-form-col">
+            <FormSection icon={CalendarClock} title="Daily report">
+              <Field label="Timezone" htmlFor="set-tz">
+                {pick("set-tz", "Timezone", "timezone", data.timezones)}
+              </Field>
+              <Field label="Report deadline" htmlFor="set-deadline" error={errors.deadline}>
+                <TimePicker value={form.deadline} onChange={(v) => set("deadline", v)} disabled={!canWrite} label="Report deadline" step={5} />
+              </Field>
+              <div className="od-field">
+                <span className="fs-label" id="set-weekend-l">Weekend and holiday rule</span>
+                <div className="er-types" role="group" aria-labelledby="set-weekend-l">
+                  {data.weekendRules.map((r) => (
+                    <button key={r.value} type="button" className="rp-day" aria-pressed={form.weekendRule === r.value} disabled={!canWrite} onClick={() => set("weekendRule", r.value)}>
+                      {r.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </FormSection>
+          </div>
         </div>
         {canWrite && (
           <div className="od-form-foot">

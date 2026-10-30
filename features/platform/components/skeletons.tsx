@@ -99,12 +99,45 @@ const ghost = (text: React.ReactNode) => <span className="sk-ghost">{text}</span
 
 // Mirrors PlanEditView (plan-form.tsx): same classes, real labels as ghost text; only the plan's name and values are blocks.
 // `currency`: the plans' shared currency (unknown here when plans differ, then the price label is a block).
-const PlanFieldSk = ({ label, req = true, hint }: { label?: string; req?: boolean; hint?: string }) => (
+const PlanFieldSk = ({ label, req = true }: { label?: string; req?: boolean }) => (
   <div className="od-field">
     {label ? <label>{ghost(label)}{req && <span className="od-req" aria-hidden="true"> *</span>}</label> : <Sk w={130} h={11} lh={18.1} />}
     <Sk h={44} r={14} />
-    {hint && <div className="od-field-msg"><p className="od-field-hint">{ghost(hint)}</p></div>}
   </div>
+)
+
+// FormSection (components/form-section.tsx) with a ghost title; the icon chip keeps its tint like SkMask'd forms. `fold`: a
+// folded FoldToggle + FormFold (closed, so no height).
+const SecSk = ({ title, fold, children }: { title: string; fold?: string; children?: React.ReactNode }) => (
+  <section className="fs-sec">
+    <h3 className="fs-sec-h">
+      <span className="fs-sec-i" aria-hidden="true" />
+      {ghost(title)}
+      {fold && <span className="fs-act">{ghost(fold)}<span style={{ width: 14, height: 14, flex: "none" }} /></span>}
+    </h3>
+    {fold ? <div className="fs-fold"><div className="fs-fold-in" /></div> : children}
+  </section>
+)
+
+const ModulesSk = ({ modules }: { modules: string[] }) => (
+  <SecSk title="Modules">
+    <fieldset className="pf-modset">
+      {modules.map((m) => (
+        <span key={m} className="pf-mod">
+          {ghost(m)}
+          <Sk w={40} h={24} r="pill" style={{ flex: "none" }} />
+        </span>
+      ))}
+    </fieldset>
+  </SecSk>
+)
+
+const LimitsSk = () => (
+  <SecSk title="Limits">
+    <div className="od-row2">
+      {LIMITS.map((l) => <PlanFieldSk key={l.key} label={limitLabel(l)} />)}
+    </div>
+  </SecSk>
 )
 
 export function PlanEditSkeleton({ modules, currency }: { modules: string[]; currency?: string }) {
@@ -120,21 +153,13 @@ export function PlanEditSkeleton({ modules, currency }: { modules: string[]; cur
       <div className="card pf-form od-form">
         <div className="od-form-cols">
           <div className="od-form-col">
-            <PlanFieldSk label={currency ? priceLabel(currency) : undefined} />
-            <div className="od-row2">
-              {LIMITS.map((l) => <PlanFieldSk key={l.key} label={limitLabel(l)} />)}
-            </div>
+            <SecSk title="Price">
+              <PlanFieldSk label={currency ? priceLabel(currency) : undefined} />
+            </SecSk>
+            <LimitsSk />
           </div>
           <div className="od-form-col">
-            <fieldset className="pf-modset">
-              <legend>{ghost("Modules")}</legend>
-              {modules.map((m) => (
-                <span key={m} className="pf-mod">
-                  {ghost(m)}
-                  <Sk w={40} h={24} r="pill" style={{ flex: "none" }} />
-                </span>
-              ))}
-            </fieldset>
+            <ModulesSk modules={modules} />
           </div>
         </div>
         <div className="od-form-foot">
@@ -160,29 +185,21 @@ export function PlanNewSkeleton({ modules, currency }: { modules: string[]; curr
       <div className="card pf-form od-form">
         <div className="od-form-cols">
           <div className="od-form-col">
-            <div className="od-row2">
-              <PlanFieldSk label="Plan ID" />
-              <PlanFieldSk label="Name" />
-            </div>
-            <div className="od-row2">
-              <PlanFieldSk label={currency ? priceLabel(currency) : undefined} />
-              <PlanFieldSk label={TRIAL_LABEL} />
-            </div>
-            <div className="od-row2">
-              {LIMITS.map((l) => <PlanFieldSk key={l.key} label={limitLabel(l)} />)}
-            </div>
+            <SecSk title="Plan">
+              <div className="od-row2">
+                <PlanFieldSk label="Plan ID" />
+                <PlanFieldSk label="Name" />
+              </div>
+              <div className="od-row2">
+                <PlanFieldSk label={currency ? priceLabel(currency) : undefined} />
+                <PlanFieldSk label={TRIAL_LABEL} />
+              </div>
+            </SecSk>
+            <LimitsSk />
           </div>
           <div className="od-form-col">
-            <fieldset className="pf-modset">
-              <legend>{ghost("Modules")}</legend>
-              {modules.map((m) => (
-                <span key={m} className="pf-mod">
-                  {ghost(m)}
-                  <Sk w={40} h={24} r="pill" style={{ flex: "none" }} />
-                </span>
-              ))}
-            </fieldset>
-            <PlanFieldSk label="Reason" req={false} hint="Optional. Saved in the audit trail." />
+            <ModulesSk modules={modules} />
+            <SecSk title="Note" fold="Add a reason" />
           </div>
         </div>
         <div className="od-form-foot">

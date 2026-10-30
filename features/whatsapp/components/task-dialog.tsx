@@ -72,7 +72,7 @@ export function TaskDialog({
       <DialogContent className="od-dialog od-form-dialog" showCloseButton={false}>
         <DialogHeader>
           <DialogTitle>Create task from message</DialogTitle>
-          <DialogDescription>Pre-filled from the message. The task links back to it and the thread records who created it.</DialogDescription>
+          <DialogDescription>Pre-filled from the message and linked back to it.</DialogDescription>
         </DialogHeader>
         <form className="od-form" onSubmit={submit} noValidate>
           <Field label="Title" htmlFor="wa-task-title" error={errors.title} required>
@@ -81,12 +81,14 @@ export function TaskDialog({
           <Field label="Description" htmlFor="wa-task-desc" error={errors.description}>
             <Textarea id="wa-task-desc" value={description} onChange={(e) => { setDescription(e.target.value); setErrors((x) => ({ ...x, description: undefined })) }} />
           </Field>
-          <Field label="Assignee" htmlFor="wa-task-assignee" required>
-            <FilterSelect label="Assignee" value={assignee} options={assignees.map((a) => ({ value: a, label: a }))} onChange={setAssignee} />
-          </Field>
-          <Field label="Due date" htmlFor="wa-task-due" error={errors.due} required>
-            <DatePicker label="Due date" value={due} today={today} min={today.slice(0, 10)} placeholder="Pick a due date" onChange={(v) => { setDue(v); setErrors((x) => ({ ...x, due: undefined })) }} />
-          </Field>
+          <div className="od-row2">
+            <Field label="Assignee" htmlFor="wa-task-assignee" required>
+              <FilterSelect label="Assignee" value={assignee} options={assignees.map((a) => ({ value: a, label: a }))} onChange={setAssignee} />
+            </Field>
+            <Field label="Due date" htmlFor="wa-task-due" error={errors.due} required>
+              <DatePicker label="Due date" value={due} today={today} min={today.slice(0, 10)} placeholder="Pick a due date" onChange={(v) => { setDue(v); setErrors((x) => ({ ...x, due: undefined })) }} />
+            </Field>
+          </div>
           <div className="od-form-foot">
             <DialogClose render={<button type="button" className="btn btn-outline" />}>Cancel</DialogClose>
             <button type="submit" className="btn btn-primary">Create task</button>

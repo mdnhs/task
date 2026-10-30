@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react"
-import { Mic, Pause, Play, Square } from "lucide-react"
+import { Mic, Pause, Play, RotateCcw, Square, Trash2 } from "lucide-react"
 
 import { VOICE_MAX_SEC, atVoiceLimit, clampVoiceSec, formatClock, pickVoiceMime, voiceTotal } from "@/lib/task-voice"
 
@@ -29,7 +29,7 @@ const MSG: Partial<Record<RecState, string>> = {
  * The mic tracks stop on Stop and on unmount. The form owns the URL once handed over; the recorder only revokes URLs it
  * replaces or removes.
  */
-export function VoiceRecorder({ id, value, onChange, max = VOICE_MAX_SEC }: { id: string; value: VoiceDraft | null; onChange(v: VoiceDraft | null): void; max?: number }) {
+export function VoiceRecorder({ id, value, onChange, max = VOICE_MAX_SEC, hint }: { id: string; value: VoiceDraft | null; onChange(v: VoiceDraft | null): void; max?: number; hint?: string }) {
   const supported = useSyncExternalStore(noop, canRecord, () => true)
   const [state, setState] = useState<RecState>("idle")
   const [elapsed, setElapsed] = useState(0)
@@ -155,17 +155,21 @@ export function VoiceRecorder({ id, value, onChange, max = VOICE_MAX_SEC }: { id
         <VoiceNotePlayer url={value.url} durationSec={value.durationSec} label="voice instructions" />
         <div className="vn-row">
           {capped && <span className="vn-cap" role="status">Maximum 2 minutes</span>}
-          <button type="button" className="vn-link" onClick={again}>Record again</button>
-          <button type="button" className="vn-link bad" onClick={remove}>Remove</button>
+          <button type="button" className="vn-link" onClick={again}><RotateCcw aria-hidden="true" />Record again</button>
+          <button type="button" className="vn-link bad" onClick={remove}><Trash2 aria-hidden="true" />Remove</button>
         </div>
       </div>
     )
 
   return (
     <div className="vn-idle">
-      <button type="button" id={id} className="vn-mic" onClick={() => void start()} disabled={state === "asking"} aria-describedby={MSG[state] ? `${id}-hint` : undefined}>
-        <Mic aria-hidden="true" />
-        <span>{state === "asking" ? "Waiting for the microphone…" : "Record"}</span>
+      {/* One tap target: the round mic plus what it does and the limit. */}
+      <button type="button" id={id} className="vn-tile" onClick={() => void start()} disabled={state === "asking"} aria-describedby={MSG[state] ? `${id}-hint` : undefined}>
+        <span className="vn-tile-ic" aria-hidden="true"><Mic /></span>
+        <span className="vn-tile-tx">
+          <b>{state === "asking" ? "Waiting for the microphone…" : "Record voice instructions"}</b>
+          {hint && <small>{hint}</small>}
+        </span>
       </button>
       {MSG[state] && (
         <p className="vn-hint" id={`${id}-hint`} role="status">

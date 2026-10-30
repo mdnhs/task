@@ -27,19 +27,26 @@ function CardHead({ sub = true, action, title = 190, subW = 240 }: { sub?: boole
   )
 }
 
-/** Today card (today-card.tsx) or, once dismissed for the day, its compact entry. Mode comes from the same cookies the page reads. */
+/** Today card (today-card.tsx): the accordion bar, plus the open body in "card" mode. Mode comes from the same cookies the page reads. */
 export type TodaySk = { mode: "card" | "chip"; tiles: number; team: boolean; data?: TodayData }
 const gh = { alignSelf: "flex-start" } as const
 export function TodayCardSkeleton({ mode, tiles, team, data }: TodaySk) {
   // With the real data the texts are ghost text, so the tiles, team lines and subtitle wrap like the loaded card (phones).
   const counts = data && todayCounts(data.tasks, data.now, data.review)
-  if (mode === "chip")
+  const open = mode === "card"
+  const bar = (
+    <div className="today-bar" aria-expanded={open}>
+      <Sk w={72} h={15} lh={22} />
+      <span className="today-peek">{counts ? <TodayChipCounts counts={counts} /> : <span className="today-chip-m"><Sk w={120} h={12} lh={19} /></span>}</span>
+      {counts && todayHasNews(counts, data!.team) && <span className="today-pulse" />}
+      <Sk w={open ? 29 : 36} h={12} lh={19} />
+      <Sk w={16} h={16} r={4} />
+    </div>
+  )
+  if (!open)
     return (
-      <div className="today-chip" aria-hidden="true">
-        <Sk w={72} h={15} lh={22} />
-        {counts ? <TodayChipCounts counts={counts} /> : <span className="today-chip-m"><Sk w={120} h={12} lh={19} /></span>}
-        {counts && todayHasNews(counts, data!.team) && <span className="today-pulse" />}
-        <Sk w={36} h={12} lh={19} />
+      <div className="card today" data-slot="accordion-item" aria-hidden="true">
+        {bar}
       </div>
     )
   const labels = counts && [
@@ -52,48 +59,49 @@ export function TodayCardSkeleton({ mode, tiles, team, data }: TodaySk) {
   const t = data?.team
   const lines = t && counts && teamLines(t, counts.reports).map((l) => `${l.n} ${l.label}${l.who ? ` · ${l.who}` : ""}`)
   return (
-    <section className="card today">
-      <div className="card-head today-head">
-        <div>
-          <Sk w={100} h={18} lh={28} />
-          {data ? <div className="sub"><span className="sk-ghost">{todaySub(data.day)}</span></div> : <Sk w={120} h={11} lh={17} style={{ marginTop: 2 }} />}
-        </div>
-        <div className="today-actions">
-          <Sk w={146} h={37} r="pill" />
-          <Sk w={116} h={37} r="pill" />
-          <Sk w={36} h={36} r="circle" />
-        </div>
-      </div>
-      <ul className="today-tiles" data-n={labels?.length ?? tiles}>
-        {(labels ?? Array.from({ length: tiles }, () => null)).map((l, i) => (
-          <li key={i}>
-            <div className="today-tile">
-              {l ? (
-                <>
-                  <b className="sk-ghost" style={gh}>{l[0]}</b>
-                  <span className="sk-ghost" style={gh}>{l[1]}</span>
-                </>
-              ) : (
-                <>
-                  <Sk w={34} h={26} lh={34} />
-                  <Sk w={90} h={11} lh={18} />
-                </>
-              )}
+    <div className="card today" data-slot="accordion-item" aria-hidden="true">
+      {bar}
+      <div data-slot="accordion-content">
+        <div className="today-body">
+          <div className="today-head">
+            {data ? <div className="sub"><span className="sk-ghost">{todaySub(data.day)}</span></div> : <Sk w={120} h={11} lh={17} />}
+            <div className="today-actions">
+              <Sk w={151.3} h={36.6} r="pill" />
+              <Sk w={107.9} h={36.6} r="pill" />
             </div>
-          </li>
-        ))}
-      </ul>
-      {team && (
-        <div className="today-team">
-          {lines ? <div className="today-team-h"><span className="sk-ghost">Team today</span></div> : <Sk w={80} h={11} lh={18} />}
-          <ul className="today-team-l">
-            {(lines ?? [200, 180, 190]).map((w, i) => (
-              <li key={i}>{typeof w === "string" ? <span className="sk-ghost">{w}</span> : <Sk w={w} h={12} lh={20} />}</li>
+          </div>
+          <ul className="today-tiles" data-n={labels?.length ?? tiles}>
+            {(labels ?? Array.from({ length: tiles }, () => null)).map((l, i) => (
+              <li key={i}>
+                <div className="today-tile">
+                  {l ? (
+                    <>
+                      <b className="sk-ghost" style={gh}>{l[0]}</b>
+                      <span className="sk-ghost" style={gh}>{l[1]}</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sk w={34} h={26} lh={34} />
+                      <Sk w={90} h={11} lh={18} />
+                    </>
+                  )}
+                </div>
+              </li>
             ))}
           </ul>
+          {team && (
+            <div className="today-team">
+              {lines ? <div className="today-team-h"><span className="sk-ghost">Team today</span></div> : <Sk w={80} h={11} lh={18} />}
+              <ul className="today-team-l">
+                {(lines ?? [200, 180, 190]).map((w, i) => (
+                  <li key={i}>{typeof w === "string" ? <span className="sk-ghost">{w}</span> : <Sk w={w} h={12} lh={20} />}</li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
-      )}
-    </section>
+      </div>
+    </div>
   )
 }
 

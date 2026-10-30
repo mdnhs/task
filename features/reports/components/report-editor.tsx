@@ -4,11 +4,12 @@ import { useEffect, useRef, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { X } from "lucide-react"
+import { ListPlus, NotebookPen, Paperclip, X, Zap } from "lucide-react"
 
 import { ActionButton } from "@/components/action-button"
 import { Field } from "@/components/field"
 import { FilterSelect } from "@/components/filter-bar"
+import { FormSection } from "@/components/form-section"
 import { Icon } from "@/components/icons"
 import { PageHead } from "@/components/page-head"
 import { Textarea } from "@/components/ui/textarea"
@@ -104,6 +105,98 @@ export function ReportEditor({
   const errorCount = Object.keys(errors).length
   const returned = r.status === "returned" ? r.comments.at(-1) : undefined
   const err = (k: string) => errors[k]
+  const optional = (sec: "unplanned" | "attachments") => (isRequired(template, sec, sec) ? "Required" : "Optional")
+
+  // Notes and the template's extra sections on the left; unplanned work and attachments on the right (ui-rules.md → Forms).
+  const left = [
+    (sectionOn(template, "summary") || sectionOn(template, "blockers")) && (
+      <FormSection key="notes" icon={NotebookPen} title="Notes">
+        {sectionOn(template, "summary") && (
+          <Field label="Summary" htmlFor="sr-summary" error={err("summary")} required={isRequired(template, "summary", "summary")}>
+            <Textarea id="sr-summary" value={r.summary} placeholder="e.g. Quiet shift, all patrols done" onChange={(e) => touch("summary", (x) => ({ ...x, summary: e.target.value }))} />
+          </Field>
+        )}
+        {sectionOn(template, "blockers") && (
+          <Field label="Blockers" htmlFor="sr-blockers" error={err("blockers")} required={isRequired(template, "blockers", "blockers")}>
+            <Textarea id="sr-blockers" value={r.blockers} placeholder="e.g. Gate 3 card reader is down" onChange={(e) => touch("blockers", (x) => ({ ...x, blockers: e.target.value }))} />
+          </Field>
+        )}
+      </FormSection>
+    ),
+    ...extraSections(template).map((s) => (
+      <FormSection key={s.id} icon={ListPlus} title={s.title}>
+        {s.fields.map((f) => {
+          const k = `${s.id}.${f.id}`
+          return (
+            <Field key={f.id} label={f.label} htmlFor={`sr-x-${k}`} error={err(`extra:${k}`)} required={f.required}>
+              <Textarea id={`sr-x-${k}`} className="sr-short" value={r.extra[k] ?? ""} onChange={(e) => touch(`extra:${k}`, (x) => ({ ...x, extra: { ...x.extra, [k]: e.target.value } }))} />
+            </Field>
+          )
+        })}
+      </FormSection>
+    )),
+  ].filter(Boolean)
+  const right = [
+    sectionOn(template, "unplanned") && (
+      <FormSection key="unplanned" icon={Zap} title="Unplanned work" note={optional("unplanned")}>
+        <fieldset className="sr-set" aria-describedby={err("unplanned") ? "sr-unplanned-e" : undefined}>
+          <legend className="sr-only">Unplanned work</legend>
+          {r.unplanned.map((u, n) => (
+            <div key={u.id} className="sr-row">
+              <input className="sr-in" type="text" aria-label={`Unplanned work ${n + 1}`} placeholder="What did you do?" value={u.text}
+                onChange={(e) => touch("unplanned", (x) => ({ ...x, unplanned: x.unplanned.map((y) => (y.id === u.id ? { ...y, text: e.target.value } : y)) }))} />
+              <input className="sr-in sr-min num" type="number" inputMode="numeric" min={0} step={5} aria-label={`Unplanned work ${n + 1}, minutes`} placeholder="Min" value={u.minutes || ""}
+                onChange={(e) => touch("unplanned", (x) => ({ ...x, unplanned: x.unplanned.map((y) => (y.id === u.id ? { ...y, minutes: Math.max(0, Math.round(Number(e.target.value) || 0)) } : y)) }))} />
+              <button type="button" className="rf-entry-x" aria-label={`Remove unplanned work ${n + 1}`} onClick={() => touch("unplanned", (x) => ({ ...x, unplanned: x.unplanned.filter((y) => y.id !== u.id) }))}>
+                <X aria-hidden="true" />
+              </button>
+            </div>
+          ))}
+          <button type="button" className="rf-add" onClick={() => touch("unplanned", (x) => ({ ...x, unplanned: [...x.unplanned, { id: `u-${Date.now().toString(36)}`, text: "", minutes: 0 }] }))}>
+            <Icon name="plus" /> Add unplanned work
+          </button>
+          {err("unplanned") && <p className="od-field-err" id="sr-unplanned-e">{err("unplanned")}</p>}
+        </fieldset>
+      </FormSection>
+    ),
+    sectionOn(template, "attachments") && (
+      <FormSection key="attachments" icon={Paperclip} title="Attachments" note={optional("attachments")}>
+        <fieldset className="sr-set" aria-describedby={err("attachments") ? "sr-att-e" : undefined}>
+          <legend className="sr-only">Attachments</legend>
+          {r.attachments.length > 0 && (
+            <ul className="sr-list">
+              {r.attachments.map((a) => (
+                <li key={a.id}>
+                  <span>{a.name}</span>
+                  <span className="num">{a.size}</span>
+                  <button type="button" className="rf-entry-x" aria-label={`Remove ${a.name}`} onClick={() => touch("attachments", (x) => ({ ...x, attachments: x.attachments.filter((y) => y.id !== a.id) }))}>
+                    <X aria-hidden="true" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          <input ref={fileRef} type="file" multiple className="sr-only" id="sr-file" onChange={(e) => addAttachments(e.target.files)} />
+          <label htmlFor="sr-file" className="rf-add">
+            <Icon name="plus" /> Add photo or file
+          </label>
+          {err("attachments") && <p className="od-field-err" id="sr-att-e">{err("attachments")}</p>}
+        </fieldset>
+      </FormSection>
+    ),
+  ].filter(Boolean)
+  const notesCard = (left.length > 0 || right.length > 0) && (
+    <section className="card sr-notes" aria-label="Shift notes">
+      {left.length > 0 && right.length > 0 ? (
+        <div className="od-form-cols">
+          <div className="od-form-col">{left}</div>
+          <div className="od-form-col">{right}</div>
+        </div>
+      ) : (
+        <div className="od-form-col">{left.length ? left : right}</div>
+      )}
+    </section>
+  )
 
   return (
     <>
@@ -144,8 +237,8 @@ export function ReportEditor({
               <div>
                 <h2 id="sr-items-h">Tasks in the shift</h2>
                 <div className="sub">
-                  {r.items.length} {r.items.length === 1 ? "task" : "tasks"} assigned to you for this shift
-                  {isRequired(template, "tasks", "time") ? " · time is needed for done and in-progress tasks" : ""}
+                  {r.items.length} {r.items.length === 1 ? "task" : "tasks"}
+                  {isRequired(template, "tasks", "time") ? " · time needed for done and in-progress tasks" : ""}
                 </div>
               </div>
             </div>
@@ -194,7 +287,7 @@ export function ReportEditor({
                               aria-invalid={err(nk) ? true : undefined}
                               aria-describedby={err(nk) ? `${nk}-e` : undefined}
                               value={i.note}
-                              placeholder={i.status === "blocked" ? "What is blocking it?" : "Optional"}
+                              placeholder={i.status === "blocked" ? "What is blocking it?" : "Add a note"}
                               onChange={(e) => setItem(i.taskRef, nk, { note: e.target.value })}
                             />
                             {err(nk) && <p className="od-field-err" id={`${nk}-e`}>{err(nk)}</p>}
@@ -208,74 +301,7 @@ export function ReportEditor({
             )}
           </section>
         )}
-        <section className="card sr-notes" aria-label="Shift notes">
-          {sectionOn(template, "summary") && (
-            <Field label="Summary" htmlFor="sr-summary" error={err("summary")} required={isRequired(template, "summary", "summary")}>
-              <Textarea id="sr-summary" value={r.summary} placeholder="What happened on this shift?" onChange={(e) => touch("summary", (x) => ({ ...x, summary: e.target.value }))} />
-            </Field>
-          )}
-          {sectionOn(template, "blockers") && (
-            <Field label="Blockers" htmlFor="sr-blockers" error={err("blockers")} required={isRequired(template, "blockers", "blockers")}>
-              <Textarea id="sr-blockers" value={r.blockers} placeholder="Anything stopping you or the next shift" onChange={(e) => touch("blockers", (x) => ({ ...x, blockers: e.target.value }))} />
-            </Field>
-          )}
-          {sectionOn(template, "unplanned") && (
-            <fieldset className="sr-set" aria-describedby={err("unplanned") ? "sr-unplanned-e" : undefined}>
-              <legend>Unplanned work{isRequired(template, "unplanned", "unplanned") && <span className="od-req" aria-hidden="true"> *</span>}</legend>
-              {r.unplanned.map((u, n) => (
-                <div key={u.id} className="sr-row">
-                  <input className="sr-in" type="text" aria-label={`Unplanned work ${n + 1}`} placeholder="What did you do?" value={u.text}
-                    onChange={(e) => touch("unplanned", (x) => ({ ...x, unplanned: x.unplanned.map((y) => (y.id === u.id ? { ...y, text: e.target.value } : y)) }))} />
-                  <input className="sr-in sr-min num" type="number" inputMode="numeric" min={0} step={5} aria-label={`Unplanned work ${n + 1}, minutes`} placeholder="Min" value={u.minutes || ""}
-                    onChange={(e) => touch("unplanned", (x) => ({ ...x, unplanned: x.unplanned.map((y) => (y.id === u.id ? { ...y, minutes: Math.max(0, Math.round(Number(e.target.value) || 0)) } : y)) }))} />
-                  <button type="button" className="rf-entry-x" aria-label={`Remove unplanned work ${n + 1}`} onClick={() => touch("unplanned", (x) => ({ ...x, unplanned: x.unplanned.filter((y) => y.id !== u.id) }))}>
-                    <X aria-hidden="true" />
-                  </button>
-                </div>
-              ))}
-              <button type="button" className="rf-add" onClick={() => touch("unplanned", (x) => ({ ...x, unplanned: [...x.unplanned, { id: `u-${Date.now().toString(36)}`, text: "", minutes: 0 }] }))}>
-                <Icon name="plus" /> Add unplanned work
-              </button>
-              {err("unplanned") && <p className="od-field-err" id="sr-unplanned-e">{err("unplanned")}</p>}
-            </fieldset>
-          )}
-          {sectionOn(template, "attachments") && (
-            <fieldset className="sr-set" aria-describedby={err("attachments") ? "sr-att-e" : undefined}>
-              <legend>Attachments{isRequired(template, "attachments", "attachments") && <span className="od-req" aria-hidden="true"> *</span>}</legend>
-              {r.attachments.length > 0 && (
-                <ul className="sr-list">
-                  {r.attachments.map((a) => (
-                    <li key={a.id}>
-                      <span>{a.name}</span>
-                      <span className="num">{a.size}</span>
-                      <button type="button" className="rf-entry-x" aria-label={`Remove ${a.name}`} onClick={() => touch("attachments", (x) => ({ ...x, attachments: x.attachments.filter((y) => y.id !== a.id) }))}>
-                        <X aria-hidden="true" />
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-              <input ref={fileRef} type="file" multiple className="sr-only" id="sr-file" onChange={(e) => addAttachments(e.target.files)} />
-              <label htmlFor="sr-file" className="rf-add">
-                <Icon name="plus" /> Add photo or file
-              </label>
-              {err("attachments") && <p className="od-field-err" id="sr-att-e">{err("attachments")}</p>}
-            </fieldset>
-          )}
-          {extraSections(template).map((s) => (
-            <fieldset key={s.id} className="sr-set">
-              <legend>{s.title}</legend>
-              {s.fields.map((f) => {
-                const k = `${s.id}.${f.id}`
-                return (
-                  <Field key={f.id} label={f.label} htmlFor={`sr-x-${k}`} error={err(`extra:${k}`)} required={f.required}>
-                    <Textarea id={`sr-x-${k}`} className="sr-short" value={r.extra[k] ?? ""} onChange={(e) => touch(`extra:${k}`, (x) => ({ ...x, extra: { ...x.extra, [k]: e.target.value } }))} />
-                  </Field>
-                )
-              })}
-            </fieldset>
-          ))}
-        </section>
+        {notesCard}
       </div>
     </>
   )

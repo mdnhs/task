@@ -73,17 +73,26 @@ export function LogDialog({
           <DialogDescription>Issue tracking only: no payroll calculation.</DialogDescription>
         </DialogHeader>
         <form className="od-form" onSubmit={submit} noValidate>
-          <Field label="Staff member" htmlFor="pay-staff" required>
-            <FilterSelect label="Staff member" value={staff} options={directory.staff.map((s) => ({ value: s.name, label: s.name }))} onChange={setStaff} />
-          </Field>
-          <Field label="Issue type" htmlFor="pay-type" required>
-            <FilterSelect label="Issue type" value={type} options={TYPE_ORDER.map((t) => ({ value: t, label: TYPE[t] }))} onChange={(v) => setType(v as IssueType)} />
-          </Field>
+          <div className="od-row2">
+            <Field label="Staff member" htmlFor="pay-staff" required>
+              <FilterSelect label="Staff member" value={staff} options={directory.staff.map((s) => ({ value: s.name, label: s.name }))} onChange={setStaff} />
+            </Field>
+            <Field label="Owner" htmlFor="pay-owner" required>
+              <FilterSelect label="Owner" value={owner} options={directory.owners.map((o) => ({ value: o, label: o }))} onChange={setOwner} />
+            </Field>
+          </div>
+          <div className="od-field">
+            <span className="fs-label" id="pay-type-l">Issue type</span>
+            <div className="er-types" role="group" aria-labelledby="pay-type-l">
+              {TYPE_ORDER.map((t) => (
+                <button key={t} type="button" className="rp-day" aria-pressed={type === t} onClick={() => setType(t)}>
+                  {TYPE[t]}
+                </button>
+              ))}
+            </div>
+          </div>
           <Field label="Description" htmlFor="pay-desc" error={errors.description} required>
-            <Textarea id="pay-desc" value={description} onChange={(e) => { setDescription(e.target.value); setErrors((x) => ({ ...x, description: undefined })) }} />
-          </Field>
-          <Field label="Owner" htmlFor="pay-owner" required>
-            <FilterSelect label="Owner" value={owner} options={directory.owners.map((o) => ({ value: o, label: o }))} onChange={setOwner} />
+            <Textarea id="pay-desc" placeholder="e.g. 6 hours missing from last week" value={description} onChange={(e) => { setDescription(e.target.value); setErrors((x) => ({ ...x, description: undefined })) }} />
           </Field>
           <Field label="Target date" htmlFor="pay-target" error={errors.target} required>
             <DatePicker label="Target date" value={target} today={today} min={today.slice(0, 10)} placeholder="Pick a target date" onChange={(v) => { setTarget(v); setErrors((x) => ({ ...x, target: undefined })) }} />

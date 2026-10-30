@@ -76,13 +76,13 @@ export function RepeatField({
         </div>
       )}
       {value.freq === "monthly" && (
-        <Field label="Day of the month" htmlFor={`${id}-dom`} hint="A short month uses its last day">
-          <Input id={`${id}-dom`} inputMode="numeric" value={value.dayOfMonth} onChange={(e) => set({ dayOfMonth: e.target.value.replace(/\D/g, "").slice(0, 2) })} />
+        <Field label="Day of month" htmlFor={`${id}-dom`} hint="Short months use their last day">
+          <Input id={`${id}-dom`} inputMode="numeric" placeholder="e.g. 15" value={value.dayOfMonth} onChange={(e) => set({ dayOfMonth: e.target.value.replace(/\D/g, "").slice(0, 2) })} />
         </Field>
       )}
       {value.freq !== "none" && (
         <>
-          <Field label="Ends (optional)" htmlFor={`${id}-until`}>
+          <Field label="Ends" htmlFor={`${id}-until`}>
             <DatePicker label="End date" value={value.until} today={today} min={min} placeholder="Never" onChange={(v) => set({ until: v })} />
           </Field>
           {value.until && <button type="button" className="rp-clear" onClick={() => set({ until: "" })}>Clear end date</button>}

@@ -43,7 +43,7 @@ export function TotpSetup({ account, onDone }: { account: string; onDone(): void
   if (step === "codes")
     return (
       <div className="mfa-steps">
-        <p>Two-step verification is ready. Save these recovery codes somewhere safe. Each one works once if you lose your phone.</p>
+        <p>Save these recovery codes somewhere safe. Each works once if you lose your phone.</p>
         <ul className="mfa-codes" aria-label="Recovery codes">
           {RECOVERY_CODES.map((c) => <li key={c}>{c}</li>)}
         </ul>
@@ -59,7 +59,7 @@ export function TotpSetup({ account, onDone }: { account: string; onDone(): void
         </svg>
       </div>
       <div className="mfa-steps">
-        <p>Open an authenticator app (Google Authenticator, Microsoft Authenticator), add an account for {account} and scan the code, or type this key:</p>
+        <p>Scan in your authenticator app for {account}, or type this key:</p>
         <span className="mfa-secret">{MOCK_TOTP_SECRET}</span>
         <Field label="6-digit code" htmlFor="mfa-code" error={error} hint={`Demo: the code is ${MOCK_TOTP_CODE}.`} required>
           <Input

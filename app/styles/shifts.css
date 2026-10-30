@@ -91,3 +91,6 @@ td.sh-act{text-align:right;white-space:nowrap}
 .sh-chip.sk-ghost{background:color-mix(in srgb,var(--ink) 8%,transparent)}
 .sh-chip.sk-ghost *{color:transparent !important}
 @media (max-width:720px){.sk-sh-nav{flex:1 1 auto;width:auto !important}}
+/* Pattern dialog: the time zone fold toggle sits left, its text in line with the field labels */
+.sh-zone{display:flex;margin-top:-6px}
+.sh-zone .fs-act{margin-left:-10px;max-width:calc(100% + 10px)}

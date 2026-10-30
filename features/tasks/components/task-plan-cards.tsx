@@ -66,7 +66,7 @@ export function ChecklistCard({ task, canTick, canEdit, onToggle, onAdd, onRemov
           }}
         >
           <Field label="New item" htmlFor="cl-new" error={err || undefined}>
-            <Input id="cl-new" value={text} maxLength={120} onChange={(e) => { setText(e.target.value); setErr("") }} />
+            <Input id="cl-new" placeholder="e.g. Check the fire exits" value={text} maxLength={120} onChange={(e) => { setText(e.target.value); setErr("") }} />
           </Field>
           <button type="submit" className="btn btn-outline">Add item</button>
         </form>
@@ -114,7 +114,7 @@ export function SubtasksCard({ subtasks, canAdd, onAdd }: { subtasks: Task[]; ca
           }}
         >
           <Field label="New subtask" htmlFor="sub-new" error={err || undefined}>
-            <Input id="sub-new" value={text} maxLength={120} onChange={(e) => { setText(e.target.value); setErr("") }} />
+            <Input id="sub-new" placeholder="e.g. Order new signage" value={text} maxLength={120} onChange={(e) => { setText(e.target.value); setErr("") }} />
           </Field>
           <button type="submit" className="btn btn-outline">Add subtask</button>
         </form>
@@ -141,7 +141,7 @@ export function DependenciesDialog({ open, onOpenChange, task, tasks, onSave }: 
       <DialogContent className="od-dialog od-form-dialog" showCloseButton={false}>
         <DialogHeader>
           <DialogTitle>Depends on</DialogTitle>
-          <DialogDescription>{task.ref} should start only after these tasks finish.</DialogDescription>
+          <DialogDescription>{task.ref} starts after these finish.</DialogDescription>
         </DialogHeader>
         <form
           className="od-form"
@@ -153,8 +153,8 @@ export function DependenciesDialog({ open, onOpenChange, task, tasks, onSave }: 
             onOpenChange(false)
           }}
         >
-          <Field label="Add a task" htmlFor="dep-add" error={err || undefined}>
-            <FilterSelect label="Add a task" value={pick} options={[{ value: "", label: "Choose…" }, ...options.map((t) => ({ value: t.ref, label: `${t.ref} · ${t.title}` }))]} onChange={add} />
+          <Field label="Task" htmlFor="dep-add" error={err || undefined}>
+            <FilterSelect label="Task" value={pick} options={[{ value: "", label: "Add a task…" }, ...options.map((t) => ({ value: t.ref, label: `${t.ref} · ${t.title}` }))]} onChange={add} />
           </Field>
           {refs.length > 0 ? (
             <ul className="sub-list">

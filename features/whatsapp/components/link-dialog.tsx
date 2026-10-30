@@ -3,7 +3,7 @@
 import { useState } from "react"
 
 import { Field } from "@/components/field"
-import { FilterSelect } from "@/components/filter-bar"
+import { FilterSeg, FilterSelect } from "@/components/filter-bar"
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { LINK_KIND, LINK_KIND_ORDER } from "../types"
 import type { LinkKind, LinkRef, LinkTargets } from "../types"
@@ -48,8 +48,9 @@ export function LinkDialog({
             onOpenChange(false)
           }}
         >
-          <Field label="Record type" htmlFor="wa-link-kind" required>
-            <FilterSelect
+          <div className="od-field wa-seg">
+            <span className="fs-label">Record type</span>
+            <FilterSeg
               label="Record type"
               value={kind}
               options={LINK_KIND_ORDER.map((k) => ({ value: k, label: LINK_KIND[k] }))}
@@ -58,8 +59,8 @@ export function LinkDialog({
                 setRef(free(k)[0]?.ref ?? "")
               }}
             />
-          </Field>
-          <Field label={LINK_KIND[kind]} htmlFor="wa-link-ref" hint={options.length ? picked?.label : "Everything of this type is already linked."} required>
+          </div>
+          <Field label={LINK_KIND[kind]} htmlFor="wa-link-ref" hint={options.length ? picked?.label : "All already linked"} required>
             {options.length ? (
               <FilterSelect label={LINK_KIND[kind]} value={ref} options={options.map((o) => ({ value: o.ref, label: kind === "user" ? o.ref : `${o.ref} · ${o.label}` }))} onChange={setRef} />
             ) : (

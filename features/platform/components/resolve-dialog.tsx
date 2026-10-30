@@ -27,7 +27,7 @@ export function ResolveDialog({
   }
   return (
     <ConfirmDialog open={open} onOpenChange={change} title={title} text={text} confirmLabel={confirmLabel} destructive={destructive} confirmDisabled={value.trim().length < REASON_MIN} onConfirm={() => onConfirm(value.trim())}>
-      <Field label={label} htmlFor="pf-resolve-text" hint={`At least ${REASON_MIN} characters. Saved in the audit trail. Don't paste the person's data.`} required>
+      <Field label={label} htmlFor="pf-resolve-text" hint={`At least ${REASON_MIN} characters · no personal data`} required>
         <Textarea id="pf-resolve-text" value={value} rows={3} maxLength={300} onChange={(e) => setValue(e.target.value)} />
       </Field>
     </ConfirmDialog>

@@ -197,7 +197,7 @@ export function TaskActions({
             }}
           >
             <Field label="Reason" htmlFor="td-reject" error={reasonErr || undefined} required>
-              <Textarea id="td-reject" value={reason} onChange={(e) => { setReason(e.target.value); setReasonErr("") }} />
+              <Textarea id="td-reject" placeholder="e.g. The photo doesn't show the exit sign" value={reason} onChange={(e) => { setReason(e.target.value); setReasonErr("") }} />
             </Field>
             <div className="od-form-foot">
               <DialogClose render={<button type="button" className="btn btn-outline" />}>Cancel</DialogClose>

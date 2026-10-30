@@ -38,11 +38,8 @@
 .team-link:focus-visible{outline:2px solid var(--brand);outline-offset:2px;border-radius:calc(6px * var(--radius-scale,1))}
 .deadline .btn:disabled{opacity:.6;cursor:not-allowed}
 .attention-empty{padding:18px 4px 4px}
-.decide-opts{display:flex;gap:10px;flex-wrap:wrap}
-.decide-opt{display:inline-flex;align-items:center;gap:8px;padding:10px 16px;border-radius:var(--r-pill);background:var(--mute-bg);font-size:14px;font-weight:600;color:var(--ink);cursor:pointer;transition:background var(--dur-fast) var(--ease)}
-.decide-opt:has([data-checked]){background:var(--brand-soft);color:var(--brand-deep)}
-:root[data-theme="dark"] .decide-opt:has([data-checked]){color:var(--brand-3)}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .decide-opt:has([data-checked]){color:var(--brand-3)}}
+/* Decide dialog (ui-rules 32): the decision FilterSeg keeps its natural width */
+.decide-seg .seg.od-seg{align-self:flex-start}
 
 /* ---- Motion wave A (ui-rules.md → Motion) ---- */
 /* Tasks-closed chart: ONE tip, moved by transform (tasks-closed-chart.tsx sets translate to the active bar's top centre).
@@ -67,8 +64,27 @@
 .head > div:has(> .sk-h1){min-width:0}
 
 /* ---- Today card + "Play my day" (today-card.tsx, today-player.tsx; SRS FR-M1-70..79) ---- */
-.today{display:flex;flex-direction:column;gap:16px}
-.today .today-head{margin-bottom:0}
+/* One accordion item (components/ui/accordion, OpsDesk skin): the bar never moves; the body opens and closes under it, height only. */
+.today-acc{display:block}
+.today[data-slot="accordion-item"]{margin:0;padding:0 22px}
+.today .today-bar{display:flex;align-items:center;gap:12px;width:100%;height:56px;padding:0;border:0;border-radius:var(--r-lg);font:inherit;text-decoration:none;color:var(--ink);cursor:pointer}
+.today .today-bar:hover{text-decoration:none}
+.today .today-bar:hover .today-chip-t{color:var(--brand)}
+.today .today-bar .today-chip-t{transition:color var(--dur-fast) var(--ease)}
+.today-peek{flex:1;min-width:0;display:flex;transition:opacity var(--dur) var(--ease)}
+.today-bar[aria-expanded="true"] .today-peek,.today-bar[aria-expanded="true"] .today-pulse{opacity:0;visibility:hidden;transition:opacity var(--dur) var(--ease),visibility 0s var(--dur)}
+.today-bar [data-slot="accordion-trigger-icon"]{width:16px;height:16px;margin-left:0;color:var(--brand);transition:transform var(--dur-slow) var(--ease-in-out)}
+.today-bar [data-slot="accordion-trigger-icon"]:last-of-type{display:none !important}
+.today-bar [data-slot="accordion-trigger-icon"]:first-of-type{display:inline !important}
+.today-bar[aria-expanded="true"] [data-slot="accordion-trigger-icon"]{transform:rotate(180deg)}
+:root[data-theme="dark"] .today-bar [data-slot="accordion-trigger-icon"]{color:var(--brand-3)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .today-bar [data-slot="accordion-trigger-icon"]{color:var(--brand-3)}}
+.today [data-slot="accordion-content"]{animation:none;height:var(--accordion-panel-height);transition:height var(--dur-slow) var(--ease-in-out);color:var(--ink);font-size:inherit}
+.today [data-slot="accordion-content"][data-starting-style],.today [data-slot="accordion-content"][data-ending-style]{height:0}
+.today .today-body{height:auto;padding:0 0 22px;display:flex;flex-direction:column;gap:16px}
+.today .today-body a{text-decoration:none}
+.today .today-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:0}
+@media (prefers-reduced-motion:reduce){.today [data-slot="accordion-content"],.today-bar [data-slot="accordion-trigger-icon"]{transition:none}}
 .today-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .today-actions .pill-btn,.td-acts .pill-btn{cursor:pointer}
 .today-actions .pill-btn[aria-pressed="true"]{background:var(--brand-soft);color:var(--brand-deep)}
@@ -142,7 +158,7 @@
 .td-acts{grid-column:1/-1;display:flex;gap:8px;flex-wrap:wrap}
 .td-acts .pill-btn:disabled{opacity:.5;cursor:not-allowed}
 @media (max-width:900px){.today-tiles,.today-tiles[data-n="4"]{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media (max-width:640px){.td-player{grid-template-columns:minmax(0,1fr)}.td-speed{justify-self:start}.today-chip{padding:0 16px}.today-chip-m{font-size:12px}}
+@media (max-width:640px){.td-player{grid-template-columns:minmax(0,1fr)}.td-speed{justify-self:start}.today-chip{padding:0 16px}.today[data-slot="accordion-item"]{padding:0 16px}.today .today-body{padding-bottom:16px}.today-chip-m{font-size:12px}}
 
 /* Task Progress breakdown (task-progress.tsx): fills the fixed-height card below the gauge. */
 .dash-fix > .card > .gauge-wrap{flex:1;min-height:0}

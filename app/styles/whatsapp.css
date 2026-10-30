@@ -251,3 +251,5 @@ a.wa-chip:hover .wa-chip-ref{text-decoration:underline;text-underline-offset:2px
 .wa-typing{animation:wa-in var(--dur) var(--ease) both}
 .wa-typing .wa-bubble{padding:12px 14px;display:flex}
 .wa-typing .wa-dots i{background:var(--ink-3)}
+/* Forms (ui-rules 32): a FilterSeg field keeps its natural width */
+.wa-seg .seg.od-seg{align-self:flex-start}

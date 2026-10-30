@@ -3,16 +3,17 @@
 import { toast } from "sonner"
 
 import { saveMfaPolicy } from "@/app/actions/security"
-import { FilterSelect } from "@/components/filter-bar"
+import { FilterSeg } from "@/components/filter-bar"
 import { Switch } from "@/components/ui/switch"
 import { describeMfaPolicy } from "@/lib/mfa"
 import type { MfaPolicy } from "@/lib/mfa"
 import { mfaPolicyStore } from "../store"
 
-const MODES = [
+// Short FilterSeg labels; the card's subtitle spells the rule out.
+const MODES: { value: MfaPolicy["mode"]; label: string }[] = [
   { value: "off", label: "Optional" },
-  { value: "all", label: "Required for everyone" },
-  { value: "roles", label: "Required for chosen roles" },
+  { value: "all", label: "Everyone" },
+  { value: "roles", label: "Chosen roles" },
 ]
 
 // Require two-step verification (FR-M0-04): everyone or chosen roles. A person it applies to who has not set it up sees the setup gate on every page.
@@ -35,11 +36,11 @@ export function MfaPolicyCard({ policy, roles, canWrite, scopeKey }: { policy: M
         </div>
         {canWrite && (
           <div className="od-filters">
-            <FilterSelect
+            <FilterSeg
               label="Two-step rule"
               value={stored.mode}
               options={MODES}
-              onChange={(v) => save({ mode: v as MfaPolicy["mode"], roles: v === "roles" ? stored.roles : [] })}
+              onChange={(v) => save({ mode: v, roles: v === "roles" ? stored.roles : [] })}
             />
           </div>
         )}

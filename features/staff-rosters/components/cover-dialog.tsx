@@ -74,7 +74,7 @@ export function CoverDialog({
             />
           </Field>
           <Field label="Next action" htmlFor="sr-cover-action" error={errors.action} required>
-            <Input id="sr-cover-action" value={form.action} onChange={(e) => set("action", e.target.value)} />
+            <Input id="sr-cover-action" placeholder="e.g. Send the shift details" value={form.action} onChange={(e) => set("action", e.target.value)} />
           </Field>
           <div className="od-form-foot">
             <DialogClose render={<button type="button" className="btn btn-outline" />}>Cancel</DialogClose>

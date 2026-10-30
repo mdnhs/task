@@ -5,7 +5,7 @@ import { motion } from "motion/react"
 import { toast } from "sonner"
 
 import { Field } from "@/components/field"
-import { FilterSelect } from "@/components/filter-bar"
+import { FilterSeg } from "@/components/filter-bar"
 import { Icon } from "@/components/icons"
 import { PageHead } from "@/components/page-head"
 import { StatusPill } from "@/components/status-pill"
@@ -212,11 +212,13 @@ function InviteDialog({ open, onOpenChange, onInvite }: { open: boolean; onOpenC
             <Input id="pf-inv-name" value={name} autoComplete="off" onChange={(e) => { setName(e.target.value); setError(null) }} />
           </Field>
           <Field label="Work email" htmlFor="pf-inv-email" error={error?.field === "email" ? error.text : undefined} required>
-            <Input id="pf-inv-email" type="email" value={email} autoComplete="off" onChange={(e) => { setEmail(e.target.value); setError(null) }} />
+            <Input id="pf-inv-email" type="email" placeholder="e.g. name@company.com" value={email} autoComplete="off" onChange={(e) => { setEmail(e.target.value); setError(null) }} />
           </Field>
-          <Field label="Role" htmlFor="pf-inv-role" hint="Owners need two-step verification, so invite with another role and promote them once it's on.">
-            <FilterSelect<StaffRole> label="Role" value={role} options={INVITE_ROLES.map((r) => ({ value: r, label: STAFF_ROLE_LABEL[r] }))} onChange={setRole} />
-          </Field>
+          <div className="od-field">
+            <span className="fs-label">Role</span>
+            <FilterSeg<StaffRole> label="Role" value={role} options={INVITE_ROLES.map((r) => ({ value: r, label: STAFF_ROLE_LABEL[r] }))} onChange={setRole} />
+            <div className="od-field-msg"><p className="od-field-hint">Owner comes later, once two-step verification is on.</p></div>
+          </div>
           <div className="od-form-foot">
             <DialogClose render={<button type="button" className="btn btn-outline" />}>Cancel</DialogClose>
             <button type="submit" className="btn btn-primary">Send invite</button>
@@ -253,10 +255,12 @@ function RoleDialog({ member, open, onClose, onSave }: { member: StaffMember | n
           <DialogDescription>Now {member ? STAFF_ROLE_LABEL[member.role].toLowerCase() : ""}. The change and your reason are recorded in the audit trail.</DialogDescription>
         </DialogHeader>
         <form className="od-form" onSubmit={submit} noValidate>
-          <Field label="New role" htmlFor="pf-role-to" hint={member && !canBeOwner(member) ? "MFA required: they can't be made owner until two-step verification is on." : undefined} required>
-            <FilterSelect<StaffRole | ""> label="New role" value={role} options={choices.map((r) => ({ value: r, label: STAFF_ROLE_LABEL[r] }))} onChange={setRole} />
-          </Field>
-          <Field label="Reason" htmlFor="pf-role-reason" error={error} hint={`At least ${REASON_MIN} characters. Saved in the audit trail.`} required>
+          <div className="od-field">
+            <span className="fs-label">New role</span>
+            <FilterSeg<StaffRole | ""> label="New role" value={role} options={choices.map((r) => ({ value: r, label: STAFF_ROLE_LABEL[r] }))} onChange={setRole} />
+            {member && !canBeOwner(member) && <div className="od-field-msg"><p className="od-field-hint">Owner needs two-step verification first.</p></div>}
+          </div>
+          <Field label="Reason" htmlFor="pf-role-reason" error={error} hint={`At least ${REASON_MIN} characters`} required>
             <Textarea id="pf-role-reason" value={reason} rows={3} maxLength={300} onChange={(e) => { setReason(e.target.value); setError(undefined) }} />
           </Field>
           <div className="od-form-foot">

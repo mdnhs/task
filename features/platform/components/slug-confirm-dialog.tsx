@@ -59,7 +59,7 @@ export function SlugConfirmDialog({
       onConfirm={() => onConfirm(why.trim())}
     >
       {reason && (
-        <Field label="Reason" htmlFor="pf-confirm-reason" hint={`At least ${REASON_MIN} characters. Saved in the audit trail.`} required>
+        <Field label="Reason" htmlFor="pf-confirm-reason" hint={`At least ${REASON_MIN} characters`} required>
           <Textarea id="pf-confirm-reason" value={why} rows={2} maxLength={300} onChange={(e) => setWhy(e.target.value)} />
         </Field>
       )}

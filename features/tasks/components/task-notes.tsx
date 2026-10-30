@@ -55,8 +55,8 @@ export function TaskNotes({
       </ul>
       {canAdd && (
         <form className="td-form" onSubmit={submit} noValidate>
-          <Field label="Add a progress note" htmlFor="td-note" error={error}>
-            <Textarea id="td-note" value={text} onChange={(e) => { setText(e.target.value); setError(undefined) }} />
+          <Field label="New note" htmlFor="td-note" error={error}>
+            <Textarea id="td-note" placeholder="e.g. Lobby done, starting floor 2" value={text} onChange={(e) => { setText(e.target.value); setError(undefined) }} />
           </Field>
           <div className="td-form-foot"><button type="submit" className="btn btn-primary">Add note</button></div>
         </form>

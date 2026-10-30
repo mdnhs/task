@@ -143,7 +143,7 @@ function ReturnDialog({ open, onOpenChange, who, onReturn }: { open: boolean; on
           }}
         >
           <Field label="Comment" htmlFor="sr-return-text" error={error} required>
-            <Textarea id="sr-return-text" value={text} onChange={(e) => { setText(e.target.value); setError("") }} />
+            <Textarea id="sr-return-text" placeholder="e.g. Add the time spent on each task" value={text} onChange={(e) => { setText(e.target.value); setError("") }} />
           </Field>
           <div className="od-form-foot">
             <DialogClose render={<button type="button" className="btn btn-outline" />}>Cancel</DialogClose>

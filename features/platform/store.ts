@@ -1,10 +1,7 @@
-import { useEffect } from "react"
-
 import { createStore } from "@/lib/store"
-import { useSupportAccess } from "@/hooks/use-support-access"
 import type { EntitlementsData } from "@/lib/entitlements"
 import { applyPatches, foldAudit, type DataRequestPatches, type InvoicePatches, type TenantPatches } from "./patches"
-import type { AuditEntry, DataRequest, Invoice, Plan, PlatformSeed, PlatformSettings, PlatformTenant, StaffMember, SubEvent, UsagePoint } from "./types"
+import type { AuditEntry, DataRequest, Invoice, Plan, PlatformSettings, PlatformTenant, StaffMember, SubEvent, UsagePoint } from "./types"
 
 export const tenantsStore = createStore<PlatformTenant[]>()
 export const plansStore = createStore<Plan[]>()
@@ -28,9 +25,8 @@ export const settingsStore = createStore<PlatformSettings>()
 // payload) never write tenantsStore or auditStore. They write:
 //   - tenantPatchStore: { [tenantId]: TenantPatch } (status / suspendedAt / suspendReason; undefined = remove the field);
 //   - auditOutbox: new audit entries (their ids are re-numbered when folded in).
-// Contract for full-record pages (tenant 360, Task 5, and anything on usePlatform): render applyPatches(tenants, patches)
-// and foldAudit(audit, outbox) over your own server data, then fold both into the full stores and clear them (usePlatform
-// does this in an effect). Slim pages read tenantsStore only as an overlay (if a full page already loaded it) and then
+// Contract for full-record pages (tenant 360): render applyPatches(tenants, patches) and foldAudit(audit, outbox) over your
+// own server data, then fold both into the full stores and clear them (foldPending, from an effect). Slim pages read tenantsStore only as an overlay (if a full page already loaded it) and then
 // apply their own patches on top. Patches always win: they are the newest edit.
 export const tenantPatchStore = createStore<TenantPatches>()
 // The billing ledger (Task 6) follows the same contract for invoices: invoicePatchStore + auditOutbox.
@@ -105,31 +101,4 @@ export function foldPending() {
     const p = take(dataRequestPatchStore, NO_REQUEST_PATCHES, noKeys)
     if (p) dataRequestsStore.set((all) => applyPatches(all, p))
   }
-}
-
-// Every platform page seeds every store, so an edit on one page shows up on the others after client navigation.
-export function usePlatform(seed: PlatformSeed) {
-  const [tenants, setTenants] = tenantsStore.useStore(seed.tenants, SCOPE)
-  const [plans, setPlans] = plansStore.useStore(seed.plans, SCOPE)
-  const [entitlements, setEntitlements] = entitlementsStore.useStore(seed.entitlements, SCOPE)
-  const [requests, setRequests] = useSupportAccess(seed.requests)
-  const [audit, setAudit] = auditStore.useStore(seed.audit, SCOPE)
-  const [subscriptions, setSubscriptions] = subscriptionsStore.useStore(seed.subscriptions, SCOPE)
-  const [invoices, setInvoices] = invoicesStore.useStore(seed.invoices, SCOPE)
-  const [usage, setUsage] = usageStore.useStore(seed.usage, SCOPE)
-  const [dataRequests, setDataRequests] = dataRequestsStore.useStore(seed.dataRequests, SCOPE)
-  const patches = usePatches()
-  const outbox = useOutbox()
-  const invoicePatches = useInvoicePatches()
-  const newEvents = useSubEventOutbox()
-  const newRequests = useDataRequestOutbox()
-  const requestPatches = useDataRequestPatches()
-  // Fold what slim pages wrote into the full stores once, then clear it (see the patch model above). The deps only
-  // re-run it; foldPending reads the stores itself, so a second run with the same values (StrictMode) folds nothing.
-  useEffect(() => {
-    foldPending()
-  }, [patches, outbox, invoicePatches, newEvents, newRequests, requestPatches])
-  return {
-    subscriptions: newEvents.length ? [...subscriptions, ...newEvents] : subscriptions, setSubscriptions, invoices: applyPatches(invoices, invoicePatches), setInvoices, usage, setUsage,
-    dataRequests: applyPatches(newRequests.length ? [...newRequests, ...dataRequests] : dataRequests, requestPatches), setDataRequests, tenants: applyPatches(tenants, patches), setTenants, plans, setPlans, entitlements, setEntitlements, requests, setRequests, audit: outbox.length ? foldAudit(audit, outbox) : audit, setAudit }
 }

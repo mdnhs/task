@@ -155,7 +155,7 @@ export function TaskDetailSkeleton({ canEdit = true, reviewer = false }: { canEd
             <div style={{ marginTop: 12 }}><Line w={120} h={11} lh={20} /></div>
             {canEdit && (
               <div className="td-form">
-                <Sk w={110} h={12} lh={18} />
+                <Sk w={60} h={12} lh={18} />
                 <Sk w="100%" h={96} r={14} />
                 <div className="td-form-foot"><Sk w={112} h={46} r={14} /></div>
               </div>

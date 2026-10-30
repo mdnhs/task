@@ -57,9 +57,9 @@ function Profile() {
         </div>
       </div>
       <div className="od-form set-form">
-        <div className="od-row2"><FieldSk label={90} /><FieldSk label={40} hint={260} /></div>
+        <div className="od-row2"><FieldSk label={90} /><FieldSk label={40} hint={150} /></div>
         <div className="od-row2"><FieldSk label={36} /><FieldSk label={80} /></div>
-        <div className="od-row2"><FieldSk label={64} hint={150} /></div>
+        <div className="od-row2"><FieldSk label={64} /></div>
         <div className="od-form-foot"><Sk w={140} h={44.3} r={14} /></div>
       </div>
     </section>
@@ -193,24 +193,28 @@ function Notifications({ counts }: { counts: AccountCounts }) {
         </div>
       </section>
       <section className="card set-card">
-        <CardHead title={120} sub={250} />
+        <CardHead title={120} sub={190} />
         <div className="od-form set-form">
-          <div className="od-row2"><FieldSk label={70} hint={210} /></div>
+          {/* "Remind me" label + FilterSeg (4 lead times) */}
+          <div className="od-field">
+            <Sk w={70} h={11} lh={18.1} />
+            <Sk w={243} h={50} r="pill" style={{ maxWidth: "100%" }} />
+          </div>
         </div>
       </section>
       <section className="card set-card">
         <CardHead title={80} sub={210} />
         <div className="acc-prefs">
           {[
-            ["Show the Today card automatically", "Counts and Play my day at the top of home on your first visit each working day. Off keeps a small entry to open it."],
-            ["Send \"Your day is ready\"", "A push at shift start on the mobile app. Not sent on leave or days off."],
+            ["Show the Today card automatically", "Opens at the top of home on your first visit each working day"],
+            ["Send \"Your day is ready\"", "Mobile push at shift start. Not on leave or days off."],
           ].map(([title, hint]) => (
             <div key={title} className="acc-pref">
               <span>
                 <span className="tt sk-ghost">{title}</span>
                 <span className="tm acc-hint sk-ghost">{hint}</span>
               </span>
-              <Sk w={32} h={18.4} r="pill" />
+              <Sk w={40} h={24} r="pill" />
             </div>
           ))}
         </div>

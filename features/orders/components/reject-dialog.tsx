@@ -38,11 +38,11 @@ export function RejectDialog({ order, open, onOpenChange, onReject }: { order: O
       <DialogContent className="od-dialog od-form-dialog" showCloseButton={false}>
         <DialogHeader>
           <DialogTitle>Reject request</DialogTitle>
-          <DialogDescription>{order ? `${order.item} (${order.ref}) from ${order.requester}. The reason is shown to the requester.` : "Give a reason."}</DialogDescription>
+          <DialogDescription>{order ? `${order.item} (${order.ref}) from ${order.requester}. They see the reason.` : "Give a reason."}</DialogDescription>
         </DialogHeader>
         <form className="od-form" onSubmit={submit} noValidate>
           <Field label="Reason" htmlFor="ord-reason" error={error} required>
-            <Textarea id="ord-reason" value={reason} onChange={(e) => { setReason(e.target.value); setError(undefined) }} />
+            <Textarea id="ord-reason" placeholder="e.g. Over budget this month" value={reason} onChange={(e) => { setReason(e.target.value); setError(undefined) }} />
           </Field>
           <div className="od-form-foot">
             <DialogClose render={<button type="button" className="btn btn-outline" />}>Cancel</DialogClose>

@@ -47,11 +47,11 @@ export function DeliverDialog({ order, open, onOpenChange, onReceive }: { order:
         <DialogHeader>
           <DialogTitle>Mark delivered</DialogTitle>
           <DialogDescription>
-            {order ? `${order.item} (${order.ref}) from ${order.supplier}. ${order.received} of ${order.qty} received so far, ${left} still to arrive.` : "Enter the quantity received."}
+            {order ? `${order.item} (${order.ref}) · ${order.received} of ${order.qty} received, ${left} to come.` : "Enter the quantity received."}
           </DialogDescription>
         </DialogHeader>
         <form className="od-form" onSubmit={submit} noValidate>
-          <Field label="Quantity received" htmlFor="ord-qty" error={error} hint={error ? undefined : "Less than the outstanding amount records a partial delivery"} required>
+          <Field label="Received" htmlFor="ord-qty" error={error} hint={error ? undefined : `Less than ${left} books a partial delivery`} required>
             <Input id="ord-qty" inputMode="numeric" value={qty} onChange={(e) => { setQty(e.target.value); setError(undefined) }} />
           </Field>
           <div className="od-form-foot">

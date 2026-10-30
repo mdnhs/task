@@ -184,6 +184,12 @@ No GSAP. CSS covers most cases. The `motion` library (`motion/react`) is used on
     Copy actions swap their icon to ✓ the same way (`od-act-in` + `od-draw`; e.g. the tenant ID copy button on `/platform/tenants`).
 31. **Long forms are pages:** a dialog that would need scrolling at 1568×698 becomes its own route (form page + exact skeleton); dialogs are for short confirmations and small forms.
     Form pages use `.od-form-cols` with two `.od-form-col` children (kit.css): two columns above 1100px, one below; the `.od-form-foot` sits after them, full width. Card uses the full content width.
+32. **Forms look like the New task page** (`features/tasks/components/new-task-form.tsx` is the reference; shared parts in `components/form-section.tsx`):
+    - Form pages and long panels group fields into `FormSection`s (icon chip from lucide + short title), balanced across the two columns. Dialog forms stay flat (no section headings) unless they have 6+ fields.
+    - Short labels. Never "(optional)" in a label: mark optional groups/fields with `OptionalTag` / the section `note`, and put examples in the placeholder (`e.g. 90`), not in hints.
+    - Small fixed choices (≤4 options: priority, type, yes/no modes) are a `FilterSeg` or `.rp-day` chips, not a select. Picking several people is `PeoplePicker` (select + removable chips), never a wall of chips.
+    - Rarely used or advanced fields go in a `FormFold` opened by a `FoldToggle` in the section heading (label names what's inside); an error inside opens it.
+    - Hints only when they prevent a mistake, one short line. Validation, error messages, `Field` and the foot (Cancel + primary) stay as they are.
 
 ## Data
 Mock API lives in `public/data/<feature>/<name>.json`. Each feature's `features/<feature>/api.ts` reads it with `getData()`

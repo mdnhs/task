@@ -3,10 +3,13 @@
 import { toast } from "sonner"
 
 import { saveDevicePolicies } from "@/app/actions/security"
-import { FilterSelect } from "@/components/filter-bar"
+import { FilterSeg } from "@/components/filter-bar"
 import { DEVICE_ALLOWS, DEVICE_FEATURES, allowFor, describePolicy } from "@/lib/devices"
 import type { DeviceAllow, DeviceFeature, DevicePolicy } from "@/lib/devices"
 import { devicePoliciesStore } from "../store"
+
+// Short FilterSeg labels; the row text spells the policy out.
+const SHORT: Record<DeviceAllow, string> = { "trusted-company-pc": "Trusted PCs", any: "Any device", none: "Nowhere" }
 
 // Device access policy (FR-M0-09, CR-02, CR-06): per feature, which devices may use it. Checked on the server for every request.
 export function DevicePolicyCard({ policies, canWrite, scopeKey }: { policies: DevicePolicy[]; canWrite: boolean; scopeKey: string }) {
@@ -39,7 +42,7 @@ export function DevicePolicyCard({ policies, canWrite, scopeKey }: { policies: D
               </div>
               {canWrite && (
                 <div className="od-filters">
-                  <FilterSelect label={`${f.label} access`} value={allow} options={DEVICE_ALLOWS} onChange={(v) => change(f.value, v as DeviceAllow)} />
+                  <FilterSeg<DeviceAllow> label={`${f.label} access`} value={allow} options={DEVICE_ALLOWS.map((o) => ({ value: o.value, label: SHORT[o.value] }))} onChange={(v) => change(f.value, v)} />
                 </div>
               )}
             </li>

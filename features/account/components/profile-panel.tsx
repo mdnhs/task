@@ -76,7 +76,7 @@ export function ProfilePanel({
               }}
             />
           </Field>
-          <Field label="Email" htmlFor="acc-email" hint="Your sign-in address. Contact an admin to change it">
+          <Field label="Email" htmlFor="acc-email" hint="Ask an admin to change it">
             <Input id="acc-email" value={email} readOnly />
           </Field>
         </div>
@@ -89,7 +89,7 @@ export function ProfilePanel({
           </Field>
         </div>
         <div className="od-row2">
-          <Field label="Timezone" htmlFor="acc-tz" hint="Set by your organisation">
+          <Field label="Timezone" htmlFor="acc-tz">
             <Input id="acc-tz" value={tzLabel} readOnly />
           </Field>
         </div>

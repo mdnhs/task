@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { Package, Truck } from "lucide-react"
 import { toast } from "sonner"
 import { z } from "zod"
 
@@ -8,6 +9,7 @@ import { ActionButton } from "@/components/action-button"
 import { DatePicker } from "@/components/date-picker"
 import { Field } from "@/components/field"
 import { FilterSelect } from "@/components/filter-bar"
+import { FormSection } from "@/components/form-section"
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { nextRef } from "../mutations"
@@ -95,31 +97,37 @@ export function NewOrderDialog({
       <DialogContent className="od-dialog od-form-dialog" showCloseButton={false}>
         <DialogHeader>
           <DialogTitle>New stock request</DialogTitle>
-          <DialogDescription>The request goes to an approver before anything is ordered.</DialogDescription>
+          <DialogDescription>An approver signs it off before anything is ordered.</DialogDescription>
         </DialogHeader>
         <form className="od-form" onSubmit={submit} noValidate>
-          <Field label="Item" htmlFor="no-item" error={errors.item} required>
-            <Input id="no-item" value={form.item} onChange={(e) => set("item", e.target.value)} />
-          </Field>
-          <div className="od-row2">
-            <Field label="Quantity" htmlFor="no-qty" error={errors.qty} required>
-              <Input id="no-qty" inputMode="numeric" value={form.qty} onChange={(e) => set("qty", e.target.value)} />
-            </Field>
-            <Field label={`Amount (${currency})`} htmlFor="no-amount" error={errors.amount} required>
-              <Input id="no-amount" inputMode="decimal" value={form.amount} onChange={(e) => set("amount", e.target.value)} />
-            </Field>
-          </div>
-          <Field label="Supplier" htmlFor="no-supplier" error={errors.supplier} required>
-            <Input id="no-supplier" value={form.supplier} onChange={(e) => set("supplier", e.target.value)} />
-          </Field>
-          <div className="od-row2">
-            <Field label="Department" htmlFor="no-dept" error={errors.dept} required>
-              <FilterSelect label="Department" value={form.dept} options={departments.map((d) => ({ value: d, label: d }))} onChange={(v) => set("dept", v)} />
-            </Field>
-            <Field label="Expected delivery" htmlFor="no-expected" error={errors.expected} required>
-              <DatePicker label="Expected delivery" value={form.expected} today={today} min={today.slice(0, 10)} placeholder="Pick a date" onChange={(v) => set("expected", v)} />
-            </Field>
-          </div>
+          <FormSection icon={Package} title="Item">
+            <div className="od-row2">
+              <Field label="Item" htmlFor="no-item" error={errors.item} required>
+                <Input id="no-item" placeholder="e.g. Floor cleaner 5L" value={form.item} onChange={(e) => set("item", e.target.value)} />
+              </Field>
+              <Field label="Department" htmlFor="no-dept" error={errors.dept} required>
+                <FilterSelect label="Department" value={form.dept} options={departments.map((d) => ({ value: d, label: d }))} onChange={(v) => set("dept", v)} />
+              </Field>
+            </div>
+            <div className="od-row2">
+              <Field label="Quantity" htmlFor="no-qty" error={errors.qty} required>
+                <Input id="no-qty" inputMode="numeric" placeholder="e.g. 10" value={form.qty} onChange={(e) => set("qty", e.target.value)} />
+              </Field>
+              <Field label={`Amount (${currency})`} htmlFor="no-amount" error={errors.amount} required>
+                <Input id="no-amount" inputMode="decimal" placeholder="e.g. 12.50" value={form.amount} onChange={(e) => set("amount", e.target.value)} />
+              </Field>
+            </div>
+          </FormSection>
+          <FormSection icon={Truck} title="Delivery">
+            <div className="od-row2">
+              <Field label="Supplier" htmlFor="no-supplier" error={errors.supplier} required>
+                <Input id="no-supplier" value={form.supplier} onChange={(e) => set("supplier", e.target.value)} />
+              </Field>
+              <Field label="Expected" htmlFor="no-expected" error={errors.expected} required>
+                <DatePicker label="Expected delivery" value={form.expected} today={today} min={today.slice(0, 10)} placeholder="Pick a date" onChange={(v) => set("expected", v)} />
+              </Field>
+            </div>
+          </FormSection>
           <div className="od-form-foot">
             <DialogClose render={<button type="button" className="btn btn-outline" />}>Cancel</DialogClose>
             <ActionButton type="submit" className="btn btn-primary">Send for approval</ActionButton>

@@ -3,12 +3,14 @@
 import { useEffect, useState } from "react"
 import { toast } from "sonner"
 
-import { Field } from "@/components/field"
-import { FilterSelect } from "@/components/filter-bar"
+import { FilterSeg } from "@/components/filter-bar"
 import { Switch } from "@/components/ui/switch"
 import { readAuto, readReady, writeAuto, writeReady } from "@/lib/today-prefs"
 import { prefsStore } from "../store"
 import type { NotificationPrefsData } from "../types"
+
+// "15 minutes before" → "15 min" for the FilterSeg (the toast keeps the full label).
+const shortLead = (label: string) => label.replace(/ before$/, "").replace(/ minutes?$/, " min").replace(/ hours?$/, " h")
 
 // Personal notification preferences: channel x event switches plus the daily-report reminder lead time.
 export function AccountNotificationsPanel({ data, scopeKey, todayUser }: { data: NotificationPrefsData; scopeKey: string; todayUser: string }) {
@@ -70,22 +72,21 @@ export function AccountNotificationsPanel({ data, scopeKey, todayUser }: { data:
         <div className="card-head">
           <div>
             <h2 id="acc-lead-h">Daily reminder</h2>
-            <div className="sub">When the daily report reminder reaches you</div>
+            <div className="sub">Before the daily report deadline</div>
           </div>
         </div>
         <div className="od-form set-form">
-          <div className="od-row2">
-            <Field label="Remind me" htmlFor="acc-lead" hint="Counted back from the report deadline">
-              <FilterSelect
-                label="Remind me"
-                value={state.lead}
-                options={data.leadOptions}
-                onChange={(v) => {
-                  setState((p) => ({ ...p, lead: v }))
-                  toast.success("Reminder time updated", { description: data.leadOptions.find((o) => o.value === v)?.label })
-                }}
-              />
-            </Field>
+          <div className="od-field set-seg-field">
+            <span className="fs-label">Remind me</span>
+            <FilterSeg
+              label="Remind me"
+              value={state.lead}
+              options={data.leadOptions.map((o) => ({ value: o.value, label: <span className="num">{shortLead(o.label)}</span> }))}
+              onChange={(v) => {
+                setState((p) => ({ ...p, lead: v }))
+                toast.success("Reminder time updated", { description: data.leadOptions.find((o) => o.value === v)?.label })
+              }}
+            />
           </div>
         </div>
       </section>
@@ -101,7 +102,7 @@ export function AccountNotificationsPanel({ data, scopeKey, todayUser }: { data:
           <label className="acc-pref">
             <span>
               <span className="tt">Show the Today card automatically</span>
-              <span className="tm acc-hint">Counts and Play my day at the top of home on your first visit each working day. Off keeps a small entry to open it.</span>
+              <span className="tm acc-hint">Opens at the top of home on your first visit each working day</span>
             </span>
             <Switch
               checked={auto}
@@ -116,7 +117,7 @@ export function AccountNotificationsPanel({ data, scopeKey, todayUser }: { data:
           <label className="acc-pref">
             <span>
               <span className="tt">Send &quot;Your day is ready&quot;</span>
-              <span className="tm acc-hint">A push at shift start on the mobile app. Not sent on leave or days off.</span>
+              <span className="tm acc-hint">Mobile push at shift start. Not on leave or days off.</span>
             </span>
             <Switch
               checked={ready}

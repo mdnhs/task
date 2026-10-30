@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useTransition } from "react"
+import { Building2, CalendarClock, ClipboardList, UserPlus } from "lucide-react"
 import { toast } from "sonner"
 
 import { signIn } from "@/app/actions/session"
@@ -8,6 +9,7 @@ import { useSlideDir } from "@/components/data-pagination"
 import { ConfirmDialog } from "@/components/confirm-dialog"
 import { Field } from "@/components/field"
 import { FilterSelect } from "@/components/filter-bar"
+import { FormSection, OptionalTag } from "@/components/form-section"
 import { TimePicker } from "@/components/time-picker"
 import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
@@ -38,7 +40,6 @@ export function OnboardingWizard({ defaults, roles }: { defaults: OnboardingDefa
   const [pending, start] = useTransition()
 
   const names = depts.map((d) => d.name.trim())
-  const tz = defaults.timezones.find((t) => t.value === timezone)
 
   const go = (i: number) => {
     setErrors({})
@@ -105,24 +106,24 @@ export function OnboardingWizard({ defaults, roles }: { defaults: OnboardingDefa
 
       {step === 0 && (
         <div className="auth-form od-slide" data-slide={dir}>
-          <h2 className="auth-h2">Departments</h2>
-          <p className="auth-sub">Daily reports are written per department.</p>
-          {errors.form && <p className="od-field-err" role="alert">{errors.form}</p>}
-          <ul className="auth-list">
-            {depts.map((d) => (
-              <li key={d.id}>
-                <Field label={`Department ${depts.indexOf(d) + 1}`} htmlFor={`ob-d${d.id}`} error={errors[`d${d.id}`]}>
-                  <Input id={`ob-d${d.id}`} value={d.name} onChange={(e) => { setDepts(depts.map((x) => (x.id === d.id ? { ...x, name: e.target.value } : x))); setErrors({}) }} />
-                </Field>
-                <button type="button" className="btn btn-outline auth-rm" onClick={() => setRemoving(d.id)} aria-label={`Remove ${d.name.trim() || "department"}`}>
-                  Remove
-                </button>
-              </li>
-            ))}
-          </ul>
-          <button type="button" className="btn btn-outline auth-add" onClick={() => { setDepts([...depts, { id: nextId, name: "" }]); setNextId(nextId + 1) }}>
-            Add department
-          </button>
+          <FormSection icon={Building2} title="Departments">
+            {errors.form && <p className="od-field-err" role="alert">{errors.form}</p>}
+            <ul className="auth-list">
+              {depts.map((d) => (
+                <li key={d.id}>
+                  <Field label={`Department ${depts.indexOf(d) + 1}`} htmlFor={`ob-d${d.id}`} error={errors[`d${d.id}`]}>
+                    <Input id={`ob-d${d.id}`} value={d.name} onChange={(e) => { setDepts(depts.map((x) => (x.id === d.id ? { ...x, name: e.target.value } : x))); setErrors({}) }} />
+                  </Field>
+                  <button type="button" className="btn btn-outline auth-rm" onClick={() => setRemoving(d.id)} aria-label={`Remove ${d.name.trim() || "department"}`}>
+                    Remove
+                  </button>
+                </li>
+              ))}
+            </ul>
+            <button type="button" className="btn btn-outline auth-add" onClick={() => { setDepts([...depts, { id: nextId, name: "" }]); setNextId(nextId + 1) }}>
+              Add department
+            </button>
+          </FormSection>
           <div className="auth-actions">
             <button type="button" className="btn btn-primary" onClick={nextFromDepts}>Continue</button>
           </div>
@@ -140,15 +141,16 @@ export function OnboardingWizard({ defaults, roles }: { defaults: OnboardingDefa
 
       {step === 1 && (
         <div className="auth-form od-slide" data-slide={dir}>
-          <h2 className="auth-h2">Timezone and deadline</h2>
-          <div className="od-row2">
-            <Field label="Timezone" htmlFor="ob-tz">
-              <FilterSelect label="Timezone" value={timezone} options={defaults.timezones.map((t) => ({ value: t.value, label: t.label }))} onChange={setTimezone} />
-            </Field>
-            <Field label="Daily report deadline" htmlFor="ob-deadline" hint={tz ? `Shown to everyone in ${tz.label}` : undefined}>
-              <TimePicker value={deadline} onChange={setDeadline} label="Daily report deadline" defaultTime={defaults.deadline} />
-            </Field>
-          </div>
+          <FormSection icon={CalendarClock} title="Timezone and deadline">
+            <div className="od-row2">
+              <Field label="Timezone" htmlFor="ob-tz">
+                <FilterSelect label="Timezone" value={timezone} options={defaults.timezones.map((t) => ({ value: t.value, label: t.label }))} onChange={setTimezone} />
+              </Field>
+              <Field label="Report deadline" htmlFor="ob-deadline">
+                <TimePicker value={deadline} onChange={setDeadline} label="Daily report deadline" defaultTime={defaults.deadline} />
+              </Field>
+            </div>
+          </FormSection>
           <div className="auth-actions">
             <button type="button" className="btn btn-outline" onClick={() => go(0)}>Back</button>
             <button type="button" className="btn btn-primary" disabled={!deadline} onClick={() => go(2)}>Continue</button>
@@ -158,27 +160,27 @@ export function OnboardingWizard({ defaults, roles }: { defaults: OnboardingDefa
 
       {step === 2 && (
         <div className="auth-form od-slide" data-slide={dir}>
-          <h2 className="auth-h2">Report template</h2>
-          <p className="auth-sub">Choose which of the {defaults.reportSections.length} sections each department fills in.</p>
-          <div className="auth-matrix" role="group" aria-label="Report sections by department" style={{ "--auth-cols": names.length } as React.CSSProperties}>
-            <div className="auth-matrix-head" aria-hidden="true">
-              <span>Section</span>
-              {depts.map((d) => <span key={d.id}>{d.name.trim()}</span>)}
-            </div>
-            {defaults.reportSections.map((s) => (
-              <div key={s} className="auth-matrix-row">
-                <span className="auth-matrix-name">{s}</span>
-                {depts.map((d) => {
-                  const id = `ob-t-${s}-${d.id}`.replace(/\W+/g, "-")
-                  return (
-                    <label key={d.id} className="auth-matrix-cell" htmlFor={id}>
-                      <Switch id={id} checked={!off.has(key(s, d.id))} onCheckedChange={(c) => toggle(key(s, d.id), c)} aria-label={`${s} for ${d.name.trim()}`} />
-                    </label>
-                  )
-                })}
+          <FormSection icon={ClipboardList} title="Report template" note={`${defaults.reportSections.length} sections`}>
+            <div className="auth-matrix" role="group" aria-label="Report sections by department" style={{ "--auth-cols": names.length } as React.CSSProperties}>
+              <div className="auth-matrix-head" aria-hidden="true">
+                <span>Section</span>
+                {depts.map((d) => <span key={d.id}>{d.name.trim()}</span>)}
               </div>
-            ))}
-          </div>
+              {defaults.reportSections.map((s) => (
+                <div key={s} className="auth-matrix-row">
+                  <span className="auth-matrix-name">{s}</span>
+                  {depts.map((d) => {
+                    const id = `ob-t-${s}-${d.id}`.replace(/\W+/g, "-")
+                    return (
+                      <label key={d.id} className="auth-matrix-cell" htmlFor={id}>
+                        <Switch id={id} checked={!off.has(key(s, d.id))} onCheckedChange={(c) => toggle(key(s, d.id), c)} aria-label={`${s} for ${d.name.trim()}`} />
+                      </label>
+                    )
+                  })}
+                </div>
+              ))}
+            </div>
+          </FormSection>
           <div className="auth-actions">
             <button type="button" className="btn btn-outline" onClick={() => go(1)}>Back</button>
             <button type="button" className="btn btn-primary" onClick={() => go(3)}>Continue</button>
@@ -188,29 +190,29 @@ export function OnboardingWizard({ defaults, roles }: { defaults: OnboardingDefa
 
       {step === 3 && (
         <div className="auth-form od-slide" data-slide={dir}>
-          <h2 className="auth-h2">Invite users</h2>
-          <p className="auth-sub">Leave a row empty to skip it.</p>
-          <ul className="auth-list">
-            {invites.map((inv, idx) => (
-              <li key={inv.id} className="auth-invite">
-                <Field label={`Email ${idx + 1}`} htmlFor={`ob-i${inv.id}`} error={errors[`i${inv.id}`]}>
-                  <Input id={`ob-i${inv.id}`} type="email" value={inv.email} placeholder="name@company.com" onChange={(e) => { setInvites(invites.map((x) => (x.id === inv.id ? { ...x, email: e.target.value } : x))); setErrors({}) }} />
-                </Field>
-                <Field label="Role" htmlFor={`ob-r${inv.id}`}>
-                  <FilterSelect label="Role" value={inv.role} options={inviteRoles.map((r) => ({ value: r.id, label: r.label }))} onChange={(v) => setInvites(invites.map((x) => (x.id === inv.id ? { ...x, role: v } : x)))} />
-                </Field>
-                <Field label="Department" htmlFor={`ob-p${inv.id}`}>
-                  <FilterSelect label="Department" value={inv.dept} options={[{ value: "", label: "All departments" }, ...names.filter(Boolean).map((n) => ({ value: n, label: n }))]} onChange={(v) => setInvites(invites.map((x) => (x.id === inv.id ? { ...x, dept: v } : x)))} />
-                </Field>
-                <button type="button" className="btn btn-outline auth-rm" disabled={invites.length === 1} onClick={() => setInvites(invites.filter((x) => x.id !== inv.id))} aria-label={`Remove invite ${idx + 1}`}>
-                  Remove
-                </button>
-              </li>
-            ))}
-          </ul>
-          <button type="button" className="btn btn-outline auth-add" onClick={() => { setInvites([...invites, { id: inviteId, email: "", role: inviteRoles[0]?.id ?? "", dept: "" }]); setInviteId(inviteId + 1) }}>
-            Add another
-          </button>
+          <FormSection icon={UserPlus} title="Invite users" action={<OptionalTag />}>
+            <ul className="auth-list">
+              {invites.map((inv, idx) => (
+                <li key={inv.id} className="auth-invite">
+                  <Field label={`Email ${idx + 1}`} htmlFor={`ob-i${inv.id}`} error={errors[`i${inv.id}`]}>
+                    <Input id={`ob-i${inv.id}`} type="email" value={inv.email} placeholder="name@company.com" onChange={(e) => { setInvites(invites.map((x) => (x.id === inv.id ? { ...x, email: e.target.value } : x))); setErrors({}) }} />
+                  </Field>
+                  <Field label="Role" htmlFor={`ob-r${inv.id}`}>
+                    <FilterSelect label="Role" value={inv.role} options={inviteRoles.map((r) => ({ value: r.id, label: r.label }))} onChange={(v) => setInvites(invites.map((x) => (x.id === inv.id ? { ...x, role: v } : x)))} />
+                  </Field>
+                  <Field label="Department" htmlFor={`ob-p${inv.id}`}>
+                    <FilterSelect label="Department" value={inv.dept} options={[{ value: "", label: "All departments" }, ...names.filter(Boolean).map((n) => ({ value: n, label: n }))]} onChange={(v) => setInvites(invites.map((x) => (x.id === inv.id ? { ...x, dept: v } : x)))} />
+                  </Field>
+                  <button type="button" className="btn btn-outline auth-rm" disabled={invites.length === 1} onClick={() => setInvites(invites.filter((x) => x.id !== inv.id))} aria-label={`Remove invite ${idx + 1}`}>
+                    Remove
+                  </button>
+                </li>
+              ))}
+            </ul>
+            <button type="button" className="btn btn-outline auth-add" onClick={() => { setInvites([...invites, { id: inviteId, email: "", role: inviteRoles[0]?.id ?? "", dept: "" }]); setInviteId(inviteId + 1) }}>
+              Add another
+            </button>
+          </FormSection>
           <div className="auth-actions">
             <button type="button" className="btn btn-outline" onClick={() => go(2)}>Back</button>
             <button type="button" className="btn btn-primary" disabled={pending} onClick={nextFromInvites}>

@@ -98,10 +98,10 @@ export function CreditDialog({ tenant: t, ctx, open, onOpenChange, currency }: B
       confirmDisabled={!amountOk || !reasonOk}
       onConfirm={confirm}
     >
-      <Field label={`Amount (${currency})`} htmlFor="pf-credit-amount" hint={`Above 0 and up to ${CREDIT_MAX}.`} required>
-        <Input id="pf-credit-amount" inputMode="decimal" value={amount} autoComplete="off" onChange={(e) => setAmount(e.target.value)} />
+      <Field label={`Amount (${currency})`} htmlFor="pf-credit-amount" hint={`Up to ${CREDIT_MAX}`} required>
+        <Input id="pf-credit-amount" inputMode="decimal" placeholder="e.g. 50" value={amount} autoComplete="off" onChange={(e) => setAmount(e.target.value)} />
       </Field>
-      <Field label="Reason" htmlFor="pf-credit-reason" hint={`At least ${REASON_MIN} characters. Saved in the audit trail.`} required>
+      <Field label="Reason" htmlFor="pf-credit-reason" hint={`At least ${REASON_MIN} characters`} required>
         <Textarea id="pf-credit-reason" value={why} rows={2} maxLength={300} onChange={(e) => setWhy(e.target.value)} />
       </Field>
     </ConfirmDialog>
@@ -140,10 +140,10 @@ export function SlugDialog({ tenant: t, ctx, open, onOpenChange, taken }: Base &
       confirmDisabled={!ok}
       onConfirm={confirm}
     >
-      <Field label="New slug" htmlFor="pf-slug-new" error={error} hint="Lowercase letters, digits and hyphens." required>
+      <Field label="New slug" htmlFor="pf-slug-new" error={error} hint="a–z, 0–9 and hyphens" required>
         <Input id="pf-slug-new" value={slug} autoComplete="off" spellCheck={false} onChange={(e) => setSlug(e.target.value)} />
       </Field>
-      <Field label="Reason" htmlFor="pf-slug-reason" hint={`At least ${REASON_MIN} characters. Saved in the audit trail.`} required>
+      <Field label="Reason" htmlFor="pf-slug-reason" hint={`At least ${REASON_MIN} characters`} required>
         <Textarea id="pf-slug-reason" value={why} rows={2} maxLength={300} onChange={(e) => setWhy(e.target.value)} />
       </Field>
       <Field label={`Type ${t.slug} to confirm`} htmlFor="pf-slug-confirm" required>

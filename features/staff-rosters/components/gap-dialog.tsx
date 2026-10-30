@@ -4,7 +4,7 @@ import { useState } from "react"
 import { z } from "zod"
 
 import { Field } from "@/components/field"
-import { FilterSelect } from "@/components/filter-bar"
+import { FilterSeg, FilterSelect } from "@/components/filter-bar"
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { COVERAGE } from "../types"
@@ -78,24 +78,30 @@ export function GapDialog({
       <DialogContent className="od-dialog od-form-dialog" showCloseButton={false}>
         <DialogHeader>
           <DialogTitle>Update cover</DialogTitle>
-          <DialogDescription>{gap ? `${gap.site} · ${gap.role}, ${gap.time}.` : "Update who is covering this shift."}</DialogDescription>
+          <DialogDescription>{gap ? `${gap.site} · ${gap.role}, ${gap.time}.` : "Who covers this shift."}</DialogDescription>
         </DialogHeader>
         <form className="od-form" onSubmit={submit} noValidate>
-          <div className="od-row2">
-            <Field label="Coverage" htmlFor="sr-cov" error={errors.coverage} required>
-              <FilterSelect label="Coverage" value={form.coverage} options={COVERAGES} onChange={(v) => set("coverage", v)} />
-            </Field>
-            <Field label="Assigned" htmlFor="sr-assigned" error={errors.assigned}>
-              <FilterSelect
-                label="Assigned"
-                value={form.assigned}
-                options={[{ value: "", label: "Nobody" }, ...options.map((s) => ({ value: s.name, label: s.name }))]}
-                onChange={(v) => set("assigned", v)}
-              />
-            </Field>
+          <div className="od-field sr-seg" data-invalid={errors.coverage ? "" : undefined}>
+            <label id="sr-cov-l">
+              Coverage<span className="od-req" aria-hidden="true"> *</span>
+            </label>
+            <FilterSeg label="Coverage" value={form.coverage} options={COVERAGES} onChange={(v) => set("coverage", v)} />
+            {errors.coverage && (
+              <div className="od-field-msg is-enter">
+                <p id="sr-cov-msg" className="od-field-err" role="alert">{errors.coverage}</p>
+              </div>
+            )}
           </div>
+          <Field label="Assigned" htmlFor="sr-assigned" error={errors.assigned}>
+            <FilterSelect
+              label="Assigned"
+              value={form.assigned}
+              options={[{ value: "", label: "Nobody" }, ...options.map((s) => ({ value: s.name, label: s.name }))]}
+              onChange={(v) => set("assigned", v)}
+            />
+          </Field>
           <Field label="Next action" htmlFor="sr-gap-action" error={errors.nextAction} required>
-            <Input id="sr-gap-action" value={form.nextAction} onChange={(e) => set("nextAction", e.target.value)} />
+            <Input id="sr-gap-action" placeholder="e.g. Confirm with the site lead" value={form.nextAction} onChange={(e) => set("nextAction", e.target.value)} />
           </Field>
           <div className="od-form-foot">
             <DialogClose render={<button type="button" className="btn btn-outline" />}>Cancel</DialogClose>

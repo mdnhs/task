@@ -1,10 +1,10 @@
 [
-  {"path": "/", "expect": ["Your day", "Summarise my day", "Play my day", "Dismiss for today", "Waiting for my review", "Team today", "missing shift reports", "shift reports to review", "href=\"/tasks?status=review\"", "href=\"/tasks?due=overdue&amp;assignee=p-lilianna\""], "notExpect": ["Open your day"]},
-  {"path": "/", "cookies": {"od-today-dismissed": "p-lilianna%7C2026-10-20"}, "expect": ["Open your day", "overdue"], "notExpect": ["Summarise my day"]},
-  {"path": "/", "cookies": {"od-today-dismissed": "p-lilianna%7C2026-10-19"}, "expect": ["Summarise my day"], "notExpect": ["Open your day"]},
-  {"path": "/", "cookies": {"od-today-auto": "0"}, "expect": ["Open your day"], "notExpect": ["Summarise my day"]},
+  {"path": "/", "expect": ["Your day", "Summarise my day", "Play my day", "Waiting for my review", "Team today", "reports missing", "reports to review", "href=\"/tasks?status=review\"", "href=\"/tasks?due=overdue&amp;assignee=p-lilianna\"", "Close your day"], "cookies": {"od-today-auto": "1"}},
+  {"path": "/", "cookies": {"od-today-dismissed": "p-lilianna%7C2026-10-20"}, "expect": ["Open your day", "overdue"], "notExpect": ["Close your day"]},
+  {"path": "/", "cookies": {"od-today-dismissed": "p-lilianna%7C2026-10-19", "od-today-auto": "1"}, "expect": ["Summarise my day", "Close your day"]},
+  {"path": "/", "cookies": {"od-today-auto": "0"}, "expect": ["Open your day"], "notExpect": ["Close your day"]},
   {"path": "/", "cookies": {"od-role": "employee"}, "expect": ["Your day", "Summarise my day", "Play my day", "href=\"/tasks?status=open&amp;priority=3&amp;assignee=p-daniel\"", "href=\"/tasks?status=open&amp;due=today&amp;assignee=p-daniel\""], "notExpect": ["Waiting for my review", "Team today"]},
-  {"path": "/", "cookies": {"od-role": "employee", "od-today-dismissed": "p-daniel%7C2026-10-20"}, "expect": ["Open your day"], "notExpect": ["Summarise my day"]},
+  {"path": "/", "cookies": {"od-role": "employee", "od-today-dismissed": "p-daniel%7C2026-10-20"}, "expect": ["Open your day"], "notExpect": ["Close your day"]},
   {"path": "/", "cookies": {"od-role": "manager"}, "expect": ["Summarise my day", "Team today"]},
   {"path": "/account/notifications", "expect": ["Show the Today card automatically", "Your day is ready"]}
 ]

@@ -1,10 +1,12 @@
 "use client"
 
 import { useState } from "react"
+import { Phone, UserRound } from "lucide-react"
 import { z } from "zod"
 
 import { Field } from "@/components/field"
 import { FilterSelect } from "@/components/filter-bar"
+import { FoldToggle, FormFold, FormSection } from "@/components/form-section"
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 
@@ -39,6 +41,7 @@ export function AddCandidateDialog({
   const blank = (): Form => ({ name: "", role: "", dept: defaultDept, owner: "", email: "", phone: "", nextAction: "" })
   const [form, setForm] = useState<Form>(blank)
   const [errors, setErrors] = useState<Partial<Record<keyof Form, string>>>({})
+  const [showNext, setShowNext] = useState(false)
   const set = <K extends keyof Form>(k: K, v: Form[K]) => {
     setForm((f) => ({ ...f, [k]: v }))
     setErrors((e) => (e[k] ? { ...e, [k]: undefined } : e))
@@ -49,6 +52,7 @@ export function AddCandidateDialog({
     if (!o) {
       setForm(blank())
       setErrors({})
+      setShowNext(false)
     }
   }
 
@@ -68,41 +72,54 @@ export function AddCandidateDialog({
     close(false)
   }
 
+  // Next action starts folded; an error inside opens it.
+  const nextOpen = showNext || !!errors.nextAction
+
   return (
     <Dialog open={open} onOpenChange={close}>
       <DialogContent className="od-dialog od-form-dialog" showCloseButton={false}>
         <DialogHeader>
           <DialogTitle>Add candidate</DialogTitle>
-          <DialogDescription>New candidates start at the Applied stage. Contact details are only visible to recruitment and management users.</DialogDescription>
+          <DialogDescription>New candidates start at Applied.</DialogDescription>
         </DialogHeader>
         <form className="od-form" onSubmit={submit} noValidate>
-          <div className="od-row2">
-            <Field label="Name" htmlFor="rc-name" error={errors.name} required>
-              <Input id="rc-name" value={form.name} onChange={(e) => set("name", e.target.value)} />
-            </Field>
-            <Field label="Role applied" htmlFor="rc-role" error={errors.role} required>
-              <Input id="rc-role" value={form.role} onChange={(e) => set("role", e.target.value)} />
-            </Field>
-          </div>
-          <div className="od-row2">
-            <Field label="Department" htmlFor="rc-dept" error={errors.dept} required>
-              <FilterSelect label="Department" value={form.dept} options={departments.map((d) => ({ value: d, label: d }))} onChange={(v) => set("dept", v)} />
-            </Field>
-            <Field label="Owner" htmlFor="rc-owner" error={errors.owner} required>
-              <FilterSelect label="Owner" value={form.owner} options={[{ value: "", label: "Choose…" }, ...owners.map((o) => ({ value: o, label: o }))]} onChange={(v) => set("owner", v)} />
-            </Field>
-          </div>
-          <div className="od-row2">
-            <Field label="Email" htmlFor="rc-email" error={errors.email} required>
-              <Input id="rc-email" type="email" value={form.email} onChange={(e) => set("email", e.target.value)} />
-            </Field>
-            <Field label="Phone" htmlFor="rc-phone" error={errors.phone} required>
-              <Input id="rc-phone" type="tel" value={form.phone} onChange={(e) => set("phone", e.target.value)} />
-            </Field>
-          </div>
-          <Field label="Next action (optional)" htmlFor="rc-next" error={errors.nextAction}>
-            <Input id="rc-next" value={form.nextAction} onChange={(e) => set("nextAction", e.target.value)} />
-          </Field>
+          <FormSection
+            icon={UserRound}
+            title="Candidate"
+            action={<FoldToggle open={nextOpen} onToggle={() => setShowNext((v) => !v)} controls="rc-next-fold" label="Next action" />}
+          >
+            <div className="od-row2">
+              <Field label="Name" htmlFor="rc-name" error={errors.name} required>
+                <Input id="rc-name" value={form.name} onChange={(e) => set("name", e.target.value)} />
+              </Field>
+              <Field label="Role applied" htmlFor="rc-role" error={errors.role} required>
+                <Input id="rc-role" placeholder="e.g. Supervisor" value={form.role} onChange={(e) => set("role", e.target.value)} />
+              </Field>
+            </div>
+            <div className="od-row2">
+              <Field label="Department" htmlFor="rc-dept" error={errors.dept} required>
+                <FilterSelect label="Department" value={form.dept} options={departments.map((d) => ({ value: d, label: d }))} onChange={(v) => set("dept", v)} />
+              </Field>
+              <Field label="Owner" htmlFor="rc-owner" error={errors.owner} required>
+                <FilterSelect label="Owner" value={form.owner} options={[{ value: "", label: "Choose…" }, ...owners.map((o) => ({ value: o, label: o }))]} onChange={(v) => set("owner", v)} />
+              </Field>
+            </div>
+            <FormFold id="rc-next-fold" open={nextOpen}>
+              <Field label="Next action" htmlFor="rc-next" error={errors.nextAction}>
+                <Input id="rc-next" placeholder="e.g. Book an interview" value={form.nextAction} onChange={(e) => set("nextAction", e.target.value)} />
+              </Field>
+            </FormFold>
+          </FormSection>
+          <FormSection icon={Phone} title="Contact" note="Recruitment & managers only">
+            <div className="od-row2">
+              <Field label="Email" htmlFor="rc-email" error={errors.email} required>
+                <Input id="rc-email" type="email" value={form.email} onChange={(e) => set("email", e.target.value)} />
+              </Field>
+              <Field label="Phone" htmlFor="rc-phone" error={errors.phone} required>
+                <Input id="rc-phone" type="tel" value={form.phone} onChange={(e) => set("phone", e.target.value)} />
+              </Field>
+            </div>
+          </FormSection>
           <div className="od-form-foot">
             <DialogClose render={<button type="button" className="btn btn-outline" />}>Cancel</DialogClose>
             <button type="submit" className="btn btn-primary">Add candidate</button>

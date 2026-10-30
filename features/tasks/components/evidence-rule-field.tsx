@@ -33,7 +33,7 @@ export function EvidenceRuleField({ id, value, onChange, people, error }: { id: 
           </div>
           <div className="od-row2">
             {value.mode === "required" && (
-              <Field label="Minimum items" htmlFor={`${id}-min`} hint={`1 to ${MAX_MIN}`}>
+              <Field label="At least" htmlFor={`${id}-min`} hint={`1 to ${MAX_MIN} items`}>
                 <Input id={`${id}-min`} type="number" inputMode="numeric" min={1} max={MAX_MIN} value={String(value.min)} onChange={(e) => set({ min: Number(e.target.value) })} />
               </Field>
             )}
@@ -51,8 +51,8 @@ export function EvidenceRuleField({ id, value, onChange, people, error }: { id: 
               />
             </Field>
           )}
-          <Field label="Instruction" htmlFor={`${id}-ins`} hint='e.g. "Photo of the cleaned area, wide angle"'>
-            <Input id={`${id}-ins`} value={value.instruction} maxLength={200} onChange={(e) => set({ instruction: e.target.value })} />
+          <Field label="Instruction" htmlFor={`${id}-ins`}>
+            <Input id={`${id}-ins`} placeholder="e.g. Wide photo of the cleaned area" value={value.instruction} maxLength={200} onChange={(e) => set({ instruction: e.target.value })} />
           </Field>
         </>
       )}

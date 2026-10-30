@@ -2,13 +2,15 @@
 
 import { useState } from "react"
 import Link from "next/link"
+import { Bookmark, CalendarClock, FileText, ShieldCheck, SlidersHorizontal, Users } from "lucide-react"
 import { toast } from "sonner"
 import { z } from "zod"
 
 import { ConfirmDialog } from "@/components/confirm-dialog"
 import { DatePicker } from "@/components/date-picker"
 import { Field } from "@/components/field"
-import { FilterSelect } from "@/components/filter-bar"
+import { FilterSeg, FilterSelect } from "@/components/filter-bar"
+import { FoldToggle, FormFold, FormSection, PeoplePicker } from "@/components/form-section"
 import { Textarea } from "@/components/ui/textarea"
 import { TimePicker } from "@/components/time-picker"
 import { Input } from "@/components/ui/input"
@@ -20,7 +22,6 @@ import { tasksStore, templatesStore } from "../store"
 import { applyTemplate, describeOffset, nextTemplateId, templateFromForm } from "../templates"
 import type { EvidenceRule, Person, Project, Task, TaskTemplate } from "../types"
 import { EvidenceRuleField } from "./evidence-rule-field"
-import { PeopleChips } from "./schedule-dialogs"
 import { NO_REPEAT, RepeatField, draftToRule, type RepeatDraft } from "./repeat-field"
 
 // FR-TASK-01 fields. Dates are ISO local wall-clock strings, like the rest of the mock data.
@@ -44,6 +45,9 @@ const schema = z
   .refine((v) => !v.start || !v.dueDate || v.dueDate >= v.start, { path: ["dueDate"], message: "Due date can't be before the start date" })
 
 type Form = z.input<typeof schema>
+
+const PRIORITIES: { value: Form["priority"]; label: string }[] = [{ value: "1", label: "Low" }, { value: "2", label: "Medium" }, { value: "3", label: "High" }]
+
 type Errors = Partial<Record<keyof Form, string>>
 
 export function nextRef(tasks: Task[], floor = 0): string {
@@ -95,6 +99,7 @@ export function NewTaskForm({
   const [repeat, setRepeat] = useState<RepeatDraft>(NO_REPEAT)
   const [repeatErr, setRepeatErr] = useState("")
   const [others, setOthers] = useState<string[]>([])
+  const [showMore, setShowMore] = useState(false)
   // Voice instructions (lib/task-voice.ts). Not part of `form`, so templates never copy it.
   const [voice, setVoice] = useState<VoiceDraft | null>(null)
   // Set once the task is stored: the page is navigating away, so a second click must not create a duplicate.
@@ -177,7 +182,7 @@ export function NewTaskForm({
     onCreated(state.ref)
   }
 
-  function useTemplate(id: string) {
+  function pickTemplate(id: string) {
     setTplId(id)
     const t = tpls.find((x) => x.id === id)
     if (!t) return
@@ -201,6 +206,8 @@ export function NewTaskForm({
   }
 
   const pickedProject = projects.find((p) => p.id === form.project)
+  // "More" starts folded; an error inside it opens it so the message is seen.
+  const moreOpen = showMore || !!errors.estimate
   const err = (k: keyof Form) => errors[k]
   const clear = (k: keyof Form) => errors[k] && setErrors((e) => ({ ...e, [k]: undefined }))
 
@@ -209,107 +216,130 @@ export function NewTaskForm({
       <form className="od-form nt-form" onSubmit={submit} noValidate>
         <div className="od-form-cols">
           <div className="od-form-col">
-            {(tpls.length > 0 || canManageTemplates) && (
-              <div className="tpl-bar">
-                {tpls.length > 0 && (
-                  <div className="tpl-row">
-                    <Field label="Use template" htmlFor="nt-tpl">
-                      <FilterSelect
-                        label="Use template"
-                        value={tplId}
-                        options={[{ value: "", label: "Start from scratch" }, ...tpls.map((t) => ({ value: t.id, label: t.name }))]}
-                        onChange={useTemplate}
-                      />
-                    </Field>
-                    {picked && canManageTemplates && <button type="button" className="tpl-link bad" onClick={() => setDeleting(true)}>Delete template</button>}
+            <FormSection
+              icon={FileText}
+              title="Task"
+              action={canManageTemplates && !saving && (
+                <button type="button" className="fs-act" onClick={() => setSaving(true)}>
+                  <Bookmark aria-hidden="true" />
+                  Save as template
+                </button>
+              )}
+            >
+              {tpls.length > 0 && (
+                <div className="nt-tpl">
+                  <span className="fs-label" id="nt-tpl-l">Templates</span>
+                  <div className="er-types" role="group" aria-labelledby="nt-tpl-l">
+                    <button type="button" className="rp-day" aria-pressed={tplId === ""} onClick={() => pickTemplate("")}>
+                      No template
+                    </button>
+                    {tpls.map((t) => (
+                      <button key={t.id} type="button" className="rp-day nt-tpl-chip" aria-pressed={tplId === t.id} onClick={() => pickTemplate(t.id)}>
+                        <Bookmark aria-hidden="true" />
+                        {t.name}
+                      </button>
+                    ))}
                   </div>
-                )}
-                {picked && <p className="tpl-note">Due {describeOffset(picked)} after the start date. You can still change everything below.</p>}
-                {canManageTemplates && !saving && <button type="button" className="tpl-link" style={{ alignSelf: "flex-start" }} onClick={() => setSaving(true)}>Save this form as a template</button>}
-                {canManageTemplates && saving && (
-                  <div className="tpl-row">
-                    <Field label="Template name" htmlFor="nt-tplname" error={tplError || undefined}>
-                      <Input id="nt-tplname" value={tplName} onChange={(e) => { setTplName(e.target.value); setTplError("") }} />
-                    </Field>
-                    <button type="button" className="btn btn-primary" onClick={saveTemplate}>Save template</button>
-                    <button type="button" className="tpl-link" onClick={() => { setSaving(false); setTplError("") }}>Cancel</button>
-                  </div>
-                )}
+                  {picked && (
+                    <p className="tpl-note">
+                      Due {describeOffset(picked)} after the start date
+                      {canManageTemplates && <> · <button type="button" className="tpl-link bad" onClick={() => setDeleting(true)}>Delete</button></>}
+                    </p>
+                  )}
+                </div>
+              )}
+              {canManageTemplates && saving && (
+                <div className="tpl-row">
+                  <Field label="Template name" htmlFor="nt-tplname" error={tplError || undefined}>
+                    <Input id="nt-tplname" autoFocus value={tplName} onChange={(e) => { setTplName(e.target.value); setTplError("") }} />
+                  </Field>
+                  <button type="button" className="btn btn-primary" onClick={saveTemplate}>Save</button>
+                  <button type="button" className="tpl-link" onClick={() => { setSaving(false); setTplError("") }}>Cancel</button>
+                </div>
+              )}
+              <Field label="Title" htmlFor="nt-title" error={err("title")} required>
+                <Input id="nt-title" value={form.title} onChange={(e) => { set("title", e.target.value); clear("title") }} />
+              </Field>
+              <Field label="Description" htmlFor="nt-desc" error={err("description")} required>
+                <Textarea id="nt-desc" value={form.description} onChange={(e) => { set("description", e.target.value); clear("description") }} />
+              </Field>
+              <div className="od-field nt-voice">
+                <span className="fs-label">Voice instructions <span className="fs-opt">Optional</span></span>
+                <VoiceRecorder id="nt-voice" value={voice} onChange={setVoice} hint="Up to 2 min · the assignee plays it on the task" />
               </div>
-            )}
-            <Field label="Title" htmlFor="nt-title" error={err("title")} required>
-              <Input id="nt-title" value={form.title} onChange={(e) => { set("title", e.target.value); clear("title") }} />
-            </Field>
-            <Field label="Description" htmlFor="nt-desc" error={err("description")} required>
-              <Textarea id="nt-desc" value={form.description} onChange={(e) => { set("description", e.target.value); clear("description") }} />
-            </Field>
-            <div className="od-row2">
-              <Field label="Department" htmlFor="nt-dept" error={err("dept")} required>
-                <FilterSelect label="Department" value={form.dept} options={departments.map((d) => ({ value: d, label: d }))} onChange={(v) => { set("dept", v); clear("dept") }} />
-              </Field>
-              <Field label="Assignee" htmlFor="nt-assignee" error={err("assignee")} required>
-                <FilterSelect
-                  label="Assignee"
-                  value={form.assignee}
-                  options={[{ value: "", label: "Choose…" }, ...people.map((p) => ({ value: p.id, label: p.name }))]}
-                  onChange={(v) => { set("assignee", v); clear("assignee") }}
-                />
-              </Field>
-            </div>
-            <div className="od-row2">
-              <Field label="Priority" htmlFor="nt-prio">
-                <FilterSelect
-                  label="Priority"
-                  value={form.priority}
-                  options={[{ value: "1", label: "Low" }, { value: "2", label: "Medium" }, { value: "3", label: "High" }]}
-                  onChange={(v) => set("priority", v as Form["priority"])}
-                />
-              </Field>
-              <Field label="Client (optional)" htmlFor="nt-client">
-                <Input id="nt-client" value={form.client} onChange={(e) => set("client", e.target.value)} />
-              </Field>
-            </div>
-            <div className="od-row3">
-              <Field label="Start date" htmlFor="nt-start" error={err("start")} required>
-                <DatePicker label="Start date" value={form.start} today={today} placeholder="Pick a start date" onChange={(v) => { set("start", v); clear("start") }} />
-              </Field>
-              <Field label="Due date" htmlFor="nt-due" error={err("dueDate")} required>
-                <DatePicker label="Due date" value={form.dueDate} today={today} min={form.start} placeholder="Pick a due date" onChange={(v) => { set("dueDate", v); clear("dueDate") }} />
-              </Field>
-              <Field label="Due time" htmlFor="nt-time" error={err("dueTime")} required>
-                <TimePicker label="Due time" value={form.dueTime} onChange={(v) => { set("dueTime", v); clear("dueTime") }} />
-              </Field>
-            </div>
+            </FormSection>
+            <FormSection icon={CalendarClock} title="Schedule">
+              <div className="od-row3">
+                <Field label="Start date" htmlFor="nt-start" error={err("start")} required>
+                  <DatePicker label="Start date" value={form.start} today={today} placeholder="Pick a start date" onChange={(v) => { set("start", v); clear("start") }} />
+                </Field>
+                <Field label="Due date" htmlFor="nt-due" error={err("dueDate")} required>
+                  <DatePicker label="Due date" value={form.dueDate} today={today} min={form.start} placeholder="Pick a due date" onChange={(v) => { set("dueDate", v); clear("dueDate") }} />
+                </Field>
+                <Field label="Due time" htmlFor="nt-time" error={err("dueTime")} required>
+                  <TimePicker label="Due time" value={form.dueTime} onChange={(v) => { set("dueTime", v); clear("dueTime") }} />
+                </Field>
+              </div>
+              <RepeatField id="nt-rp" value={repeat} onChange={(v) => { setRepeat(v); setRepeatErr("") }} today={today} min={form.dueDate || form.start} error={repeatErr} />
+            </FormSection>
           </div>
           <div className="od-form-col">
-            <RepeatField id="nt-rp" value={repeat} onChange={(v) => { setRepeat(v); setRepeatErr("") }} today={today} min={form.dueDate || form.start} error={repeatErr} />
-            <Field label="Labels" htmlFor="nt-tags" hint="Separate with commas">
-              <Input id="nt-tags" value={form.tags} onChange={(e) => set("tags", e.target.value)} />
-            </Field>
-            <Field label="Also assigned (optional)" htmlFor="nt-others" hint="Several people can work on one task">
-              <PeopleChips people={people.filter((p) => p.id !== form.assignee)} value={others.filter((o) => o !== form.assignee)} onChange={setOthers} label="Also assigned" />
-            </Field>
-            <div className="od-row2">
-              <Field label="Estimate in minutes (optional)" htmlFor="nt-est" error={err("estimate")}>
-                <Input id="nt-est" inputMode="numeric" value={form.estimate} onChange={(e) => { set("estimate", e.target.value); clear("estimate") }} />
-              </Field>
-              {projects.length > 0 && (
-                <Field label="Project (optional)" htmlFor="nt-project">
-                  <FilterSelect label="Project" value={form.project} options={[{ value: "", label: "No project" }, ...projects.map((p) => ({ value: p.id, label: p.name }))]} onChange={(v) => { set("project", v); set("milestone", "") }} />
+            <FormSection icon={Users} title="People">
+              <div className="od-row2">
+                <Field label="Department" htmlFor="nt-dept" error={err("dept")} required>
+                  <FilterSelect label="Department" value={form.dept} options={departments.map((d) => ({ value: d, label: d }))} onChange={(v) => { set("dept", v); clear("dept") }} />
                 </Field>
-              )}
-            </div>
-            {pickedProject && pickedProject.milestones.length > 0 && (
-              <Field label="Milestone (optional)" htmlFor="nt-ms">
-                <FilterSelect label="Milestone" value={form.milestone} options={[{ value: "", label: "No milestone" }, ...pickedProject.milestones.map((m) => ({ value: m.id, label: `${m.name} · ${m.due}` }))]} onChange={(v) => set("milestone", v)} />
+                <Field label="Assignee" htmlFor="nt-assignee" error={err("assignee")} required>
+                  <FilterSelect
+                    label="Assignee"
+                    value={form.assignee}
+                    options={[{ value: "", label: "Choose…" }, ...people.map((p) => ({ value: p.id, label: p.name }))]}
+                    onChange={(v) => { set("assignee", v); clear("assignee") }}
+                  />
+                </Field>
+              </div>
+              <Field label="Also assigned" htmlFor="nt-others">
+                <PeoplePicker people={people} value={others} onChange={setOthers} label="Also assigned" exclude={[form.assignee]} />
               </Field>
-            )}
-            <EvidenceRuleField id="nt-ev" value={form.evidenceRule} onChange={(r) => { set("evidenceRule", r); clear("evidenceRule") }} people={people} error={err("evidenceRule")} />
-            <fieldset className="er-field vn-field" aria-describedby="nt-voice-msg">
-              <legend className="er-legend">Voice instructions (optional)</legend>
-              <VoiceRecorder id="nt-voice" value={voice} onChange={setVoice} />
-              <p id="nt-voice-msg" className="tpl-note">Up to 2 minutes. The assignee can play it on the task.</p>
-            </fieldset>
+              <div className="od-field nt-prio">
+                <span className="fs-label">Priority</span>
+                <FilterSeg label="Priority" value={form.priority} options={PRIORITIES} onChange={(v) => set("priority", v)} />
+              </div>
+            </FormSection>
+            <FormSection
+              icon={SlidersHorizontal}
+              title="More"
+              action={<FoldToggle open={moreOpen} onToggle={() => setShowMore((v) => !v)} controls="nt-more" label="Client, labels, estimate" />}
+            >
+              <FormFold id="nt-more" open={moreOpen}>
+                <div className="od-row2">
+                  <Field label="Client" htmlFor="nt-client">
+                    <Input id="nt-client" value={form.client} onChange={(e) => set("client", e.target.value)} />
+                  </Field>
+                  <Field label="Estimate (min)" htmlFor="nt-est" error={err("estimate")}>
+                    <Input id="nt-est" inputMode="numeric" placeholder="e.g. 90" value={form.estimate} onChange={(e) => { set("estimate", e.target.value); clear("estimate") }} />
+                  </Field>
+                </div>
+                <div className="od-row2">
+                  <Field label="Labels" htmlFor="nt-tags">
+                    <Input id="nt-tags" placeholder="e.g. lobby, urgent" value={form.tags} onChange={(e) => set("tags", e.target.value)} />
+                  </Field>
+                  {projects.length > 0 && (
+                    <Field label="Project" htmlFor="nt-project">
+                      <FilterSelect label="Project" value={form.project} options={[{ value: "", label: "No project" }, ...projects.map((p) => ({ value: p.id, label: p.name }))]} onChange={(v) => { set("project", v); set("milestone", "") }} />
+                    </Field>
+                  )}
+                </div>
+                {pickedProject && pickedProject.milestones.length > 0 && (
+                  <Field label="Milestone" htmlFor="nt-ms">
+                    <FilterSelect label="Milestone" value={form.milestone} options={[{ value: "", label: "No milestone" }, ...pickedProject.milestones.map((m) => ({ value: m.id, label: `${m.name} · ${m.due}` }))]} onChange={(v) => set("milestone", v)} />
+                  </Field>
+                )}
+              </FormFold>
+            </FormSection>
+            <FormSection icon={ShieldCheck} title="Proof of completion" className="nt-ev">
+              <EvidenceRuleField id="nt-ev" value={form.evidenceRule} onChange={(r) => { set("evidenceRule", r); clear("evidenceRule") }} people={people} error={err("evidenceRule")} />
+            </FormSection>
           </div>
         </div>
         <div className="od-form-foot">

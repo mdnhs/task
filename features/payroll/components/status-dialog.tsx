@@ -5,7 +5,6 @@ import { z } from "zod"
 
 import { ActionButton } from "@/components/action-button"
 import { Field } from "@/components/field"
-import { FilterSelect } from "@/components/filter-bar"
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
 import { STATUS, STATUS_ORDER } from "../types"
@@ -52,22 +51,30 @@ export function StatusDialog({
           <DialogDescription>{issue ? `${issue.ref} · ${issue.staff}` : "Change the status of this issue."}</DialogDescription>
         </DialogHeader>
         <form className="od-form" onSubmit={submit} noValidate>
-          <Field label="Status" htmlFor="pay-status" error={errors.status} required>
-            <FilterSelect
-              label="Status"
-              value={status}
-              options={STATUS_ORDER.map((s) => ({ value: s, label: STATUS[s].label }))}
-              onChange={(v) => { setStatus(v); setErrors({}) }}
+          <div className="od-field" data-invalid={errors.status ? "" : undefined}>
+            <label id="pay-status-l">
+              Status<span className="od-req" aria-hidden="true"> *</span>
+            </label>
+            <div className="er-types" role="group" aria-labelledby="pay-status-l" aria-describedby={errors.status ? "pay-status-msg" : undefined}>
+              {STATUS_ORDER.map((s) => (
+                <button key={s} type="button" className="rp-day" aria-pressed={status === s} onClick={() => { setStatus(s); setErrors({}) }}>
+                  {STATUS[s].label}
+                </button>
+              ))}
+            </div>
+            {errors.status && (
+              <div className="od-field-msg is-enter">
+                <p id="pay-status-msg" className="od-field-err" role="alert">{errors.status}</p>
+              </div>
+            )}
+          </div>
+          <Field label={resolving ? "Resolution note" : "Note"} htmlFor="pay-note" error={errors.note} required={resolving}>
+            <Textarea
+              id="pay-note"
+              placeholder={resolving ? "e.g. Paid in the next run" : undefined}
+              value={note}
+              onChange={(e) => { setNote(e.target.value); setErrors((x) => ({ ...x, note: undefined })) }}
             />
-          </Field>
-          <Field
-            label={resolving ? "Resolution note" : "Note"}
-            htmlFor="pay-note"
-            error={errors.note}
-            hint={resolving ? "Say how this was resolved." : "Optional."}
-            required={resolving}
-          >
-            <Textarea id="pay-note" value={note} onChange={(e) => { setNote(e.target.value); setErrors((x) => ({ ...x, note: undefined })) }} />
           </Field>
           <div className="od-form-foot">
             <DialogClose render={<button type="button" className="btn btn-outline" />}>Cancel</DialogClose>

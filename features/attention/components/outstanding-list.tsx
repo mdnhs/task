@@ -168,17 +168,17 @@ function OutstandingDialog({
         </DialogHeader>
         <form className="od-form" onSubmit={submit} noValidate>
           {mode === "update" ? (
-            <>
+            <div className="od-row2">
               <Field label="Next action" htmlFor="out-next" error={errors.nextAction} required>
                 <Input id="out-next" value={nextAction} onChange={(e) => { setNextAction(e.target.value); setErrors((x) => ({ ...x, nextAction: undefined })) }} />
               </Field>
               <Field label="Target date" htmlFor="out-target" error={errors.target} required>
                 <DatePicker label="Target date" value={date} today={today} min={today.slice(0, 10)} placeholder="Pick a target date" onChange={(v) => { setDate(v); setErrors((x) => ({ ...x, target: undefined })) }} />
               </Field>
-            </>
+            </div>
           ) : (
-            <Field label="Resolution note" htmlFor="out-res" error={errors.resolution} hint="Say how this was resolved." required>
-              <Textarea id="out-res" value={resolution} onChange={(e) => { setResolution(e.target.value); setErrors((x) => ({ ...x, resolution: undefined })) }} />
+            <Field label="Resolution note" htmlFor="out-res" error={errors.resolution} required>
+              <Textarea id="out-res" placeholder="e.g. Fixed by the day team" value={resolution} onChange={(e) => { setResolution(e.target.value); setErrors((x) => ({ ...x, resolution: undefined })) }} />
             </Field>
           )}
           <div className="od-form-foot">

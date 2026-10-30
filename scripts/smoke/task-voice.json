@@ -1,4 +1,4 @@
 [
-  {"path": "/tasks/new", "expect": ["Voice instructions (optional)", "Up to 2 minutes. The assignee can play it on the task.", "Create task"], "notExpect": ["Access restricted"]},
-  {"path": "/tasks/new", "cookies": {"od-role": "employee"}, "expect": ["Voice instructions (optional)"], "notExpect": ["Access restricted"]}
+  {"path": "/tasks/new", "expect": ["Voice instructions", "Up to 2 min · the assignee plays it on the task", "Create task"], "notExpect": ["Access restricted"]},
+  {"path": "/tasks/new", "cookies": {"od-role": "employee"}, "expect": ["Voice instructions"], "notExpect": ["Access restricted"]}
 ]

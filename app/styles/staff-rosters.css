@@ -57,3 +57,5 @@
 /* Gaps skeleton: meta lines keep their own width (they share a wrapping row ≤760); at ≤640 the seeded shift line wraps to 2 lines */
 .sr-meta .sk-line{width:auto}
 @media (max-width:640px){.sr-main .sk-line:has(> .sk-sum2){height:38px !important}}
+/* Forms (ui-rules 32): a FilterSeg field keeps its natural width; its label row shakes like a Field's control when invalid */
+.sr-seg .seg.od-seg{align-self:flex-start}

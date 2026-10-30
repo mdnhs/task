@@ -5,6 +5,7 @@ import { z } from "zod"
 
 import { Field } from "@/components/field"
 import { FilterSelect } from "@/components/filter-bar"
+import { FoldToggle, FormFold } from "@/components/form-section"
 import { TimePicker } from "@/components/time-picker"
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
@@ -69,6 +70,7 @@ export function PatternDialog({
   })
   const [form, setForm] = useState<Form>(initial)
   const [errors, setErrors] = useState<Errors>({})
+  const [showZone, setShowZone] = useState(() => !!initial().timeZone)
   const [seen, setSeen] = useState({ id: pattern?.id, open })
   // Reload the form when the dialog opens or another pattern is opened.
   if (seen.id !== pattern?.id || seen.open !== open) {
@@ -76,6 +78,7 @@ export function PatternDialog({
     if (open) {
       setForm(initial())
       setErrors({})
+      setShowZone(!!initial().timeZone)
     }
   }
   const zones = useMemo(() => zoneOptions(tz), [tz])
@@ -110,6 +113,8 @@ export function PatternDialog({
   }
 
   const night = isHm(form.start) && isHm(form.end) && crossesMidnight(form)
+  // The time zone is rarely changed: folded unless the pattern has its own zone; an error inside opens it.
+  const zoneOpen = showZone || !!errors.timeZone
   const endHint = night ? (form.start === form.end ? "A 24-hour shift: ends at this time the next day." : "Ends the next day (night shift).") : undefined
 
   return (
@@ -117,12 +122,12 @@ export function PatternDialog({
       <DialogContent className="od-dialog od-form-dialog" showCloseButton={false}>
         <DialogHeader>
           <DialogTitle>{pattern ? "Edit shift pattern" : "New shift pattern"}</DialogTitle>
-          <DialogDescription>Times are in the pattern&apos;s time zone. A shift belongs to the day it starts.</DialogDescription>
+          <DialogDescription>A shift belongs to the day it starts.</DialogDescription>
         </DialogHeader>
         <form className="od-form" onSubmit={submit} noValidate>
           <div className="od-row2">
             <Field label="Name" htmlFor="sh-name" error={errors.name} required>
-              <Input id="sh-name" value={form.name} onChange={(e) => set("name", e.target.value)} />
+              <Input id="sh-name" placeholder="e.g. Early" value={form.name} onChange={(e) => set("name", e.target.value)} />
             </Field>
             <Field label="Team" htmlFor="sh-team" error={errors.team} required>
               <FilterSelect label="Team" value={form.team} options={teams.map((t) => ({ value: t, label: t }))} onChange={(v) => set("team", v)} />
@@ -153,9 +158,14 @@ export function PatternDialog({
               </div>
             )}
           </div>
-          <Field label="Time zone" htmlFor="sh-tz" error={errors.timeZone} hint="Only change this for a site in another time zone.">
-            <FilterSelect label="Time zone" value={form.timeZone} options={zones} onChange={(v) => set("timeZone", v)} />
-          </Field>
+          <div className="sh-zone">
+            <FoldToggle open={zoneOpen} onToggle={() => setShowZone((v) => !v)} controls="sh-tz-fold" label={`Time zone · ${form.timeZone || tz}`} />
+          </div>
+          <FormFold id="sh-tz-fold" open={zoneOpen}>
+            <Field label="Time zone" htmlFor="sh-tz" error={errors.timeZone} hint="Only for a site in another time zone">
+              <FilterSelect label="Time zone" value={form.timeZone} options={zones} onChange={(v) => set("timeZone", v)} />
+            </Field>
+          </FormFold>
           <div className="od-form-foot">
             <DialogClose render={<button type="button" className="btn btn-outline" />}>Cancel</DialogClose>
             <button type="submit" className="btn btn-primary">{pattern ? "Save" : "Create pattern"}</button>

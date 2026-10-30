@@ -4,8 +4,8 @@ import { useState } from "react"
 
 import { ActionButton } from "@/components/action-button"
 import { Field } from "@/components/field"
+import { FilterSeg } from "@/components/filter-bar"
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Textarea } from "@/components/ui/textarea"
 
 export type Outcome = "approved" | "rejected" | "deferred"
@@ -53,16 +53,12 @@ export function DecideDialog({
           <DialogDescription>{item ? `${item.title} · raised by ${item.by}` : ""}</DialogDescription>
         </DialogHeader>
         <form className="od-form" onSubmit={submit} noValidate>
-          <RadioGroup value={outcome} onValueChange={(v) => setOutcome(v as Outcome)} className="decide-opts" aria-label="Decision">
-            {OUTCOMES.map((o) => (
-              <label key={o.value} className="decide-opt">
-                <RadioGroupItem value={o.value} />
-                {o.label}
-              </label>
-            ))}
-          </RadioGroup>
+          <div className="od-field decide-seg">
+            <span className="fs-label">Decision</span>
+            <FilterSeg<Outcome> label="Decision" value={outcome} options={OUTCOMES} onChange={setOutcome} />
+          </div>
           <Field label="Decision note" htmlFor="decide-note" error={noteErr} required>
-            <Textarea id="decide-note" value={note} onChange={(e) => { setNote(e.target.value); setNoteErr(undefined) }} />
+            <Textarea id="decide-note" placeholder="e.g. Approved for this week only" value={note} onChange={(e) => { setNote(e.target.value); setNoteErr(undefined) }} />
           </Field>
           <div className="od-form-foot">
             <DialogClose render={<button type="button" className="btn btn-outline" />}>Cancel</DialogClose>

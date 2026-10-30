@@ -2,12 +2,14 @@
 
 import { useState, useSyncExternalStore } from "react"
 import Link from "next/link"
+import { ArrowLeftRight, CalendarCheck, CalendarPlus, Layers, ShieldCheck, Trash2 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 
 import { EmptyState } from "@/components/empty-state"
 import { Field } from "@/components/field"
 import { FilterSeg } from "@/components/filter-bar"
+import { FormSection } from "@/components/form-section"
 import { PageHead } from "@/components/page-head"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -33,7 +35,7 @@ function Back({ t, to, label }: { t: PlatformTenant; to: Parameters<typeof tenan
 
 function ReasonField({ value, onChange, error }: { value: string; onChange(v: string): void; error?: string }) {
   return (
-    <Field label="Reason" htmlFor="pf-form-reason" error={error} hint={`At least ${REASON_MIN} characters. Saved in the audit trail.`} required>
+    <Field label="Reason" htmlFor="pf-form-reason" error={error} hint={`At least ${REASON_MIN} characters · audit trail`} required>
       <Textarea id="pf-form-reason" value={value} rows={3} maxLength={300} onChange={(e) => onChange(e.target.value)} />
     </Field>
   )
@@ -92,8 +94,9 @@ export function ChangePlanView({ head, modules, ctx }: { head: T360Head; modules
       <form className="card pf-form od-form" onSubmit={submit} noValidate aria-label="Change plan">
         <div className="od-form-cols">
           <div className="od-form-col">
+            <FormSection icon={Layers} title="New plan">
             <fieldset className="pf-plan-pick">
-              <legend>New plan</legend>
+              <legend className="sr-only">New plan</legend>
               {choices.map((p) => {
                 const isCurrent = p.id === t.plan
                 return (
@@ -110,10 +113,11 @@ export function ChangePlanView({ head, modules, ctx }: { head: T360Head; modules
                 )
               })}
             </fieldset>
+            </FormSection>
           </div>
           <div className="od-form-col">
+            <FormSection icon={ArrowLeftRight} title="What changes">
             <div className="pf-form-sum" aria-live="polite">
-              <h3 className="pf-sub-h">What changes</h3>
               <dl className="pf-meta pf-meta-1">
                 <div>
                   <dt>Monthly recurring revenue</dt>
@@ -133,7 +137,10 @@ export function ChangePlanView({ head, modules, ctx }: { head: T360Head; modules
                 )}
               </dl>
             </div>
-            <ReasonField value={reason} onChange={(v) => { setReason(v); if (errors.reason) setErrors({}) }} error={errors.reason} />
+            </FormSection>
+            <FormSection icon={ShieldCheck} title="Confirm">
+              <ReasonField value={reason} onChange={(v) => { setReason(v); if (errors.reason) setErrors({}) }} error={errors.reason} />
+            </FormSection>
           </div>
         </div>
         <div className="od-form-foot">
@@ -186,25 +193,27 @@ export function ExtendTrialView({ head, ctx }: { head: T360Head; ctx: T360Ctx })
       <form className="card pf-form od-form" onSubmit={submit} noValidate aria-label="Extend trial">
         <div className="od-form-cols">
           <div className="od-form-col">
-            <div className="pf-form-group">
-              <span className="pf-form-lbl" aria-hidden="true">Extend by</span>
+            <FormSection icon={CalendarPlus} title="Extend by">
               <FilterSeg
                 label="Extend by"
                 value={(PRESETS as readonly string[]).includes(days) ? (days as (typeof PRESETS)[number]) : ("" as (typeof PRESETS)[number])}
                 options={PRESETS.map((d) => ({ value: d, label: `${d} days` }))}
                 onChange={(v) => { setDays(v); if (errors.days) setErrors((x) => ({ ...x, days: undefined })) }}
               />
-            </div>
-            <Field label="Days" htmlFor="pf-trial-days" error={errors.days} hint={`1 to ${TRIAL_EXTENSION_MAX} days at a time.`} required>
-              <Input id="pf-trial-days" inputMode="numeric" value={days} onChange={(e) => { setDays(e.target.value.replace(/\D/g, "")); if (errors.days) setErrors((x) => ({ ...x, days: undefined })) }} />
-            </Field>
+              <Field label="Days" htmlFor="pf-trial-days" error={errors.days} hint={`Max ${TRIAL_EXTENSION_MAX}`} required>
+                <Input id="pf-trial-days" inputMode="numeric" value={days} onChange={(e) => { setDays(e.target.value.replace(/\D/g, "")); if (errors.days) setErrors((x) => ({ ...x, days: undefined })) }} />
+              </Field>
+            </FormSection>
           </div>
           <div className="od-form-col">
-            <div className="pf-form-sum" aria-live="polite">
-              <h3 className="pf-sub-h">New trial end</h3>
-              <p className="pf-form-big num">{daysOk ? `${dateY(addDaysToDate(end, n))} ${ctx.tzLabel}` : "—"}</p>
-            </div>
-            <ReasonField value={reason} onChange={(v) => { setReason(v); if (errors.reason) setErrors((x) => ({ ...x, reason: undefined })) }} error={errors.reason} />
+            <FormSection icon={CalendarCheck} title="New trial end">
+              <div className="pf-form-sum" aria-live="polite">
+                <p className="pf-form-big num">{daysOk ? `${dateY(addDaysToDate(end, n))} ${ctx.tzLabel}` : "—"}</p>
+              </div>
+            </FormSection>
+            <FormSection icon={ShieldCheck} title="Confirm">
+              <ReasonField value={reason} onChange={(v) => { setReason(v); if (errors.reason) setErrors((x) => ({ ...x, reason: undefined })) }} error={errors.reason} />
+            </FormSection>
           </div>
         </div>
         <div className="od-form-foot">
@@ -254,21 +263,24 @@ export function ScheduleDeletionView({ head, ctx, retentionDays }: { head: T360H
       <form className="card pf-form od-form" onSubmit={submit} noValidate aria-label="Schedule deletion">
         <div className="od-form-cols">
           <div className="od-form-col">
+            <FormSection icon={Trash2} title={`Deleted on ${dateY(on)}`} className="pf-sec-danger">
             <div className="pf-form-sum pf-form-danger">
-              <h3 className="pf-sub-h">What is deleted on {dateY(on)}</h3>
               <ul className="pf-form-list">
                 <li>The workspace <span className="num">{t.subdomain}</span> and its settings</li>
                 <li><span className="num">{num(t.users)}</span> user accounts and their sign-ins</li>
                 <li><span className="num">{num(t.storageGb)} GB</span> of stored files and records</li>
               </ul>
-              <p className="pf-muted">Invoices are kept for accounting. Consider an export first: <Link href={tenantPath(t.id, "settings")} className="pf-inline-link">request one in Settings</Link>.</p>
+              <p className="pf-muted">Invoices are kept. Export first? <Link href={tenantPath(t.id, "settings")} className="pf-inline-link">Request one in Settings</Link>.</p>
             </div>
+            </FormSection>
           </div>
           <div className="od-form-col">
-            <ReasonField value={reason} onChange={(v) => { setReason(v); if (errors.reason) setErrors((x) => ({ ...x, reason: undefined })) }} error={errors.reason} />
-            <Field label={`Type ${t.slug} to confirm`} htmlFor="pf-del-slug" error={errors.slug} required>
-              <Input id="pf-del-slug" value={typed} autoComplete="off" spellCheck={false} onChange={(e) => { setTyped(e.target.value); if (errors.slug) setErrors((x) => ({ ...x, slug: undefined })) }} />
-            </Field>
+            <FormSection icon={ShieldCheck} title="Confirm">
+              <ReasonField value={reason} onChange={(v) => { setReason(v); if (errors.reason) setErrors((x) => ({ ...x, reason: undefined })) }} error={errors.reason} />
+              <Field label={`Type ${t.slug} to confirm`} htmlFor="pf-del-slug" error={errors.slug} required>
+                <Input id="pf-del-slug" value={typed} autoComplete="off" spellCheck={false} onChange={(e) => { setTyped(e.target.value); if (errors.slug) setErrors((x) => ({ ...x, slug: undefined })) }} />
+              </Field>
+            </FormSection>
           </div>
         </div>
         <div className="od-form-foot">

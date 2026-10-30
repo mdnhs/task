@@ -49,6 +49,10 @@
 .td-form{display:flex;flex-direction:column;gap:14px;margin-top:14px}
 .td-form-foot{display:flex;justify-content:flex-end}
 .td-overdue .td-muted{margin-bottom:2px}
+.td-overdue-h{display:flex;align-items:center;gap:10px;margin-bottom:0}
+:root .fs-sec-i.td-overdue-i{background:var(--warn-bg);color:var(--warn)}
+:root[data-theme="dark"] .fs-sec-i.td-overdue-i{color:var(--warn)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .fs-sec-i.td-overdue-i{color:var(--warn)}}
 .td-timeline,.td-notes,.ev-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
 .td-timeline li{display:flex;gap:12px;padding:10px 0;position:relative}
 .td-timeline li:not(:last-child)::before{content:"";position:absolute;left:4px;top:26px;bottom:-10px;width:2px;background:var(--line)}
@@ -59,7 +63,12 @@
 .td-notes li:not(:last-child){border-bottom:1px solid var(--line)}
 .td-notes p{margin:0 0 4px;font-size:14px;line-height:21px;white-space:pre-wrap;overflow-wrap:anywhere}
 .ev-drop{display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center;padding:22px 16px;border-radius:var(--r-md);background:var(--mute-bg);color:var(--ink-2);font-size:13px;cursor:pointer;transition:box-shadow var(--dur-fast) var(--ease),background var(--dur-fast) var(--ease)}
-.ev-drop strong{font-size:14px;color:var(--ink)}
+.ev-drop strong{display:inline-flex;align-items:center;gap:8px;font-size:14px;color:var(--ink)}
+.ev-drop strong svg{width:16px;height:16px;flex:none;color:var(--brand-deep)}
+:root[data-theme="dark"] .ev-drop strong svg{color:var(--brand-3)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .ev-drop strong svg{color:var(--brand-3)}}
+.ev-add .btn{gap:8px}
+.ev-add .btn svg{width:16px;height:16px;flex:none}
 .ev-drop:hover,.ev-drop[data-drag],.ev-drop:focus-within{box-shadow:inset 0 0 0 1.5px var(--brand);background:var(--brand-soft)}
 :root[data-theme="dark"] .ev-drop:is(:hover,[data-drag],:focus-within) strong{color:var(--brand-3)}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .ev-drop:is(:hover,[data-drag],:focus-within) strong{color:var(--brand-3)}}
@@ -260,6 +269,19 @@
 
 /* ===== New task page (/tasks/new; was a dialog) ===== */
 .nt-card{width:100%;padding:28px}
+/* New task form: titled groups (Task, Schedule, People, More, Proof), each column a stack of groups. */
+.er-legend .fs-opt{float:right;margin:0;line-height:20px}
+.nt-voice .fs-label{display:flex;align-items:baseline}
+/* Templates: "Start from" chips (one click fills the form) and a small "Save as template" action on the Task heading. */
+.nt-tpl{display:flex;flex-direction:column;gap:8px}
+.nt-form .tpl-row{align-items:flex-end}
+.nt-tpl-chip{display:inline-flex;align-items:center;gap:6px}
+.nt-tpl-chip svg{width:13px;height:13px;flex:none}
+.nt-form .tpl-row .btn,.nt-form .tpl-row .tpl-link{min-height:44px}
+.nt-tpl .er-types{display:flex;flex-wrap:wrap;gap:8px}
+.nt-prio .seg.od-seg{align-self:flex-start}
+/* The section heading already says it; the fieldset keeps its legend for screen readers only. */
+.nt-ev .er-legend{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
 :root[data-theme="dark"] .nt-form input{color-scheme:dark}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .nt-form input{color-scheme:dark}}
 @media (max-width:640px){.nt-card{padding:20px}}

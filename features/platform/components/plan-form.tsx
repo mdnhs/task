@@ -3,10 +3,12 @@
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
+import { Banknote, Blocks, FileText, Gauge, Tag } from "lucide-react"
 import { toast } from "sonner"
 import { z } from "zod"
 
 import { Field } from "@/components/field"
+import { FoldToggle, FormFold, FormSection } from "@/components/form-section"
 import { Input } from "@/components/ui/input"
 import { PageHead } from "@/components/page-head"
 import { Switch } from "@/components/ui/switch"
@@ -129,26 +131,24 @@ function PlanForm({ plan, entitlements, operator, today }: { plan: Plan; entitle
     <form className="card pf-form od-form" onSubmit={submit} noValidate aria-label={`Edit ${plan.name} plan`}>
       <div className="od-form-cols">
         <div className="od-form-col">
-          <Field label={priceLabel(plan.currency)} htmlFor="pf-price" error={errors.price} required>
-            <Input id="pf-price" inputMode="decimal" value={form.price} onChange={(e) => setField("price", e.target.value)} />
-          </Field>
-          <div className="od-row2">
-            {LIMITS.map((l) => (
-              <Field key={l.key} label={limitLabel(l)} htmlFor={`pf-${l.key}`} error={errors[l.key]} required>
-                <Input id={`pf-${l.key}`} inputMode="numeric" value={form[l.key]} onChange={(e) => setField(l.key, e.target.value)} />
-              </Field>
-            ))}
-          </div>
-          {priceChanged && (
-            <>
-              <p className="pf-note pf-note-warn pf-note-flat" role="status">
-                {PRICE_CHANGE_NOTICE} The change from {money(plan.priceMonthly, plan.currency)} to {money(newPrice, plan.currency)} a month is recorded in the audit trail.
-              </p>
-              <Field label="Reason" htmlFor="pf-price-reason" error={errors.reason} hint={`At least ${REASON_MIN} characters. Saved in the audit trail.`} required>
-                <Textarea id="pf-price-reason" value={reason} rows={2} maxLength={300} onChange={(e) => { setReason(e.target.value); setErrors((x) => ({ ...x, reason: undefined })) }} />
-              </Field>
-            </>
-          )}
+          <FormSection icon={Banknote} title="Price">
+            <Field label={priceLabel(plan.currency)} htmlFor="pf-price" error={errors.price} required>
+              <Input id="pf-price" inputMode="decimal" placeholder="e.g. 149.50" value={form.price} onChange={(e) => setField("price", e.target.value)} />
+            </Field>
+            {priceChanged && (
+              <>
+                <p className="pf-note pf-note-warn pf-note-flat" role="status">
+                  {PRICE_CHANGE_NOTICE} {money(plan.priceMonthly, plan.currency)} → {money(newPrice, plan.currency)} a month, recorded in the audit trail.
+                </p>
+                <Field label="Reason" htmlFor="pf-price-reason" error={errors.reason} hint={`At least ${REASON_MIN} characters`} required>
+                  <Textarea id="pf-price-reason" value={reason} rows={2} maxLength={300} onChange={(e) => { setReason(e.target.value); setErrors((x) => ({ ...x, reason: undefined })) }} />
+                </Field>
+              </>
+            )}
+          </FormSection>
+          <FormSection icon={Gauge} title="Limits">
+            <LimitFields values={form} errors={errors} onChange={setField} />
+          </FormSection>
         </div>
         <div className="od-form-col">
           <ModuleSet
@@ -173,8 +173,9 @@ function PlanForm({ plan, entitlements, operator, today }: { plan: Plan; entitle
 // `error` shows inline under the switches (no toast), so it reads with the other field errors and clears on a change.
 function ModuleSet({ entitlements, modules, error, onChange }: { entitlements: EntitlementsData; modules: string[]; error?: string; onChange(m: string[]): void }) {
   return (
+    <FormSection icon={Blocks} title="Modules">
     <fieldset className="pf-modset" aria-describedby={error ? "pf-modset-msg" : undefined} aria-invalid={error ? true : undefined} data-invalid={error ? "" : undefined}>
-      <legend>Modules</legend>
+      <legend className="sr-only">Modules</legend>
       {entitlements.productModules.map(({ id: m, label }) => {
         const id = `pf-mod-${m}`
         return (
@@ -190,6 +191,22 @@ function ModuleSet({ entitlements, modules, error, onChange }: { entitlements: E
         </div>
       )}
     </fieldset>
+    </FormSection>
+  )
+}
+
+type LimitKey = (typeof LIMITS)[number]["key"]
+
+/** The four usage limits, two per row. */
+function LimitFields({ values, errors, onChange }: { values: Record<LimitKey, string>; errors: Partial<Record<LimitKey, string>>; onChange(k: LimitKey, v: string): void }) {
+  return (
+    <div className="od-row2">
+      {LIMITS.map((l) => (
+        <Field key={l.key} label={limitLabel(l)} htmlFor={`pf-${l.key}`} error={errors[l.key]} required>
+          <Input id={`pf-${l.key}`} inputMode="numeric" value={values[l.key]} onChange={(e) => onChange(l.key, e.target.value)} />
+        </Field>
+      ))}
+    </div>
   )
 }
 
@@ -218,6 +235,7 @@ function NewPlanForm({ plans, entitlements, operator, today, defaultTrialDays }:
   const [reason, setReason] = useState("")
   const [errors, setErrors] = useState<NewPlanErrors>({})
   const [modulesError, setModulesError] = useState<string | undefined>()
+  const [showNote, setShowNote] = useState(false)
 
   function setField(k: keyof NewPlanInput, v: string) {
     setForm((f) => ({ ...f, [k]: v }))
@@ -254,29 +272,27 @@ function NewPlanForm({ plans, entitlements, operator, today, defaultTrialDays }:
     <form className="card pf-form od-form" onSubmit={submit} noValidate aria-label="New plan">
       <div className="od-form-cols">
         <div className="od-form-col">
-          <div className="od-row2">
-            <Field label="Plan ID" htmlFor="pf-id" error={errors.id} required>
-              <Input id="pf-id" value={form.id} placeholder="team-plus" autoComplete="off" spellCheck={false} maxLength={40} onChange={(e) => setField("id", e.target.value)} />
-            </Field>
-            <Field label="Name" htmlFor="pf-name" error={errors.name} required>
-              <Input id="pf-name" value={form.name} autoComplete="off" maxLength={40} onChange={(e) => setField("name", e.target.value)} />
-            </Field>
-          </div>
-          <div className="od-row2">
-            <Field label={priceLabel(currency)} htmlFor="pf-price" error={errors.price} required>
-              <Input id="pf-price" inputMode="decimal" value={form.price} onChange={(e) => setField("price", e.target.value)} />
-            </Field>
-            <Field label={TRIAL_LABEL} htmlFor="pf-trial" error={errors.trialDays} required>
-              <Input id="pf-trial" inputMode="numeric" value={form.trialDays} onChange={(e) => setField("trialDays", e.target.value)} />
-            </Field>
-          </div>
-          <div className="od-row2">
-            {LIMITS.map((l) => (
-              <Field key={l.key} label={limitLabel(l)} htmlFor={`pf-${l.key}`} error={errors[l.key]} required>
-                <Input id={`pf-${l.key}`} inputMode="numeric" value={form[l.key]} onChange={(e) => setField(l.key, e.target.value)} />
+          <FormSection icon={Tag} title="Plan">
+            <div className="od-row2">
+              <Field label="Plan ID" htmlFor="pf-id" error={errors.id} required>
+                <Input id="pf-id" value={form.id} placeholder="e.g. team-plus" autoComplete="off" spellCheck={false} maxLength={40} onChange={(e) => setField("id", e.target.value)} />
               </Field>
-            ))}
-          </div>
+              <Field label="Name" htmlFor="pf-name" error={errors.name} required>
+                <Input id="pf-name" value={form.name} placeholder="e.g. Team Plus" autoComplete="off" maxLength={40} onChange={(e) => setField("name", e.target.value)} />
+              </Field>
+            </div>
+            <div className="od-row2">
+              <Field label={priceLabel(currency)} htmlFor="pf-price" error={errors.price} required>
+                <Input id="pf-price" inputMode="decimal" placeholder="e.g. 149" value={form.price} onChange={(e) => setField("price", e.target.value)} />
+              </Field>
+              <Field label={TRIAL_LABEL} htmlFor="pf-trial" error={errors.trialDays} required>
+                <Input id="pf-trial" inputMode="numeric" value={form.trialDays} onChange={(e) => setField("trialDays", e.target.value)} />
+              </Field>
+            </div>
+          </FormSection>
+          <FormSection icon={Gauge} title="Limits">
+            <LimitFields values={form} errors={errors} onChange={setField} />
+          </FormSection>
         </div>
         <div className="od-form-col">
           <ModuleSet
@@ -288,9 +304,13 @@ function NewPlanForm({ plans, entitlements, operator, today, defaultTrialDays }:
               setModulesError(undefined)
             }}
           />
-          <Field label="Reason" htmlFor="pf-new-reason" hint="Optional. Saved in the audit trail.">
-            <Textarea id="pf-new-reason" value={reason} rows={2} maxLength={300} onChange={(e) => setReason(e.target.value)} />
-          </Field>
+          <FormSection icon={FileText} title="Note" action={<FoldToggle open={showNote} onToggle={() => setShowNote((v) => !v)} controls="pf-new-note" label="Add a reason" />}>
+            <FormFold id="pf-new-note" open={showNote}>
+              <Field label="Reason" htmlFor="pf-new-reason" hint="Saved in the audit trail">
+                <Textarea id="pf-new-reason" value={reason} rows={2} maxLength={300} onChange={(e) => setReason(e.target.value)} />
+              </Field>
+            </FormFold>
+          </FormSection>
         </div>
       </div>
       <div className="od-form-foot">

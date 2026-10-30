@@ -87,6 +87,7 @@ export function RequestDialog({ tenants, open, onOpenChange, operator, today, in
           <Field label="Reason" htmlFor="pf-req-reason" error={errors.reason} required>
             <Textarea
               id="pf-req-reason"
+              placeholder="e.g. Shift reports fail to save since Monday"
               value={reason}
               onChange={(e) => {
                 setReason(e.target.value)

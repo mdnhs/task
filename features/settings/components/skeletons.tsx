@@ -127,29 +127,50 @@ const Foot = ({ w = 135 }: { w?: number }) => (
   </div>
 )
 
-function Organisation({ rules, tzLabel }: { rules: string[]; tzLabel: string }) {
+// FormSection (ui-rules.md rule 32): icon chip + title, then its fields. An empty .fs-sec-i keeps the chip's tint and size.
+const SecSk = ({ title, action, children }: { title: string; action?: string; children?: React.ReactNode }) => (
+  <section className="fs-sec">
+    <h3 className="fs-sec-h">
+      <span className="fs-sec-i" aria-hidden="true" />
+      {g(title)}
+      {action && <span className="fs-act">{g(action)}</span>}
+    </h3>
+    {children}
+  </section>
+)
+
+// .rp-day chip choices (ghost labels so long ones wrap like the loaded chips).
+const ChipsSk = ({ label, chips }: { label: string; chips: string[] }) => (
+  <div className="od-field">
+    <span className="fs-label">{g(label)}</span>
+    <div className="er-types">
+      {chips.map((c) => <span key={c} className="rp-day sk-pill">{g(c)}</span>)}
+    </div>
+  </div>
+)
+
+function Organisation({ rules }: { rules: string[] }) {
   return (
     <section className="card set-card">
       <CardHead title={120} sub={230} />
       <div className="od-form set-form">
-        <div className="od-row2">
-          <FieldSk label="Company name" hint={0} required />
-          <FieldSk label="Subdomain" hint="Set when the workspace was created" />
-        </div>
-        <div className="od-row2">
-          <FieldSk label="Timezone" hint="Deadlines and timestamps use this timezone" />
-          <FieldSk label="Report deadline" hint={`Reports are due by this time, ${tzLabel}`} />
-        </div>
-        <fieldset className="set-fieldset">
-          <legend>{g("Weekend and holiday rule")}</legend>
-          <div className="od-choices">
-            {rules.map((r) => (
-              <span key={r} className="od-choice sk-pill"><Sk w={16} h={16} r="circle" />{g(r)}</span>
-            ))}
+        <div className="od-form-cols">
+          <div className="od-form-col">
+            <SecSk title="Company">
+              <FieldSk label="Company name" hint={0} required />
+              <FieldSk label="Subdomain" hint={0} />
+            </SecSk>
+            <SecSk title="Security">
+              <FieldSk label="Session timeout" hint="Idle time before sign-out" />
+            </SecSk>
           </div>
-        </fieldset>
-        <div className="od-row2">
-          <FieldSk label="Session timeout" hint="Signed-in users are logged out after this much inactivity" />
+          <div className="od-form-col">
+            <SecSk title="Daily report">
+              <FieldSk label="Timezone" hint={0} />
+              <FieldSk label="Report deadline" hint={0} />
+              <ChipsSk label="Weekend and holiday rule" chips={rules} />
+            </SecSk>
+          </div>
         </div>
         <Foot />
       </div>
@@ -521,7 +542,8 @@ function DevicePolicies({ canWrite, policies }: { canWrite: boolean; policies: D
               <b className="sk-ghost" style={{ alignSelf: "flex-start" }}>{f.label}</b>
               <span>{g(describePolicy({ feature: f.value, allow: allowFor(f.value, policies) }))}</span>
             </div>
-            {canWrite && <div className="od-filters"><Sk w={220} h={39.6} r="pill" /></div>}
+            {/* FilterSeg: Trusted PCs / Any device / Nowhere (browser-measured 297 wide) */}
+            {canWrite && <div className="od-filters"><Sk w={297} h={50} r="pill" style={{ maxWidth: "100%" }} /></div>}
           </li>
         ))}
       </ul>
@@ -529,11 +551,12 @@ function DevicePolicies({ canWrite, policies }: { canWrite: boolean; policies: D
   )
 }
 
-// Two-step rule card under Roles (MfaPolicyCard).
+// Two-step rule card under Roles (MfaPolicyCard). The rule is a FilterSeg (Optional / Everyone / Chosen roles), browser-measured.
+const MFA_SEG_W = 292
 function MfaPolicySk({ canWrite, policy, roleLabels }: { canWrite: boolean; policy: MfaPolicy; roleLabels: Record<string, string> }) {
   return (
     <section className="card set-card">
-      <CardHead title="Two-step verification" sub={describeMfaPolicy(policy, roleLabels)} extra={canWrite ? <div className="od-filters"><Sk w={190} h={39.6} r="pill" /></div> : null} />
+      <CardHead title="Two-step verification" sub={describeMfaPolicy(policy, roleLabels)} extra={canWrite ? <div className="od-filters"><Sk w={MFA_SEG_W} h={50} r="pill" style={{ maxWidth: "100%" }} /></div> : null} />
       {policy.mode === "roles" && (
         <div className="dev-roles">
           {Object.entries(roleLabels).map(([id, text]) => (
@@ -592,25 +615,30 @@ function Branding({
       <CardHead title={90} sub={230} />
       <div className="set-brand">
         <div className="od-form set-form">
-          <FieldSk label={100} hint={0} />
-          <div className="od-field">
-            <Sk w={40} h={11} lh={18.1} />
-            <Sk h={76} r={20} />
-            <Sk w={190} h={10} lh={17.4} style={{ marginTop: 6 }} />
-          </div>
-          <div className="od-field">
-            <Sk w={90} h={11} lh={18.1} />
-            <Sk h={44} r={14} />
-          </div>
-          <div className="set-appear">
-            <div className="set-appear-head"><Sk w={74} h={11} lh={18.1} /></div>
-            {APPEAR_PILLS.map((ws, i) => (
-              <div key={i} className="set-appear-row">
-                <Sk w={LEGEND_W[i]} h={11} lh={18.1} />
-                <div className="set-appear-opts">{ws.map((w, j) => <Sk key={j} w={w} h={34} r="pill" />)}</div>
-              </div>
-            ))}
-          </div>
+          <SecSk title="Name and logo">
+            <FieldSk label={100} hint={0} />
+            <div className="od-field">
+              <Sk w={40} h={11} lh={18.1} />
+              <Sk h={76} r={20} />
+              <Sk w={190} h={10} lh={17.4} style={{ marginTop: 6 }} />
+            </div>
+          </SecSk>
+          <SecSk title="Colour">
+            <div className="od-field">
+              <Sk w={90} h={11} lh={18.1} />
+              <Sk h={44} r={14} />
+            </div>
+          </SecSk>
+          <SecSk title="Appearance">
+            <div className="set-appear">
+              {APPEAR_PILLS.map((ws, i) => (
+                <div key={i} className="set-appear-row">
+                  <Sk w={LEGEND_W[i]} h={11} lh={18.8} />
+                  <div className="set-appear-opts">{ws.map((w, j) => <Sk key={j} w={w} h={34.8} r="pill" />)}</div>
+                </div>
+              ))}
+            </div>
+          </SecSk>
           {canWrite && <Foot w={138} />}
         </div>
         <div className="set-preview">
@@ -711,7 +739,7 @@ export function SettingsBodySkeleton({
 }) {
   switch (tab) {
     case "organisation":
-      return <Organisation rules={counts.data?.weekendRules ?? []} tzLabel={counts.data?.tzLabel ?? ""} />
+      return <Organisation rules={counts.data?.weekendRules ?? []} />
     case "departments":
       return (
         <Departments departments={counts.departments} canWrite={canWrite} seed={counts.data?.departments ?? []} />

@@ -102,7 +102,7 @@ The support page gets `supportData` (support.ts: tenant names, the requests and,
 `support.*` audit lines; the card is hidden otherwise) and the plan forms `planFormData` (plans.ts: plans and
 entitlements). No console page passes the raw seed to the client any more.
 
-Full-record pages (tenant 360, and `usePlatform` if a page uses it again) render `applyPatches(rows, patches)` and `foldAudit(audit, outbox)` over
+Full-record pages (tenant 360) render `applyPatches(rows, patches)` and `foldAudit(audit, outbox)` over
 their server data, then fold both into the full stores and clear them. `foldPending()` (store.ts) does the fold: it reads each box from its
 store and clears it before folding, so a second call (StrictMode's double mount effect) adds nothing. Slim pages read a full store only as an overlay
 when a full page has already loaded it, then apply their own patches on top.

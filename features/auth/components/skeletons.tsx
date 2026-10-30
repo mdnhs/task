@@ -93,17 +93,22 @@ export function OnboardingSkeleton({ departments = 2 }: { departments?: number }
       <Head />
       <StepperSk steps={4} />
       <div className="auth-form">
-        <span className="auth-h2"><Sk w={140} h={20} lh={28} /></span>
-        <span className="auth-sub"><Sk w="55%" h={13} lh={20} /></span>
-        <ul className="auth-list">
-          {Array.from({ length: departments }, (_, i) => (
-            <li key={i}>
-              <FieldSk />
-              <Sk w={92} h={44.3} r={14} />
-            </li>
-          ))}
-        </ul>
-        <Sk w={170} h={48.3} r={14} />
+        {/* FormSection: 30px icon chip + 15px title (line 22) */}
+        <section className="fs-sec">
+          <h3 className="fs-sec-h">
+            <span className="fs-sec-i" aria-hidden="true" />
+            <Sk w={96} h={14} lh={22} />
+          </h3>
+          <ul className="auth-list">
+            {Array.from({ length: departments }, (_, i) => (
+              <li key={i}>
+                <FieldSk />
+                <Sk w={92} h={44.3} r={14} />
+              </li>
+            ))}
+          </ul>
+          <Sk w={170} h={48.3} r={14} />
+        </section>
         <div className="auth-actions"><ButtonSk w={140} h={46.3} /></div>
       </div>
     </SkGroup>

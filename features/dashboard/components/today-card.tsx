@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
 
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { taskInbox } from "@/lib/task-inbox"
 import { taskVoice, withVoice, type VoiceEntry } from "@/lib/task-voice"
 import { dayOrder, daySummary, handledToday, todayCounts, todayHasNews, todayUpdate } from "@/lib/today"
@@ -15,7 +16,8 @@ import { TodayPlayer } from "./today-player"
 import { TodayChipCounts, teamLines, todaySub } from "./today-copy"
 
 // The Today card (FR-M1-70..79, AC-M1-09/10). First paint comes from the server (cookie mirror of the dismissal), then the
-// localStorage record wins if it differs. Dismissing folds it into a compact entry that reopens it for the rest of the day.
+// localStorage record wins if it differs. One accordion item: the "Your day" bar (counts) stays put and the body opens and
+// closes under it (height only), so the page never jumps. Closing it is the dismissal for the day; opening undoes it.
 // The brief only ever holds the user's own tasks, cut on the server (FR-M1-80).
 
 type Tile = { key: string; label: string; n: number; href: string; tone?: "bad" | "warn" }
@@ -24,7 +26,7 @@ export function TodayCard({ data }: { data: TodayData }) {
   const router = useRouter()
   const { meId, day, now, tenantId, meName } = data
   const [open, setOpen] = useState(data.mode === "card")
-    const [summaryOn, setSummaryOn] = useState(false)
+  const [summaryOn, setSummaryOn] = useState(false)
   const [player, setPlayer] = useState<{ autoplay: boolean } | null>(null)
   const [mode, setMode] = useState<DayMode>("all")
   const [done, setDone] = useState<Set<string>>(new Set())
@@ -71,13 +73,11 @@ export function TodayCard({ data }: { data: TodayData }) {
     { key: "blocked", label: "Blocked", n: counts.blocked, href: `/tasks?status=blocked&${mine}` },
   ]
 
-  const dismiss = () => {
-    writeDismissed(meId, day.key, true)
-    setOpen(false)
-    setPlayer(null)
-    toast("Today card hidden", { description: "You can open it again from the home screen." })
+  const toggle = (next: boolean) => {
+    writeDismissed(meId, day.key, !next)
+    setOpen(next)
+    if (!next) setPlayer(null)
   }
-  const reopen = () => setOpen(true)
 
   const markDone = (item: DayItem) => {
     if (item.task.evidenceRequired) {
@@ -97,93 +97,87 @@ export function TodayCard({ data }: { data: TodayData }) {
     toast(`${item.task.ref} snoozed for today`)
   }
 
-  if (!open)
-    return (
-      <button type="button" className="today-chip" onClick={reopen} aria-label={news ? "Open your day, new items waiting" : "Open your day"}>
-        <span className="today-chip-t">Your day</span>
-        <TodayChipCounts counts={counts} />
-        {news && <span className="today-pulse" aria-hidden="true" />}
-        <span className="today-chip-a">Open</span>
-      </button>
-    )
-
   return (
-    <section className="card today" aria-labelledby="today-h">
-      <div className="card-head today-head">
-        <div>
-          <h2 id="today-h">Your day</h2>
-          <div className="sub">{todaySub(day)}</div>
-        </div>
-        <div className="today-actions">
-          <button type="button" className="pill-btn" aria-pressed={summaryOn} onClick={() => setSummaryOn((v) => !v)}>
-            Summarise my day
-          </button>
-          <button type="button" className="pill-btn today-play" onClick={() => setPlayer({ autoplay: true })}>
-            Play my day
-          </button>
-          <button type="button" className="today-x" aria-label="Dismiss for today" onClick={dismiss}>
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
-          </button>
-        </div>
-      </div>
+    <Accordion className="today-acc" value={open ? ["today"] : []} onValueChange={(v) => toggle(v.includes("today"))}>
+      <AccordionItem value="today" className="card today">
+        <AccordionTrigger className="today-bar" aria-label={open ? "Close your day" : news ? "Open your day, new items waiting" : "Open your day"}>
+          <span className="today-chip-t" id="today-h">Your day</span>
+          <span className="today-peek" aria-hidden={open}><TodayChipCounts counts={counts} /></span>
+          {news && <span className="today-pulse" aria-hidden="true" />}
+          <span className="today-chip-a">{open ? "Hide" : "Open"}</span>
+        </AccordionTrigger>
+        <AccordionContent keepMounted className="today-body">
+          <div className="today-head">
+            <div className="sub">{todaySub(day)}</div>
+            <div className="today-actions">
+              <button type="button" className="pill-btn" aria-pressed={summaryOn} onClick={() => setSummaryOn((v) => !v)}>
+                Summarise my day
+              </button>
+              <button type="button" className="pill-btn today-play" onClick={() => setPlayer({ autoplay: true })}>
+                Play my day
+              </button>
+            </div>
+          </div>
 
-      <ul className="today-tiles" data-n={tiles.length}>
-        {tiles.map((t) => (
-          <li key={t.key}>
-            <Link href={t.href} className="today-tile" data-tone={t.n > 0 ? t.tone : undefined}>
-              <b>{t.n}</b>
-              <span>{t.label}</span>
-            </Link>
-          </li>
-        ))}
-      </ul>
-
-      {data.team && (
-        <div className="today-team" aria-label="Team">
-          <div className="today-team-h">Team today</div>
-          <ul className="today-team-l">
-            {teamLines(data.team, counts.reports).map((l) => (
-              <li key={l.label}>
-                <Link href={l.href}><b>{l.n}</b> {l.label}</Link>
-                {l.who && <span className="today-team-m"> · {l.who}</span>}
+          <ul className="today-tiles" data-n={tiles.length}>
+            {tiles.map((t) => (
+              <li key={t.key}>
+                <Link href={t.href} className="today-tile" data-tone={t.n > 0 ? t.tone : undefined}>
+                  <b>{t.n}</b>
+                  <span>{t.label}</span>
+                </Link>
               </li>
             ))}
           </ul>
-        </div>
-      )}
 
-      {summaryOn && (
-        <div className="today-sum" aria-live="polite">
-          <div className="today-sum-h">{summary.headline}</div>
-          <ul>
-            {summary.lines.map((l, i) => (
-              <li key={i} data-note={l.ref ? undefined : ""}>
-                {l.ref ? (
-                  <Link href={`/tasks/${l.ref}`}>{l.text}</Link>
-                ) : (
-                  l.text
-                )}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
+          {data.team && (
+            <div className="today-team" aria-label="Team">
+              <div className="today-team-h">Team today</div>
+              <ul className="today-team-l">
+                {teamLines(data.team, counts.reports).map((l) => (
+                  <li key={l.label}>
+                    <Link href={l.href}><b>{l.n}</b> {l.label}</Link>
+                    {l.who && <span className="today-team-m"> · {l.who}</span>}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
-      {player && (
-        <TodayPlayer
-          items={queue}
-          voice={voice.notes}
-          summary={summary}
-          now={now}
-          mode={mode}
-          autoplay={player.autoplay}
-          onMode={setMode}
-          onDone={markDone}
-          onSnooze={snooze}
-          onOpen={(i) => router.push(`/tasks/${i.task.ref}`)}
-          onClose={() => setPlayer(null)}
-        />
-      )}
-    </section>
+          {summaryOn && (
+            <div className="today-sum" aria-live="polite">
+              <div className="today-sum-h">{summary.headline}</div>
+              <ul>
+                {summary.lines.map((l, i) => (
+                  <li key={i} data-note={l.ref ? undefined : ""}>
+                    {l.ref ? (
+                      <Link href={`/tasks/${l.ref}`}>{l.text}</Link>
+                    ) : (
+                      l.text
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {player && (
+            <TodayPlayer
+              items={queue}
+              voice={voice.notes}
+              summary={summary}
+              now={now}
+              mode={mode}
+              autoplay={player.autoplay}
+              onMode={setMode}
+              onDone={markDone}
+              onSnooze={snooze}
+              onOpen={(i) => router.push(`/tasks/${i.task.ref}`)}
+              onClose={() => setPlayer(null)}
+            />
+          )}
+        </AccordionContent>
+      </AccordionItem>
+    </Accordion>
   )
 }

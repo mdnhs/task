@@ -1,11 +1,13 @@
 "use client"
 
 import { useState } from "react"
+import { CreditCard, FileText, Megaphone, SlidersHorizontal } from "lucide-react"
 import { toast } from "sonner"
 
 import { DatePicker } from "@/components/date-picker"
 import { Field } from "@/components/field"
-import { FilterSelect } from "@/components/filter-bar"
+import { FilterSeg } from "@/components/filter-bar"
+import { FormSection } from "@/components/form-section"
 import { Icon } from "@/components/icons"
 import { PageHead } from "@/components/page-head"
 import { PlatformNoticeBanner } from "@/components/platform-notice"
@@ -92,54 +94,64 @@ export function SettingsView({ settings: server, today, tzLabel, operator, canWr
           <legend className="sr-only">Platform settings{canWrite ? "" : " (read only)"}</legend>
           <div className="od-form-cols">
             <div className="od-form-col">
-              <section className="pf-form-sum" aria-labelledby="pf-set-pay">
-                <h2 id="pf-set-pay" className="pf-sub-h">Payment provider</h2>
-                <div className="pf-pay">
-                  <span>{paymentsLabel(settings.payments)}</span>
-                  <StatusPill status={{ tone: PAY_TONE[settings.payments.status], label: PAYMENT_STATUS_LABEL[settings.payments.status] }} />
+              <FormSection icon={CreditCard} title="Payments">
+                <div className="pf-form-sum">
+                  <div className="pf-pay">
+                    <span>{paymentsLabel(settings.payments)}</span>
+                    <StatusPill status={{ tone: PAY_TONE[settings.payments.status], label: PAYMENT_STATUS_LABEL[settings.payments.status] }} />
+                  </div>
+                  <p className="pf-pay-note">Managed in the provider&apos;s dashboard.</p>
                 </div>
-                <p className="pf-pay-note">Read from the billing provider. Switch mode or reconnect in the provider&apos;s dashboard.</p>
-              </section>
-              <Field label="Default trial length (days)" htmlFor="pf-set-trial" error={errors.defaultTrialDays} hint={`${TRIAL_DAYS.min} to ${TRIAL_DAYS.max}. New plans start with this trial.`} required>
-                <Input id="pf-set-trial" inputMode="numeric" value={form.defaultTrialDays} onChange={(e) => set("defaultTrialDays", e.target.value)} />
-              </Field>
-              <Field label="Data retention (days)" htmlFor="pf-set-ret" error={errors.retentionDays} hint={`${RETENTION_DAYS.min} to ${RETENTION_DAYS.max}. How long a closed workspace is kept before deletion.`} required>
-                <Input id="pf-set-ret" inputMode="numeric" value={form.retentionDays} onChange={(e) => set("retentionDays", e.target.value)} />
-              </Field>
-              <Field label="Default support access (hours)" htmlFor="pf-set-sup" error={errors.supportAccessHours} hint={`${SUPPORT_HOURS.min} to ${SUPPORT_HOURS.max}. Suggested length when a tenant grants support access.`} required>
-                <Input id="pf-set-sup" inputMode="numeric" value={form.supportAccessHours} onChange={(e) => set("supportAccessHours", e.target.value)} />
-              </Field>
+              </FormSection>
+              <FormSection icon={SlidersHorizontal} title="Defaults">
+                <Field label="Trial length (days)" htmlFor="pf-set-trial" error={errors.defaultTrialDays} hint={`${TRIAL_DAYS.min}–${TRIAL_DAYS.max} · for new plans`} required>
+                  <Input id="pf-set-trial" inputMode="numeric" value={form.defaultTrialDays} onChange={(e) => set("defaultTrialDays", e.target.value)} />
+                </Field>
+                <div className="od-row2">
+                  <Field label="Retention (days)" htmlFor="pf-set-ret" error={errors.retentionDays} hint={`${RETENTION_DAYS.min}–${RETENTION_DAYS.max} · closed workspaces`} required>
+                    <Input id="pf-set-ret" inputMode="numeric" value={form.retentionDays} onChange={(e) => set("retentionDays", e.target.value)} />
+                  </Field>
+                  <Field label="Support access (hours)" htmlFor="pf-set-sup" error={errors.supportAccessHours} hint={`${SUPPORT_HOURS.min}–${SUPPORT_HOURS.max} · suggested length`} required>
+                    <Input id="pf-set-sup" inputMode="numeric" value={form.supportAccessHours} onChange={(e) => set("supportAccessHours", e.target.value)} />
+                  </Field>
+                </div>
+              </FormSection>
             </div>
             <div className="od-form-col">
-              <label htmlFor="pf-set-ann" className="pf-mod">
-                <span>Show an announcement in every tenant app</span>
-                <Switch id="pf-set-ann" checked={form.announce} disabled={!canWrite} onCheckedChange={(c) => set("announce", c)} />
-              </label>
-              {form.announce ? (
-                <>
-                  <Field label="Kind" htmlFor="pf-set-kind">
-                    <FilterSelect label="Kind" value={form.kind} options={NOTICE_KINDS} onChange={(v) => set("kind", v)} />
-                  </Field>
-                  <Field label="Message" htmlFor="pf-set-msg" error={errors.message} hint={`${form.message.trim().length}/${NOTICE_MAX}. Tenants see it above every page.`} required>
-                    <Textarea id="pf-set-msg" value={form.message} rows={3} maxLength={NOTICE_MAX} onChange={(e) => set("message", e.target.value)} />
-                  </Field>
-                  <Field label="Ends (optional)" htmlFor="pf-set-end" error={errors.endsAt} hint={`${tzLabel}. Leave empty to show it until you turn it off.`}>
-                    <DatePicker value={form.endsAt} onChange={(v) => set("endsAt", v)} today={today} min={today.slice(0, 10)} withTime label="Ends" placeholder="No end" />
-                  </Field>
-                  {preview && (
-                    <div>
-                      <h2 className="pf-sub-h">Preview</h2>
-                      <PlatformNoticeBanner notice={preview} today={today} tzLabel={tzLabel} preview />
+              <FormSection icon={Megaphone} title="Announcement">
+                <label htmlFor="pf-set-ann" className="pf-mod">
+                  <span>Show an announcement in every tenant app</span>
+                  <Switch id="pf-set-ann" checked={form.announce} disabled={!canWrite} onCheckedChange={(c) => set("announce", c)} />
+                </label>
+                {form.announce ? (
+                  <>
+                    <div className="od-field">
+                      <span className="fs-label">Kind</span>
+                      <FilterSeg label="Kind" value={form.kind} options={NOTICE_KINDS} onChange={(v) => set("kind", v)} />
                     </div>
-                  )}
-                </>
-              ) : (
-                <p className="pf-notice-off">No announcement is showing. Turn it on to add an information or maintenance notice.</p>
-              )}
+                    <Field label="Message" htmlFor="pf-set-msg" error={errors.message} hint={`${form.message.trim().length}/${NOTICE_MAX}`} required>
+                      <Textarea id="pf-set-msg" value={form.message} rows={3} maxLength={NOTICE_MAX} placeholder="e.g. Maintenance on Sunday 02:00–03:00" onChange={(e) => set("message", e.target.value)} />
+                    </Field>
+                    <Field label="Ends" htmlFor="pf-set-end" error={errors.endsAt} hint={`${tzLabel} · empty = until turned off`}>
+                      <DatePicker value={form.endsAt} onChange={(v) => set("endsAt", v)} today={today} min={today.slice(0, 10)} withTime label="Ends" placeholder="No end" />
+                    </Field>
+                    {preview && (
+                      <div>
+                        <h2 className="pf-sub-h">Preview</h2>
+                        <PlatformNoticeBanner notice={preview} today={today} tzLabel={tzLabel} preview />
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <p className="pf-notice-off">No announcement is showing.</p>
+                )}
+              </FormSection>
               {canWrite && changed && (
-                <Field label="Reason for the change" htmlFor="pf-set-reason" error={errors.reason} hint={`At least ${REASON_MIN} characters. Saved in the audit trail.`} required>
-                  <Textarea id="pf-set-reason" value={reason} rows={2} maxLength={300} onChange={(e) => { setReason(e.target.value); setErrors((x) => ({ ...x, reason: undefined })) }} />
-                </Field>
+                <FormSection icon={FileText} title="Reason">
+                  <Field label="Why the change" htmlFor="pf-set-reason" error={errors.reason} hint={`At least ${REASON_MIN} characters · audit trail`} required>
+                    <Textarea id="pf-set-reason" value={reason} rows={2} maxLength={300} onChange={(e) => { setReason(e.target.value); setErrors((x) => ({ ...x, reason: undefined })) }} />
+                  </Field>
+                </FormSection>
               )}
             </div>
           </div>

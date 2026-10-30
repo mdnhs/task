@@ -9,7 +9,7 @@ import { ConfirmDialog } from "@/components/confirm-dialog"
 import { DataPagination } from "@/components/data-pagination"
 import { EmptyState } from "@/components/empty-state"
 import { Field } from "@/components/field"
-import { FilterSelect } from "@/components/filter-bar"
+import { FilterSeg, FilterSelect } from "@/components/filter-bar"
 import { Icon } from "@/components/icons"
 import { StatusPill } from "@/components/status-pill"
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -113,6 +113,9 @@ export function DevicesPanel({ devices, users, today, tzLabel, canWrite, scopeKe
   )
 }
 
+// Short FilterSeg labels; the register rows keep the full DEVICE_TYPES labels.
+const SHORT_TYPE: Record<DeviceType, string> = { pc: "PC", android: "Android", browser: "Browser" }
+
 function AddDeviceDialog({ users, onClose, onAdd }: { users: DeviceUser[]; onClose(): void; onAdd(d: Omit<Device, "id" | "lastSeen">): void }) {
   const [text, setText] = useState("")
   const [userId, setUserId] = useState("")
@@ -138,21 +141,25 @@ function AddDeviceDialog({ users, onClose, onAdd }: { users: DeviceUser[]; onClo
       <DialogContent className="od-dialog od-form-dialog" showCloseButton={false}>
         <DialogHeader>
           <DialogTitle>Add device</DialogTitle>
-          <DialogDescription>Register the device a person works from. Only a trusted company PC can open Google Drive.</DialogDescription>
+          <DialogDescription>Only a trusted company PC can open Google Drive.</DialogDescription>
         </DialogHeader>
         <form className="od-form" onSubmit={submit} noValidate>
           <Field label="Name" htmlFor="dev-name" error={errors.label} required>
-            <Input id="dev-name" value={text} placeholder="Front desk PC" onChange={(e) => { setText(e.target.value); setErrors((x) => ({ ...x, label: undefined })) }} />
+            <Input id="dev-name" value={text} placeholder="e.g. Front desk PC" onChange={(e) => { setText(e.target.value); setErrors((x) => ({ ...x, label: undefined })) }} />
           </Field>
           <Field label="Allocated to" htmlFor="dev-user" error={errors.userId} required>
             <FilterSelect label="Allocated to" value={userId} options={[{ value: "", label: "Choose a person" }, ...users.map((u) => ({ value: u.id, label: u.name }))]} onChange={(v) => { setUserId(v); setErrors((x) => ({ ...x, userId: undefined })) }} />
           </Field>
-          <Field label="Type" htmlFor="dev-type">
-            <FilterSelect label="Type" value={type} options={DEVICE_TYPES} onChange={(v) => setType(v as DeviceType)} />
-          </Field>
-          <Field label="Owner" htmlFor="dev-owner">
-            <FilterSelect label="Owner" value={owner} options={DEVICE_OWNERS} onChange={(v) => setOwner(v as DeviceOwner)} />
-          </Field>
+          <div className="od-row2">
+            <div className="od-field set-seg-field">
+              <span className="fs-label">Type</span>
+              <FilterSeg<DeviceType> label="Type" value={type} options={DEVICE_TYPES.map((t) => ({ value: t.value, label: SHORT_TYPE[t.value] }))} onChange={setType} />
+            </div>
+            <div className="od-field set-seg-field">
+              <span className="fs-label">Owner</span>
+              <FilterSeg<DeviceOwner> label="Owner" value={owner} options={DEVICE_OWNERS} onChange={setOwner} />
+            </div>
+          </div>
           <label className="set-switch-row">
             <Switch checked={trusted} onCheckedChange={setTrusted} aria-label="Trusted" />
             Trusted device

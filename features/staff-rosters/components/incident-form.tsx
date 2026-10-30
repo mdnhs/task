@@ -3,10 +3,12 @@
 import { useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+import { ClipboardList, MapPin, Siren } from "lucide-react"
 import { toast } from "sonner"
 
 import { Field } from "@/components/field"
-import { FilterSelect } from "@/components/filter-bar"
+import { FilterSeg, FilterSelect } from "@/components/filter-bar"
+import { FoldToggle, FormFold, FormSection } from "@/components/form-section"
 import { PageHead } from "@/components/page-head"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -45,6 +47,7 @@ export function IncidentForm({
   const [, setIncidents] = incidentsStore.useStore(incidents, scopeKey)
   const [form, setForm] = useState<Form>({ type: "callout", staff: "", site: "", client: "", shift: "", action: "", contact: "", notes: "" })
   const [errors, setErrors] = useState<Errors>({})
+  const [showMore, setShowMore] = useState(false)
   const set = <K extends keyof Form>(k: K, v: Form[K]) => {
     setForm((f) => ({ ...f, [k]: v }))
     setErrors((e) => (e[k] ? { ...e, [k]: undefined } : e))
@@ -65,49 +68,65 @@ export function IncidentForm({
     router.push(BACK)
   }
 
+  // Contact and notes start folded; an error inside opens the fold so the message is seen.
+  const moreOpen = showMore || !!errors.notes || !!errors.contact
+
   return (
     <>
       <Link href={BACK} className="sr-back">← Staff &amp; Rosters</Link>
-      <PageHead title="Log incident" subtitle="Record a call-out, no-show, cover request or staff issue." />
+      <PageHead title="Log incident" subtitle="Call-out, no-show, cover request or staff issue." />
       <div className="card sr-page-card">
-        <form className="od-form" onSubmit={submit} noValidate>
+        <form className="od-form sr-form" onSubmit={submit} noValidate>
           <div className="od-form-cols">
             <div className="od-form-col">
-              <div className="od-row2">
-                <Field label="Type" htmlFor="sr-type" error={errors.type} required>
-                  <FilterSelect label="Type" value={form.type} options={TYPES} onChange={(v) => set("type", v)} />
-                </Field>
-                <Field label="Staff member" htmlFor="sr-staff" error={errors.staff} required>
-                  <FilterSelect
-                    label="Staff member"
-                    value={form.staff}
-                    options={[{ value: "", label: "Choose…" }, ...staff.map((s) => ({ value: s.name, label: s.name }))]}
-                    onChange={(v) => set("staff", v)}
-                  />
-                </Field>
-              </div>
-              <div className="od-row2">
-                <Field label="Site" htmlFor="sr-site" error={errors.site} required>
-                  <Input id="sr-site" value={form.site} onChange={(e) => set("site", e.target.value)} />
-                </Field>
-                <Field label="Client" htmlFor="sr-client" error={errors.client} required>
-                  <Input id="sr-client" value={form.client} onChange={(e) => set("client", e.target.value)} />
-                </Field>
-              </div>
-              <Field label="Shift or subject" htmlFor="sr-shift" error={errors.shift} hint="For example 22:00–06:00, or Licence" required>
-                <Input id="sr-shift" value={form.shift} onChange={(e) => set("shift", e.target.value)} />
-              </Field>
+              <FormSection icon={Siren} title="Incident">
+                <div className="od-field sr-seg">
+                  <span className="fs-label">Type</span>
+                  <FilterSeg label="Type" value={form.type} options={TYPES} onChange={(v) => set("type", v)} />
+                </div>
+                <div className="od-row2">
+                  <Field label="Staff member" htmlFor="sr-staff" error={errors.staff} required>
+                    <FilterSelect
+                      label="Staff member"
+                      value={form.staff}
+                      options={[{ value: "", label: "Choose…" }, ...staff.map((s) => ({ value: s.name, label: s.name }))]}
+                      onChange={(v) => set("staff", v)}
+                    />
+                  </Field>
+                  <Field label="Shift or subject" htmlFor="sr-shift" error={errors.shift} required>
+                    <Input id="sr-shift" placeholder="e.g. 22:00–06:00" value={form.shift} onChange={(e) => set("shift", e.target.value)} />
+                  </Field>
+                </div>
+              </FormSection>
+              <FormSection icon={MapPin} title="Where">
+                <div className="od-row2">
+                  <Field label="Site" htmlFor="sr-site" error={errors.site} required>
+                    <Input id="sr-site" value={form.site} onChange={(e) => set("site", e.target.value)} />
+                  </Field>
+                  <Field label="Client" htmlFor="sr-client" error={errors.client} required>
+                    <Input id="sr-client" value={form.client} onChange={(e) => set("client", e.target.value)} />
+                  </Field>
+                </div>
+              </FormSection>
             </div>
             <div className="od-form-col">
-              <Field label="Next action" htmlFor="sr-action" error={errors.action} required>
-                <Input id="sr-action" value={form.action} onChange={(e) => set("action", e.target.value)} />
-              </Field>
-              <Field label="Contact (optional)" htmlFor="sr-contact" hint="Visible only to roles with staff write access">
-                <Input id="sr-contact" value={form.contact} onChange={(e) => set("contact", e.target.value)} />
-              </Field>
-              <Field label="Notes (optional)" htmlFor="sr-notes" error={errors.notes}>
-                <Textarea id="sr-notes" value={form.notes} onChange={(e) => set("notes", e.target.value)} />
-              </Field>
+              <FormSection
+                icon={ClipboardList}
+                title="Follow-up"
+                action={<FoldToggle open={moreOpen} onToggle={() => setShowMore((v) => !v)} controls="sr-more" label="Contact, notes" />}
+              >
+                <Field label="Next action" htmlFor="sr-action" error={errors.action} required>
+                  <Input id="sr-action" placeholder="e.g. Find cover by 18:00" value={form.action} onChange={(e) => set("action", e.target.value)} />
+                </Field>
+                <FormFold id="sr-more" open={moreOpen}>
+                  <Field label="Contact" htmlFor="sr-contact" error={errors.contact} hint="Hidden from read-only roles">
+                    <Input id="sr-contact" placeholder="e.g. phone number" value={form.contact} onChange={(e) => set("contact", e.target.value)} />
+                  </Field>
+                  <Field label="Notes" htmlFor="sr-notes" error={errors.notes}>
+                    <Textarea id="sr-notes" value={form.notes} onChange={(e) => set("notes", e.target.value)} />
+                  </Field>
+                </FormFold>
+              </FormSection>
             </div>
           </div>
           <div className="od-form-foot">

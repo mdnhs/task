@@ -273,11 +273,11 @@ function InviteDialog({ roles, departments, onClose, onInvite }: { roles: RoleOp
       <DialogContent className="od-dialog od-form-dialog" showCloseButton={false}>
         <DialogHeader>
           <DialogTitle>Invite user</DialogTitle>
-          <DialogDescription>They get an email with a link to join. It expires after {INVITE_DAYS} days.</DialogDescription>
+          <DialogDescription>They get a join link by email. It expires after {INVITE_DAYS} days.</DialogDescription>
         </DialogHeader>
         <form className="od-form" onSubmit={submit} noValidate>
           <Field label="Email" htmlFor="inv-email" error={errors.email} required>
-            <Input id="inv-email" type="email" value={email} onChange={(e) => { setEmail(e.target.value); setErrors((x) => ({ ...x, email: undefined })) }} />
+            <Input id="inv-email" type="email" placeholder="e.g. name@company.com" value={email} onChange={(e) => { setEmail(e.target.value); setErrors((x) => ({ ...x, email: undefined })) }} />
           </Field>
           <div className="od-row2">
             <Field label="Role" htmlFor="inv-role" error={errors.role} required>

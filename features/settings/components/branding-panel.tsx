@@ -1,11 +1,13 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
+import { ImageIcon, Palette, SlidersHorizontal } from "lucide-react"
 import { toast } from "sonner"
 import { z } from "zod"
 
 import { ActionButton } from "@/components/action-button"
 import { Field } from "@/components/field"
+import { FormSection } from "@/components/form-section"
 import { ColorPicker } from "@/components/ui/color-picker"
 import { Input } from "@/components/ui/input"
 import { saveBranding } from "@/app/actions/session"
@@ -89,33 +91,43 @@ export function BrandingPanel({ tenantId, name, color, appearance, presets, canW
       </div>
       <div className="set-brand">
         <form className="od-form set-form" noValidate onSubmit={(e) => { e.preventDefault(); document.getElementById("brand-save")?.click() }}>
-          <Field label="Display name" htmlFor="brand-name" error={errors.name} required>
-            <Input id="brand-name" value={form.name} readOnly={!canWrite} onChange={(e) => { setForm((f) => ({ ...f, name: e.target.value })); setErrors((x) => ({ ...x, name: undefined })) }} />
-          </Field>
-          <Field label="Logo" htmlFor="brand-logo" error={errors.logo} hint="PNG, JPG, SVG or WebP, up to 512 KB">
-            <span className="set-upload">
-              <input ref={file} id="brand-logo" type="file" accept={LOGO_ACCEPT} className="sr-only" tabIndex={-1} disabled={!canWrite} onChange={(e) => { pick(e.target.files?.[0]); e.target.value = "" }} />
-              <button
-                type="button"
-                className="set-drop"
-                data-over={over ? "" : undefined}
-                data-disabled={canWrite ? undefined : ""}
-                disabled={!canWrite}
-                onClick={() => file.current?.click()}
-                onDragOver={(e) => { if (!canWrite) return; e.preventDefault(); setOver(true) }}
-                onDragLeave={() => setOver(false)}
-                onDrop={(e) => { e.preventDefault(); setOver(false); pick(e.dataTransfer.files?.[0]) }}
-              >
-                <strong>{logo ? "Replace logo" : "Upload logo"}</strong>
-                <span>Click to choose or drop an image here</span>
-              </button>
-              {logo && canWrite && <button type="button" className="btn btn-outline" onClick={() => setLogo("")}>Remove logo</button>}
-            </span>
-          </Field>
-          <Field label="Brand colour" htmlFor="brand-color" error={errors.color} required>
-            <ColorPicker id="brand-color" aria-label="Brand colour" value={form.color} presets={presets} disabled={!canWrite} readOnly={!canWrite} invalid={!!errors.color} onValueChange={(hex) => { setForm((f) => ({ ...f, color: hex })); setErrors((x) => ({ ...x, color: undefined })) }} />
-          </Field>
-          <AppearancePicker value={look} disabled={!canWrite} onChange={setLook} onReset={lookDefault ? undefined : () => setLook(DEFAULT_APPEARANCE)} />
+          <FormSection icon={ImageIcon} title="Name and logo">
+            <Field label="Display name" htmlFor="brand-name" error={errors.name} required>
+              <Input id="brand-name" value={form.name} readOnly={!canWrite} onChange={(e) => { setForm((f) => ({ ...f, name: e.target.value })); setErrors((x) => ({ ...x, name: undefined })) }} />
+            </Field>
+            <Field label="Logo" htmlFor="brand-logo" error={errors.logo} hint="PNG, JPG, SVG or WebP, up to 512 KB">
+              <span className="set-upload">
+                <input ref={file} id="brand-logo" type="file" accept={LOGO_ACCEPT} className="sr-only" tabIndex={-1} disabled={!canWrite} onChange={(e) => { pick(e.target.files?.[0]); e.target.value = "" }} />
+                <button
+                  type="button"
+                  className="set-drop"
+                  data-over={over ? "" : undefined}
+                  data-disabled={canWrite ? undefined : ""}
+                  disabled={!canWrite}
+                  onClick={() => file.current?.click()}
+                  onDragOver={(e) => { if (!canWrite) return; e.preventDefault(); setOver(true) }}
+                  onDragLeave={() => setOver(false)}
+                  onDrop={(e) => { e.preventDefault(); setOver(false); pick(e.dataTransfer.files?.[0]) }}
+                >
+                  <strong>{logo ? "Replace logo" : "Upload logo"}</strong>
+                  <span>Click or drop an image</span>
+                </button>
+                {logo && canWrite && <button type="button" className="btn btn-outline" onClick={() => setLogo("")}>Remove logo</button>}
+              </span>
+            </Field>
+          </FormSection>
+          <FormSection icon={Palette} title="Colour">
+            <Field label="Brand colour" htmlFor="brand-color" error={errors.color} required>
+              <ColorPicker id="brand-color" aria-label="Brand colour" value={form.color} presets={presets} disabled={!canWrite} readOnly={!canWrite} invalid={!!errors.color} onValueChange={(hex) => { setForm((f) => ({ ...f, color: hex })); setErrors((x) => ({ ...x, color: undefined })) }} />
+            </Field>
+          </FormSection>
+          <FormSection
+            icon={SlidersHorizontal}
+            title="Appearance"
+            action={!lookDefault && canWrite && <button type="button" className="fs-act" onClick={() => setLook(DEFAULT_APPEARANCE)}>Reset to default</button>}
+          >
+            <AppearancePicker value={look} disabled={!canWrite} onChange={setLook} />
+          </FormSection>
           {canWrite && (
             <div className="od-form-foot">
               {(chip.toLowerCase() !== color.toLowerCase() || logo !== savedLogo || lookChanged) && <span className="od-field-hint">Previewing. Save to keep these changes.</span>}
@@ -144,14 +156,10 @@ const GROUPS = [
   { key: "spacing", label: "Spacing" },
 ] as const
 
-// Workspace appearance presets (spec 2026-10-30-appearance-presets-design.md): one pill row per setting, native radios.
-function AppearancePicker({ value, disabled, onChange, onReset }: { value: Appearance; disabled: boolean; onChange: (a: Appearance) => void; onReset?: () => void }) {
+// Workspace appearance presets (spec 2026-10-30-appearance-presets-design.md): one pill row per setting, native radios. The section heading holds Reset.
+function AppearancePicker({ value, disabled, onChange }: { value: Appearance; disabled: boolean; onChange: (a: Appearance) => void }) {
   return (
     <div className="set-appear">
-      <div className="set-appear-head">
-        <span className="od-field-label">Appearance</span>
-        {onReset && !disabled && <button type="button" className="set-appear-reset" onClick={onReset}>Reset to default</button>}
-      </div>
       {GROUPS.map((g) => (
         <fieldset key={g.key} className="set-appear-row" disabled={disabled}>
           <legend>{g.label}</legend>

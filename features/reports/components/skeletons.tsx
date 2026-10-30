@@ -170,6 +170,15 @@ export function ReportsSkeleton({ own = false, prompts = 0, mine = true, rows = 
   )
 }
 
+/** A FormSection heading (components/form-section.tsx): icon chip, title, optional note on the right. */
+const SecHead = ({ w, note = false }: { w: number; note?: boolean }) => (
+  <div className="fs-sec-h">
+    <Sk w={30} h={30} r={10} />
+    <Sk w={w} h={13} lh={22} />
+    {note && <Sk w={52} h={10} lh={16} style={{ marginLeft: "auto" }} />}
+  </div>
+)
+
 /**
  * Mirrors ReportPage. loading.tsx gets no params, so counts are typical values: `edit` = the member's editor (task rows with
  * inputs, notes card with summary, blockers, unplanned, attachments, one extra section), otherwise the read-only review
@@ -203,7 +212,7 @@ export function ReportPageSkeleton({ edit = false, review = false, items = 5 }: 
           </dl>
         </section>
         <section className="card">
-          <CardHead title={150} sub={edit ? 300 : 60} />
+          <CardHead title={150} sub={edit ? 295 : 60} />
           <div className="table-wrap">
             <table className={`rtable sr-items${edit ? " sr-items-edit" : ""}`}>
               <thead><tr>{[40, 46, 60, 40].map((w, i) => <th key={i}><Sk w={w} h={10} lh={16} /></th>)}</tr></thead>
@@ -232,14 +241,31 @@ export function ReportPageSkeleton({ edit = false, review = false, items = 5 }: 
         </section>
         <section className="card sr-notes">
           {edit ? (
-            <>
-              {[0, 1].map((i) => (
-                <div key={i} className="od-field"><Sk w={80} h={11} lh={18} /><Sk w="100%" h={96} r={14} /></div>
-              ))}
-              {[0, 1, 2].map((i) => (
-                <div key={i} className="sr-set"><Sk w={120} h={12} lh={20} /><Sk w={190} h={34} r="pill" /></div>
-              ))}
-            </>
+            // report-editor.tsx: Notes (summary, blockers) and one two-field extra template section | Unplanned work, Attachments.
+            <div className="od-form-cols">
+              <div className="od-form-col">
+                <section className="fs-sec">
+                  <SecHead w={46} />
+                  {[0, 1].map((i) => (
+                    <div key={i} className="od-field"><Sk w={80} h={11} lh={18} /><Sk w="100%" h={76} r={14} /></div>
+                  ))}
+                </section>
+                <section className="fs-sec">
+                  <SecHead w={70} />
+                  {[0, 1].map((i) => (
+                    <div key={i} className="od-field"><Sk w={120} h={11} lh={18} /><Sk w="100%" h={72} r={14} /></div>
+                  ))}
+                </section>
+              </div>
+              <div className="od-form-col">
+                {[120, 100].map((w, i) => (
+                  <section key={i} className="fs-sec">
+                    <SecHead w={w} note />
+                    <div className="sr-set"><Sk w={150} h={34.8} r="pill" /></div>
+                  </section>
+                ))}
+              </div>
+            </div>
           ) : (
             [0, 1, 2, 3, 4].map((i) => (
               <div key={i}><Sk w={110} h={16} lh={24} style={{ marginBottom: 12 }} /><Sk w="70%" h={12} lh={22} /></div>

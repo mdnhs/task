@@ -133,7 +133,7 @@ function DepartmentDialog({ dep, owners, onClose, onSave }: { dep?: Department; 
       <DialogContent className="od-dialog od-form-dialog" showCloseButton={false}>
         <DialogHeader>
           <DialogTitle>{dep ? "Edit department" : "Add department"}</DialogTitle>
-          <DialogDescription>Sites and teams are comma separated.</DialogDescription>
+          <DialogDescription>Separate sites and teams with commas.</DialogDescription>
         </DialogHeader>
         <form className="od-form" onSubmit={submit} noValidate>
           <Field label="Name" htmlFor="dep-name" error={errors.name} required>
@@ -143,10 +143,10 @@ function DepartmentDialog({ dep, owners, onClose, onSave }: { dep?: Department; 
             <FilterSelect label="Report owner" value={owner} options={options} onChange={(v) => { setOwner(v); setErrors((x) => ({ ...x, reportOwner: undefined })) }} />
           </Field>
           <Field label="Sites" htmlFor="dep-sites">
-            <Input id="dep-sites" value={sites} onChange={(e) => setSites(e.target.value)} placeholder="Canary Wharf, Riverside House" />
+            <Input id="dep-sites" value={sites} onChange={(e) => setSites(e.target.value)} placeholder="e.g. Canary Wharf, Riverside House" />
           </Field>
           <Field label="Teams" htmlFor="dep-teams">
-            <Input id="dep-teams" value={teams} onChange={(e) => setTeams(e.target.value)} placeholder="Day patrol, Night patrol" />
+            <Input id="dep-teams" value={teams} onChange={(e) => setTeams(e.target.value)} placeholder="e.g. Day patrol, Night patrol" />
           </Field>
           <div className="od-form-foot">
             <DialogClose render={<button type="button" className="btn btn-outline" />}>Cancel</DialogClose>

@@ -13,7 +13,7 @@ export const planEditPath = (id: string) => `${PLANS_PATH}/${encodeURIComponent(
 export const PLAN_NEW_PATH = `${PLANS_PATH}/new`
 export const PLAN_NEW_SUBTITLE = "Set the price, limits and modules. It joins the comparison and can be picked for tenants right away."
 export const PRICE_CHANGE_NOTICE = "Existing tenants keep their price until renewal."
-export const PLAN_EDIT_SUBTITLE = "Changes apply to every tenant on this plan and are recorded in the audit trail."
+export const PLAN_EDIT_SUBTITLE = "Applies to every tenant on this plan · recorded in the audit log"
 
 // Console page heads (D2): each page's title and subtitle (and its nav icon).
 export const PAGE_HEADS = {

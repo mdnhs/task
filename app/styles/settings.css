@@ -187,3 +187,14 @@
 .set-appear-row:disabled .set-opt{cursor:not-allowed;opacity:.6}
 .set-appear-row:disabled .set-opt:hover{color:var(--ink-2)}
 @media (max-width:640px){.set-appear-row{grid-template-columns:minmax(0,1fr)}}
+/* Forms (ui-rules.md rule 32): chip choices inside settings cards; long labels may wrap on phones */
+.set-card .rp-day{height:auto;min-height:36px;padding-block:8px;line-height:20px;text-align:left}
+.set-card .rp-day:disabled{cursor:not-allowed}
+.set-card .rp-day:disabled:not([aria-pressed="true"]):hover{color:var(--ink-2)}
+.set-card .rp-day:disabled:not([aria-pressed="true"]){opacity:.6}
+.rp-day.sk-pill{background:color-mix(in srgb,var(--ink) 8%,transparent);cursor:default}
+/* .seg is hidden on phones by opsdesk.css (topbar); form FilterSegs stay visible */
+.set-seg-field>.seg.od-seg{display:flex;align-self:flex-start}
+.dev-policy .seg.od-seg{background:var(--card)}
+/* the hidden logo input must keep .sr-only size (.od-field input sets width:100%, which made the page scroll sideways) */
+.set-upload>input.sr-only{width:1px;min-height:0;height:1px;padding:0}

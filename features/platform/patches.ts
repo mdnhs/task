@@ -3,7 +3,7 @@ import type { AuditEntry, DataRequest, Invoice, PlatformTenant } from "./types"
 
 // Store patch model (pure part; the stores are in store.ts). A page that holds only slim tenant rows (the tenants list)
 // never writes full records: it records a patch per tenant and pushes new audit entries to an outbox. A page that holds
-// the full records (usePlatform) applies both over its own server data and then clears them.
+// the full records (foldPending) applies both over its own server data and then clears them.
 
 /**
  * The fields a page may change on a tenant: the tenants list writes the suspend fields, the tenant 360 (Task 5) the rest.

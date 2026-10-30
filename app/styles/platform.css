@@ -414,6 +414,8 @@ button.pf-arrow:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
 .pf-form-sum .pf-sub-h{margin-bottom:10px}
 .pf-form-danger{background:var(--bad-bg)}
 .pf-form-danger .pf-sub-h{color:var(--bad)}
+.pf-sec-danger .fs-sec-i,:root[data-theme="dark"] .pf-sec-danger .fs-sec-i{background:var(--bad-bg);color:var(--bad)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .pf-sec-danger .fs-sec-i{color:var(--bad)}}
 .pf-form-big{margin:0;font-size:22px;line-height:30px;font-weight:700;color:var(--ink);letter-spacing:-.01em}
 .pf-form-list{margin:0 0 12px;padding-left:18px;display:flex;flex-direction:column;gap:6px;font-size:14px;line-height:21px;color:var(--ink)}
 .pf-form-sum .pf-muted{margin:0;font-size:13px;line-height:20px;color:var(--ink-2)}

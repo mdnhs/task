@@ -117,5 +117,5 @@
 .sr-row{display:grid;grid-template-columns:minmax(0,1fr) 96px 34px;gap:8px;align-items:center}
 .sr-set .rf-add{cursor:pointer}
 .sr-set .sr-only:focus-visible+label.rf-add{outline:2px solid var(--brand);outline-offset:2px}
-.sr-short{min-height:72px}
+.od-field textarea.sr-short[data-slot]{min-height:72px}
 @media print{.sr-counts,.sr-prompt{display:none !important}}

@@ -5,6 +5,8 @@ import { toast } from "sonner"
 
 import { DatePicker } from "@/components/date-picker"
 import { Field } from "@/components/field"
+import { FilterSelect } from "@/components/filter-bar"
+import { PeoplePicker } from "@/components/form-section"
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
 import { formatDate } from "@/lib/dates"
@@ -122,12 +124,12 @@ export function ProposeDialog({ open, onOpenChange, task, today, onSave }: {
       <DialogContent className="od-dialog od-form-dialog" showCloseButton={false}>
         <DialogHeader>
           <DialogTitle>Propose new dates</DialogTitle>
-          <DialogDescription>Only managers change timelines. Your manager approves or declines this.</DialogDescription>
+          <DialogDescription>Your manager approves or declines the change.</DialogDescription>
         </DialogHeader>
         <form className="od-form" onSubmit={save} noValidate>
           <DateFields id="pp" start={start} due={due} today={today} onStart={(v) => { setStart(v); setErr("") }} onDue={(v) => { setDue(v); setErr("") }} />
           <Field label="Reason" htmlFor="pp-reason" required>
-            <Textarea id="pp-reason" value={reason} onChange={(e) => { setReason(e.target.value); setErr("") }} />
+            <Textarea id="pp-reason" placeholder="e.g. Parts arrive on Friday" value={reason} onChange={(e) => { setReason(e.target.value); setErr("") }} />
           </Field>
           {err && <p className="rp-err" role="alert">{err}</p>}
           <div className="od-form-foot">
@@ -140,26 +142,12 @@ export function ProposeDialog({ open, onOpenChange, task, today, onSave }: {
   )
 }
 
-/** People as toggle chips (several assignees, FR-M1-01). The first picked is the primary assignee. */
-export function PeopleChips({ people, value, onChange, label }: { people: Person[]; value: string[]; onChange(ids: string[]): void; label: string }) {
-  return (
-    <div className="er-types" role="group" aria-label={label}>
-      {people.map((p) => {
-        const on = value.includes(p.id)
-        return (
-          <button key={p.id} type="button" className="rp-day" aria-pressed={on} onClick={() => onChange(on ? value.filter((x) => x !== p.id) : [...value, p.id])}>
-            {p.name}
-            {value[0] === p.id && <span className="er-pc"> · primary</span>}
-          </button>
-        )
-      })}
-    </div>
-  )
-}
-
 export function ReassignDialog({ open, onOpenChange, task, people, onSave }: { open: boolean; onOpenChange(o: boolean): void; task: Task; people: Person[]; onSave(ids: string[]): void }) {
-  const [ids, setIds] = useState<string[]>([task.assignee, ...(task.assignees ?? [])])
+  // The primary assignee comes first (FR-M1-01); with no primary, the first other person takes its place.
+  const [primary, setPrimary] = useState(task.assignee)
+  const [others, setOthers] = useState<string[]>(task.assignees ?? [])
   const [err, setErr] = useState("")
+  const ids = [...new Set([primary, ...others].filter(Boolean))]
   function save(e: React.FormEvent) {
     e.preventDefault()
     if (ids.length === 0) return setErr("Choose at least one person")
@@ -172,11 +160,20 @@ export function ReassignDialog({ open, onOpenChange, task, people, onSave }: { o
       <DialogContent className="od-dialog od-form-dialog" showCloseButton={false}>
         <DialogHeader>
           <DialogTitle>Reassign</DialogTitle>
-          <DialogDescription>Pick who works on {task.ref}. Everyone added or removed is notified.</DialogDescription>
+          <DialogDescription>Who works on {task.ref}. Everyone added or removed is notified.</DialogDescription>
         </DialogHeader>
         <form className="od-form" onSubmit={save} noValidate>
-          <PeopleChips people={people} value={ids} onChange={(v) => { setIds(v); setErr("") }} label="Assignees" />
-          {err && <p className="rp-err" role="alert">{err}</p>}
+          <Field label="Assignee" htmlFor="ra-assignee" error={err || undefined}>
+            <FilterSelect
+              label="Assignee"
+              value={primary}
+              options={[{ value: "", label: "Choose…" }, ...people.map((p) => ({ value: p.id, label: p.name }))]}
+              onChange={(v) => { setPrimary(v); setErr("") }}
+            />
+          </Field>
+          <Field label="Also assigned" htmlFor="ra-others">
+            <PeoplePicker people={people} value={others} onChange={(v) => { setOthers(v); setErr("") }} label="Also assigned" exclude={[primary]} />
+          </Field>
           <div className="od-form-foot">
             <DialogClose render={<button type="button" className="btn btn-outline" />}>Cancel</DialogClose>
             <button type="submit" className="btn btn-primary">Save</button>

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react"
 import { AnimatePresence, motion } from "motion/react"
+import { Camera, Link2, ListChecks, PenLine, StickyNote, Upload } from "lucide-react"
 import { toast } from "sonner"
 import { z } from "zod"
 
@@ -143,7 +144,7 @@ export function EvidenceAdder({ task, me, driveAllowed, onAdd }: { task: Task; m
           onDrop={(e) => { e.preventDefault(); setDrag(false); pickFiles(e.dataTransfer.files) }}
         >
           <input type="file" multiple accept={accept} className="sr-only" onChange={(e) => { pickFiles(e.target.files); e.target.value = "" }} />
-          <strong>Drop files here or browse</strong>
+          <strong><Upload aria-hidden="true" />Drop files here or browse</strong>
           <span>{fileTypes.map((t) => EVIDENCE_TYPE_LABEL[t]).join(", ")}. Uploads are simulated in this preview.</span>
         </label>
       )}
@@ -151,16 +152,18 @@ export function EvidenceAdder({ task, me, driveAllowed, onAdd }: { task: Task; m
         {allowed("photo") && (
           <label className="btn btn-outline ev-cam">
             <input type="file" accept="image/*" capture="environment" className="sr-only" onChange={(e) => { pickFiles(e.target.files, true); e.target.value = "" }} />
+            <Camera aria-hidden="true" />
             Take photo
           </label>
         )}
-        {allowed("note") && <button type="button" className="btn btn-outline" aria-pressed={mode === "note"} onClick={() => toggleMode("note")}>Add note</button>}
+        {allowed("note") && <button type="button" className="btn btn-outline" aria-pressed={mode === "note"} onClick={() => toggleMode("note")}><StickyNote aria-hidden="true" />Add note</button>}
         {allowed("drive") && (
           <button type="button" className="btn btn-outline" aria-pressed={mode === "drive"} disabled={!driveAllowed} title={driveAllowed ? undefined : "Available on your work PC"} onClick={() => toggleMode("drive")}>
+            <Link2 aria-hidden="true" />
             Drive link <span className="er-pc">· PC only</span>
           </button>
         )}
-        {allowed("signature") && <button type="button" className="btn btn-outline" onClick={() => setSigning(true)}>Sign</button>}
+        {allowed("signature") && <button type="button" className="btn btn-outline" onClick={() => setSigning(true)}><PenLine aria-hidden="true" />Sign</button>}
         {allowed("checklist") && (
           <button
             type="button"
@@ -172,17 +175,18 @@ export function EvidenceAdder({ task, me, driveAllowed, onAdd }: { task: Task; m
               toast.success("Checklist attached")
             }}
           >
+            <ListChecks aria-hidden="true" />
             Attach checklist
           </button>
         )}
       </div>
       {mode && (
         <form className="td-form" onSubmit={addText} noValidate>
-          <Field label={mode === "drive" ? "Drive link" : "Evidence note"} htmlFor="ev-text" error={textErr} required>
+          <Field label={mode === "drive" ? "Drive link" : "Note"} htmlFor="ev-text" error={textErr} required>
             {mode === "drive" ? (
               <Input id="ev-text" type="url" placeholder="https://drive.google.com/…" value={text} onChange={(e) => { setText(e.target.value); setTextErr(undefined) }} />
             ) : (
-              <Textarea id="ev-text" value={text} onChange={(e) => { setText(e.target.value); setTextErr(undefined) }} />
+              <Textarea id="ev-text" placeholder="e.g. Floor mopped, signs put back" value={text} onChange={(e) => { setText(e.target.value); setTextErr(undefined) }} />
             )}
           </Field>
           <div className="td-form-foot"><button type="submit" className="btn btn-primary">{mode === "drive" ? "Add link" : "Add note"}</button></div>
@@ -413,7 +417,7 @@ export function EvidencePanel({
           </DialogHeader>
           <form className="od-form" onSubmit={confirmReason} noValidate>
             <Field label="Reason" htmlFor="ev-reason" error={reasonErr} required>
-              <Textarea id="ev-reason" value={reason} onChange={(e) => { setReason(e.target.value); setReasonErr(undefined) }} />
+              <Textarea id="ev-reason" placeholder="e.g. The photo is too dark" value={reason} onChange={(e) => { setReason(e.target.value); setReasonErr(undefined) }} />
             </Field>
             <div className="od-form-foot">
               <DialogClose render={<button type="button" className="btn btn-outline" />}>Cancel</DialogClose>
