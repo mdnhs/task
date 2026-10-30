@@ -1,7 +1,7 @@
 // Tenant brand colour → OpsDesk brand tokens (FR-SAAS-11). Shared by the server layout and the branding panel's live preview.
 // The default colour emits nothing, so the hand-tuned tokens in opsdesk.css stay exact.
 
-export const DEFAULT_BRAND = "#2f7d52"
+export const DEFAULT_BRAND = "#1a8a3a"
 export const BRAND_STYLE_ID = "od-brand"
 const HEX = /^#[0-9a-f]{6}$/i
 

@@ -1,7 +1,7 @@
 /* OpsDesk – ported 1:1 from task_light.html / task_dark.html */
 :root{
   color-scheme:light;
-  /* Calm palette: sage/eucalyptus green, warm off-white surfaces, softer ink and muted status colours (less glare, easier on the eyes). */
+  /* Calm palette with the classic OpsDesk green (#1a8a3a) as the brand: warm off-white surfaces, softer ink, muted status colours. */
   --page:#e8ebe6;
   --shell:#f5f6f2;
   --panel:#eef1eb;
@@ -11,13 +11,13 @@
   --ink-3:#8b958f;
   --placeholder:#67736c;
   --line:#e0e5dd;
-  --brand:#2f7d52;
-  --brand-2:#4c9670;
-  --brand-3:#7bb898;
-  --brand-deep:#1f5a3b;
-  --brand-soft:#e3efe6;
-  --stripe:#b3d3bf;
-  --ok:#2f7d52;     --ok-bg:#e2f0e6;
+  --brand:#1a8a3a;
+  --brand-2:#3f9c5c;
+  --brand-3:#5fbb87;
+  --brand-deep:#0f5a26;
+  --brand-soft:#e3f3e8;
+  --stripe:#a9d4b6;
+  --ok:#1d8a46;     --ok-bg:#e1f5e8;
   --warn:#a8742a;   --warn-bg:#f7eedc;
   --bad:#b5524e;    --bad-bg:#f7e4e1;
   --info:#46719e;   --info-bg:#e4ecf5;
@@ -25,6 +25,15 @@
   --on-brand:#ffffff;
   /* Darker brand shade (second bar colour, "in progress" arc). Follows a tenant brand and dark mode because it mixes --brand. */
   --brand-shade:color-mix(in oklab,var(--brand) 72%,#16201b);
+  /* Sidebar promo card ("Work from anywhere"): dark in both themes, derived from the brand so the default and every
+     tenant colour match. brandCss (lib/brand.ts) sets the same mixes for custom brands. */
+  --promo-1:color-mix(in oklab,var(--brand) 88%,#000);
+  --promo-2:color-mix(in oklab,var(--brand) 35%,#000);
+  --promo-3:color-mix(in oklab,var(--brand) 12%,#000);
+  --promo-ring:color-mix(in oklab,var(--brand) 12%,transparent);
+  --promo-text:color-mix(in oklab,var(--brand) 15%,#fff);
+  --promo-btn:color-mix(in oklab,var(--brand) 90%,#fff);
+  --promo-btn-hover:color-mix(in oklab,var(--brand) 78%,#fff);
   --shadow:0 1px 2px rgba(30,50,38,.035),0 8px 24px rgba(30,50,38,.045);
   /* Motion tokens (ui-rules.md → Motion). JS side mirrors them in lib/motion.ts */
   --dur-fast:.15s; --dur:.22s; --dur-slow:.32s;
@@ -35,12 +44,12 @@
 }
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
   --page:#111614;--shell:#161c19;--panel:#1a211d;--card:#1f2722;--ink:#e2e8e3;--ink-2:#a9b5ad;--ink-3:#7a867e;--placeholder:#8a968e;--line:#2a332e;
-  --brand:#4f9d73;--brand-2:#4c9670;--brand-3:#7bb898;--brand-deep:#1d4a32;--brand-soft:#213429;--stripe:#3d6650;
+  --brand:#2fa553;--brand-2:#3f9c5c;--brand-3:#5fbb87;--brand-deep:#0c4a20;--brand-soft:#1f3a29;--stripe:#3b6b4b;
   --ok:#7cc49b;--ok-bg:#1f3628;--warn:#d6a865;--warn-bg:#352c1b;--bad:#dc8b85;--bad-bg:#3a2422;--info:#90b2d8;--info-bg:#1f2b38;--mute-bg:#252d29;
   --shadow:0 1px 2px rgba(0,0,0,.3);color-scheme:dark}}
 :root[data-theme="dark"]{
   --page:#111614;--shell:#161c19;--panel:#1a211d;--card:#1f2722;--ink:#e2e8e3;--ink-2:#a9b5ad;--ink-3:#7a867e;--placeholder:#8a968e;--line:#2a332e;
-  --brand:#4f9d73;--brand-2:#4c9670;--brand-3:#7bb898;--brand-deep:#1d4a32;--brand-soft:#213429;--stripe:#3d6650;
+  --brand:#2fa553;--brand-2:#3f9c5c;--brand-3:#5fbb87;--brand-deep:#0c4a20;--brand-soft:#1f3a29;--stripe:#3b6b4b;
   --ok:#7cc49b;--ok-bg:#1f3628;--warn:#d6a865;--warn-bg:#352c1b;--bad:#dc8b85;--bad-bg:#3a2422;--info:#90b2d8;--info-bg:#1f2b38;--mute-bg:#252d29;
   --shadow:0 1px 2px rgba(0,0,0,.3);color-scheme:dark}
 
@@ -434,8 +443,8 @@ body{padding:0;background:#fff}
 /* Liquid glass over the promo background (iOS/macOS control-tile style). The rings move into the card background so
    ::before can be the frosted pane and ::after a masked gradient rim that stays an even 1px round the corners. */
 .app-card{background:repeating-radial-gradient(circle at 110% 120%,transparent 0 18px,var(--promo-ring,rgba(120,220,150,.09)) 18px 19px),
-  /* Calm palette: still a dark base with a lit corner for contrast, but the glow is sage, not neon. */
-  radial-gradient(120% 90% at 100% 100%,color-mix(in srgb,var(--promo-1,#2f6e4c) 60%,#8fc4a5) 0%,var(--promo-1,#2f6e4c) 24%,transparent 62%),
+  /* Dark base with a lit corner for contrast; the glow is a light tint of the brand. */
+  radial-gradient(120% 90% at 100% 100%,color-mix(in oklab,var(--promo-1) 60%,#fff) 0%,var(--promo-1) 24%,transparent 62%),
   radial-gradient(80% 70% at 0% 0%,var(--promo-2,#1b3a2a) 0%,transparent 62%),color-mix(in srgb,var(--promo-3,#0c1712) 55%,#000)}
 /* Wrapper clips the glass pane: Chrome can paint backdrop-filter past a rounded overflow:hidden box, leaving square corners. */
 .app-card-clip{margin-top:auto;flex:none;border-radius:var(--r-lg);overflow:hidden;isolation:isolate}
