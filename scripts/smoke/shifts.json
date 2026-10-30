@@ -1,0 +1,7 @@
+[
+  {"path": "/shifts", "expect": ["Shifts", "10 people · 7 patterns · Reports due 60 min after shift end", "Night patrol", "Marcus Hill", "New pattern", "This week", "+1"], "notExpect": ["Access restricted"]},
+  {"path": "/shifts", "cookies": {"od-role": "auditor"}, "expect": ["Night patrol", "Marcus Hill"], "notExpect": ["New pattern", "Access restricted"]},
+  {"path": "/shifts", "cookies": {"od-role": "employee"}, "expect": ["Your shifts · Manager: Lilianna Novak · Shift reporting on", "Day patrol"], "notExpect": ["Marcus Hill", "p-marcus", "Night patrol", "p-leo", "New pattern"]},
+  {"path": "/shifts", "cookies": {"od-role": "supervisor"}, "expect": ["Your shifts"], "notExpect": ["Nadia Rahman", "Evening crew", "New pattern"]},
+  {"path": "/", "expect": ["href=\"/shifts\""]}
+]

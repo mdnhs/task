@@ -1,30 +1,30 @@
 {
   "title": "Coverage & Files",
-  "subtitle": "From rosters and employee records",
+  "subtitle": "Rosters · files",
   "coverage": [
     {
       "count": 2,
       "tone": "bad",
-      "title": "Shifts uncovered tomorrow",
-      "detail": "Canary Wharf 22:00 · Shoreditch 06:00"
+      "title": "Uncovered tomorrow",
+      "detail": "Canary Wharf · Shoreditch"
     },
     {
       "count": 5,
       "tone": "warn",
       "title": "Gaps next week",
-      "detail": "Mostly weekend cleaning rounds"
+      "detail": "Mostly weekends"
     },
     {
       "count": 3,
       "tone": "ok",
-      "title": "Call-outs covered today",
-      "detail": "No no-shows reported"
+      "title": "Call-outs covered",
+      "detail": "No no-shows"
     }
   ],
   "expiringDocuments": [
     {
       "title": "SIA licence · M. Haddad",
-      "expires": "Expires 1 Nov 2026",
+      "expires": "Expires 1 Nov, 2026",
       "badge": {
         "tone": "bad",
         "label": "12 days"
@@ -32,7 +32,7 @@
     },
     {
       "title": "Right to work · J. Silva",
-      "expires": "Expires 14 Nov 2026",
+      "expires": "Expires 14 Nov, 2026",
       "badge": {
         "tone": "warn",
         "label": "25 days"
@@ -40,7 +40,7 @@
     },
     {
       "title": "DBS check · A. Kowalski",
-      "expires": "Expires 2 Dec 2026",
+      "expires": "Expires 2 Dec, 2026",
       "badge": {
         "tone": "mute",
         "label": "43 days"

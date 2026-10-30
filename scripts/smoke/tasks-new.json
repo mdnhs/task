@@ -1,0 +1,12 @@
+[
+  {"path": "/tasks/new", "expect": ["New task", "Assign work with an owner", "Create task", "Use template", "Save this form as a template", "← All tasks"], "notExpect": ["Access restricted"]},
+  {"path": "/tasks/new?from=/&then=task", "expect": ["← Dashboard", "Create task"]},
+  {"path": "/tasks/new?from=//evil.test", "expect": ["← All tasks"], "notExpect": ["evil.test\">"]},
+  {"path": "/tasks/new", "cookies": {"od-role": "employee"}, "expect": ["Create task"], "notExpect": ["Save this form as a template", "Access restricted"]},
+  {"path": "/tasks/new", "cookies": {"od-role": "auditor"}, "expect": ["Access restricted"], "notExpect": ["Create task"]},
+  {"path": "/tasks/new", "cookies": {"od-role": "admin"}, "expect": ["Access restricted"], "notExpect": ["Create task"]},
+  {"path": "/tasks", "expect": ["href=\"/tasks/new\""]},
+  {"path": "/tasks", "cookies": {"od-role": "auditor"}, "notExpect": ["/tasks/new"]},
+  {"path": "/", "expect": ["href=\"/tasks/new?from=%2F&amp;then=task\""]},
+  {"path": "/tasks?new=1", "expect": ["NEXT_REDIRECT;replace;/tasks/new"]}
+]

@@ -2,9 +2,10 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { AlarmClock, BellRing, CalendarClock, FileCheck2, ListChecks, Repeat2, RotateCcw, type LucideIcon } from "lucide-react"
+import { AlarmClock, BellRing, CalendarClock, CreditCard, FileCheck2, Hourglass, KeyRound, ListChecks, Repeat2, RotateCcw, type LucideIcon } from "lucide-react"
 import { AnimatePresence, motion, useReducedMotion } from "motion/react"
 
+import { FilterSeg } from "@/components/filter-bar"
 import { Icon } from "@/components/icons"
 import { RollNumber } from "@/components/roll-number"
 import { Button } from "@/components/ui/button"
@@ -25,6 +26,9 @@ const ICONS: Record<NotificationType, LucideIcon> = {
   "report-returned": RotateCcw,
   "manager-action": BellRing,
   reminder: AlarmClock,
+  payment: CreditCard,
+  access: KeyRound,
+  trial: Hourglass,
 }
 
 type Tab = "all" | "unread"
@@ -100,12 +104,13 @@ export function NotificationsPanel({ items, today, tzLabel, scope, notify }: { i
             Mark all read
           </button>
         </div>
-        <div className="od-notif-tabs" role="group" aria-label="Filter notifications">
-          {(["all", "unread"] as const).map((t) => (
-            <button key={t} type="button" aria-pressed={tab === t} onClick={() => setTab(t)}>
-              {t === "all" ? "All" : `Unread (${unread})`}
-            </button>
-          ))}
+        <div className="od-notif-tabs">
+          <FilterSeg
+            label="Filter notifications"
+            value={tab}
+            options={[{ value: "all", label: "All" }, { value: "unread", label: `Unread (${unread})` }]}
+            onChange={(v) => setTab(v as Tab)}
+          />
         </div>
         <div className="od-notif-list">
           {shown.length === 0 && <p className="od-menu-sub-hint">You are all caught up.</p>}

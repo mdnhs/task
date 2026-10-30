@@ -13,6 +13,8 @@ export type RoleOption = { id: string; label: string }
 export type OnboardingDefaults = {
   domain: string
   defaultPlan: string
+  /** BCP 47 locale for plan prices and numbers on the sign-up page (no tenant yet). */
+  locale: string
   countries: Country[]
   timezones: TimezoneOption[]
   deadline: string

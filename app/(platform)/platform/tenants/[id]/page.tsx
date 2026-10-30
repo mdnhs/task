@@ -1,10 +1,13 @@
-import { TenantDetail, getPlatformSeed } from "@/features/platform"
-import { AccessRestricted } from "@/features/shell"
-import { getOrg } from "@/lib/org"
-import { getSession } from "@/lib/session"
+import { redirect } from "next/navigation"
 
+import { tenantPath } from "@/features/platform"
+
+import { gate } from "../../../gate"
+
+// The tenant 360 opens on its overview tab (D9). Gated first, so a denied role gets "Access restricted" and no redirect.
 export default async function Page({ params }: { params: Promise<{ id: string }> }) {
-  const [{ id }, session, org] = await Promise.all([params, getSession(), getOrg()])
-  if (!session.role.platform) return <AccessRestricted moduleLabel="the Platform console" />
-  return <TenantDetail seed={await getPlatformSeed()} id={id} today={org.today} tzLabel={org.tzLabel} actor={session.role.label} />
+  const g = await gate("tenants.read", "platform tenants")
+  if ("denied" in g) return g.denied
+  const { id } = await params
+  redirect(tenantPath(id))
 }

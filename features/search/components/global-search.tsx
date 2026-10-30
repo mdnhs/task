@@ -23,7 +23,7 @@ import {
   removeLastFilter,
   searchItems,
 } from "../match"
-import { pushRecent, readRecents, removeRecent, writeRecents } from "../recents"
+import { pushRecent, readRecents, recentsKey, removeRecent, writeRecents } from "../recents"
 import { isFilterShortcut, isMacPlatform, isNewTabEnter, isSlashShortcut, isToggleShortcut, shortcutLabel } from "../shortcuts"
 import type { FilterKey, SearchConfig, SearchFilters, SearchItem } from "../types"
 import { searchIndex } from "../actions"
@@ -39,22 +39,32 @@ const macSnapshot = () => isMacPlatform(navigator.platform || navigator.userAgen
 // Server and hydration render `null` (no hint), then the client value: no hydration mismatch, no setState in an effect.
 const useIsMac = () => React.useSyncExternalStore(noop, macSnapshot, () => null)
 
-const recentsListeners = new Set<() => void>()
-let recentsCache: string[] | null = null
-const recentsStore = {
-  subscribe(fn: () => void) {
-    recentsListeners.add(fn)
-    return () => recentsListeners.delete(fn)
-  },
-  get() {
-    if (recentsCache === null) recentsCache = readRecents()
-    return recentsCache
-  },
-  set(next: string[]) {
-    recentsCache = next
-    writeRecents(next)
-    recentsListeners.forEach((fn) => fn())
-  },
+// Recent searches, one store per index (`scope`), so tenant and platform queries never mix (recents.ts → recentsKey).
+type RecentsStore = { subscribe: (fn: () => void) => () => void; get: () => string[]; set: (next: string[]) => void }
+const recentsStores = new Map<string, RecentsStore>()
+function recentsFor(scope: string): RecentsStore {
+  let st = recentsStores.get(scope)
+  if (st) return st
+  const key = recentsKey(scope)
+  const listeners = new Set<() => void>()
+  let cache: string[] | null = null
+  st = {
+    subscribe(fn) {
+      listeners.add(fn)
+      return () => listeners.delete(fn)
+    },
+    get() {
+      if (cache === null) cache = readRecents(undefined, key)
+      return cache
+    },
+    set(next) {
+      cache = next
+      writeRecents(next, undefined, key)
+      listeners.forEach((fn) => fn())
+    },
+  }
+  recentsStores.set(scope, st)
+  return st
 }
 const EMPTY: string[] = []
 
@@ -87,13 +97,21 @@ const reducedMotion = () => {
 
 // The index is loaded lazily on the first open (server action, role-filtered on the server) and cached for the session.
 // It is never part of a page's RSC payload, so pages don't carry other modules' text.
+// One cache per index (`scope`), so the tenant app and the platform console never share results.
 type SearchData = { items: SearchItem[]; config: SearchConfig }
-let dataCache: Promise<SearchData> | null = null
-const loadSearch = () =>
-  (dataCache ??= searchIndex().catch((e: unknown) => {
-    dataCache = null
-    throw e
-  }))
+type SearchLoader = () => Promise<SearchData>
+const dataCache = new Map<string, Promise<SearchData>>()
+const loadSearch = (scope: string, load: SearchLoader) => {
+  let p = dataCache.get(scope)
+  if (!p) {
+    p = load().catch((e: unknown) => {
+      dataCache.delete(scope)
+      throw e
+    })
+    dataCache.set(scope, p)
+  }
+  return p
+}
 const NO_ITEMS: SearchItem[] = []
 const NO_CONFIG: SearchConfig = { popular: [], actions: [] }
 
@@ -102,14 +120,23 @@ const optId = (id: string) => `od-sopt-${id.replace(/[^a-zA-Z0-9_-]/g, "_")}`
 export function GlobalSearch({
   departments,
   today,
+  scope = "app",
+  load = searchIndex,
+  placeholder = "Search tasks, reports, clients…",
 }: {
-  // Tenant departments from shell data (never hard-coded).
+  // Tenant departments from shell data (never hard-coded). Empty hides the Department filter.
   departments: string[]
   // Tenant "today" (org.today) for the date-range presets.
   today: string
+  /** Which index this is (cache key). The platform console passes "platform" with its own server action as `load`. */
+  scope?: string
+  /** Server action returning the role-filtered index; called lazily on first open. Defaults to the tenant index. */
+  load?: SearchLoader
+  placeholder?: string
 }) {
   const router = useRouter()
   const mac = useIsMac()
+  const recentsStore = recentsFor(scope)
   const recents = React.useSyncExternalStore(recentsStore.subscribe, recentsStore.get, () => EMPTY)
 
   const [open, setOpen] = React.useState(false)
@@ -154,7 +181,7 @@ export function GlobalSearch({
   const activeId = open && view === "list" && opts[cur] ? optId(opts[cur].id) : undefined
 
   const openPanel = React.useCallback((v: "list" | "filters" = "list") => {
-    loadSearch().then(
+    loadSearch(scope, load).then(
       (d) => {
         setData(d)
         setLoadError(false)
@@ -164,7 +191,7 @@ export function GlobalSearch({
     setOpen(true)
     setClosing(false)
     setView(v)
-  }, [])
+  }, [scope, load])
 
   const close = React.useCallback((restore: boolean) => {
     // Sections stay mounted while the surface collapses back into the pill (see the morph effect).
@@ -204,10 +231,10 @@ export function GlobalSearch({
   // Warm the lazily loaded index once the page is idle, so the first open doesn't grow when results arrive mid-morph.
   React.useEffect(() => {
     const t = window.setTimeout(() => {
-      loadSearch().then(setData, () => {})
+      loadSearch(scope, load).then(setData, () => {})
     }, 1200)
     return () => window.clearTimeout(t)
-  }, [])
+  }, [scope, load])
 
   // Click outside closes.
   React.useEffect(() => {
@@ -393,7 +420,7 @@ export function GlobalSearch({
           aria-activedescendant={activeId}
           aria-keyshortcuts={mac === null ? undefined : mac ? "Meta+K /" : "Control+K /"}
           autoComplete="off"
-          placeholder="Search tasks, reports, clients…"
+          placeholder={placeholder}
           value={q}
           onChange={(e) => {
             setQ(e.target.value)

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import { AnimatePresence, motion } from "motion/react"
 
-import { ACTION, DUR, EASE, layoutTransition } from "@/lib/motion"
+import { ACTION, DUR, EASE } from "@/lib/motion"
 import type { Status } from "@/lib/types"
 
 const fade = {
@@ -13,9 +13,9 @@ const fade = {
 }
 
 // Maps onto the existing .st pill and its tone classes (ok/warn/bad/info/mute). Always shows the text label.
-// When the status changes after mount: the tone colours crossfade (CSS transition on .st), the new label fades in, the
-// pill's width eases to fit (motion `layout="size"`, children counter-scaled so the text never stretches) and, unless
-// `tick={false}` (a change the user didn't make), a ✓ draws in front of the label for a moment. Nothing animates on mount.
+// When the status changes after mount: the tone colours crossfade (CSS transition on .st), the new label fades in and,
+// unless `tick={false}` (a change the user didn't make), a ✓ draws in front of the label for a moment. Nothing animates on mount.
+// No motion `layout` here: pills sit inside layout-animated list rows, and nested projection left labels stuck off the pill.
 export function StatusPill({ status, tick = true }: { status: Status; tick?: boolean }) {
   const key = `${status.tone}|${status.label}`
   const [seen, setSeen] = useState(key)
@@ -34,17 +34,17 @@ export function StatusPill({ status, tick = true }: { status: Status; tick?: boo
   }, [ack, change])
 
   return (
-    <motion.span layout="size" transition={layoutTransition} className={`st ${status.tone}`} style={{ borderRadius: 8 }}>
+    <span className={`st ${status.tone}`}>
       <AnimatePresence initial={false}>
         {ack && (
-          <motion.svg key={`tick-${change}`} layout="position" className="st-tick" viewBox="0 0 12 12" aria-hidden="true" {...fade}>
+          <motion.svg key={`tick-${change}`} className="st-tick" viewBox="0 0 12 12" aria-hidden="true" {...fade}>
             <path d="M2.5 6.2 5 8.6l4.5-5" />
           </motion.svg>
         )}
       </AnimatePresence>
-      <motion.span key={status.label} layout="position" transition={layoutTransition} initial={change ? { opacity: 0 } : false} animate={{ opacity: 1 }}>
+      <motion.span key={status.label} initial={change ? { opacity: 0 } : false} animate={{ opacity: 1 }}>
         {status.label}
       </motion.span>
-    </motion.span>
+    </span>
   )
 }

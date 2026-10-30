@@ -15,6 +15,13 @@ export const TYPE_LABELS: Record<SearchType, string> = {
   staff: "Staff",
   candidate: "Candidates",
   file: "Files",
+  page: "Pages",
+  tenant: "Tenants",
+  invoice: "Invoices",
+  support: "Support access",
+  datarequest: "Data requests",
+  member: "Team",
+  action: "Actions",
 }
 
 export const TYPE_ICONS: Record<SearchType, string> = {
@@ -26,6 +33,13 @@ export const TYPE_ICONS: Record<SearchType, string> = {
   staff: "roster",
   candidate: "userplus",
   file: "folder",
+  page: "arrow",
+  tenant: "building",
+  invoice: "receipt",
+  support: "help",
+  datarequest: "download",
+  member: "badge",
+  action: "lock",
 }
 
 export const humanStatus = (s: string) => s.replace(/[_-]+/g, " ").replace(/^\w/, (c) => c.toUpperCase())
@@ -45,13 +59,14 @@ export function scoreItem(item: SearchItem, q: string): number {
   const title = norm(item.title)
   const ref = norm(item.ref)
   const rest = norm([item.owner, item.dept, humanStatus(item.status), TYPE_LABELS[item.type]].join(" "))
+  const keys = tokens(item.keywords ?? "")
   const whole = ts.join(" ")
   let score = 0
-  if (ref === whole) score += 100
+  if (ref === whole || keys.includes(whole)) score += 100
   else if (ref.startsWith(whole)) score += 70
   if (title.startsWith(whole)) score += 40
   for (const t of ts) {
-    if (ref.includes(t)) score += 20
+    if (ref.includes(t) || keys.some((k) => k.startsWith(t))) score += 20
     else if (wordStart(title, t)) score += 15
     else if (title.includes(t)) score += 8
     else if (rest.includes(t)) score += 3

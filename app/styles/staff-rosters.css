@@ -5,7 +5,7 @@
 .sr-link:hover{color:var(--brand-deep)}
 :root[data-theme="dark"] .sr-link:hover{color:var(--brand-3)}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .sr-link:hover{color:var(--brand-3)}}
-.sr-link:focus-visible{outline:2px solid var(--brand);outline-offset:2px;border-radius:4px}
+.sr-link:focus-visible{outline:2px solid var(--brand);outline-offset:2px;border-radius:calc(4px * var(--radius-scale,1))}
 .sr-shift{font-weight:500;color:var(--ink-2)}
 .sr-none{color:var(--ink-3)}
 .sr-restricted{display:inline-flex;align-items:center;padding:2px 10px;border-radius:var(--r-pill);background:var(--mute-bg);color:var(--ink-2);font-size:12px;font-weight:600}
@@ -15,7 +15,7 @@
 .sr-group-h{margin:0 0 4px;font-size:13px;font-weight:700;letter-spacing:.02em;color:var(--ink-3);line-height:20px}
 .sr-list{list-style:none;margin:0;padding:0}
 .sr-list>li{border-top:1px solid var(--line)}
-.sr-row{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;padding:14px 12px;margin:0 -12px;width:calc(100% + 24px);text-align:left;color:var(--ink);font:inherit;border-radius:var(--r-md);cursor:pointer}
+.sr-row{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;padding:14px 12px;margin:0 -12px;width:calc(100% + 24px);text-align:left;color:var(--ink);font:inherit;border-radius:var(--r-md);cursor:pointer;text-decoration:none}
 .sr-row:hover .sr-title{color:var(--brand-deep)}
 :root[data-theme="dark"] .sr-row:hover .sr-title{color:var(--brand-3)}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .sr-row:hover .sr-title{color:var(--brand-3)}}
@@ -37,6 +37,19 @@
 .sr-history{list-style:none;margin:6px 0 0;padding:0;display:flex;flex-direction:column;gap:12px;font-size:13px;line-height:19px;color:var(--ink)}
 .sr-history li{padding:10px 14px;border-radius:var(--r-md);background:var(--mute-bg)}
 .sr-when{display:block;font-size:12px;color:var(--ink-3)}
+/* Form and detail pages (/staff-rosters/incidents/new, /staff-rosters/gaps/[id]): back link, PageHead, one card */
+.sr-back{align-self:flex-start;font-size:13px;font-weight:600;color:var(--ink-2);text-decoration:none;line-height:20px;margin-bottom:-6px;transition:color var(--dur-fast) var(--ease)}
+.sr-back:hover{color:var(--brand-deep)}
+:root[data-theme="dark"] .sr-back:hover{color:var(--brand-3)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .sr-back:hover{color:var(--brand-3)}}
+.sr-back:focus-visible{outline:2px solid var(--brand);outline-offset:2px;border-radius:calc(4px * var(--radius-scale,1))}
+.sr-page-card{width:100%;max-width:760px}
+.sr-page-card:has(.od-form-cols){max-width:none}
+.head .sr-sheet-pills{margin-top:0}
+.sr-page-card .sr-dl{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 24px}
+@media (max-width:640px){.sr-page-card .sr-dl{grid-template-columns:1fr}}
+:root[data-theme="dark"] .sr-page-card input{color-scheme:dark}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .sr-page-card input{color-scheme:dark}}
 @media (max-width:760px){
   .sr-row{flex-direction:column;gap:10px}
   .sr-meta{width:100%;flex-direction:row;flex-wrap:wrap;align-items:center;gap:6px 14px}

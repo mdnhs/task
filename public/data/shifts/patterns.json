@@ -1,0 +1,11 @@
+{
+  "patterns": [
+    { "id": "pat-sec-day", "name": "Day patrol", "team": "Security", "start": "07:00", "end": "15:00", "days": [1, 2, 3, 4, 5] },
+    { "id": "pat-sec-eve", "name": "Evening patrol", "team": "Security", "start": "15:00", "end": "23:00", "days": [1, 2, 3, 4, 5, 6] },
+    { "id": "pat-sec-night", "name": "Night patrol", "team": "Security", "start": "22:00", "end": "07:00", "days": [0, 1, 2, 3, 4, 5, 6] },
+    { "id": "pat-sec-wkd", "name": "Weekend day patrol", "team": "Security", "start": "08:00", "end": "20:00", "days": [6, 0] },
+    { "id": "pat-cle-day", "name": "Day crew", "team": "Cleaning", "start": "06:00", "end": "14:00", "days": [1, 2, 3, 4, 5] },
+    { "id": "pat-cle-eve", "name": "Evening crew", "team": "Cleaning", "start": "17:00", "end": "23:00", "days": [1, 2, 3, 4, 5] },
+    { "id": "pat-cle-night", "name": "Night clean", "team": "Cleaning", "start": "23:00", "end": "05:30", "days": [0, 1, 2, 3, 4], "timeZone": "Europe/Dublin" }
+  ]
+}

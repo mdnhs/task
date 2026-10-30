@@ -1,7 +1,7 @@
 # OpsDesk full frontend UI: design
 
 Date: 2026-10-28 · Status: draft for approval
-Source of truth for requirements: `.claude/docs/requirements/SRS.md` (v1.1). Section numbers below refer to it.
+Source of truth for requirements: `.claude/docs/requirements/SRS-v1.2-built.md` (then v1.1). Section numbers below refer to it.
 
 ## 1. Intent
 

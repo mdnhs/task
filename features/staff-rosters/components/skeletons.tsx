@@ -171,3 +171,31 @@ function GapsBodySkeleton({
     </>
   )
 }
+
+// /staff-rosters/gaps/[id] for an id loading.tsx cannot look up (known ids render the real GapPage under SkMask):
+// back link, PageHead (title, coverage pill + ref, Update cover), and the card with the 8-row detail list and one history entry.
+export function GapPageSkeleton({ canWrite = true }: { canWrite?: boolean }) {
+  return (
+    <SkGroup label="Loading roster gap" className="sk-page">
+      <Sk w={110} h={12} lh={20} className="sr-back" />
+      <PageHeadSkeleton actions={canWrite ? [133] : 0} sub={150} />
+      <div className="card sr-page-card">
+        <dl className="sr-dl">
+          {[70, 200, 180, 150, 110, 110, 220, 160].map((w, i) => (
+            <div key={i}>
+              <dt><Sk w={70} h={10} lh={20} /></dt>
+              <dd><Sk w={w} h={12} lh={21} /></dd>
+            </div>
+          ))}
+        </dl>
+        <Sk w={56} h={10} lh={20} />
+        <ol className="sr-history">
+          <li>
+            <Sk w={180} h={11} lh={19} />
+            <Sk w={120} h={10} lh={18} />
+          </li>
+        </ol>
+      </div>
+    </SkGroup>
+  )
+}

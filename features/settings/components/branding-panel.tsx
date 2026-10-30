@@ -10,6 +10,7 @@ import { ColorPicker } from "@/components/ui/color-picker"
 import { Input } from "@/components/ui/input"
 import { saveBranding } from "@/app/actions/session"
 import { useTenantLogo } from "@/hooks/use-branding"
+import { APPEARANCE_OPTIONS, DEFAULT_APPEARANCE, appearanceCss, type Appearance } from "@/lib/appearance"
 import { BRAND_STYLE_ID, brandCss } from "@/lib/brand"
 import { LOGO_ACCEPT, initialsOf, isLogoDataUrl, logoError } from "@/lib/branding"
 const schema = z.object({
@@ -18,8 +19,9 @@ const schema = z.object({
 })
 
 // Branding (FR-SAAS-11): name, logo and brand colour with a live preview of the sidebar logo chip.
-export function BrandingPanel({ tenantId, name, color, presets, canWrite }: { tenantId: string; name: string; color: string; presets: string[]; canWrite: boolean }) {
+export function BrandingPanel({ tenantId, name, color, appearance, presets, canWrite }: { tenantId: string; name: string; color: string; appearance: Appearance; presets: string[]; canWrite: boolean }) {
   const [form, setForm] = useState({ name, color })
+  const [look, setLook] = useState<Appearance>(appearance)
   const [savedLogo, saveLogo] = useTenantLogo(tenantId)
   const [logo, setLogo] = useState<string>(savedLogo)
   const [over, setOver] = useState(false)
@@ -27,20 +29,22 @@ export function BrandingPanel({ tenantId, name, color, presets, canWrite }: { te
   const file = useRef<HTMLInputElement>(null)
   const valid = /^#[0-9a-fA-F]{6}$/.test(form.color)
   const chip = valid ? form.color : color
-  const saved = useRef(color)
+  const saved = useRef({ color, appearance })
 
-  // Live preview: the whole app takes the picked colour at once. Leaving without saving puts the saved colour back.
+  // Live preview: the whole app takes the picked colour and appearance at once. Leaving without saving puts the saved look back.
   useEffect(() => {
-    saved.current = color
-  }, [color])
+    saved.current = { color, appearance }
+  }, [color, appearance])
   useEffect(() => {
     const el = document.getElementById(BRAND_STYLE_ID)
-    if (el) el.textContent = brandCss(chip)
-  }, [chip])
+    if (el) el.textContent = brandCss(chip) + appearanceCss(look)
+  }, [chip, look])
   useEffect(() => () => {
     const el = document.getElementById(BRAND_STYLE_ID)
-    if (el) el.textContent = brandCss(saved.current)
+    if (el) el.textContent = brandCss(saved.current.color) + appearanceCss(saved.current.appearance)
   }, [])
+  const lookChanged = (Object.keys(look) as (keyof Appearance)[]).some((k) => look[k] !== appearance[k])
+  const lookDefault = (Object.keys(look) as (keyof Appearance)[]).every((k) => look[k] === DEFAULT_APPEARANCE[k])
 
   function pick(f: File | undefined) {
     if (!f || !canWrite) return
@@ -68,7 +72,7 @@ export function BrandingPanel({ tenantId, name, color, presets, canWrite }: { te
       setErrors(next)
       return false
     }
-    const r = await saveBranding(parsed.data)
+    const r = await saveBranding({ ...parsed.data, appearance: look })
     if (r.ok) saveLogo(tenantId, logo)
     if (r.ok) toast.success("Branding saved", { description: parsed.data.name })
     else toast.error("Branding not saved", { description: "Check the name and colour, then try again." })
@@ -111,9 +115,10 @@ export function BrandingPanel({ tenantId, name, color, presets, canWrite }: { te
           <Field label="Brand colour" htmlFor="brand-color" error={errors.color} required>
             <ColorPicker id="brand-color" aria-label="Brand colour" value={form.color} presets={presets} disabled={!canWrite} readOnly={!canWrite} invalid={!!errors.color} onValueChange={(hex) => { setForm((f) => ({ ...f, color: hex })); setErrors((x) => ({ ...x, color: undefined })) }} />
           </Field>
+          <AppearancePicker value={look} disabled={!canWrite} onChange={setLook} onReset={lookDefault ? undefined : () => setLook(DEFAULT_APPEARANCE)} />
           {canWrite && (
             <div className="od-form-foot">
-              {(chip.toLowerCase() !== color.toLowerCase() || logo !== savedLogo) && <span className="od-field-hint">Previewing. Save to keep these changes.</span>}
+              {(chip.toLowerCase() !== color.toLowerCase() || logo !== savedLogo || lookChanged) && <span className="od-field-hint">Previewing. Save to keep these changes.</span>}
               <ActionButton id="brand-save" className="btn btn-primary" onAction={save}>Save branding</ActionButton>
             </div>
           )}
@@ -130,5 +135,36 @@ export function BrandingPanel({ tenantId, name, color, presets, canWrite }: { te
         </div>
       </div>
     </section>
+  )
+}
+
+const GROUPS = [
+  { key: "corners", label: "Corners" },
+  { key: "text", label: "Text size" },
+  { key: "spacing", label: "Spacing" },
+] as const
+
+// Workspace appearance presets (spec 2026-10-30-appearance-presets-design.md): one pill row per setting, native radios.
+function AppearancePicker({ value, disabled, onChange, onReset }: { value: Appearance; disabled: boolean; onChange: (a: Appearance) => void; onReset?: () => void }) {
+  return (
+    <div className="set-appear">
+      <div className="set-appear-head">
+        <span className="od-field-label">Appearance</span>
+        {onReset && !disabled && <button type="button" className="set-appear-reset" onClick={onReset}>Reset to default</button>}
+      </div>
+      {GROUPS.map((g) => (
+        <fieldset key={g.key} className="set-appear-row" disabled={disabled}>
+          <legend>{g.label}</legend>
+          <div className="set-appear-opts">
+            {APPEARANCE_OPTIONS[g.key].map((o) => (
+              <label key={o.value} className="set-opt">
+                <input type="radio" className="sr-only" name={`appear-${g.key}`} value={o.value} checked={value[g.key] === o.value} onChange={() => onChange({ ...value, [g.key]: o.value })} />
+                {o.label}
+              </label>
+            ))}
+          </div>
+        </fieldset>
+      ))}
+    </div>
   )
 }

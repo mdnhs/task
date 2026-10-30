@@ -1,13 +1,24 @@
 /* Manager dashboard rows with a fixed card height, so the department switch (which shortens lists) never shifts the page.
    Heights = the tallest ("All") content at 1440px; shorter content leaves space at the bottom, longer lists scroll inside. */
-.dash-fix-a{--row-h:428px}
-.dash-fix-b{--row-h:374px}
+/* Fixed rows grow with the Spacing preset: 60px of each = card padding (2×22) + head margin (16). */
+.dash-fix-a{--row-h:calc(368px + 60px * var(--space-scale,1))}
+.dash-fix-b{--row-h:calc(314px + 60px * var(--space-scale,1))}
+/* Attention + Coverage row: Coverage's "All" height. Only fixed on desktop: on one column Coverage's text wraps taller. */
+@media (min-width:1081px){.dash-fix-c{--row-h:calc(452px + 60px * var(--space-scale,1))}}
+/* Chart row: Tasks Closed takes the rest, Task Progress + Shift report deadline sit beside it at the side-card width.
+   Narrower screens: chart on its own row, the two side cards share the next; phones stack. */
+.grid-3{display:grid;grid-template-columns:minmax(0,1fr) 320px 320px;gap:calc(16px * var(--space-scale,1))}
+@media (max-width:1400px){.grid-3{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.grid-3 > :first-child{grid-column:1/-1}}
+@media (max-width:1080px){.grid-3{grid-template-columns:minmax(0,1fr)}}
 .dash-fix > .card{height:var(--row-h);display:flex;flex-direction:column;overflow:hidden}
 .dash-fix > .card > .list{flex:1;min-height:0;overflow-y:auto;scrollbar-width:thin}
 .dash-fix > .deadline > .btn{margin-top:auto}
 /* skeleton text lines keep their line box in the fixed-height card (real text cannot shrink below it either) */
 .deadline > .sk-line{flex-shrink:0}
 .dash-fix > .deadline > .sk:last-child{margin-top:auto !important}
+/* Shift report deadline rows link to the report (member) or the team's inbox (manager); hover = text colour only. */
+.rep-row a.dep{color:var(--ink);text-decoration:none;transition:color var(--dur-fast) var(--ease)}
+.rep-row a.dep:hover{color:var(--brand)}
 
 /* Staff dashboard (features/dashboard/components/staff-*). Reuses .stats/.card/.item/.deadline from opsdesk.css. */
 .staff-col{display:flex;flex-direction:column;gap:16px;min-width:0}
@@ -24,7 +35,7 @@
 .team-link:hover{color:var(--brand-deep)}
 :root[data-theme="dark"] .team-link:hover{color:var(--brand-3)}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .team-link:hover{color:var(--brand-3)}}
-.team-link:focus-visible{outline:2px solid var(--brand);outline-offset:2px;border-radius:6px}
+.team-link:focus-visible{outline:2px solid var(--brand);outline-offset:2px;border-radius:calc(6px * var(--radius-scale,1))}
 .deadline .btn:disabled{opacity:.6;cursor:not-allowed}
 .attention-empty{padding:18px 4px 4px}
 .decide-opts{display:flex;gap:10px;flex-wrap:wrap}
@@ -41,6 +52,10 @@
 .rc-tip[data-show]{opacity:1}
 .rc-tip[data-follow]{transition:opacity var(--dur) var(--ease)}
 .rc-tip .tip{position:absolute;left:0;bottom:20px;transform:translateX(-50%)}
+/* Two-line tip: closed count on top, on-time rate under it (chart top margin is 60px to fit it over the tallest bar). */
+.tip-2l{display:flex;flex-direction:column;align-items:center;padding:5px 11px;line-height:1.2}
+.tip-2l b{font-size:15px;font-weight:700}
+.tip-2l span{font-size:11px;font-weight:500}
 /* Deadline countdown: in the last 15 minutes the boxes ease from brand to warn (deadline-countdown.tsx sets [data-warn]). */
 .countdown div{transition:background-color var(--dur-slow) var(--ease-in-out)}
 .countdown b{transition:color var(--dur-slow) var(--ease-in-out)}
@@ -50,3 +65,139 @@
 
 /* Header skeleton: its subtitle bar is a fixed 390px; let that column shrink on phones instead of widening the page (418px). */
 .head > div:has(> .sk-h1){min-width:0}
+
+/* ---- Today card + "Play my day" (today-card.tsx, today-player.tsx; SRS FR-M1-70..79) ---- */
+.today{display:flex;flex-direction:column;gap:16px}
+.today .today-head{margin-bottom:0}
+.today-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.today-actions .pill-btn,.td-acts .pill-btn{cursor:pointer}
+.today-actions .pill-btn[aria-pressed="true"]{background:var(--brand-soft);color:var(--brand-deep)}
+:root[data-theme="dark"] .today-actions .pill-btn[aria-pressed="true"]{color:var(--brand-3)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .today-actions .pill-btn[aria-pressed="true"]{color:var(--brand-3)}}
+.today-x{display:grid;place-items:center;width:36px;height:36px;border:0;border-radius:var(--r-pill);background:transparent;color:var(--ink-3);cursor:pointer;transition:color var(--dur-fast) var(--ease)}
+.today-x:hover{color:var(--ink)}
+.today-x:focus-visible,.td-ib:focus-visible,.td-sp:focus-visible,.today-chip:focus-visible,.today-tile:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+.today-tiles{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px}
+.today-tiles[data-n="4"]{grid-template-columns:repeat(4,minmax(0,1fr))}
+.today-tile{display:flex;flex-direction:column;gap:2px;padding:14px 16px;border-radius:var(--r-md);background:var(--shell);color:var(--ink);text-decoration:none;min-height:72px}
+.today-tile b{font-size:28px;line-height:34px;font-weight:600;letter-spacing:-.02em;transition:color var(--dur-fast) var(--ease)}
+.today-tile span{font-size:12.5px;line-height:18px;color:var(--ink-2);transition:color var(--dur-fast) var(--ease)}
+.today-tile[data-tone="bad"] b{color:var(--bad)}
+.today-tile[data-tone="warn"] b{color:var(--warn)}
+.today-tile:hover b,.today-tile:hover span{color:var(--brand)}
+:root[data-theme="dark"] .today-tile:hover b,:root[data-theme="dark"] .today-tile:hover span{color:var(--brand-3)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .today-tile:hover b,:root:not([data-theme="light"]) .today-tile:hover span{color:var(--brand-3)}}
+.today-team{border-radius:var(--r-md);background:var(--shell);padding:14px 16px;display:flex;flex-direction:column;gap:6px}
+.today-team-h{font-size:12.5px;line-height:18px;font-weight:600;color:var(--ink-2)}
+.today-team-l{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px;font-size:13.5px;line-height:20px}
+.today-team-l a{color:var(--ink);text-decoration:none;transition:color var(--dur-fast) var(--ease)}
+.today-team-l a:hover{color:var(--brand)}
+:root[data-theme="dark"] .today-team-l a:hover{color:var(--brand-3)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .today-team-l a:hover{color:var(--brand-3)}}
+.today-team-m{color:var(--ink-3)}
+.today-sum{border-radius:var(--r-md);background:var(--shell);padding:14px 16px;display:flex;flex-direction:column;gap:8px}
+.today-sum-h{font-weight:600;font-size:14px;line-height:20px}
+.today-sum ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;font-size:13.5px;line-height:20px;color:var(--ink-2)}
+.today-sum a{color:inherit;text-decoration:none;transition:color var(--dur-fast) var(--ease)}
+.today-sum a:hover{color:var(--brand)}
+:root[data-theme="dark"] .today-sum a:hover{color:var(--brand-3)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .today-sum a:hover{color:var(--brand-3)}}
+/* compact entry that reopens the card after it was dismissed (or switched off) */
+.today-chip{display:flex;align-items:center;gap:12px;width:100%;border:0;border-radius:var(--r-lg);background:var(--card);color:var(--ink);font:inherit;text-align:left;padding:0 22px;height:56px;cursor:pointer}
+.today-chip-t{font-weight:600;font-size:15px}
+.today-chip-m{flex:1;min-width:0;font-size:13px;color:var(--ink-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* Icon + number chips on the closed card (today-copy.tsx); tone only when the count is above zero. */
+.today-chip-m{display:flex;align-items:center;gap:14px}
+.tc{display:inline-flex;align-items:center;gap:5px;font-weight:600;color:var(--ink-2);font-variant-numeric:tabular-nums}
+.tc .ico{width:15px;height:15px;color:var(--ink-3)}
+.tc[data-tone="bad"],.tc[data-tone="bad"] .ico{color:var(--bad)}
+.tc[data-tone="warn"],.tc[data-tone="warn"] .ico{color:var(--warn)}
+.today-chip-a{font-size:13px;font-weight:600;color:var(--brand);transition:color var(--dur-fast) var(--ease)}
+:root[data-theme="dark"] .today-chip-a{color:var(--brand-3)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .today-chip-a{color:var(--brand-3)}}
+.today-chip:hover .today-chip-t{color:var(--brand)}
+/* Pulse dot beside "Open" when the closed card has something in it: a solid dot plus a ring that grows and fades (transform/opacity only). */
+.today-pulse{position:relative;width:8px;height:8px;border-radius:50%;background:var(--brand);flex:none}
+.today-pulse::after{content:"";position:absolute;inset:0;border-radius:50%;background:var(--brand);animation:today-pulse 1.8s var(--ease) infinite}
+@keyframes today-pulse{from{transform:scale(1);opacity:.55}to{transform:scale(3);opacity:0}}
+:root[data-theme="dark"] .today-pulse,:root[data-theme="dark"] .today-pulse::after{background:var(--brand-3)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .today-pulse,:root:not([data-theme="light"]) .today-pulse::after{background:var(--brand-3)}}
+/* player bar */
+.td-player{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px 20px;align-items:center;border-radius:var(--r-md);background:var(--brand-soft);padding:14px 16px}
+.td-now{grid-column:1/-1;min-width:0}
+.td-pos{font-size:12px;line-height:16px;font-weight:600;color:var(--ink-2);text-transform:uppercase;letter-spacing:.04em}
+.td-title{font-size:15px;line-height:22px;font-weight:600;overflow-wrap:anywhere}
+.td-meta{font-size:13px;line-height:19px;color:var(--ink-2)}
+.td-ctl{display:flex;align-items:center;gap:6px}
+.td-ib{display:grid;place-items:center;width:38px;height:38px;border:0;border-radius:var(--r-pill);background:var(--card);color:var(--ink);cursor:pointer;transition:color var(--dur-fast) var(--ease),opacity var(--dur-fast) var(--ease)}
+.td-ib:hover:not(:disabled){color:var(--brand)}
+.td-ib:disabled{opacity:.4;cursor:not-allowed}
+.td-play{width:44px;height:44px;background:var(--brand);color:var(--on-brand)}
+.td-play:hover:not(:disabled){color:var(--on-brand);background:var(--brand-deep)}
+.td-speed{display:flex;gap:4px;justify-self:end}
+.td-sp{border:0;border-radius:var(--r-pill);background:var(--card);color:var(--ink-2);font:inherit;font-size:12.5px;font-weight:600;padding:7px 11px;cursor:pointer;transition:color var(--dur-fast) var(--ease)}
+.td-sp:hover{color:var(--ink)}
+.td-sp[aria-pressed="true"]{background:var(--brand);color:var(--on-brand)}
+.td-only{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink-2);cursor:pointer}
+.td-acts{grid-column:1/-1;display:flex;gap:8px;flex-wrap:wrap}
+.td-acts .pill-btn:disabled{opacity:.5;cursor:not-allowed}
+@media (max-width:900px){.today-tiles,.today-tiles[data-n="4"]{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:640px){.td-player{grid-template-columns:minmax(0,1fr)}.td-speed{justify-self:start}.today-chip{padding:0 16px}.today-chip-m{font-size:12px}}
+
+/* Task Progress breakdown (task-progress.tsx): fills the fixed-height card below the gauge. */
+.dash-fix > .card > .gauge-wrap{flex:1;min-height:0}
+.gauge-list{list-style:none;margin:auto 0 0;padding:0;width:100%;display:flex;flex-direction:column;gap:14px}
+.gl-row{display:flex;align-items:center;gap:8px;font-size:13px;line-height:17px}
+.gl-row .sw{width:10px;height:10px;flex:none}
+.gl-lbl{flex:1;min-width:0;color:var(--ink-2);font-weight:500}
+.gl-row b{color:var(--ink);font-weight:700}
+.gl-pct{width:36px;text-align:right;color:var(--ink-3);font-size:12px;display:flex;justify-content:flex-end}
+.gl-track{height:6px;margin-top:7px;border-radius:var(--r-pill);background:var(--mute-bg);overflow:hidden}
+/* 1s to keep pace with the gauge arcs and CountUp (task-progress.tsx); reduced motion is covered by the global rule. */
+.gl-fill{display:block;height:100%;border-radius:inherit;transform:scaleX(0);transform-origin:left;transition:transform 1s var(--ease-in-out)}
+.gl-fill[data-on]{transform:none}
+.gl-fill.solid{background:var(--brand-2)}
+.gl-fill.deep{background:var(--brand-shade)}
+.gl-fill.striped{background:repeating-linear-gradient(135deg,var(--stripe) 0 3px,var(--brand-soft) 3px 6px)}
+
+/* Manager Attention priority summary (manager-attention.tsx): sits at the foot of the fixed-height card, Coverage-tile look. */
+.att-sum{display:grid;grid-template-columns:repeat(auto-fit,minmax(0,1fr));gap:12px;margin-top:16px;flex:none}
+.att-tile{display:flex;align-items:center;gap:12px;padding:14px 16px;border-radius:var(--r-md);background:var(--mute-bg);font-size:13px;line-height:17px;color:var(--ink-2);font-weight:500}
+.att-tile b{font-size:24px;line-height:28px;font-weight:700;letter-spacing:-.02em}
+.att-tile b.bad{color:var(--bad)}
+.att-tile b.warn{color:var(--warn)}
+.att-tile b.info{color:var(--info)}
+.att-tile b.ok{color:var(--ok)}
+
+/* Dashboard stat cards (section-cards.tsx), scoped: .stat is shared with other pages. Icon chip beside the title,
+   the highlight as a tone pill, an arrow that turns on hover, and the promo card's ring texture on the hero. */
+.dash-stats .stat-top{align-items:center}
+.dash-stats .stat-title{display:flex;align-items:center;gap:10px;min-width:0;flex:1}
+.dash-stats .stat-title .sk-line{width:auto}
+.stat-ico{width:32px;height:32px;border-radius:calc(10px * var(--radius-scale,1));display:grid;place-items:center;flex:none;background:var(--brand-soft);color:var(--brand-deep)}
+.stat-ico .ico{width:17px;height:17px}
+:root[data-theme="dark"] .stat-ico{color:var(--brand-3)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .stat-ico{color:var(--brand-3)}}
+.dash-stats .stat.hero .stat-ico{background:rgba(255,255,255,.16);color:#fff}
+.dash-stats .note .up,.dash-stats .note .down{padding:1px 8px;border-radius:var(--r-pill);font-size:11.5px;line-height:17px}
+.dash-stats .note .up{background:var(--ok-bg)}
+.dash-stats .note .down{background:var(--bad-bg)}
+.dash-stats .stat.hero .note .up{background:rgba(255,255,255,.16)}
+.dash-stats .arrow{transition:background var(--dur-fast) var(--ease),color var(--dur-fast) var(--ease),border-color var(--dur-fast) var(--ease)}
+.dash-stats .arrow .ico{transition:transform var(--dur) var(--ease)}
+.dash-stats .stat:hover .arrow .ico{transform:rotate(45deg)}
+.dash-stats .arrow:hover{background:var(--ink);border-color:var(--ink);color:var(--card)}
+.dash-stats .stat.hero .arrow:hover{background:var(--brand-soft);border-color:var(--brand-soft);color:color-mix(in oklab,var(--brand) 82%,#000)}
+.dash-stats .stat.hero{position:relative;overflow:hidden}
+.dash-stats .stat.hero::after{content:"";position:absolute;inset:0;pointer-events:none;
+  background:repeating-radial-gradient(circle at 110% 120%,transparent 0 18px,rgba(255,255,255,.07) 18px 19px)}
+.dash-stats .stat.hero > *{position:relative;z-index:1}
+/* Value + 7-day sparkline row (sparkline.tsx). The line takes the card's tone via currentColor; it draws in once on load. */
+.dash-stats .stat-mid{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-top:auto;color:var(--brand-2)}
+.dash-stats .stat-mid .value{margin-top:0;color:var(--ink)}
+.dash-stats .stat-mid.bad{color:var(--bad)}
+.dash-stats .stat.hero .stat-mid,.dash-stats .stat.hero .stat-mid .value{color:#fff}
+.spark{width:120px;height:44px;flex:none;display:block;overflow:visible;transform-origin:bottom;animation:spark-in var(--dur-slow) var(--ease) .25s both}
+.spark-dot{filter:drop-shadow(0 0 0 currentColor)}
+@keyframes spark-in{from{opacity:0;transform:scaleY(.4)}to{opacity:1;transform:none}}
+.dash-stats .stat-mid .sk-spark{width:auto}

@@ -1,6 +1,9 @@
 export const RECENTS_KEY = "od-search-recents"
 export const RECENTS_MAX = 6
 
+/** One list per search index (`scope`): the tenant app keeps the original key, the platform console gets its own. */
+export const recentsKey = (scope: string) => (scope === "app" ? RECENTS_KEY : `${RECENTS_KEY}:${scope}`)
+
 type StorageLike = Pick<Storage, "getItem" | "setItem" | "removeItem">
 
 /** Newest first, case-insensitive de-dupe, capped. Blank queries are ignored. */
@@ -23,9 +26,9 @@ function storage(): StorageLike | null {
 }
 
 /** Every access is guarded: private windows, blocked site data and previews can throw or return junk. */
-export function readRecents(s: StorageLike | null = storage()): string[] {
+export function readRecents(s: StorageLike | null = storage(), key = RECENTS_KEY): string[] {
   try {
-    const raw = s?.getItem(RECENTS_KEY)
+    const raw = s?.getItem(key)
     const v: unknown = raw ? JSON.parse(raw) : []
     return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string").slice(0, RECENTS_MAX) : []
   } catch {
@@ -33,10 +36,10 @@ export function readRecents(s: StorageLike | null = storage()): string[] {
   }
 }
 
-export function writeRecents(list: string[], s: StorageLike | null = storage()): void {
+export function writeRecents(list: string[], s: StorageLike | null = storage(), key = RECENTS_KEY): void {
   try {
-    if (list.length === 0) s?.removeItem(RECENTS_KEY)
-    else s?.setItem(RECENTS_KEY, JSON.stringify(list))
+    if (list.length === 0) s?.removeItem(key)
+    else s?.setItem(key, JSON.stringify(list))
   } catch {
     // Storage unavailable: recents just live in memory for this session.
   }

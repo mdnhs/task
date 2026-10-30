@@ -2,6 +2,7 @@
   "stats": [
     {
       "title": "Open Tasks",
+      "icon": "task",
       "ariaLabel": "View open tasks",
       "href": "/tasks?status=open",
       "value": "48",
@@ -9,96 +10,213 @@
       "note": {
         "tone": "up",
         "highlight": "+6",
-        "text": " assigned since yesterday"
+        "text": " new"
       },
+      "trend": [
+        38,
+        41,
+        40,
+        44,
+        42,
+        45,
+        48
+      ],
       "byDept": {
         "Security": {
           "value": "27",
           "note": {
             "tone": "up",
             "highlight": "+4",
-            "text": " assigned since yesterday"
-          }
+            "text": " new"
+          },
+          "trend": [
+            20,
+            22,
+            21,
+            24,
+            23,
+            25,
+            27
+          ]
         },
         "Cleaning": {
           "value": "21",
           "note": {
             "tone": "up",
             "highlight": "+2",
-            "text": " assigned since yesterday"
-          }
+            "text": " new"
+          },
+          "trend": [
+            18,
+            19,
+            19,
+            20,
+            19,
+            20,
+            21
+          ]
         }
       }
     },
     {
       "title": "Overdue Tasks",
+      "icon": "clock",
       "ariaLabel": "View overdue tasks",
       "href": "/tasks?due=overdue",
       "value": "7",
       "note": {
         "tone": "down",
         "highlight": "3 blocked",
-        "text": " · reason required"
+        "text": ""
       },
+      "trend": [
+        4,
+        5,
+        5,
+        6,
+        4,
+        6,
+        7
+      ],
       "byDept": {
         "Security": {
           "value": "4",
           "note": {
             "tone": "down",
             "highlight": "2 blocked",
-            "text": " · reason required"
-          }
+            "text": ""
+          },
+          "trend": [
+            2,
+            3,
+            3,
+            3,
+            2,
+            3,
+            4
+          ]
         },
         "Cleaning": {
           "value": "3",
           "note": {
             "tone": "down",
             "highlight": "1 blocked",
-            "text": " · reason required"
-          }
+            "text": ""
+          },
+          "trend": [
+            2,
+            2,
+            2,
+            3,
+            2,
+            3,
+            3
+          ]
         }
       }
     },
     {
       "title": "Awaiting Review",
+      "icon": "badge",
       "ariaLabel": "View tasks awaiting review",
       "href": "/tasks?status=submitted",
       "value": "9",
       "note": {
-        "text": "Evidence submitted, not yet approved"
+        "text": "to approve"
       },
+      "trend": [
+        12,
+        10,
+        11,
+        8,
+        9,
+        7,
+        9
+      ],
       "byDept": {
         "Security": {
-          "value": "5"
+          "value": "5",
+          "trend": [
+            7,
+            6,
+            6,
+            4,
+            5,
+            4,
+            5
+          ]
         },
         "Cleaning": {
-          "value": "4"
+          "value": "4",
+          "trend": [
+            5,
+            4,
+            5,
+            4,
+            4,
+            3,
+            4
+          ]
         }
       }
     },
     {
-      "title": "Reports Today",
-      "ariaLabel": "View daily reports",
+      "title": "Shift Reports",
+      "icon": "report",
+      "ariaLabel": "View shift reports",
       "href": "/daily-reports",
-      "value": "1",
-      "valueSuffix": "/2",
+      "value": "2",
+      "valueSuffix": "/4",
       "note": {
-        "text": "Cleaning report still in draft"
+        "text": "",
+        "tone": "down",
+        "highlight": "2 missing"
       },
+      "trend": [
+        4,
+        3,
+        4,
+        4,
+        3,
+        3,
+        2
+      ],
       "byDept": {
         "Security": {
           "value": "1",
-          "valueSuffix": "/1",
+          "valueSuffix": "/2",
           "note": {
-            "text": "Security report submitted"
-          }
+            "text": " · Day patrol",
+            "tone": "down",
+            "highlight": "1 missing"
+          },
+          "trend": [
+            2,
+            2,
+            2,
+            2,
+            2,
+            1,
+            1
+          ]
         },
         "Cleaning": {
-          "value": "0",
-          "valueSuffix": "/1",
+          "value": "1",
+          "valueSuffix": "/2",
           "note": {
-            "text": "Cleaning report still in draft"
-          }
+            "text": " · Night clean",
+            "tone": "down",
+            "highlight": "1 missing"
+          },
+          "trend": [
+            2,
+            1,
+            2,
+            2,
+            1,
+            2,
+            1
+          ]
         }
       }
     }

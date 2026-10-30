@@ -1,0 +1,44 @@
+{
+  "projects": [
+    {
+      "id": "PRJ-1",
+      "name": "Site compliance Q4",
+      "dept": "Security",
+      "lead": "p-daniel",
+      "description": "Access, fire and risk checks the client audit needs before December.",
+      "due": "2026-11-27",
+      "milestones": [
+        {
+          "id": "PRJ-1-M1",
+          "name": "Access control reviewed",
+          "due": "2026-10-30"
+        },
+        {
+          "id": "PRJ-1-M2",
+          "name": "Fire and risk sign-off",
+          "due": "2026-11-13"
+        }
+      ]
+    },
+    {
+      "id": "PRJ-2",
+      "name": "Winter deep clean",
+      "dept": "Cleaning",
+      "lead": "p-grace",
+      "description": "Floor-by-floor deep clean of every site before the winter season.",
+      "due": "2026-11-20",
+      "milestones": [
+        {
+          "id": "PRJ-2-M1",
+          "name": "Floors 1 to 3",
+          "due": "2026-10-23"
+        },
+        {
+          "id": "PRJ-2-M2",
+          "name": "Floors 4 to 6",
+          "due": "2026-11-06"
+        }
+      ]
+    }
+  ]
+}

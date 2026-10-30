@@ -1,10 +1,8 @@
-// FR-REP-12: pure row building for the PDF and Excel exports. No browser or library code here, so it is unit-tested.
+// FR-M1-31: pure row building for the PDF, Excel and CSV exports. No browser or library code here, so it is unit-tested.
 // features/reports/export.ts turns an ExportDoc into a file.
+import { csvEscape, csvSafe } from "@/lib/csv"
 import { formatDate, formatTime } from "@/lib/dates"
-import type { Person } from "@/lib/types"
-import { isLateSubmission, sectionProgress } from "./lifecycle"
-import { FIELD_STATE, REPORT_STATUS } from "./types"
-import type { Report, ReportEntry, TemplateField, TemplateSection } from "./types"
+import { ITEM_STATUS, REPORT_STATE, isLate, minutesText, totalMinutes, windowLabel, type ReportState, type ShiftReport } from "@/lib/shift-report"
 
 export type ExportTable = { title?: string; head: string[]; rows: string[][] }
 export type ExportDoc = {
@@ -18,133 +16,98 @@ export type ExportDoc = {
 }
 
 const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "")
+const stamp = (wall: string) => `${formatDate(wall)} ${formatTime(wall)}`
+const submitted = (r: ShiftReport, tz: string) => (r.submittedAt ? `${stamp(r.submittedAt)}${isLate(r, tz) ? " (late)" : ""}` : "Not submitted")
 
-/** `daily-report-<dept>-<YYYY-MM-DD>` (extension added by the caller). */
-export const exportFileBase = (dept: string, date: string) => `daily-report-${slug(dept) || "all"}-${date.slice(0, 10)}`
-
-const entryText = (f: TemplateField, e: ReportEntry) =>
-  f.entry === "structured" && e.cells
-    ? (f.columns ?? Object.keys(e.cells)).map((c) => `${c}: ${e.cells?.[c] ?? ""}`).join("; ")
-    : e.text
-
-const submittedText = (r: Report, deadline: string) =>
-  r.submittedAt ? `${formatTime(r.submittedAt)}${isLateSubmission(r, deadline) ? " (late)" : ""}` : "Not submitted"
-
-/** One report: a details table, then one table per section (Field / Answer / Details). `skip` = sections the role may not read. */
-export function buildReportDoc({
-  report,
-  template,
-  owner,
-  skip = [],
-  deadline,
-  tzLabel,
-}: {
-  report: Report
-  template: TemplateSection[]
+/** One shift report: details, the task rows, unplanned work, and the free-text sections. */
+export function buildReportDoc({ report: r, owner, state, tz, tzLabel, extraLabels = {} }: {
+  report: ShiftReport
   owner: string
-  skip?: string[]
-  deadline: string
+  state: ReportState
+  tz: string
   tzLabel: string
+  /** "sectionId.fieldId" → label, for the template's extra fields. */
+  extraLabels?: Record<string, string>
 }): ExportDoc {
-  const sections = template.filter((s) => !skip.includes(s.id))
+  const extras = Object.entries(r.extra).filter(([, v]) => v.trim())
   return {
-    title: `${report.dept} daily report`,
-    subtitle: `${formatDate(report.date)} · due ${formatTime(`${report.date}T${deadline}:00`)} ${tzLabel}`,
+    title: `Shift report: ${owner}`,
+    subtitle: `${r.shiftName} · ${formatDate(r.date)} ${windowLabel(r)} · ${tzLabel}`,
     meta: [
-      ["Date", report.date],
-      ["Department", report.dept],
-      ["Owner", owner],
-      ["Status", REPORT_STATUS[report.status].label],
-      ["Submitted", submittedText(report, deadline)],
-      ...(report.nil ? [["Report type", "Nil report"] as [string, string]] : []),
+      ["Person", owner],
+      ["Team", r.team],
+      ["Shift", `${r.shiftName}, ${formatDate(r.date)} ${windowLabel(r)}`],
+      ["Status", REPORT_STATE[state].label],
+      ["Due", stamp(r.due)],
+      ["Submitted", submitted(r, tz)],
+      ["Time reported", minutesText(totalMinutes(r))],
+      ...(r.reviewedBy && r.reviewedAt ? [["Reviewed", `${r.reviewedBy}, ${stamp(r.reviewedAt)}`] as [string, string]] : []),
     ],
-    tables: sections.map((s) => ({
-      title: `${s.n}. ${s.title}`,
-      head: ["Field", "Answer", "Details"],
-      rows: s.fields.map((f) => {
-        const v = report.fields[`${s.id}.${f.id}`]
-        return [f.label, v?.state ? FIELD_STATE[v.state] : "Not answered", (v?.entries ?? []).map((e) => entryText(f, e)).filter(Boolean).join("\n")]
-      }),
-    })),
-    fileBase: exportFileBase(report.dept, report.date),
-  }
-}
-
-/** The day's submission board: one row per department (who submitted, status, time). */
-export function buildBoardDoc({
-  reports,
-  people,
-  template,
-  departments,
-  today,
-  tzLabel,
-  deadline,
-}: {
-  reports: Report[]
-  people: Map<string, Person>
-  template: TemplateSection[]
-  departments: string[]
-  today: string
-  tzLabel: string
-  deadline: string
-}): ExportDoc {
-  const day = today.slice(0, 10)
-  return {
-    title: "Daily report submissions",
-    subtitle: `${formatDate(day)} · due ${formatTime(`${day}T${deadline}:00`)} ${tzLabel}`,
-    meta: [["Date", day]],
     tables: [
+      { title: "Tasks in the shift", head: ["Task", "Title", "Status", "Time", "Note"], rows: r.items.map((i) => [i.taskRef, i.title, ITEM_STATUS[i.status].label, minutesText(i.minutes), i.note]) },
+      ...(r.unplanned.length ? [{ title: "Unplanned work", head: ["Work", "Time"], rows: r.unplanned.map((u) => [u.text, minutesText(u.minutes)]) }] : []),
       {
-        head: ["Department", "Owner", "Status", "Submitted", "Sections complete"],
-        rows: departments.map((d) => {
-          const r = reports.find((x) => x.date === day && x.dept === d)
-          const { done, total } = r ? sectionProgress(r, template) : { done: 0, total: template.length }
-          return [
-            d,
-            (r && people.get(r.owner)?.name) || "Unassigned",
-            r ? REPORT_STATUS[r.status].label : "Not started",
-            r ? submittedText(r, deadline) : "Not started",
-            `${done} of ${total}`,
-          ]
-        }),
+        title: "Notes",
+        head: ["Section", "Answer"],
+        rows: [
+          ["Summary", r.summary],
+          ["Blockers", r.blockers],
+          ...extras.map(([k, v]) => [extraLabels[k] ?? k, v]),
+          ...(r.attachments.length ? [["Attachments", r.attachments.map((a) => a.name).join(", ")]] : []),
+        ],
       },
     ],
-    fileBase: `daily-report-submissions-${day}`,
+    fileBase: `shift-report-${slug(owner)}-${r.date}`,
   }
 }
 
-/** The history list as shown (after filters). */
-export function buildHistoryDoc({
-  reports,
-  people,
-  today,
-  deadline,
-  showOwner,
-}: {
-  reports: Report[]
-  people: Map<string, Person>
-  today: string
-  deadline: string
-  showOwner: boolean
+/** Every report in a date range (the inbox after filters): a summary table plus all task rows. */
+export function buildRangeDoc({ rows, people, states, from, to, tz }: {
+  rows: ShiftReport[]
+  people: Map<string, { name: string }>
+  states: Map<string, ReportState>
+  from: string
+  to: string
+  tz: string
 }): ExportDoc {
-  const day = today.slice(0, 10)
+  const name = (id: string) => people.get(id)?.name ?? id
+  const range = from && to ? (from === to ? formatDate(from) : `${formatDate(from)} to ${formatDate(to)}`) : "All dates"
+  const sorted = [...rows].sort((a, b) => a.start.localeCompare(b.start) || name(a.personId).localeCompare(name(b.personId)))
   return {
-    title: showOwner ? "Daily report history" : "My daily report history",
-    subtitle: `${reports.length} ${reports.length === 1 ? "report" : "reports"} · up to ${formatDate(day)}`,
-    meta: [["Generated for", day]],
+    title: "Shift reports",
+    subtitle: `${range} · ${rows.length} ${rows.length === 1 ? "report" : "reports"}`,
+    meta: [["Dates", from && to ? `${from} to ${to}` : "All"]],
     tables: [
       {
-        head: ["Report", "Date", "Department", ...(showOwner ? ["Owner"] : []), "Status", "Submitted"],
-        rows: reports.map((r) => [
-          r.id,
-          r.date,
-          r.dept,
-          ...(showOwner ? [people.get(r.owner)?.name ?? r.owner] : []),
-          REPORT_STATUS[r.status].label,
-          submittedText(r, deadline),
+        title: "Reports",
+        head: ["Date", "Shift", "Team", "Person", "Status", "Due", "Submitted", "Tasks", "Time", "Summary", "Blockers"],
+        rows: sorted.map((r) => [
+          r.date, `${r.shiftName} ${windowLabel(r)}`, r.team, name(r.personId), REPORT_STATE[states.get(r.id) ?? "draft"].label,
+          stamp(r.due), submitted(r, tz), String(r.items.length), minutesText(totalMinutes(r)), r.summary, r.blockers,
         ]),
       },
+      {
+        title: "Task rows",
+        head: ["Date", "Person", "Task", "Title", "Status", "Minutes", "Note"],
+        rows: sorted.flatMap((r) => r.items.map((i) => [r.date, name(r.personId), i.taskRef, i.title, ITEM_STATUS[i.status].label, String(i.minutes), i.note])),
+      },
     ],
-    fileBase: `daily-report-history-${day}`,
+    fileBase: `shift-reports-${from || "all"}${to && to !== from ? `-to-${to}` : ""}`,
   }
+}
+
+// Cell quoting and the formula-injection guard are the shared CSV rules (lib/csv.ts).
+const cell = csvEscape
+const safe = csvSafe
+
+/** RFC 4180 CSV (CRLF). Each table is written as its title row, head and rows, with a blank line between tables. */
+export function toCsv(doc: ExportDoc): string {
+  const lines: string[] = []
+  doc.tables.forEach((t, i) => {
+    if (i > 0) lines.push("")
+    if (doc.tables.length > 1 && t.title) lines.push(cell(t.title))
+    lines.push(t.head.map((c) => cell(safe(c))).join(","))
+    for (const row of t.rows) lines.push(row.map((c) => cell(safe(c))).join(","))
+  })
+  return lines.join("\r\n") + "\r\n"
 }

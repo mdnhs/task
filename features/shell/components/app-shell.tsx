@@ -21,25 +21,33 @@ import { DeptRow } from "./dept-row"
 import { NavUser } from "./nav-user"
 import type { NotifyContext } from "@/lib/notify"
 import { NotificationsPanel } from "./notifications-panel"
-import { AppPromo, Logo } from "./sidebar-parts"
+import { AppPromo, Logo, PlatformContext } from "./sidebar-parts"
 import { SubscriptionBanner } from "./subscription-banner"
 
-function Nav({ items, onNavigate }: { items: NavItemData[]; onNavigate: () => void }) {
-  const pathname = usePathname()
+// The nav item for the current path: an exact match, or (when `nested`) the longest href the path sits below,
+// so /platform/tenants/t1 keeps Tenants active. The tenant app matches exactly.
+function activeHref(items: NavItemData[], pathname: string, nested: boolean): string | undefined {
+  if (items.some((n) => n.href === pathname)) return pathname
+  if (!nested) return undefined
+  return items.filter((n) => pathname.startsWith(`${n.href}/`)).sort((a, b) => b.href.length - a.href.length)[0]?.href
+}
+
+function Nav({ items, active, onNavigate, label }: { items: NavItemData[]; active: string | undefined; onNavigate: () => void; label?: string }) {
+  const isActive = (href: string) => href === active
   return (
-    <nav className="nav">
+    <nav className="nav" aria-label={label}>
       {items.map((n) => (
         <Link
           key={n.label}
           href={n.href}
-          className={pathname === n.href ? "active" : undefined}
-          aria-current={pathname === n.href ? "page" : undefined}
+          className={isActive(n.href) ? "active" : undefined}
+          aria-current={isActive(n.href) ? "page" : undefined}
           title={n.label}
           aria-label={n.badge ? `${n.label}, ${n.badge.text}` : undefined}
           onClick={onNavigate}
         >
           {/* Shared indicators (bar + background): on route change they slide from the old item to the new one, across both nav groups */}
-          {pathname === n.href && (
+          {isActive(n.href) && (
             <>
               <motion.span layoutId="nav-active-bg" className="nav-bg" transition={layoutTransition} />
               <motion.span layoutId="nav-active" className="nav-ind" transition={layoutTransition} />
@@ -59,6 +67,17 @@ function Nav({ items, onNavigate }: { items: NavItemData[]; onNavigate: () => vo
       ))}
     </nav>
   )
+}
+
+// Groups nav items by their optional `section`, keeping first-seen order. Items without one come first, unlabelled.
+function sections(items: NavItemData[]): { section?: string; items: NavItemData[] }[] {
+  const out: { section?: string; items: NavItemData[] }[] = []
+  for (const n of items) {
+    const g = out.find((o) => o.section === n.section)
+    if (g) g.items.push(n)
+    else out.push({ section: n.section, items: [n] })
+  }
+  return out.sort((a, b) => Number(!!a.section) - Number(!!b.section))
 }
 
 function DeptSeg({
@@ -111,6 +130,9 @@ export function AppShell({
   assistant,
   search,
   departments,
+  variant = "app",
+  env,
+  bellScope,
   children,
 }: {
   navigation: NavigationData
@@ -127,8 +149,19 @@ export function AppShell({
   search?: React.ReactNode
   // `false` hides the department filter (the platform console isn't scoped to a company's departments).
   departments?: false
+  /** "platform" = the operator console (D1): no app promo or department filter, a "Platform" badge and the environment pill. */
+  variant?: "app" | "platform"
+  /** Platform only: payment environment from platform settings, e.g. { label: "Test mode", live: false }. */
+  env?: { label: string; live: boolean }
+  /** Read-state key for the bell. Defaults to tenant + role; the console passes its own (platform alerts never share tenant state). */
+  bellScope?: string
   children: React.ReactNode
 }) {
+  const platform = variant === "platform"
+  const showDepts = departments !== false && !platform
+  const grouped = navigation.menu.some((n) => n.section)
+  const pathname = usePathname()
+  const active = activeHref([...navigation.menu, ...navigation.general], pathname, platform)
   const [dep, setDep] = React.useState<Dept>("all")
   const [open, setOpen] = React.useState(false)
   const [collapsed, setCollapsed] = React.useState(false)
@@ -146,23 +179,32 @@ export function AppShell({
       <RevealObserver />
       <div className={cn("app", collapsed && "collapsed")}>
         <aside className={cn("sidebar", open && "open")} id="sidebar" aria-label="Main navigation">
-          <Logo tenantId={session.tenant.id} />
+          {platform ? <Logo href="/platform" onNavigate={() => setOpen(false)} /> : <Logo tenantId={session.tenant.id} onNavigate={() => setOpen(false)} />}
 
           <div className="sidebar-scroll">
-            <div>
-              <div className="nav-label">Menu</div>
-              <Nav items={navigation.menu} onNavigate={() => setOpen(false)} />
-            </div>
+            {grouped ? (
+              sections(navigation.menu).map((g) => (
+                <div key={g.section ?? ""}>
+                  {g.section && <div className="nav-label">{g.section}</div>}
+                  <Nav items={g.items} active={active} label={g.section} onNavigate={() => setOpen(false)} />
+                </div>
+              ))
+            ) : (
+              <div>
+                <div className="nav-label">Menu</div>
+                <Nav items={navigation.menu} active={active} onNavigate={() => setOpen(false)} />
+              </div>
+            )}
 
             {navigation.general.length > 0 && (
               <div>
                 <div className="nav-label">General</div>
-                <Nav items={navigation.general} onNavigate={() => setOpen(false)} />
+                <Nav items={navigation.general} active={active} onNavigate={() => setOpen(false)} />
               </div>
             )}
           </div>
 
-          <AppPromo />
+          {!platform && <AppPromo />}
         </aside>
         {open && <div className="scrim" onClick={() => setOpen(false)} />}
 
@@ -179,23 +221,27 @@ export function AppShell({
                 <Icon name="sliders" />
               </label>
             )}
-            {departments !== false && <DeptSeg items={navigation.departments} dep={dep} onChange={setDep} />}
+            {showDepts && <DeptSeg items={navigation.departments} dep={dep} onChange={setDep} />}
+            {platform && <PlatformContext env={env} />}
             <div className="top-actions">
               {assistant}
-              <Button
-                variant="ghost"
-                size="icon-lg"
-                className="icon-btn"
-                aria-label="WhatsApp inbox"
-                nativeButton={false}
-                render={<Link href="/whatsapp" />}
-              >
-                <Icon name="mail" />
-              </Button>
-              <NotificationsPanel items={notifications} today={today} tzLabel={tzLabel} scope={`${session.tenant.id}:${session.role.id}`} notify={notify} />
-              <NavUser user={user} session={session} />
+              {/* The nav is already filtered by role and plan, so the shortcut follows it. */}
+              {navigation.menu.some((n) => n.href === "/whatsapp") && (
+                <Button
+                  variant="ghost"
+                  size="icon-lg"
+                  className="icon-btn"
+                  aria-label="WhatsApp inbox"
+                  nativeButton={false}
+                  render={<Link href="/whatsapp" />}
+                >
+                  <Icon name="mail" />
+                </Button>
+              )}
+              <NotificationsPanel items={notifications} today={today} tzLabel={tzLabel} scope={bellScope ?? `${session.tenant.id}:${session.role.id}`} notify={notify} />
+              <NavUser user={user} session={session} variant={variant} />
             </div>
-            {departments !== false && <DeptRow items={navigation.departments} dep={dep} onChange={setDep} />}
+            {showDepts && <DeptRow items={navigation.departments} dep={dep} onChange={setDep} />}
           </header>
           </div>
 

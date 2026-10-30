@@ -1,0 +1,35 @@
+{
+  "productModules": [
+    { "id": "M0", "label": "Core platform", "description": "Dashboard, settings, roles and audit log." },
+    { "id": "M1", "label": "Tasks and shifts", "description": "Tasks, daily and shift reports, manager attention and shifts." },
+    { "id": "M2", "label": "AI assistant", "description": "The assistant panel and voice." },
+    { "id": "M4", "label": "People and files", "description": "Recruitment and employee and client files." },
+    { "id": "M8", "label": "Payroll", "description": "Payroll issues." },
+    { "id": "rosters", "label": "Staff and rosters", "description": "Staff records, attendance incidents, rosters and cover." },
+    { "id": "orders-stock", "label": "Orders and stock", "description": "Stock requests, supplier orders and approvals." },
+    { "id": "whatsapp", "label": "WhatsApp", "description": "Staff and client WhatsApp messages and voice notes." }
+  ],
+  "modules": {
+    "dashboard": "M0",
+    "settings": "M0",
+    "audit": "M0",
+    "tasks": "M1",
+    "reports": "M1",
+    "attention": "M1",
+    "shifts": "M1",
+    "recruitment": "M4",
+    "files": "M4",
+    "payroll": "M8",
+    "staff": "rosters",
+    "orders": "orders-stock",
+    "whatsapp": "whatsapp"
+  },
+  "assistant": "M2",
+  "defaultPlan": "starter",
+  "core": ["M0"],
+  "plans": {
+    "starter": ["M0", "M1", "whatsapp"],
+    "business": ["M0", "M1", "M2", "M4", "M8", "rosters", "orders-stock", "whatsapp"],
+    "enterprise": ["M0", "M1", "M2", "M4", "M8", "rosters", "orders-stock", "whatsapp"]
+  }
+}

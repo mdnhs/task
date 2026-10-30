@@ -1,0 +1,81 @@
+{
+ "requests": [
+  {
+   "id": "DSR-1",
+   "tenantId": "t1",
+   "kind": "export",
+   "subject": "tenant",
+   "requestedBy": "Lilianna Novak",
+   "requestedAt": "2026-09-14T10:20:00",
+   "dueAt": "2026-10-14T10:20:00",
+   "status": "completed",
+   "note": "Full workspace export before an audit."
+  },
+  {
+   "id": "DSR-2",
+   "tenantId": "t3",
+   "kind": "deletion",
+   "subject": "tenant",
+   "requestedBy": "Daniel Okafor",
+   "requestedAt": "2026-10-08T09:40:00",
+   "dueAt": "2026-11-07T09:40:00",
+   "status": "in_progress",
+   "note": "Closing the account; retention check pending."
+  },
+  {
+   "id": "DSR-3",
+   "tenantId": "t8",
+   "kind": "deletion",
+   "subject": "tenant",
+   "requestedBy": "Hannah Doyle",
+   "requestedAt": "2026-10-15T14:05:00",
+   "dueAt": "2026-11-14T14:05:00",
+   "status": "received",
+   "note": "Asked for deletion after suspension."
+  },
+  {
+   "id": "DSR-4",
+   "tenantId": "t9",
+   "kind": "correction",
+   "subject": "person",
+   "requestedBy": "Anjali Menon",
+   "requestedAt": "2026-10-12T16:30:00",
+   "dueAt": "2026-11-11T16:30:00",
+   "status": "received",
+   "note": "Wrong legal name on an invoice contact."
+  },
+  {
+   "id": "DSR-5",
+   "tenantId": "t5",
+   "kind": "export",
+   "subject": "person",
+   "requestedBy": "Marcus Bell",
+   "requestedAt": "2026-10-02T11:10:00",
+   "dueAt": "2026-11-01T11:10:00",
+   "status": "in_progress",
+   "note": "A former employee asked for their own records."
+  },
+  {
+   "id": "DSR-6",
+   "tenantId": "t7",
+   "kind": "deletion",
+   "subject": "person",
+   "requestedBy": "Tomasz W\u00f3jcik",
+   "requestedAt": "2026-09-22T08:55:00",
+   "dueAt": "2026-10-22T08:55:00",
+   "status": "rejected",
+   "note": "Records are under a legal hold."
+  },
+  {
+   "id": "DSR-7",
+   "tenantId": "t13",
+   "kind": "export",
+   "subject": "tenant",
+   "requestedBy": "Yusuf Karim",
+   "requestedAt": "2026-09-25T10:00:00",
+   "dueAt": "2026-10-25T10:00:00",
+   "status": "in_progress",
+   "note": "Full workspace export requested before a contract review."
+  }
+ ]
+}

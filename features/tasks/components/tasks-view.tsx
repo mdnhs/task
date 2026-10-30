@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import Link from "next/link"
 import { usePathname, useSearchParams } from "next/navigation"
 
 import { DataPagination } from "@/components/data-pagination"
@@ -10,12 +11,14 @@ import { Icon } from "@/components/icons"
 import { PageHead } from "@/components/page-head"
 import { useDept } from "@/hooks/use-dept"
 import { paginate } from "@/lib/paginate"
-import { EMPTY_FILTERS, TASKS_PAGE_SIZE, matchesDue, matchesRepeat, matchesStatus } from "../filters"
+import { newTaskHref } from "../new-task"
+import { EMPTY_FILTERS, TASKS_PAGE_SIZE, matchesDue, matchesProject, matchesRepeat, matchesStatus } from "../filters"
+import { isAssigned, liveTasks } from "../planning"
 import { useTasksStore } from "../store"
 import { STATUS, STATUS_ORDER } from "../types"
-import type { Person, Task, TasksFilters, TaskTemplate } from "../types"
-import { NewTaskDialog } from "./new-task-dialog"
+import type { Person, Project, Task, TasksFilters } from "../types"
 import { TaskTable } from "./task-table"
+import { TaskViewTabs } from "./task-view-tabs"
 
 const PRIORITIES = [
   { value: "all", label: "All priorities" },
@@ -39,50 +42,45 @@ const STATUSES = [
   { value: "stuck", label: "Overdue or blocked" },
   ...STATUS_ORDER.map((s) => ({ value: s, label: STATUS[s].label })),
 ]
+// Reviewers also get "Waiting for my review" (submitted, not their own): the Today card's review tile opens it.
+const REVIEW_STATUS = { value: "review", label: "Waiting for my review" }
 
 export function TasksView({
   tasks,
   people,
-  departments,
   today,
   tzLabel,
   canCreate,
   initialFilters = EMPTY_FILTERS,
   initialPage = 1,
-  initialCreate = false,
   onlyAssignee,
-  creator,
+  reviewerId,
   scopeKey,
   refFloor,
-  templates,
-  canManageTemplates = false,
+  projects = [],
 }: {
   tasks: Task[]
   people: Person[]
-  departments: string[]
   today: string
   tzLabel: string
   canCreate: boolean
   initialFilters?: TasksFilters
   /** ?page= from the URL. Filter and department changes reset it to 1. */
   initialPage?: number
-  /** ?new=1 (command palette "New task"): open the New Task dialog on arrival. Ignored without create access. */
-  initialCreate?: boolean
   /** Staff roles only see their own tasks: the Person.id they are limited to. */
   onlyAssignee?: string
-  creator: { id: string; name: string }
+  /** Managers: the Person.id the "Waiting for my review" filter leaves out (their own submitted tasks). */
+  reviewerId?: string
   /** Names what `tasks` was scoped for (tenant + role). When it changes, the in-memory store is reseeded. */
   scopeKey: string
   /** Highest task number in the full seed, so new refs never collide with tasks a staff user cannot see. */
   refFloor: number
-  /** Seed for the New task dialog's template picker. */
-  templates?: TaskTemplate[]
-  canManageTemplates?: boolean
+  /** FR-M1-04 projects for the filter. */
+  projects?: Project[]
 }) {
   const dept = useDept()
   const [stored] = useTasksStore(tasks, scopeKey, people, { today, refFloor })
   const [filters, setFilters] = useState<TasksFilters>(initialFilters)
-  const [creating, setCreating] = useState(!!initialCreate && canCreate)
   const pathname = usePathname()
   const search = useSearchParams()
   const urlPage = Math.max(1, Number(search.get("page")) || 1)
@@ -114,41 +112,33 @@ export function TasksView({
     setPage(p)
     window.history.pushState(null, "", pageHref(p))
   }
-  // Drop the one-shot ?new=1 once it has opened the dialog, so a refresh or back doesn't reopen it.
-  useEffect(() => {
-    if (!search.has("new")) return
-    const q = new URLSearchParams(search.toString())
-    q.delete("new")
-    const qs = q.toString()
-    window.history.replaceState(null, "", qs ? `${pathname}?${qs}` : pathname)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
   // Back on page 1 after a filter or department change: drop the stale ?page= from the URL.
   useEffect(() => {
     if (page === 1 && search.has("page")) window.history.replaceState(null, "", pageHref(1))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page])
 
-  const scoped = useMemo(() => (onlyAssignee ? stored.filter((t) => t.assignee === onlyAssignee) : stored), [stored, onlyAssignee])
+  const scoped = useMemo(() => liveTasks(onlyAssignee ? stored.filter((t) => isAssigned(t, onlyAssignee)) : stored), [stored, onlyAssignee])
   const peopleById = useMemo(() => new Map(people.map((p) => [p.id, p])), [people])
   const rows = useMemo(() => {
     const q = filters.q.trim().toLowerCase()
     return scoped.filter(
       (t) =>
         (dept === "all" || t.dept === dept) &&
-        matchesStatus(t, filters.status, today) &&
+        matchesStatus(t, filters.status, today, reviewerId) &&
         matchesDue(t, filters.due, today) &&
         matchesRepeat(t, filters.repeat) &&
+        matchesProject(t, filters.project) &&
         (filters.priority === "all" || String(t.priority) === filters.priority) &&
-        (filters.assignee === "all" || t.assignee === filters.assignee) &&
+        (filters.assignee === "all" || isAssigned(t, filters.assignee)) &&
         (!q ||
           [t.title, t.ref, t.client ?? "", peopleById.get(t.assignee)?.name ?? "", ...t.tags].some((s) => s.toLowerCase().includes(q))),
     )
-  }, [scoped, dept, filters, today, peopleById])
+  }, [scoped, dept, filters, today, peopleById, reviewerId])
 
   const paged = paginate(rows, page, TASKS_PAGE_SIZE)
 
-  const filtered = filters.status !== "all" || filters.due !== "all" || filters.priority !== "all" || filters.assignee !== "all" || filters.repeat !== "all" || !!filters.q || dept !== "all"
+  const filtered = filters.status !== "all" || filters.due !== "all" || filters.priority !== "all" || filters.assignee !== "all" || filters.repeat !== "all" || filters.project !== "all" || !!filters.q || dept !== "all"
 
   return (
     <>
@@ -157,19 +147,23 @@ export function TasksView({
         subtitle={`${rows.length} of ${scoped.length} tasks`}
         actions={
           canCreate && (
-            <button type="button" className="btn btn-primary" onClick={() => setCreating(true)}>
+            <Link href={newTaskHref({ from: pageHref(page) })} className="btn btn-primary">
               <Icon name="plus" />
               New task
-            </button>
+            </Link>
           )
         }
       />
+      <TaskViewTabs active="list" />
       <div className="card tasks-card">
         <FilterBar>
           <FilterSearch value={filters.q} onChange={(v) => set("q", v)} placeholder="Search tasks" />
-          <FilterSelect label="Status" value={filters.status} options={STATUSES} onChange={(v) => set("status", v)} />
+          <FilterSelect label="Status" value={filters.status} options={onlyAssignee ? STATUSES : [...STATUSES.slice(0, 3), REVIEW_STATUS, ...STATUSES.slice(3)]} onChange={(v) => set("status", v)} />
           <FilterSelect label="Priority" value={filters.priority} options={PRIORITIES} onChange={(v) => set("priority", v)} />
           <FilterSelect label="Repeat" value={filters.repeat} options={REPEAT} onChange={(v) => set("repeat", v)} />
+          {projects.length > 0 && (
+            <FilterSelect label="Project" value={filters.project} options={[{ value: "all", label: "All projects" }, { value: "none", label: "No project" }, ...projects.map((p) => ({ value: p.id, label: p.name }))]} onChange={(v) => set("project", v)} />
+          )}
           {!onlyAssignee && (
             <FilterSelect
               label="Assignee"
@@ -203,22 +197,6 @@ export function TasksView({
           />
         )}
       </div>
-      {canCreate && (
-        <NewTaskDialog
-          open={creating}
-          onOpenChange={setCreating}
-          people={onlyAssignee ? people.filter((p) => p.id === onlyAssignee) : people}
-          departments={departments}
-          defaultDept={dept !== "all" ? dept : (departments[0] ?? "")}
-          defaultAssignee={onlyAssignee}
-          creator={creator}
-          today={today}
-          refFloor={refFloor}
-          templates={templates}
-          canManageTemplates={canManageTemplates}
-          scopeKey={scopeKey}
-        />
-      )}
     </>
   )
 }

@@ -27,7 +27,7 @@
     },
     {
       "to": 0.87,
-      "fill": "#3c7a4a"
+      "fill": "var(--brand-shade)"
     },
     {
       "to": 0.6,

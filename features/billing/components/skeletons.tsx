@@ -6,14 +6,14 @@ import { INVOICES_PAGE_SIZE } from "../constants"
 import type { Invoice } from "../types"
 
 // Mirrors BillingView's four cards (plan, usage, plans grid, invoices) with the same classes. Rendered inside the settings skeleton's .set-body.
-const dateText = (iso: string) => new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" }).replace(",", "")
-const moneyText = (amount: number, currency: string) => new Intl.NumberFormat("en-GB", { style: "currency", currency }).format(amount)
+const dateText = (iso: string, locale: string) => new Date(`${iso}T00:00:00Z`).toLocaleDateString(locale, { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" }).replace(",", "")
+const moneyText = (amount: number, currency: string, locale: string) => new Intl.NumberFormat(locale, { style: "currency", currency }).format(amount)
 
-const CardHead = ({ title, sub, actions }: { title: number; sub: number; actions?: ReactNode }) => (
+const CardHead = ({ title, sub, actions }: { title: number; sub: number | string; actions?: ReactNode }) => (
   <div className="card-head">
     <div>
       <Sk w={title} h={18} lh={28} />
-      <Sk w={sub} h={11} lh={17} style={{ marginTop: 2 }} />
+      {typeof sub === "string" ? <div className="sub"><span className="sk-ghost">{sub}</span></div> : <Sk w={sub} h={11} lh={17} style={{ marginTop: 2 }} />}
     </div>
     {actions && <div className="bill-actions">{actions}</div>}
   </div>
@@ -27,6 +27,9 @@ export function BillingSkeleton({
   currentIndex = 0,
   pastDue = false,
   fullUsage = [],
+  locale = "en-IE",
+  modules = [],
+  planName = "",
 }: {
   plans?: number
   invoices?: number
@@ -39,6 +42,12 @@ export function BillingSkeleton({
   pastDue?: boolean
   /** Usage row indexes that are at their limit (they show the "Limit reached" line). */
   fullUsage?: number[]
+  /** Tenant locale (org.locale), so ghost dates and amounts wrap like the loaded ones. */
+  locale?: string
+  /** Product modules of the catalogue (label + description) for the Included modules card; ghost text wraps like the real one. */
+  modules?: { label: string; description: string; included?: boolean }[]
+  /** The tenant's plan name, for the Included modules subtitle (it wraps on phones). */
+  planName?: string
 }) {
   return (
     <>
@@ -67,6 +76,20 @@ export function BillingSkeleton({
               <div className="bill-usage-row"><Sk w={100} h={12} lh={20} /><Sk w={110} h={12} lh={19} /></div>
               <Sk h={8} r="pill" style={{ marginTop: 8 }} />
               {fullUsage.includes(i) && <Sk w={200} h={12} lh={17} style={{ marginTop: 6 }} />}
+            </li>
+          ))}
+        </ul>
+      </section>
+      <section className="card set-card">
+        <CardHead title={150} sub={planName ? `What the ${planName} plan includes. Other modules are hidden from your workspace.` : 330} />
+        <ul className="bill-mods">
+          {modules.map((m, i) => (
+            <li key={i} data-included={m.included === false ? undefined : ""}>
+              <div>
+                <span className="tt sk-ghost">{m.label}</span>
+                <div className="tm sk-ghost">{m.description}</div>
+              </div>
+              {m.included === undefined ? <Sk w={84} h={29.4} r={8} /> : <span className="st sk-ghost">{m.included ? "Included" : "Not in plan"}</span>}
             </li>
           ))}
         </ul>
@@ -101,8 +124,8 @@ export function BillingSkeleton({
                       <td data-label="Number">
                         {inv ? <><span className="tt num sk-ghost">{inv.number}</span><div className="tm sk-ghost">{inv.description}</div></> : <><Sk w={130} h={12} lh={19} /><Sk w={120} h={10} lh={16} /></>}
                       </td>
-                      <td data-label="Date" className="num">{inv ? <time className="od-when sk-ghost">{dateText(inv.date)}</time> : <Sk w={80} h={12} />}</td>
-                      <td data-label="Amount" className="num">{inv ? <span className="sk-ghost">{moneyText(inv.amount, inv.currency)}</span> : <Sk w={64} h={12} />}</td>
+                      <td data-label="Date" className="num">{inv ? <time className="od-when sk-ghost">{dateText(inv.date, locale)}</time> : <Sk w={80} h={12} />}</td>
+                      <td data-label="Amount" className="num">{inv ? <span className="sk-ghost">{moneyText(inv.amount, inv.currency, locale)}</span> : <Sk w={64} h={12} />}</td>
                       <td data-label="Status"><Sk w={64} h={29.4} r={8} /></td>
                       <td data-label="Download"><Sk w={100} h={36.8} r={12} /></td>
                     </tr>

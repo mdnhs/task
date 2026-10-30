@@ -1,7 +1,9 @@
 // Tenant brand colour → OpsDesk brand tokens (FR-SAAS-11). Shared by the server layout and the branding panel's live preview.
 // The default colour emits nothing, so the hand-tuned tokens in opsdesk.css stay exact.
 
-export const DEFAULT_BRAND = "#1a8a3a"
+export const DEFAULT_BRAND = "#2f7d52"
+// The pre-calm-palette default: tenants that saved it get the current default tokens, not a vivid override.
+const LEGACY_DEFAULTS = ["#1a8a3a"]
 export const BRAND_STYLE_ID = "od-brand"
 const HEX = /^#[0-9a-f]{6}$/i
 
@@ -17,7 +19,7 @@ function luminance(hex: string) {
 }
 
 export function brandCss(hex: string | undefined): string {
-  if (!hex || !HEX.test(hex) || hex.toLowerCase() === DEFAULT_BRAND) return ""
+  if (!hex || !HEX.test(hex) || hex.toLowerCase() === DEFAULT_BRAND || LEGACY_DEFAULTS.includes(hex.toLowerCase())) return ""
   const on = luminance(hex) > 0.45 ? "#14201a" : "#ffffff"
   const light = `--brand:${hex};--brand-2:${mix(hex, 80, "#fff")};--brand-3:${mix(hex, 62, "#fff")};--brand-deep:${mix(hex, 62, "#000")};--brand-soft:${mix(hex, 13, "#fff")};--stripe:${mix(hex, 40, "#fff")};--on-brand:${on}`
   const dark = `--brand:${mix(hex, 85, "#fff")};--brand-2:${mix(hex, 80, "#fff")};--brand-3:${mix(hex, 62, "#fff")};--brand-deep:${mix(hex, 55, "#000")};--brand-soft:${mix(hex, 26, "#101614")};--stripe:${mix(hex, 45, "#1a201d")}`

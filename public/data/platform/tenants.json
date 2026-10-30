@@ -39,7 +39,7 @@
       "name": "Harbourline Cleaning Co",
       "slug": "harbourline",
       "subdomain": "harbourline.opsdesk.app",
-      "plan": "business",
+      "plan": "starter",
       "status": "trial",
       "users": 8,
       "storageGb": 2.1,
@@ -103,7 +103,7 @@
       "name": "Riverside Property Care",
       "slug": "riverside",
       "subdomain": "riverside.opsdesk.app",
-      "plan": "starter",
+      "plan": "business",
       "status": "active",
       "users": 9,
       "storageGb": 6.3,
@@ -192,7 +192,7 @@
       ],
       "billing": {
         "paymentMethod": "None on file",
-        "trialEndsOn": "2026-11-06"
+        "trialEndsOn": "2026-10-26"
       }
     },
     {

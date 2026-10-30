@@ -1,22 +1,25 @@
 import { PageHeadSkeleton } from "@/components/page-head"
-import { PagerSkeleton, needsPager, pageRows } from "@/components/pager-skeleton"
-import { Sk, SkGroup } from "@/components/sk"
+import { PagerSkeleton } from "@/components/pager-skeleton"
+import { Sk, SkGroup, SkMask } from "@/components/sk"
 import { Icon } from "@/components/icons"
 import { formatDue, nowInTz } from "@/lib/dates"
-import { AUDIT_PAGE_SIZE, SUPPORT_PAGE_SIZE, TENANTS_PAGE_SIZE } from "../constants"
-import { effectiveStatus, formatLeft, isoSeconds } from "../logic"
-import { REQUEST_STATUS } from "../types"
-import type { AuditEntry, SupportRequest } from "../types"
+import { AUDIT_PAGE_SIZE, PLAN_EDIT_SUBTITLE, PLAN_NEW_SUBTITLE, SUPPORT_PAGE_SIZE } from "../constants"
+import { effectiveStatus, formatLeft, isoSeconds, limitLabel, priceLabel } from "../logic"
+import { TRIAL_LABEL } from "../plans"
+import { LIMITS, REQUEST_STATUS } from "../types"
+import type { SupportRequest } from "../types"
+import type { SupportAuditLine } from "../support"
+import type { OverviewData } from "../overview"
+import { OverviewDashboard } from "./overview-dashboard"
+import { PlansView } from "./plans-view"
+import { TenantsView } from "./tenants-view"
+import { BillingLedger } from "./billing-ledger"
+import { DataRequestsView } from "./data-requests-view"
+import { AuditLogView } from "./audit-log-view"
+import { SettingsView } from "./settings-view"
+import { TeamView } from "./team-view"
 
 // Mirrors the platform views. `lh` values are the line boxes the dashboard/tasks skeletons already use for the same classes.
-
-function Th({ widths }: { widths: number[] }) {
-  return (
-    <thead>
-      <tr>{widths.map((w, i) => <th key={i}><Sk w={w} h={10} lh={16} /></th>)}</tr>
-    </thead>
-  )
-}
 
 const CardHead = ({ title, sub }: { title: number; sub?: number }) => (
   <div className="card-head">
@@ -27,163 +30,169 @@ const CardHead = ({ title, sub }: { title: number; sub?: number }) => (
   </div>
 )
 
-export function OverviewSkeleton({ rows = 10 }: { rows?: number }) {
+// The billing ledger: the real ledger, masked (SkMask), from the same gate, view model and saved view as the page.
+export function BillingSkeleton(props: React.ComponentProps<typeof BillingLedger>) {
   return (
-    <SkGroup label="Loading tenants" className="sk-page">
-      <PageHeadSkeleton />
-      <section className="stats">
-        {Array.from({ length: 4 }, (_, i) => (
-          <article key={i} className="stat">
-            <div className="stat-top">
-              <Sk w="55%" h={14} lh={22} />
-              <Sk w={38} h={38} r="circle" />
-            </div>
-            <Sk w={90} h={40} r={10} lh={46} className="sk-val" style={{ marginTop: "auto" }} />
-            <Sk w="70%" h={11} lh={17} />
-          </article>
-        ))}
-      </section>
-      <div className="card pf-card">
-        <div className="od-filters">
-          <Sk h={40} r="pill" className="sk-fsearch" />
-          <Sk w={140} h={40} r="pill" />
-          <Sk w={140} h={40} r="pill" />
-        </div>
-        <div className="table-wrap">
-          <table className="rtable pf-table">
-            <Th widths={[48, 70, 34, 44, 36, 48, 50, 34]} />
-            <tbody>
-              {Array.from({ length: pageRows(rows, TENANTS_PAGE_SIZE) }, (_, i) => (
-                <tr key={i}>
-                  <td data-label="Tenant"><Sk w={170} h={12} lh={19} /></td>
-                  <td data-label="Subdomain"><Sk w={130} h={12} lh={19} /></td>
-                  <td data-label="Plan"><Sk w={64} h={12} lh={19} /></td>
-                  <td data-label="Status"><Sk w={84} h={29.4} r={8} /></td>
-                  <td data-label="Users"><Sk w={24} h={12} lh={19} /></td>
-                  <td data-label="Storage"><Sk w={52} h={12} lh={19} /></td>
-                  <td data-label="Created"><Sk w={96} h={12} lh={19} /></td>
-                  <td data-label="MRR"><Sk w={44} h={12} lh={19} /></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        {needsPager(rows, TENANTS_PAGE_SIZE) && <PagerSkeleton rows={rows} size={TENANTS_PAGE_SIZE} />}
-      </div>
-    </SkGroup>
+    <SkMask label="Loading billing">
+      <BillingLedger {...props} />
+    </SkMask>
   )
 }
 
-const MetaSk = ({ n }: { n: number }) => (
-  <dl className="pf-meta">
-    {Array.from({ length: n }, (_, i) => (
-      <div key={i}>
-        <Sk w={56} h={10} lh={16} />
-        <Sk w={110} h={13} lh={22} style={{ marginTop: 4 }} />
-      </div>
-    ))}
-  </dl>
-)
-
-export function TenantDetailSkeleton() {
+// The data requests queue: the real view, masked (SkMask), from the same gate, view model and saved view as the page.
+export function DataRequestsSkeleton(props: React.ComponentProps<typeof DataRequestsView>) {
   return (
-    <SkGroup label="Loading tenant" className="sk-page">
-      <span className="pf-back"><Sk w={80} h={13} lh={20} /></span>
-      <PageHeadSkeleton actions={[130]} />
-      <div className="pf-grid">
-        <div className="pf-col">
-          <section className="card">
-            <div className="card-head">
-              <div>
-                <Sk w={130} h={18} lh={28} />
-                <Sk w={90} h={11} lh={17} style={{ marginTop: 2 }} />
-              </div>
-              <Sk w={84} h={29.4} r={8} />
-            </div>
-            <MetaSk n={5} />
-          </section>
-          <section className="card">
-            <CardHead title={180} sub={80} />
-            <ul className="pf-meters">
-              {Array.from({ length: 4 }, (_, i) => (
-                <li key={i}>
-                  <div className="pf-meter-top">
-                    <Sk w={90} h={12} lh={20} />
-                    <Sk w={110} h={12} lh={20} />
-                  </div>
-                  <Sk h={8} r="pill" />
-                </li>
-              ))}
-            </ul>
-          </section>
-        </div>
-        <div className="pf-col">
-          <section className="card pf-hidden">
-            <Sk w={48} h={48} r="circle" />
-            <Sk w={200} h={18} lh={28} />
-            <Sk w="90%" h={12} lh={20} />
-            <Sk w="75%" h={12} lh={20} />
-            <Sk w={150} h={46} r={14} />
-          </section>
-          <section className="card">
-            <CardHead title={90} />
-            <ul className="pf-contacts">
-              {Array.from({ length: 2 }, (_, i) => (
-                <li key={i}>
-                  <Sk w={60} h={10} lh={16} />
-                  <Sk w={120} h={13} lh={20} />
-                  <Sk w={190} h={12} lh={20} />
-                </li>
-              ))}
-            </ul>
-          </section>
-          <section className="card">
-            <CardHead title={120} />
-            <MetaSk n={2} />
-          </section>
-        </div>
-      </div>
-    </SkGroup>
+    <SkMask label="Loading data requests">
+      <DataRequestsView {...props} />
+    </SkMask>
   )
 }
 
-export function PlansSkeleton({ plans = 3, modules = [4, 9, 11] }: { plans?: number; modules?: number[] }) {
+// Task 9: the audit log, team and settings pages: the real views, masked (SkMask), from the same gate and view models.
+export function AuditLogSkeleton(props: React.ComponentProps<typeof AuditLogView>) {
   return (
-    <SkGroup label="Loading plans" className="sk-page">
-      <PageHeadSkeleton />
-      <section className="pf-plans">
-        {Array.from({ length: plans }, (_, i) => (
-          <article key={i} className="card pf-plan">
-            <div className="card-head">
-              <div>
-                <Sk w={110} h={18} lh={28} />
-                <Sk w={150} h={11} lh={17} style={{ marginTop: 2 }} />
-              </div>
-              <Sk w={84} h={42.3} r={14} />
-            </div>
-            <Sk w={130} h={26} lh={39} />
-            <dl className="pf-limits">
-              {Array.from({ length: 4 }, (_, j) => (
-                <div key={j}>
-                  <Sk w={70} h={10} lh={16} />
-                  <Sk w={60} h={13} lh={22} style={{ marginTop: 2 }} />
-                </div>
-              ))}
-            </dl>
-            <div>
-              <Sk w={60} h={11} lh={18} />
-              <ul className="pf-chips">
-                {Array.from({ length: modules[i % modules.length] }, (_, k) => <li key={k}><Sk w={60 + ((k * 13) % 40)} h={19} r={6} /></li>)}
-              </ul>
-            </div>
-          </article>
-        ))}
-      </section>
-    </SkGroup>
+    <SkMask label="Loading audit log">
+      <AuditLogView {...props} />
+    </SkMask>
+  )
+}
+export function TeamSkeleton(props: React.ComponentProps<typeof TeamView>) {
+  return (
+    <SkMask label="Loading team">
+      <TeamView {...props} />
+    </SkMask>
+  )
+}
+export function SettingsSkeleton(props: React.ComponentProps<typeof SettingsView>) {
+  return (
+    <SkMask label="Loading settings">
+      <SettingsView {...props} />
+    </SkMask>
+  )
+}
+
+// Tenant 360 (Task 5): the real header and tab, masked, from the same gate and view models as the routes. `[id]/loading.tsx`
+// masks the header and the tab (or a long-form page); `[tab]/loading.tsx` masks only the tab, under the live header.
+export function Tenant360Skeleton({ label = "Loading tenant", children }: { label?: string; children: React.ReactNode }) {
+  return <SkMask label={label}>{children}</SkMask>
+}
+
+// The tenants list: the real view, masked (SkMask), from the same view model and saved view as the page.
+export function TenantsSkeleton(props: React.ComponentProps<typeof TenantsView>) {
+  return (
+    <SkMask label="Loading tenants">
+      <TenantsView {...props} />
+    </SkMask>
+  )
+}
+
+// The plans comparison: the real view, masked (SkMask), from the same gate and view model as the page.
+export function PlansSkeleton(props: React.ComponentProps<typeof PlansView>) {
+  return (
+    <SkMask label="Loading plans">
+      <PlansView {...props} />
+    </SkMask>
   )
 }
 
 const ghost = (text: React.ReactNode) => <span className="sk-ghost">{text}</span>
+
+// Mirrors PlanEditView (plan-form.tsx): same classes, real labels as ghost text; only the plan's name and values are blocks.
+// `currency`: the plans' shared currency (unknown here when plans differ, then the price label is a block).
+const PlanFieldSk = ({ label, req = true, hint }: { label?: string; req?: boolean; hint?: string }) => (
+  <div className="od-field">
+    {label ? <label>{ghost(label)}{req && <span className="od-req" aria-hidden="true"> *</span>}</label> : <Sk w={130} h={11} lh={18.1} />}
+    <Sk h={44} r={14} />
+    {hint && <div className="od-field-msg"><p className="od-field-hint">{ghost(hint)}</p></div>}
+  </div>
+)
+
+export function PlanEditSkeleton({ modules, currency }: { modules: string[]; currency?: string }) {
+  return (
+    <SkGroup label="Loading plan" className="sk-page">
+      <span className="pf-back">{ghost("← Plans")}</span>
+      <div className="head">
+        <div>
+          <span className="sk-line sk-h1"><Sk w={300} h="var(--sk-h1,32px)" r={10} /></span>
+          <p>{ghost(PLAN_EDIT_SUBTITLE)}</p>
+        </div>
+      </div>
+      <div className="card pf-form od-form">
+        <div className="od-form-cols">
+          <div className="od-form-col">
+            <PlanFieldSk label={currency ? priceLabel(currency) : undefined} />
+            <div className="od-row2">
+              {LIMITS.map((l) => <PlanFieldSk key={l.key} label={limitLabel(l)} />)}
+            </div>
+          </div>
+          <div className="od-form-col">
+            <fieldset className="pf-modset">
+              <legend>{ghost("Modules")}</legend>
+              {modules.map((m) => (
+                <span key={m} className="pf-mod">
+                  {ghost(m)}
+                  <Sk w={40} h={24} r="pill" style={{ flex: "none" }} />
+                </span>
+              ))}
+            </fieldset>
+          </div>
+        </div>
+        <div className="od-form-foot">
+          <span className="btn btn-outline sk-ghost-btn">Cancel</span>
+          <span className="btn btn-primary sk-ghost-btn">Save plan</span>
+        </div>
+      </div>
+    </SkGroup>
+  )
+}
+
+// Mirrors PlanNewView / NewPlanForm (plan-form.tsx): every label is real text, nothing in the form is data.
+export function PlanNewSkeleton({ modules, currency }: { modules: string[]; currency?: string }) {
+  return (
+    <SkGroup label="Loading new plan" className="sk-page">
+      <span className="pf-back">{ghost("← Plans")}</span>
+      <div className="head">
+        <div>
+          <h1><span className="sk-ghost">New plan</span></h1>
+          <p>{ghost(PLAN_NEW_SUBTITLE)}</p>
+        </div>
+      </div>
+      <div className="card pf-form od-form">
+        <div className="od-form-cols">
+          <div className="od-form-col">
+            <div className="od-row2">
+              <PlanFieldSk label="Plan ID" />
+              <PlanFieldSk label="Name" />
+            </div>
+            <div className="od-row2">
+              <PlanFieldSk label={currency ? priceLabel(currency) : undefined} />
+              <PlanFieldSk label={TRIAL_LABEL} />
+            </div>
+            <div className="od-row2">
+              {LIMITS.map((l) => <PlanFieldSk key={l.key} label={limitLabel(l)} />)}
+            </div>
+          </div>
+          <div className="od-form-col">
+            <fieldset className="pf-modset">
+              <legend>{ghost("Modules")}</legend>
+              {modules.map((m) => (
+                <span key={m} className="pf-mod">
+                  {ghost(m)}
+                  <Sk w={40} h={24} r="pill" style={{ flex: "none" }} />
+                </span>
+              ))}
+            </fieldset>
+            <PlanFieldSk label="Reason" req={false} hint="Optional. Saved in the audit trail." />
+          </div>
+        </div>
+        <div className="od-form-foot">
+          <span className="btn btn-outline sk-ghost-btn">Cancel</span>
+          <span className="btn btn-primary sk-ghost-btn">Create plan</span>
+        </div>
+      </div>
+    </SkGroup>
+  )
+}
 
 // Same markup as <When>: relative day or date, plus the timezone label (in its own span) when it carries a time.
 const whenText = (iso: string, today: string, tzLabel: string) => {
@@ -195,7 +204,8 @@ const whenText = (iso: string, today: string, tzLabel: string) => {
 // loaded table at every width. Granted rows get the same two action buttons (ghosted).
 export function SupportSkeleton({ requests = [], audit = [], tenants = [], today = "", tzLabel = "", tz = "" }: {
   requests?: SupportRequest[]
-  audit?: AuditEntry[]
+  /** null without audit.read: the page hides the audit card, so the skeleton does too. */
+  audit?: SupportAuditLine[] | null
   tenants?: { id: string; name: string }[]
   today?: string
   tzLabel?: string
@@ -251,7 +261,7 @@ export function SupportSkeleton({ requests = [], audit = [], tenants = [], today
         </div>
         {requests.length > SUPPORT_PAGE_SIZE && <PagerSkeleton rows={requests.length} size={SUPPORT_PAGE_SIZE} />}
       </div>
-      <section className="card pf-card">
+      {audit && <section className="card pf-card">
         <CardHead title={190} sub={260} />
         <ul className="pf-audit">
           {audit.slice(0, AUDIT_PAGE_SIZE).map((e) => (
@@ -266,7 +276,26 @@ export function SupportSkeleton({ requests = [], audit = [], tenants = [], today
           ))}
         </ul>
         {audit.length > AUDIT_PAGE_SIZE && <PagerSkeleton rows={audit.length} size={AUDIT_PAGE_SIZE} />}
-      </section>
+      </section>}
+    </SkGroup>
+  )
+}
+
+// /platform overview: the real dashboard with its real view model, masked (SkMask), charts as plain blocks.
+// The loading route builds the same view model as the page, so counts, wrapping and card heights match by construction.
+export function OverviewDashboardSkeleton(props: { data: OverviewData; today: string; tzLabel: string }) {
+  return (
+    <SkMask label="Loading Overview">
+      <OverviewDashboard {...props} skeleton />
+    </SkMask>
+  )
+}
+
+// A route whose gate will refuse the viewer: no data at all, just the page head.
+export function DeniedSkeleton() {
+  return (
+    <SkGroup label="Loading">
+      <PageHeadSkeleton />
     </SkGroup>
   )
 }

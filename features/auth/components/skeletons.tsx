@@ -42,6 +42,11 @@ export function SignInSkeleton() {
   return (
     <SkGroup label="Loading sign in" className="auth-form">
       <Head />
+      <div className="auth-sso">
+        <Sk h={48} r={14} />
+        <Sk h={48} r={14} />
+      </div>
+      <p className="auth-or"><Sk w={130} h={11} lh={20} style={{ margin: "0 auto" }} /></p>
       <FieldSk />
       <FieldSk hint />
       <div className="auth-row"><Sk w={120} h={13} lh={20} /></div>

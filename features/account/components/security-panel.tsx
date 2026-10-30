@@ -5,9 +5,12 @@ import { AlertDialog as AlertDialogPrimitive } from "@base-ui/react/alert-dialog
 import { Monitor } from "lucide-react"
 import { toast } from "sonner"
 
+import { disableMfa } from "@/app/actions/security"
+
 import { ConfirmDialog } from "@/components/confirm-dialog"
 import { DataPagination } from "@/components/data-pagination"
 import { Icon } from "@/components/icons"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Switch } from "@/components/ui/switch"
 import { When } from "@/components/when"
 import { AlertDialog, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
@@ -16,6 +19,7 @@ import { paginate } from "@/lib/paginate"
 import { ACTIVITY_PAGE_SIZE } from "../constants"
 import { securityStore } from "../store"
 import type { SecurityData } from "../types"
+import { TotpSetup } from "./totp-setup"
 
 // Security (FR-AUTH-04/05/06): verified password reset, MFA, active sessions. Every action lands in the activity list and a toast.
 export function SecurityPanel({
@@ -25,6 +29,7 @@ export function SecurityPanel({
   timezone,
   tzLabel,
   scopeKey,
+  mfaRequired = false,
 }: {
   data: SecurityData
   email: string
@@ -32,10 +37,13 @@ export function SecurityPanel({
   timezone: string
   tzLabel: string
   scopeKey: string
+  /** The workspace requires two-step verification for this person (FR-M0-04): it cannot be switched off. */
+  mfaRequired?: boolean
 }) {
   const [state, setState] = securityStore.useStore({ mfa: data.mfa, sessions: data.sessions, activity: data.activity }, scopeKey)
   const [resetOpen, setResetOpen] = useState(false)
   const [mfaNext, setMfaNext] = useState<boolean | null>(null)
+  const [setupOpen, setSetupOpen] = useState(false)
   const [signOutAll, setSignOutAll] = useState(false)
   const [page, setPage] = useState(1)
 
@@ -48,11 +56,13 @@ export function SecurityPanel({
     toast.success("Reset link sent", { description: `Check ${email}` })
     setResetOpen(true)
   }
-  function applyMfa() {
-    if (mfaNext === null) return
-    setState((p) => ({ ...p, mfa: mfaNext }))
-    log(mfaNext ? "Two-step verification turned on" : "Two-step verification turned off")
-    toast.success(mfaNext ? "Two-step verification on" : "Two-step verification off")
+  async function applyMfa() {
+    if (mfaNext !== false) return
+    const r = await disableMfa()
+    if (!r.ok) return toast.error("Two-step verification is required for your role")
+    setState((p) => ({ ...p, mfa: false }))
+    log("Two-step verification turned off")
+    toast.success("Two-step verification off")
   }
   function signOutOne(id: string) {
     const s = state.sessions.find((x) => x.id === id)
@@ -81,11 +91,12 @@ export function SecurityPanel({
           <Switch
             checked={state.mfa}
             aria-label="Two-step verification"
-            onCheckedChange={(on) => setMfaNext(on)}
+            disabled={mfaRequired && state.mfa}
+            onCheckedChange={(on) => (on ? setSetupOpen(true) : setMfaNext(false))}
           />
           <span className="acc-mfa-text">
             <span>Two-step verification</span>
-            <span className="tm">{state.mfa ? "On: a code is asked at every new sign-in" : "Off: add a code step to protect your account"}</span>
+            <span className="tm">{state.mfa ? (mfaRequired ? "On: required by your workspace administrator" : "On: a code is asked at every new sign-in") : "Off: add a code step to protect your account"}</span>
           </span>
         </label>
       </section>
@@ -154,13 +165,29 @@ export function SecurityPanel({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      <Dialog open={setupOpen} onOpenChange={setSetupOpen}>
+        <DialogContent className="od-dialog od-form-dialog">
+          <DialogHeader>
+            <DialogTitle>Set up two-step verification</DialogTitle>
+            <DialogDescription>Add this account to an authenticator app, then confirm with a code.</DialogDescription>
+          </DialogHeader>
+          <TotpSetup
+            account={email}
+            onDone={() => {
+              setSetupOpen(false)
+              setState((p) => ({ ...p, mfa: true }))
+              log("Two-step verification turned on")
+            }}
+          />
+        </DialogContent>
+      </Dialog>
       <ConfirmDialog
         open={mfaNext !== null}
         onOpenChange={(o) => !o && setMfaNext(null)}
-        title={mfaNext ? "Turn on two-step verification?" : "Turn off two-step verification?"}
-        text={mfaNext ? "You will be asked for a code from your authenticator app each time you sign in on a new device." : "Your account will be protected by your password alone. We recommend keeping it on."}
-        confirmLabel={mfaNext ? "Turn on" : "Turn off"}
-        destructive={mfaNext === false}
+        title="Turn off two-step verification?"
+        text="Your account will be protected by your password alone. We recommend keeping it on."
+        confirmLabel="Turn off"
+        destructive
         onConfirm={applyMfa}
       />
       <ConfirmDialog

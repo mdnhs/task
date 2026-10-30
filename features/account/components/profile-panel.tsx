@@ -57,7 +57,7 @@ export function ProfilePanel({
         </div>
       </div>
       <div className="acc-id">
-        <span className="avatar av1 acc-avatar" aria-hidden="true">{initials}</span>
+        <span className="avatar av-me acc-avatar" aria-hidden="true">{initials}</span>
         <div className="acc-id-text">
           <b>{saved}</b>
           <span>{role}</span>

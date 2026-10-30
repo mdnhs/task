@@ -7,6 +7,7 @@ import { Sk, SkGroup } from "@/components/sk"
 import {
   DEPARTMENTS_PAGE_SIZE,
   DELIVERY_PAGE_SIZE,
+  DEVICES_PAGE_SIZE,
   GRANTS_PAGE_SIZE,
   INVITES_PAGE_SIZE,
   USERS_PAGE_SIZE,
@@ -14,6 +15,10 @@ import {
 import { nextReminder, reminderSchedule } from "@/lib/notify"
 import { daysBetween, formatDate, formatDue, formatTime } from "@/lib/dates"
 import { SUPPORT_STATUS, supportRows, type SupportAccess } from "@/lib/support-access"
+import { DEVICE_TYPES, DEVICE_FEATURES, allowFor, describePolicy } from "@/lib/devices"
+import type { Device, DevicePolicy } from "@/lib/devices"
+import { describeMfaPolicy } from "@/lib/mfa"
+import type { MfaPolicy } from "@/lib/mfa"
 import { SETTINGS_TABS } from "../types"
 import type { DeliveryRow, Department, Integration, Invite, MatrixData, NotificationsData, SettingsTabId, SettingsUser, TemplateData } from "../types"
 
@@ -55,6 +60,9 @@ export type SettingsSkeletonData = {
   template?: TemplateData
   notifications?: NotificationsData
   deliveryLog?: DeliveryRow[]
+  devices?: Device[]
+  devicePolicies?: DevicePolicy[]
+  mfaPolicy?: MfaPolicy
 }
 
 // Transparent text on the skeleton tint (see .sk-ghost in dashboard.css): wraps exactly like the loaded text.
@@ -501,6 +509,76 @@ function Integrations({
   )
 }
 
+// Device access card under Integrations (DevicePolicyCard): one row per feature, a select when the user can write.
+function DevicePolicies({ canWrite, policies }: { canWrite: boolean; policies: DevicePolicy[] }) {
+  return (
+    <section className="card set-card">
+      <CardHead title="Device access" sub="Where each feature can be used. Register devices on the Devices tab." />
+      <ul className="set-list">
+        {DEVICE_FEATURES.map((f) => (
+          <li key={f.value} className="dev-policy">
+            <div className="dev-policy-text">
+              <b className="sk-ghost" style={{ alignSelf: "flex-start" }}>{f.label}</b>
+              <span>{g(describePolicy({ feature: f.value, allow: allowFor(f.value, policies) }))}</span>
+            </div>
+            {canWrite && <div className="od-filters"><Sk w={220} h={39.6} r="pill" /></div>}
+          </li>
+        ))}
+      </ul>
+    </section>
+  )
+}
+
+// Two-step rule card under Roles (MfaPolicyCard).
+function MfaPolicySk({ canWrite, policy, roleLabels }: { canWrite: boolean; policy: MfaPolicy; roleLabels: Record<string, string> }) {
+  return (
+    <section className="card set-card">
+      <CardHead title="Two-step verification" sub={describeMfaPolicy(policy, roleLabels)} extra={canWrite ? <div className="od-filters"><Sk w={190} h={39.6} r="pill" /></div> : null} />
+      {policy.mode === "roles" && (
+        <div className="dev-roles">
+          {Object.entries(roleLabels).map(([id, text]) => (
+            <label key={id} className="set-switch-row"><Sk w={40} h={24} r="pill" />{g(text)}</label>
+          ))}
+        </div>
+      )}
+    </section>
+  )
+}
+
+// Mirrors DevicesPanel: head with the add button, then one row per device (switch + remove when the user can write).
+function Devices({ canWrite, data }: { canWrite: boolean; data?: SettingsSkeletonData }) {
+  const devices = data?.devices ?? []
+  const names = Object.fromEntries((data?.users ?? []).map((u) => [u.id, u.name]))
+  const rows = [...devices].sort((a, b) => (names[a.userId] ?? "Unknown user").localeCompare(names[b.userId] ?? "Unknown user") || a.label.localeCompare(b.label)).slice(0, DEVICES_PAGE_SIZE)
+  const trusted = devices.filter((d) => d.trusted && d.type === "pc" && d.owner === "company").length
+  return (
+    <section className="card set-card">
+      <CardHead title="Registered devices" sub={`${devices.length} ${devices.length === 1 ? "device" : "devices"} · ${trusted} trusted company PCs`} button={canWrite ? 138 : undefined} />
+      <ul className="set-list">
+        {rows.map((d) => (
+          <li key={d.id} className="dev-row">
+            <Sk w={40} h={40} r={12} />
+            <div className="dev-main">
+              <span className="dev-top">
+                <b className="dev-name">{g(d.label)}</b>
+                <span className="st sk-ghost">{d.owner === "company" ? "Company" : "Personal"}</span>
+              </span>
+              <span className="tm">{g(`${names[d.userId] ?? "Unknown user"} · ${DEVICE_TYPES.find((t) => t.value === d.type)?.label}`)}{d.lastSeen && <> {g(<>· Last seen {when(d.lastSeen, data?.today ?? "", data?.tzLabel ?? "")}</>)}</>}</span>
+            </div>
+            <label className="dev-trust"><Sk w={40} h={24} r="pill" />{g("Trusted")}</label>
+            {canWrite && <span className="btn btn-outline set-sm sk-ghost-btn">Remove</span>}
+          </li>
+        ))}
+      </ul>
+      {needsPager(devices.length, DEVICES_PAGE_SIZE) && <PagerSkeleton rows={devices.length} size={DEVICES_PAGE_SIZE} />}
+    </section>
+  )
+}
+
+// Appearance pill widths (Sharp/Soft/Round, Small/Default/Large, Compact/Comfortable/Spacious) and legend widths, browser-measured.
+const APPEAR_PILLS = [[66, 56, 70], [64, 77, 66], [88, 112, 89]]
+const LEGEND_W = [55, 62, 53]
+
 // `nameLines`: the tenant name wraps in the preview bar (21.75px lines) when it is long; browser-measured at 1440.
 function Branding({
   canWrite,
@@ -523,6 +601,15 @@ function Branding({
           <div className="od-field">
             <Sk w={90} h={11} lh={18.1} />
             <Sk h={44} r={14} />
+          </div>
+          <div className="set-appear">
+            <div className="set-appear-head"><Sk w={74} h={11} lh={18.1} /></div>
+            {APPEAR_PILLS.map((ws, i) => (
+              <div key={i} className="set-appear-row">
+                <Sk w={LEGEND_W[i]} h={11} lh={18.1} />
+                <div className="set-appear-opts">{ws.map((w, j) => <Sk key={j} w={w} h={34} r="pill" />)}</div>
+              </div>
+            ))}
           </div>
           {canWrite && <Foot w={138} />}
         </div>
@@ -640,7 +727,10 @@ export function SettingsBodySkeleton({
       )
     case "roles":
       return (
-        <Roles canWrite={canWrite} matrix={counts.data?.matrix} />
+        <>
+          <Roles canWrite={canWrite} matrix={counts.data?.matrix} />
+          <MfaPolicySk canWrite={canWrite} policy={counts.data?.mfaPolicy ?? { mode: "off", roles: [] }} roleLabels={counts.data?.roleLabels ?? {}} />
+        </>
       )
     case "template":
       return (
@@ -652,8 +742,13 @@ export function SettingsBodySkeleton({
       )
     case "integrations":
       return (
-        <Integrations canWrite={canWrite} seed={counts.data?.integrations ?? []} today={counts.data?.today ?? ""} tzLabel={counts.data?.tzLabel ?? ""} />
+        <>
+          <Integrations canWrite={canWrite} seed={counts.data?.integrations ?? []} today={counts.data?.today ?? ""} tzLabel={counts.data?.tzLabel ?? ""} />
+          <DevicePolicies canWrite={canWrite} policies={counts.data?.devicePolicies ?? []} />
+        </>
       )
+    case "devices":
+      return <Devices canWrite={canWrite} data={counts.data} />
     case "branding":
       return <Branding canWrite={canWrite} nameLines={counts.brandNameLines} />
     case "billing":

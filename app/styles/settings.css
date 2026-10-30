@@ -25,7 +25,7 @@
 .set-card .btn:disabled{opacity:.5;cursor:not-allowed}
 .set-card .btn-primary:disabled:hover{background:var(--brand)}
 .set-card .btn-outline:disabled:hover{background:transparent}
-.set-sm{padding:8px 14px;font-size:13px;border-radius:12px;cursor:pointer}
+.set-sm{padding:8px 14px;font-size:13px;border-radius:calc(12px * var(--radius-scale,1));cursor:pointer}
 .set-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
 .set-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
 .set-notice{display:flex;align-items:flex-start;gap:10px;margin:0 0 14px;padding:12px 16px;border-radius:var(--r-md);background:var(--brand-soft);color:var(--brand-deep);font-size:13px;font-weight:600;line-height:1.45}
@@ -124,7 +124,7 @@
 .set-card .set-upload .btn{cursor:pointer}
 .set-preview{display:flex;flex-direction:column;gap:10px}
 .set-preview-bar{display:flex;align-items:center;gap:12px;padding:22px 18px;border-radius:var(--r-lg);background:var(--panel)}
-.set-preview-chip{display:grid;place-items:center;width:42px;height:42px;border-radius:14px;color:#fff;font-weight:800;font-size:15px;overflow:hidden;flex:none}
+.set-preview-chip{display:grid;place-items:center;width:42px;height:42px;border-radius:calc(14px * var(--radius-scale,1));color:#fff;font-weight:800;font-size:15px;overflow:hidden;flex:none}
 .set-preview-chip.has-logo{background:var(--card)!important;padding:4px}
 .set-preview-chip img{width:100%;height:100%;object-fit:contain;display:block}
 .set-drop{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;width:100%;height:76px;padding:0 14px;border:0;font:inherit;border-radius:var(--r-lg);background:var(--panel);color:var(--ink-2);font-size:13px;text-align:center;cursor:pointer;transition:background .2s,color .2s}
@@ -166,3 +166,24 @@
 .set-clock{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;margin:12px 0 0}
 .set-card .set-clock{margin-bottom:0}
 @media (max-width:640px){.set-clock{flex-direction:column;align-items:stretch}}
+
+/* Branding → Appearance presets (branding-panel.tsx AppearancePicker). Pill radios in the .decide-opt look; label = .od-field>label. */
+.set-appear{display:flex;flex-direction:column;gap:12px}
+.set-appear-head{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.set-appear-head .od-field-label{font-size:12.5px;font-weight:700;color:var(--ink-2)}
+.set-appear-reset{font-size:12.5px;font-weight:600;color:var(--brand);transition:color var(--dur-fast) var(--ease)}
+.set-appear-reset:hover{color:var(--brand-deep)}
+:root[data-theme="dark"] .set-appear-reset{color:var(--brand-3)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .set-appear-reset{color:var(--brand-3)}}
+.set-appear-row{display:grid;grid-template-columns:96px minmax(0,1fr);align-items:center;gap:12px;margin:0;padding:0;border:0;min-width:0}
+.set-appear-row legend{float:left;font-size:13px;color:var(--ink-2);padding:0}
+.set-appear-opts{display:flex;gap:8px;flex-wrap:wrap}
+.set-opt{display:inline-flex;align-items:center;padding:8px 14px;border-radius:var(--r-pill);background:var(--mute-bg);font-size:13px;font-weight:600;color:var(--ink-2);cursor:pointer;transition:background var(--dur-fast) var(--ease),color var(--dur-fast) var(--ease)}
+.set-opt:hover{color:var(--ink)}
+.set-opt:has(:checked){background:var(--brand-soft);color:var(--brand-deep)}
+:root[data-theme="dark"] .set-opt:has(:checked){color:var(--brand-3)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .set-opt:has(:checked){color:var(--brand-3)}}
+.set-opt:has(:focus-visible){outline:2px solid var(--brand);outline-offset:2px}
+.set-appear-row:disabled .set-opt{cursor:not-allowed;opacity:.6}
+.set-appear-row:disabled .set-opt:hover{color:var(--ink-2)}
+@media (max-width:640px){.set-appear-row{grid-template-columns:minmax(0,1fr)}}

@@ -42,6 +42,11 @@ export function SignInForm({ roles }: { roles: RoleOption[] }) {
     setStage("role")
   }
 
+  // Mock single sign-on: both providers sign in as the seed user (no role pick), like a real redirect back from the provider.
+  function sso() {
+    start(() => signIn())
+  }
+
   function finish(e: React.FormEvent) {
     e.preventDefault()
     start(() => signIn(role))
@@ -99,6 +104,17 @@ export function SignInForm({ roles }: { roles: RoleOption[] }) {
         <h1>Sign in</h1>
         <p>Welcome back. Sign in to your company workspace.</p>
       </header>
+      <div className="auth-sso">
+        <button type="button" className="btn btn-outline" disabled={pending} onClick={sso}>
+          <span className="auth-sso-mark" style={{ color: "#4285f4" }} aria-hidden="true">G</span>
+          Continue with Google
+        </button>
+        <button type="button" className="btn btn-outline" disabled={pending} onClick={sso}>
+          <span className="auth-sso-mark" style={{ color: "#00a4ef" }} aria-hidden="true">M</span>
+          Continue with Microsoft
+        </button>
+      </div>
+      <p className="auth-or"><span>or use your email</span></p>
       <Field label="Work email" htmlFor="si-email" error={errors.email} required>
         <Input id="si-email" type="email" autoComplete="username" value={email} placeholder="name@company.com" onChange={(e) => { setEmail(e.target.value); setErrors((x) => ({ ...x, email: "" })) }} />
       </Field>

@@ -1,9 +1,15 @@
 [
-  {"path": "/platform", "cookies": {"od-role": "platform"}, "expect": ["Tenants", "MRR", "Northgate Facility Services"]},
+  {"path": "/platform", "cookies": {"od-role": "platform"}, "expect": ["Overview", "Monthly recurring revenue", "Needs attention", "Customers", "Revenue", "Trust", "Admin"]},
   {"path": "/platform", "expect": ["Access restricted"], "notExpect": ["northgate.opsdesk.app", "Past due"]},
-  {"path": "/platform/tenants/t1", "cookies": {"od-role": "platform"}, "expect": ["Operational data hidden", "requires tenant-granted support access"]},
+  {"path": "/platform/tenants", "cookies": {"od-role": "platform"}, "expect": ["Tenants", "MRR", "Northgate Facility Services"]},
+  {"path": "/platform/tenants", "expect": ["Access restricted"], "notExpect": ["northgate.opsdesk.app", "Past due"]},
+  {"path": "/platform/tenants/t1", "cookies": {"od-role": "platform"}, "expect": ["Operational data hidden", "requires tenant-granted support access", "/platform/tenants"]},
   {"path": "/platform/tenants/t1", "expect": ["Access restricted"], "notExpect": ["Usage against limits"]},
   {"path": "/platform/plans", "cookies": {"od-role": "platform"}, "expect": ["Business", "Enterprise"]},
-  {"path": "/platform/support", "cookies": {"od-role": "platform"}, "expect": ["Support access", "Platform audit trail"]},
-  {"path": "/platform/support", "cookies": {"od-role": "employee"}, "expect": ["Access restricted"], "notExpect": ["Platform audit trail"]}
+  {"path": "/platform/support", "cookies": {"od-role": "platform"}, "expect": ["Support access", "Support access audit"]},
+  {"path": "/platform/support", "cookies": {"od-role": "employee"}, "expect": ["Access restricted"], "notExpect": ["Support access audit"]},
+  {"path": "/platform/plans", "cookies": {"od-role": "platform"}, "expect": ["/platform/plans/business/edit"]},
+  {"path": "/platform/plans/business/edit", "cookies": {"od-role": "platform"}, "expect": ["Edit Business plan", "Price per month", "Transcription (min)", "Save plan", "Cancel"]},
+  {"path": "/platform/plans/business/edit", "expect": ["Access restricted"], "notExpect": ["pf-price"]},
+  {"path": "/platform/plans/nope/edit", "cookies": {"od-role": "platform"}, "status": 404}
 ]

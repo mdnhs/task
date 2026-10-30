@@ -1,1 +1,710 @@
-{"reports":[{"id":"RPT-2026-10-20-cleaning","date":"2026-10-20","dept":"Cleaning","owner":"p-grace","status":"draft","createdAt":"2026-10-20T08:30:00","updatedAt":"2026-10-20T08:55:00","nil":false,"fields":{"staff.call-outs":{"state":"details","entries":[{"id":"staff.call-outs-1","text":"Amara Kone, morning shift: unwell","cells":{"Staff":"Amara Kone","Shift":"Morning","Notes":"Unwell"}},{"id":"staff.call-outs-2","text":"Nadia Rahman, evening shift: transport delay","cells":{"Staff":"Nadia Rahman","Shift":"Evening","Notes":"Transport delay"}}]},"staff.no-shows":{"state":"details","entries":[{"id":"staff.no-shows-1","text":"Agency cleaner did not attend Block B","cells":{"Staff":"Agency cleaner","Shift":"Day, Block B","Notes":"Did not attend"}}]},"staff.cover-arranged":{"state":"no_issues","entries":[]},"staff.outstanding-staff-issues":{"state":"no_issues","entries":[]},"clients.client-contacted":{"state":"no_issues","entries":[]},"clients.complaints":{"state":"no_issues","entries":[]},"clients.requests":{"state":"action_required","entries":[{"id":"clients.requests-1","text":"Deep clean of the kitchen area requested"}]},"clients.outstanding-issues":{"state":"no_issues","entries":[]},"rosters.todays-issues":{"state":"no_issues","entries":[]},"rosters.tomorrows-cover":{"state":"no_issues","entries":[]},"rosters.next-weeks-gaps":{"state":"no_issues","entries":[]},"recruitment.applications-reviewed":{"state":"no_issues","entries":[]},"recruitment.candidates-contacted":{"state":"no_issues","entries":[]},"recruitment.interviews-arranged":{"state":"details","entries":[{"id":"recruitment.interviews-arranged-1","text":"2"}]},"recruitment.new-starters":{"state":"details","entries":[{"id":"recruitment.new-starters-1","text":"1"}]},"recruitment.outstanding-candidates":{"state":"no_issues","entries":[]},"employee-files.files-updated":{"state":"no_issues","entries":[]},"employee-files.documents-received":{"state":"no_issues","entries":[]},"employee-files.missing-documents":{"state":"no_issues","entries":[]},"employee-files.expiring-documents":{"state":"action_required","entries":[{"id":"employee-files.expiring-documents-1","text":"Manual handling certificate expires in 14 days"}]},"client-files.files-updated":{"state":"no_issues","entries":[]},"client-files.contracts":{"state":"na","entries":[]},"client-files.contact-details":{"state":"no_issues","entries":[]},"client-files.outstanding-paperwork":{"state":"no_issues","entries":[]},"payroll.issues-identified":{"state":"no_issues","entries":[]},"payroll.corrections-required":{"state":"no_issues","entries":[]},"payroll.outstanding-information":{"state":"no_issues","entries":[]}},"comments":[],"versions":[]},{"id":"RPT-2026-10-20-security","date":"2026-10-20","dept":"Security","owner":"p-daniel","status":"submitted","createdAt":"2026-10-20T08:30:00","updatedAt":"2026-10-20T16:52:00","submittedAt":"2026-10-20T16:52:00","nil":false,"fields":{"staff.call-outs":{"state":"no_issues","entries":[]},"staff.no-shows":{"state":"no_issues","entries":[]},"staff.cover-arranged":{"state":"no_issues","entries":[]},"staff.outstanding-staff-issues":{"state":"no_issues","entries":[]},"clients.client-contacted":{"state":"na","entries":[]},"clients.complaints":{"state":"no_issues","entries":[]},"clients.requests":{"state":"no_issues","entries":[]},"clients.outstanding-issues":{"state":"no_issues","entries":[]},"rosters.todays-issues":{"state":"no_issues","entries":[]},"rosters.tomorrows-cover":{"state":"no_issues","entries":[]},"rosters.next-weeks-gaps":{"state":"no_issues","entries":[]},"recruitment.applications-reviewed":{"state":"no_issues","entries":[]},"recruitment.candidates-contacted":{"state":"details","entries":[{"id":"recruitment.candidates-contacted-1","text":"3"}]},"recruitment.interviews-arranged":{"state":"details","entries":[{"id":"recruitment.interviews-arranged-1","text":"2"}]},"recruitment.new-starters":{"state":"no_issues","entries":[]},"recruitment.outstanding-candidates":{"state":"no_issues","entries":[]},"employee-files.files-updated":{"state":"no_issues","entries":[]},"employee-files.documents-received":{"state":"no_issues","entries":[]},"employee-files.missing-documents":{"state":"no_issues","entries":[]},"employee-files.expiring-documents":{"state":"no_issues","entries":[]},"client-files.files-updated":{"state":"no_issues","entries":[]},"client-files.contracts":{"state":"no_issues","entries":[]},"client-files.contact-details":{"state":"no_issues","entries":[]},"client-files.outstanding-paperwork":{"state":"no_issues","entries":[]},"payroll.issues-identified":{"state":"na","entries":[]},"payroll.corrections-required":{"state":"no_issues","entries":[]},"payroll.outstanding-information":{"state":"no_issues","entries":[]},"orders.orders-placed":{"state":"na","entries":[]},"orders.deliveries-received":{"state":"no_issues","entries":[]},"orders.items-required":{"state":"no_issues","entries":[]},"orders.waiting-for-approval":{"state":"no_issues","entries":[]},"outstanding.tasks-not-completed":{"state":"no_issues","entries":[]},"outstanding.reason":{"state":"no_issues","entries":[]},"outstanding.action-required":{"state":"no_issues","entries":[]},"attention.decision-needed":{"state":"no_issues","entries":[]}},"comments":[],"versions":[{"v":1,"at":"2026-10-20T16:52:00","by":"Daniel Okafor","note":"Submitted"}]},{"id":"RPT-2026-10-19-cleaning","date":"2026-10-19","dept":"Cleaning","owner":"p-grace","status":"submitted","createdAt":"2026-10-19T08:23:00","updatedAt":"2026-10-19T16:58:00","submittedAt":"2026-10-19T16:58:00","nil":false,"fields":{"staff.call-outs":{"state":"no_issues","entries":[]},"staff.no-shows":{"state":"na","entries":[]},"staff.cover-arranged":{"state":"no_issues","entries":[]},"staff.outstanding-staff-issues":{"state":"no_issues","entries":[]},"clients.client-contacted":{"state":"na","entries":[]},"clients.complaints":{"state":"no_issues","entries":[]},"clients.requests":{"state":"action_required","entries":[{"id":"clients.requests-1","text":"Deep clean of the kitchen area requested"}]},"clients.outstanding-issues":{"state":"no_issues","entries":[]},"rosters.todays-issues":{"state":"action_required","entries":[{"id":"rosters.todays-issues-1","text":"Block A evening clean short by one person"}]},"rosters.tomorrows-cover":{"state":"no_issues","entries":[]},"rosters.next-weeks-gaps":{"state":"no_issues","entries":[]},"recruitment.applications-reviewed":{"state":"details","entries":[{"id":"recruitment.applications-reviewed-1","text":"6"}]},"recruitment.candidates-contacted":{"state":"details","entries":[{"id":"recruitment.candidates-contacted-1","text":"3"}]},"recruitment.interviews-arranged":{"state":"details","entries":[{"id":"recruitment.interviews-arranged-1","text":"2"}]},"recruitment.new-starters":{"state":"details","entries":[{"id":"recruitment.new-starters-1","text":"1"}]},"recruitment.outstanding-candidates":{"state":"no_issues","entries":[]},"employee-files.files-updated":{"state":"no_issues","entries":[]},"employee-files.documents-received":{"state":"na","entries":[]},"employee-files.missing-documents":{"state":"no_issues","entries":[]},"employee-files.expiring-documents":{"state":"no_issues","entries":[]},"client-files.files-updated":{"state":"no_issues","entries":[]},"client-files.contracts":{"state":"no_issues","entries":[]},"client-files.contact-details":{"state":"na","entries":[]},"client-files.outstanding-paperwork":{"state":"no_issues","entries":[]},"payroll.issues-identified":{"state":"na","entries":[]},"payroll.corrections-required":{"state":"no_issues","entries":[]},"payroll.outstanding-information":{"state":"no_issues","entries":[]},"orders.orders-placed":{"state":"no_issues","entries":[]},"orders.deliveries-received":{"state":"no_issues","entries":[]},"orders.items-required":{"state":"no_issues","entries":[]},"orders.waiting-for-approval":{"state":"na","entries":[]},"outstanding.tasks-not-completed":{"state":"details","entries":[{"id":"outstanding.tasks-not-completed-1","text":"Carpet shampoo in Block C not finished","cells":{"Task":"Carpet shampoo in Block C","Owner":"Owen Price","Target date":"2026-10-21"}}]},"outstanding.reason":{"state":"no_issues","entries":[]},"outstanding.action-required":{"state":"no_issues","entries":[]},"attention.decision-needed":{"state":"na","entries":[]}},"comments":[],"versions":[{"v":1,"at":"2026-10-19T16:58:00","by":"Grace Mensah","note":"Submitted"}]},{"id":"RPT-2026-10-19-security","date":"2026-10-19","dept":"Security","owner":"p-daniel","status":"reviewed","createdAt":"2026-10-19T08:23:00","updatedAt":"2026-10-20T09:30:00","submittedAt":"2026-10-19T16:36:00","nil":false,"fields":{"staff.call-outs":{"state":"no_issues","entries":[]},"staff.no-shows":{"state":"details","entries":[{"id":"staff.no-shows-1","text":"Contract guard did not arrive at Canary Wharf gate","cells":{"Staff":"Contract guard","Shift":"Day, Canary Wharf gate","Notes":"Did not arrive"}}]},"staff.cover-arranged":{"state":"na","entries":[]},"staff.outstanding-staff-issues":{"state":"no_issues","entries":[]},"clients.client-contacted":{"state":"na","entries":[]},"clients.complaints":{"state":"details","entries":[{"id":"clients.complaints-1","text":"Canary Wharf: late patrol start reported by site manager","cells":{"Client / site":"Canary Wharf","Details":"late patrol start reported by site manager","Urgency":"Medium"}}]},"clients.requests":{"state":"action_required","entries":[{"id":"clients.requests-1","text":"Extra evening patrol requested for Friday"}]},"clients.outstanding-issues":{"state":"no_issues","entries":[]},"rosters.todays-issues":{"state":"no_issues","entries":[]},"rosters.tomorrows-cover":{"state":"no_issues","entries":[]},"rosters.next-weeks-gaps":{"state":"no_issues","entries":[]},"recruitment.applications-reviewed":{"state":"no_issues","entries":[]},"recruitment.candidates-contacted":{"state":"details","entries":[{"id":"recruitment.candidates-contacted-1","text":"3"}]},"recruitment.interviews-arranged":{"state":"details","entries":[{"id":"recruitment.interviews-arranged-1","text":"2"}]},"recruitment.new-starters":{"state":"details","entries":[{"id":"recruitment.new-starters-1","text":"1"}]},"recruitment.outstanding-candidates":{"state":"no_issues","entries":[]},"employee-files.files-updated":{"state":"no_issues","entries":[]},"employee-files.documents-received":{"state":"no_issues","entries":[]},"employee-files.missing-documents":{"state":"details","entries":[{"id":"employee-files.missing-documents-1","text":"Right-to-work copy missing for new starter"}]},"employee-files.expiring-documents":{"state":"no_issues","entries":[]},"client-files.files-updated":{"state":"no_issues","entries":[]},"client-files.contracts":{"state":"no_issues","entries":[]},"client-files.contact-details":{"state":"no_issues","entries":[]},"client-files.outstanding-paperwork":{"state":"na","entries":[]},"payroll.issues-identified":{"state":"no_issues","entries":[]},"payroll.corrections-required":{"state":"no_issues","entries":[]},"payroll.outstanding-information":{"state":"no_issues","entries":[]},"orders.orders-placed":{"state":"no_issues","entries":[]},"orders.deliveries-received":{"state":"no_issues","entries":[]},"orders.items-required":{"state":"no_issues","entries":[]},"orders.waiting-for-approval":{"state":"no_issues","entries":[]},"outstanding.tasks-not-completed":{"state":"no_issues","entries":[]},"outstanding.reason":{"state":"no_issues","entries":[]},"outstanding.action-required":{"state":"no_issues","entries":[]},"attention.decision-needed":{"state":"no_issues","entries":[]}},"comments":[],"versions":[{"v":1,"at":"2026-10-19T16:36:00","by":"Daniel Okafor","note":"Submitted"}]},{"id":"RPT-2026-10-18-cleaning","date":"2026-10-18","dept":"Cleaning","owner":"p-grace","status":"overdue","createdAt":"2026-10-18T08:16:00","updatedAt":"2026-10-18T15:20:00","nil":false,"fields":{"staff.call-outs":{"state":"details","entries":[{"id":"staff.call-outs-1","text":"Amara Kone, morning shift: unwell","cells":{"Staff":"Amara Kone","Shift":"Morning","Notes":"Unwell"}},{"id":"staff.call-outs-2","text":"Nadia Rahman, evening shift: transport delay","cells":{"Staff":"Nadia Rahman","Shift":"Evening","Notes":"Transport delay"}}]},"staff.no-shows":{"state":"no_issues","entries":[]},"staff.cover-arranged":{"state":"no_issues","entries":[]},"staff.outstanding-staff-issues":{"state":"no_issues","entries":[]},"clients.client-contacted":{"state":"no_issues","entries":[]},"clients.complaints":{"state":"no_issues","entries":[]},"clients.requests":{"state":"na","entries":[]},"clients.outstanding-issues":{"state":"no_issues","entries":[]},"rosters.todays-issues":{"state":"no_issues","entries":[]},"rosters.tomorrows-cover":{"state":"details","entries":[{"id":"rosters.tomorrows-cover-1","text":"Weekend cover still open for Block C"}]},"rosters.next-weeks-gaps":{"state":"no_issues","entries":[]},"recruitment.applications-reviewed":{"state":"no_issues","entries":[]},"recruitment.candidates-contacted":{"state":"details","entries":[{"id":"recruitment.candidates-contacted-1","text":"3"}]},"recruitment.interviews-arranged":{"state":"details","entries":[{"id":"recruitment.interviews-arranged-1","text":"2"}]},"recruitment.new-starters":{"state":"na","entries":[]},"recruitment.outstanding-candidates":{"state":"na","entries":[]},"employee-files.files-updated":{"state":"no_issues","entries":[]},"employee-files.documents-received":{"state":"no_issues","entries":[]},"employee-files.missing-documents":{"state":"no_issues","entries":[]},"employee-files.expiring-documents":{"state":"action_required","entries":[{"id":"employee-files.expiring-documents-1","text":"Manual handling certificate expires in 14 days"}]}},"comments":[],"versions":[]},{"id":"RPT-2026-10-18-security","date":"2026-10-18","dept":"Security","owner":"p-daniel","status":"reviewed","createdAt":"2026-10-18T08:16:00","updatedAt":"2026-10-19T09:30:00","submittedAt":"2026-10-18T15:58:00","nil":true,"fields":{"staff.call-outs":{"state":"na","entries":[]},"staff.no-shows":{"state":"no_issues","entries":[]},"staff.cover-arranged":{"state":"na","entries":[]},"staff.outstanding-staff-issues":{"state":"no_issues","entries":[]},"clients.client-contacted":{"state":"no_issues","entries":[]},"clients.complaints":{"state":"no_issues","entries":[]},"clients.requests":{"state":"na","entries":[]},"clients.outstanding-issues":{"state":"no_issues","entries":[]},"rosters.todays-issues":{"state":"no_issues","entries":[]},"rosters.tomorrows-cover":{"state":"no_issues","entries":[]},"rosters.next-weeks-gaps":{"state":"na","entries":[]},"recruitment.applications-reviewed":{"state":"no_issues","entries":[]},"recruitment.candidates-contacted":{"state":"no_issues","entries":[]},"recruitment.interviews-arranged":{"state":"na","entries":[]},"recruitment.new-starters":{"state":"na","entries":[]},"recruitment.outstanding-candidates":{"state":"na","entries":[]},"employee-files.files-updated":{"state":"na","entries":[]},"employee-files.documents-received":{"state":"na","entries":[]},"employee-files.missing-documents":{"state":"no_issues","entries":[]},"employee-files.expiring-documents":{"state":"no_issues","entries":[]},"client-files.files-updated":{"state":"no_issues","entries":[]},"client-files.contracts":{"state":"na","entries":[]},"client-files.contact-details":{"state":"na","entries":[]},"client-files.outstanding-paperwork":{"state":"no_issues","entries":[]},"payroll.issues-identified":{"state":"na","entries":[]},"payroll.corrections-required":{"state":"no_issues","entries":[]},"payroll.outstanding-information":{"state":"no_issues","entries":[]},"orders.orders-placed":{"state":"no_issues","entries":[]},"orders.deliveries-received":{"state":"no_issues","entries":[]},"orders.items-required":{"state":"no_issues","entries":[]},"orders.waiting-for-approval":{"state":"na","entries":[]},"outstanding.tasks-not-completed":{"state":"na","entries":[]},"outstanding.reason":{"state":"no_issues","entries":[]},"outstanding.action-required":{"state":"no_issues","entries":[]},"attention.decision-needed":{"state":"no_issues","entries":[]}},"comments":[],"versions":[{"v":1,"at":"2026-10-18T15:58:00","by":"Daniel Okafor","note":"Submitted"}]},{"id":"RPT-2026-10-17-cleaning","date":"2026-10-17","dept":"Cleaning","owner":"p-grace","status":"reviewed","createdAt":"2026-10-17T08:49:00","updatedAt":"2026-10-18T09:30:00","submittedAt":"2026-10-17T16:02:00","nil":true,"fields":{"staff.call-outs":{"state":"no_issues","entries":[]},"staff.no-shows":{"state":"no_issues","entries":[]},"staff.cover-arranged":{"state":"no_issues","entries":[]},"staff.outstanding-staff-issues":{"state":"no_issues","entries":[]},"clients.client-contacted":{"state":"no_issues","entries":[]},"clients.complaints":{"state":"no_issues","entries":[]},"clients.requests":{"state":"no_issues","entries":[]},"clients.outstanding-issues":{"state":"no_issues","entries":[]},"rosters.todays-issues":{"state":"no_issues","entries":[]},"rosters.tomorrows-cover":{"state":"no_issues","entries":[]},"rosters.next-weeks-gaps":{"state":"na","entries":[]},"recruitment.applications-reviewed":{"state":"no_issues","entries":[]},"recruitment.candidates-contacted":{"state":"no_issues","entries":[]},"recruitment.interviews-arranged":{"state":"no_issues","entries":[]},"recruitment.new-starters":{"state":"no_issues","entries":[]},"recruitment.outstanding-candidates":{"state":"no_issues","entries":[]},"employee-files.files-updated":{"state":"na","entries":[]},"employee-files.documents-received":{"state":"na","entries":[]},"employee-files.missing-documents":{"state":"no_issues","entries":[]},"employee-files.expiring-documents":{"state":"no_issues","entries":[]},"client-files.files-updated":{"state":"no_issues","entries":[]},"client-files.contracts":{"state":"na","entries":[]},"client-files.contact-details":{"state":"no_issues","entries":[]},"client-files.outstanding-paperwork":{"state":"na","entries":[]},"payroll.issues-identified":{"state":"no_issues","entries":[]},"payroll.corrections-required":{"state":"no_issues","entries":[]},"payroll.outstanding-information":{"state":"no_issues","entries":[]},"orders.orders-placed":{"state":"no_issues","entries":[]},"orders.deliveries-received":{"state":"no_issues","entries":[]},"orders.items-required":{"state":"na","entries":[]},"orders.waiting-for-approval":{"state":"no_issues","entries":[]},"outstanding.tasks-not-completed":{"state":"no_issues","entries":[]},"outstanding.reason":{"state":"no_issues","entries":[]},"outstanding.action-required":{"state":"no_issues","entries":[]},"attention.decision-needed":{"state":"na","entries":[]}},"comments":[],"versions":[{"v":1,"at":"2026-10-17T16:02:00","by":"Grace Mensah","note":"Submitted"}]},{"id":"RPT-2026-10-17-security","date":"2026-10-17","dept":"Security","owner":"p-daniel","status":"resubmitted","createdAt":"2026-10-17T08:49:00","updatedAt":"2026-10-18T10:05:00","submittedAt":"2026-10-17T16:30:00","nil":false,"fields":{"staff.call-outs":{"state":"no_issues","entries":[]},"staff.no-shows":{"state":"no_issues","entries":[]},"staff.cover-arranged":{"state":"no_issues","entries":[]},"staff.outstanding-staff-issues":{"state":"no_issues","entries":[]},"clients.client-contacted":{"state":"no_issues","entries":[]},"clients.complaints":{"state":"na","entries":[]},"clients.requests":{"state":"no_issues","entries":[]},"clients.outstanding-issues":{"state":"no_issues","entries":[]},"rosters.todays-issues":{"state":"no_issues","entries":[]},"rosters.tomorrows-cover":{"state":"no_issues","entries":[]},"rosters.next-weeks-gaps":{"state":"no_issues","entries":[]},"recruitment.applications-reviewed":{"state":"details","entries":[{"id":"recruitment.applications-reviewed-1","text":"6"}]},"recruitment.candidates-contacted":{"state":"no_issues","entries":[]},"recruitment.interviews-arranged":{"state":"no_issues","entries":[]},"recruitment.new-starters":{"state":"na","entries":[]},"recruitment.outstanding-candidates":{"state":"no_issues","entries":[]},"employee-files.files-updated":{"state":"no_issues","entries":[]},"employee-files.documents-received":{"state":"no_issues","entries":[]},"employee-files.missing-documents":{"state":"na","entries":[]},"employee-files.expiring-documents":{"state":"no_issues","entries":[]},"client-files.files-updated":{"state":"no_issues","entries":[]},"client-files.contracts":{"state":"no_issues","entries":[]},"client-files.contact-details":{"state":"na","entries":[]},"client-files.outstanding-paperwork":{"state":"no_issues","entries":[]},"payroll.issues-identified":{"state":"na","entries":[]},"payroll.corrections-required":{"state":"no_issues","entries":[]},"payroll.outstanding-information":{"state":"no_issues","entries":[]},"orders.orders-placed":{"state":"no_issues","entries":[]},"orders.deliveries-received":{"state":"no_issues","entries":[]},"orders.items-required":{"state":"no_issues","entries":[]},"orders.waiting-for-approval":{"state":"no_issues","entries":[]},"outstanding.tasks-not-completed":{"state":"no_issues","entries":[]},"outstanding.reason":{"state":"no_issues","entries":[]},"outstanding.action-required":{"state":"no_issues","entries":[]},"attention.decision-needed":{"state":"no_issues","entries":[]}},"comments":[{"at":"2026-10-18T09:15:00","by":"Lilianna Novak","section":"clients","text":"Please add the client and site for the complaint, and say what follow-up is planned."},{"at":"2026-10-18T10:05:00","by":"Daniel Okafor","section":"clients","text":"Added the missing details."}],"versions":[{"v":1,"at":"2026-10-17T16:30:00","by":"Daniel Okafor","note":"Submitted"},{"v":2,"at":"2026-10-18T10:05:00","by":"Daniel Okafor","note":"Resubmitted after correction"}]},{"id":"RPT-2026-10-16-cleaning","date":"2026-10-16","dept":"Cleaning","owner":"p-grace","status":"returned","createdAt":"2026-10-16T08:42:00","updatedAt":"2026-10-17T09:15:00","submittedAt":"2026-10-16T16:26:00","nil":false,"fields":{"staff.call-outs":{"state":"na","entries":[]},"staff.no-shows":{"state":"no_issues","entries":[]},"staff.cover-arranged":{"state":"no_issues","entries":[]},"staff.outstanding-staff-issues":{"state":"no_issues","entries":[]},"clients.client-contacted":{"state":"no_issues","entries":[]},"clients.complaints":{"state":"na","entries":[]},"clients.requests":{"state":"no_issues","entries":[]},"clients.outstanding-issues":{"state":"no_issues","entries":[]},"rosters.todays-issues":{"state":"no_issues","entries":[]},"rosters.tomorrows-cover":{"state":"no_issues","entries":[]},"rosters.next-weeks-gaps":{"state":"no_issues","entries":[]},"recruitment.applications-reviewed":{"state":"na","entries":[]},"recruitment.candidates-contacted":{"state":"details","entries":[{"id":"recruitment.candidates-contacted-1","text":"3"}]},"recruitment.interviews-arranged":{"state":"no_issues","entries":[]},"recruitment.new-starters":{"state":"na","entries":[]},"recruitment.outstanding-candidates":{"state":"no_issues","entries":[]},"employee-files.files-updated":{"state":"no_issues","entries":[]},"employee-files.documents-received":{"state":"na","entries":[]},"employee-files.missing-documents":{"state":"no_issues","entries":[]},"employee-files.expiring-documents":{"state":"na","entries":[]},"client-files.files-updated":{"state":"no_issues","entries":[]},"client-files.contracts":{"state":"no_issues","entries":[]},"client-files.contact-details":{"state":"no_issues","entries":[]},"client-files.outstanding-paperwork":{"state":"no_issues","entries":[]},"payroll.issues-identified":{"state":"no_issues","entries":[]},"payroll.corrections-required":{"state":"no_issues","entries":[]},"payroll.outstanding-information":{"state":"no_issues","entries":[]},"orders.orders-placed":{"state":"no_issues","entries":[]},"orders.deliveries-received":{"state":"no_issues","entries":[]},"orders.items-required":{"state":"no_issues","entries":[]},"orders.waiting-for-approval":{"state":"action_required","entries":[{"id":"orders.waiting-for-approval-1","text":"Microfibre cloth bulk order, awaiting approval"}]},"outstanding.tasks-not-completed":{"state":"na","entries":[]},"outstanding.reason":{"state":"no_issues","entries":[]},"outstanding.action-required":{"state":"no_issues","entries":[]},"attention.decision-needed":{"state":"no_issues","entries":[]}},"comments":[{"at":"2026-10-17T09:15:00","by":"Lilianna Novak","section":"orders","text":"Quantities are missing on the stock request. Please add them and resubmit."}],"versions":[{"v":1,"at":"2026-10-16T16:26:00","by":"Grace Mensah","note":"Submitted"}]},{"id":"RPT-2026-10-16-security","date":"2026-10-16","dept":"Security","owner":"p-daniel","status":"returned","createdAt":"2026-10-16T08:42:00","updatedAt":"2026-10-17T09:15:00","submittedAt":"2026-10-16T16:44:00","nil":false,"fields":{"staff.call-outs":{"state":"details","entries":[{"id":"staff.call-outs-1","text":"Marcus Hill, night shift: called out sick","cells":{"Staff":"Marcus Hill","Shift":"Night","Notes":"Called out sick"}},{"id":"staff.call-outs-2","text":"Leo Fernandez, early shift: family emergency","cells":{"Staff":"Leo Fernandez","Shift":"Early","Notes":"Family emergency"}}]},"staff.no-shows":{"state":"no_issues","entries":[]},"staff.cover-arranged":{"state":"no_issues","entries":[]},"staff.outstanding-staff-issues":{"state":"no_issues","entries":[]},"clients.client-contacted":{"state":"no_issues","entries":[]},"clients.complaints":{"state":"na","entries":[]},"clients.requests":{"state":"no_issues","entries":[]},"clients.outstanding-issues":{"state":"no_issues","entries":[]},"rosters.todays-issues":{"state":"no_issues","entries":[]},"rosters.tomorrows-cover":{"state":"no_issues","entries":[]},"rosters.next-weeks-gaps":{"state":"no_issues","entries":[]},"recruitment.applications-reviewed":{"state":"details","entries":[{"id":"recruitment.applications-reviewed-1","text":"6"}]},"recruitment.candidates-contacted":{"state":"no_issues","entries":[]},"recruitment.interviews-arranged":{"state":"details","entries":[{"id":"recruitment.interviews-arranged-1","text":"2"}]},"recruitment.new-starters":{"state":"details","entries":[{"id":"recruitment.new-starters-1","text":"1"}]},"recruitment.outstanding-candidates":{"state":"no_issues","entries":[]},"employee-files.files-updated":{"state":"no_issues","entries":[]},"employee-files.documents-received":{"state":"na","entries":[]},"employee-files.missing-documents":{"state":"no_issues","entries":[]},"employee-files.expiring-documents":{"state":"no_issues","entries":[]},"client-files.files-updated":{"state":"no_issues","entries":[]},"client-files.contracts":{"state":"no_issues","entries":[]},"client-files.contact-details":{"state":"no_issues","entries":[]},"client-files.outstanding-paperwork":{"state":"no_issues","entries":[]},"payroll.issues-identified":{"state":"no_issues","entries":[]},"payroll.corrections-required":{"state":"no_issues","entries":[]},"payroll.outstanding-information":{"state":"no_issues","entries":[]},"orders.orders-placed":{"state":"na","entries":[]},"orders.deliveries-received":{"state":"no_issues","entries":[]},"orders.items-required":{"state":"no_issues","entries":[]},"orders.waiting-for-approval":{"state":"na","entries":[]},"outstanding.tasks-not-completed":{"state":"no_issues","entries":[]},"outstanding.reason":{"state":"no_issues","entries":[]},"outstanding.action-required":{"state":"no_issues","entries":[]},"attention.decision-needed":{"state":"no_issues","entries":[]}},"comments":[{"at":"2026-10-17T09:15:00","by":"Lilianna Novak","section":"clients","text":"Please add the client and site for the complaint, and say what follow-up is planned."}],"versions":[{"v":1,"at":"2026-10-16T16:44:00","by":"Daniel Okafor","note":"Submitted"}]},{"id":"RPT-2026-10-15-cleaning","date":"2026-10-15","dept":"Cleaning","owner":"p-grace","status":"overdue","createdAt":"2026-10-15T08:35:00","updatedAt":"2026-10-15T15:20:00","nil":false,"fields":{"staff.call-outs":{"state":"no_issues","entries":[]},"staff.no-shows":{"state":"details","entries":[{"id":"staff.no-shows-1","text":"Agency cleaner did not attend Block B","cells":{"Staff":"Agency cleaner","Shift":"Day, Block B","Notes":"Did not attend"}}]},"staff.cover-arranged":{"state":"no_issues","entries":[]},"staff.outstanding-staff-issues":{"state":"no_issues","entries":[]},"clients.client-contacted":{"state":"no_issues","entries":[]},"clients.complaints":{"state":"no_issues","entries":[]},"clients.requests":{"state":"details","entries":[{"id":"clients.requests-1","text":"Deep clean of the kitchen area requested"}]},"clients.outstanding-issues":{"state":"no_issues","entries":[]},"rosters.todays-issues":{"state":"no_issues","entries":[]},"rosters.tomorrows-cover":{"state":"details","entries":[{"id":"rosters.tomorrows-cover-1","text":"Weekend cover still open for Block C"}]},"rosters.next-weeks-gaps":{"state":"no_issues","entries":[]}},"comments":[],"versions":[]},{"id":"RPT-2026-10-15-security","date":"2026-10-15","dept":"Security","owner":"p-daniel","status":"reviewed","createdAt":"2026-10-15T08:35:00","updatedAt":"2026-10-16T09:30:00","submittedAt":"2026-10-15T16:57:00","nil":false,"fields":{"staff.call-outs":{"state":"details","entries":[{"id":"staff.call-outs-1","text":"Marcus Hill, night shift: called out sick","cells":{"Staff":"Marcus Hill","Shift":"Night","Notes":"Called out sick"}},{"id":"staff.call-outs-2","text":"Leo Fernandez, early shift: family emergency","cells":{"Staff":"Leo Fernandez","Shift":"Early","Notes":"Family emergency"}}]},"staff.no-shows":{"state":"no_issues","entries":[]},"staff.cover-arranged":{"state":"no_issues","entries":[]},"staff.outstanding-staff-issues":{"state":"no_issues","entries":[]},"clients.client-contacted":{"state":"no_issues","entries":[]},"clients.complaints":{"state":"details","entries":[{"id":"clients.complaints-1","text":"Canary Wharf: late patrol start reported by site manager","cells":{"Client / site":"Canary Wharf","Details":"late patrol start reported by site manager","Urgency":"Medium"}}]},"clients.requests":{"state":"no_issues","entries":[]},"clients.outstanding-issues":{"state":"na","entries":[]},"rosters.todays-issues":{"state":"na","entries":[]},"rosters.tomorrows-cover":{"state":"no_issues","entries":[]},"rosters.next-weeks-gaps":{"state":"na","entries":[]},"recruitment.applications-reviewed":{"state":"no_issues","entries":[]},"recruitment.candidates-contacted":{"state":"details","entries":[{"id":"recruitment.candidates-contacted-1","text":"3"}]},"recruitment.interviews-arranged":{"state":"details","entries":[{"id":"recruitment.interviews-arranged-1","text":"2"}]},"recruitment.new-starters":{"state":"details","entries":[{"id":"recruitment.new-starters-1","text":"1"}]},"recruitment.outstanding-candidates":{"state":"na","entries":[]},"employee-files.files-updated":{"state":"no_issues","entries":[]},"employee-files.documents-received":{"state":"no_issues","entries":[]},"employee-files.missing-documents":{"state":"action_required","entries":[{"id":"employee-files.missing-documents-1","text":"Right-to-work copy missing for new starter"}]},"employee-files.expiring-documents":{"state":"no_issues","entries":[]},"client-files.files-updated":{"state":"na","entries":[]},"client-files.contracts":{"state":"no_issues","entries":[]},"client-files.contact-details":{"state":"no_issues","entries":[]},"client-files.outstanding-paperwork":{"state":"no_issues","entries":[]},"payroll.issues-identified":{"state":"no_issues","entries":[]},"payroll.corrections-required":{"state":"no_issues","entries":[]},"payroll.outstanding-information":{"state":"no_issues","entries":[]},"orders.orders-placed":{"state":"na","entries":[]},"orders.deliveries-received":{"state":"no_issues","entries":[]},"orders.items-required":{"state":"na","entries":[]},"orders.waiting-for-approval":{"state":"action_required","entries":[{"id":"orders.waiting-for-approval-1","text":"Replacement torches, awaiting approval"}]},"outstanding.tasks-not-completed":{"state":"details","entries":[{"id":"outstanding.tasks-not-completed-1","text":"Fire alarm log not reconciled","cells":{"Task":"Reconcile the fire alarm log","Owner":"Daniel Okafor","Target date":"2026-10-21"}}]},"outstanding.reason":{"state":"no_issues","entries":[]},"outstanding.action-required":{"state":"na","entries":[]},"attention.decision-needed":{"state":"action_required","entries":[{"id":"attention.decision-needed-1","text":"Overtime approval needed to cover the Canary Wharf gap","cells":{"Summary":"Canary Wharf gate is short of officers","Decision requested":"Approve overtime for 2 shifts","Urgency":"High"}}]}},"comments":[{"at":"2026-10-16T09:30:00","by":"Lilianna Novak","text":"Reviewed. Thanks, follow-ups noted."}],"versions":[{"v":1,"at":"2026-10-15T16:57:00","by":"Daniel Okafor","note":"Submitted"}]},{"id":"RPT-2026-10-14-cleaning","date":"2026-10-14","dept":"Cleaning","owner":"p-grace","status":"reviewed","createdAt":"2026-10-14T08:28:00","updatedAt":"2026-10-15T09:30:00","submittedAt":"2026-10-14T16:51:00","nil":false,"fields":{"staff.call-outs":{"state":"no_issues","entries":[]},"staff.no-shows":{"state":"no_issues","entries":[]},"staff.cover-arranged":{"state":"no_issues","entries":[]},"staff.outstanding-staff-issues":{"state":"no_issues","entries":[]},"clients.client-contacted":{"state":"no_issues","entries":[]},"clients.complaints":{"state":"action_required","entries":[{"id":"clients.complaints-1","text":"Tower Hill: missed washroom restock on level 4","cells":{"Client / site":"Tower Hill","Details":"missed washroom restock on level 4","Urgency":"Medium"}}]},"clients.requests":{"state":"details","entries":[{"id":"clients.requests-1","text":"Deep clean of the kitchen area requested"}]},"clients.outstanding-issues":{"state":"no_issues","entries":[]},"rosters.todays-issues":{"state":"no_issues","entries":[]},"rosters.tomorrows-cover":{"state":"no_issues","entries":[]},"rosters.next-weeks-gaps":{"state":"no_issues","entries":[]},"recruitment.applications-reviewed":{"state":"details","entries":[{"id":"recruitment.applications-reviewed-1","text":"6"}]},"recruitment.candidates-contacted":{"state":"no_issues","entries":[]},"recruitment.interviews-arranged":{"state":"details","entries":[{"id":"recruitment.interviews-arranged-1","text":"2"}]},"recruitment.new-starters":{"state":"details","entries":[{"id":"recruitment.new-starters-1","text":"1"}]},"recruitment.outstanding-candidates":{"state":"no_issues","entries":[]},"employee-files.files-updated":{"state":"na","entries":[]},"employee-files.documents-received":{"state":"no_issues","entries":[]},"employee-files.missing-documents":{"state":"na","entries":[]},"employee-files.expiring-documents":{"state":"no_issues","entries":[]},"client-files.files-updated":{"state":"no_issues","entries":[]},"client-files.contracts":{"state":"no_issues","entries":[]},"client-files.contact-details":{"state":"no_issues","entries":[]},"client-files.outstanding-paperwork":{"state":"no_issues","entries":[]},"payroll.issues-identified":{"state":"no_issues","entries":[]},"payroll.corrections-required":{"state":"no_issues","entries":[]},"payroll.outstanding-information":{"state":"na","entries":[]},"orders.orders-placed":{"state":"no_issues","entries":[]},"orders.deliveries-received":{"state":"no_issues","entries":[]},"orders.items-required":{"state":"no_issues","entries":[]},"orders.waiting-for-approval":{"state":"no_issues","entries":[]},"outstanding.tasks-not-completed":{"state":"no_issues","entries":[]},"outstanding.reason":{"state":"na","entries":[]},"outstanding.action-required":{"state":"no_issues","entries":[]},"attention.decision-needed":{"state":"details","entries":[{"id":"attention.decision-needed-1","text":"Supplier price rise needs a decision before next order","cells":{"Summary":"Supplier raised cleaning product prices","Decision requested":"Accept the new price or change supplier","Urgency":"Medium"}}]}},"comments":[],"versions":[{"v":1,"at":"2026-10-14T16:51:00","by":"Grace Mensah","note":"Submitted"}]},{"id":"RPT-2026-10-14-security","date":"2026-10-14","dept":"Security","owner":"p-daniel","status":"reviewed","createdAt":"2026-10-14T08:28:00","updatedAt":"2026-10-15T09:30:00","submittedAt":"2026-10-14T16:29:00","nil":false,"fields":{"staff.call-outs":{"state":"no_issues","entries":[]},"staff.no-shows":{"state":"no_issues","entries":[]},"staff.cover-arranged":{"state":"no_issues","entries":[]},"staff.outstanding-staff-issues":{"state":"no_issues","entries":[]},"clients.client-contacted":{"state":"no_issues","entries":[]},"clients.complaints":{"state":"no_issues","entries":[]},"clients.requests":{"state":"no_issues","entries":[]},"clients.outstanding-issues":{"state":"no_issues","entries":[]},"rosters.todays-issues":{"state":"details","entries":[{"id":"rosters.todays-issues-1","text":"Gate 2 short by one officer from 18:00"}]},"rosters.tomorrows-cover":{"state":"no_issues","entries":[]},"rosters.next-weeks-gaps":{"state":"na","entries":[]},"recruitment.applications-reviewed":{"state":"no_issues","entries":[]},"recruitment.candidates-contacted":{"state":"no_issues","entries":[]},"recruitment.interviews-arranged":{"state":"no_issues","entries":[]},"recruitment.new-starters":{"state":"no_issues","entries":[]},"recruitment.outstanding-candidates":{"state":"no_issues","entries":[]},"employee-files.files-updated":{"state":"na","entries":[]},"employee-files.documents-received":{"state":"no_issues","entries":[]},"employee-files.missing-documents":{"state":"no_issues","entries":[]},"employee-files.expiring-documents":{"state":"no_issues","entries":[]},"client-files.files-updated":{"state":"no_issues","entries":[]},"client-files.contracts":{"state":"no_issues","entries":[]},"client-files.contact-details":{"state":"na","entries":[]},"client-files.outstanding-paperwork":{"state":"na","entries":[]},"payroll.issues-identified":{"state":"no_issues","entries":[]},"payroll.corrections-required":{"state":"no_issues","entries":[]},"payroll.outstanding-information":{"state":"no_issues","entries":[]},"orders.orders-placed":{"state":"no_issues","entries":[]},"orders.deliveries-received":{"state":"no_issues","entries":[]},"orders.items-required":{"state":"no_issues","entries":[]},"orders.waiting-for-approval":{"state":"no_issues","entries":[]},"outstanding.tasks-not-completed":{"state":"no_issues","entries":[]},"outstanding.reason":{"state":"no_issues","entries":[]},"outstanding.action-required":{"state":"na","entries":[]},"attention.decision-needed":{"state":"no_issues","entries":[]}},"comments":[],"versions":[{"v":1,"at":"2026-10-14T16:29:00","by":"Daniel Okafor","note":"Submitted"}]},{"id":"RPT-2026-10-13-cleaning","date":"2026-10-13","dept":"Cleaning","owner":"p-grace","status":"resubmitted","createdAt":"2026-10-13T08:21:00","updatedAt":"2026-10-14T10:05:00","submittedAt":"2026-10-13T16:39:00","nil":false,"fields":{"staff.call-outs":{"state":"no_issues","entries":[]},"staff.no-shows":{"state":"na","entries":[]},"staff.cover-arranged":{"state":"no_issues","entries":[]},"staff.outstanding-staff-issues":{"state":"no_issues","entries":[]},"clients.client-contacted":{"state":"no_issues","entries":[]},"clients.complaints":{"state":"details","entries":[{"id":"clients.complaints-1","text":"Tower Hill: missed washroom restock on level 4","cells":{"Client / site":"Tower Hill","Details":"missed washroom restock on level 4","Urgency":"Medium"}}]},"clients.requests":{"state":"na","entries":[]},"clients.outstanding-issues":{"state":"no_issues","entries":[]},"rosters.todays-issues":{"state":"details","entries":[{"id":"rosters.todays-issues-1","text":"Block A evening clean short by one person"}]},"rosters.tomorrows-cover":{"state":"no_issues","entries":[]},"rosters.next-weeks-gaps":{"state":"no_issues","entries":[]},"recruitment.applications-reviewed":{"state":"details","entries":[{"id":"recruitment.applications-reviewed-1","text":"6"}]},"recruitment.candidates-contacted":{"state":"details","entries":[{"id":"recruitment.candidates-contacted-1","text":"3"}]},"recruitment.interviews-arranged":{"state":"details","entries":[{"id":"recruitment.interviews-arranged-1","text":"2"}]},"recruitment.new-starters":{"state":"details","entries":[{"id":"recruitment.new-starters-1","text":"1"}]},"recruitment.outstanding-candidates":{"state":"no_issues","entries":[]},"employee-files.files-updated":{"state":"no_issues","entries":[]},"employee-files.documents-received":{"state":"no_issues","entries":[]},"employee-files.missing-documents":{"state":"no_issues","entries":[]},"employee-files.expiring-documents":{"state":"details","entries":[{"id":"employee-files.expiring-documents-1","text":"Manual handling certificate expires in 14 days"}]},"client-files.files-updated":{"state":"na","entries":[]},"client-files.contracts":{"state":"no_issues","entries":[]},"client-files.contact-details":{"state":"no_issues","entries":[]},"client-files.outstanding-paperwork":{"state":"no_issues","entries":[]},"payroll.issues-identified":{"state":"no_issues","entries":[]},"payroll.corrections-required":{"state":"no_issues","entries":[]},"payroll.outstanding-information":{"state":"no_issues","entries":[]},"orders.orders-placed":{"state":"no_issues","entries":[]},"orders.deliveries-received":{"state":"na","entries":[]},"orders.items-required":{"state":"na","entries":[]},"orders.waiting-for-approval":{"state":"no_issues","entries":[]},"outstanding.tasks-not-completed":{"state":"details","entries":[{"id":"outstanding.tasks-not-completed-1","text":"Carpet shampoo in Block C not finished","cells":{"Task":"Carpet shampoo in Block C","Owner":"Owen Price","Target date":"2026-10-21"}}]},"outstanding.reason":{"state":"no_issues","entries":[]},"outstanding.action-required":{"state":"no_issues","entries":[]},"attention.decision-needed":{"state":"no_issues","entries":[]}},"comments":[{"at":"2026-10-14T09:15:00","by":"Lilianna Novak","section":"orders","text":"Quantities are missing on the stock request. Please add them and resubmit."},{"at":"2026-10-14T10:05:00","by":"Grace Mensah","section":"orders","text":"Added the missing details."}],"versions":[{"v":1,"at":"2026-10-13T16:39:00","by":"Grace Mensah","note":"Submitted"},{"v":2,"at":"2026-10-14T10:05:00","by":"Grace Mensah","note":"Resubmitted after correction"}]},{"id":"RPT-2026-10-13-security","date":"2026-10-13","dept":"Security","owner":"p-daniel","status":"reviewed","createdAt":"2026-10-13T08:21:00","updatedAt":"2026-10-14T09:30:00","submittedAt":"2026-10-13T16:18:00","nil":false,"fields":{"staff.call-outs":{"state":"no_issues","entries":[]},"staff.no-shows":{"state":"no_issues","entries":[]},"staff.cover-arranged":{"state":"details","entries":[{"id":"staff.cover-arranged-1","text":"Cover found from the reserve list"}]},"staff.outstanding-staff-issues":{"state":"no_issues","entries":[]},"clients.client-contacted":{"state":"na","entries":[]},"clients.complaints":{"state":"no_issues","entries":[]},"clients.requests":{"state":"na","entries":[]},"clients.outstanding-issues":{"state":"no_issues","entries":[]},"rosters.todays-issues":{"state":"no_issues","entries":[]},"rosters.tomorrows-cover":{"state":"details","entries":[{"id":"rosters.tomorrows-cover-1","text":"Tomorrow's night shift needs one more officer"}]},"rosters.next-weeks-gaps":{"state":"na","entries":[]},"recruitment.applications-reviewed":{"state":"details","entries":[{"id":"recruitment.applications-reviewed-1","text":"6"}]},"recruitment.candidates-contacted":{"state":"na","entries":[]},"recruitment.interviews-arranged":{"state":"details","entries":[{"id":"recruitment.interviews-arranged-1","text":"2"}]},"recruitment.new-starters":{"state":"no_issues","entries":[]},"recruitment.outstanding-candidates":{"state":"na","entries":[]},"employee-files.files-updated":{"state":"no_issues","entries":[]},"employee-files.documents-received":{"state":"no_issues","entries":[]},"employee-files.missing-documents":{"state":"action_required","entries":[{"id":"employee-files.missing-documents-1","text":"Right-to-work copy missing for new starter"}]},"employee-files.expiring-documents":{"state":"na","entries":[]},"client-files.files-updated":{"state":"no_issues","entries":[]},"client-files.contracts":{"state":"no_issues","entries":[]},"client-files.contact-details":{"state":"no_issues","entries":[]},"client-files.outstanding-paperwork":{"state":"no_issues","entries":[]},"payroll.issues-identified":{"state":"no_issues","entries":[]},"payroll.corrections-required":{"state":"na","entries":[]},"payroll.outstanding-information":{"state":"no_issues","entries":[]},"orders.orders-placed":{"state":"no_issues","entries":[]},"orders.deliveries-received":{"state":"no_issues","entries":[]},"orders.items-required":{"state":"no_issues","entries":[]},"orders.waiting-for-approval":{"state":"no_issues","entries":[]},"outstanding.tasks-not-completed":{"state":"na","entries":[]},"outstanding.reason":{"state":"no_issues","entries":[]},"outstanding.action-required":{"state":"na","entries":[]},"attention.decision-needed":{"state":"no_issues","entries":[]}},"comments":[],"versions":[{"v":1,"at":"2026-10-13T16:18:00","by":"Daniel Okafor","note":"Submitted"}]},{"id":"RPT-2026-10-12-cleaning","date":"2026-10-12","dept":"Cleaning","owner":"p-grace","status":"reviewed","createdAt":"2026-10-12T08:14:00","updatedAt":"2026-10-13T09:10:00","submittedAt":"2026-10-12T16:15:00","nil":false,"fields":{"staff.call-outs":{"state":"no_issues","entries":[]},"staff.no-shows":{"state":"no_issues","entries":[]},"staff.cover-arranged":{"state":"no_issues","entries":[]},"staff.outstanding-staff-issues":{"state":"na","entries":[]},"clients.client-contacted":{"state":"no_issues","entries":[]},"clients.complaints":{"state":"na","entries":[]},"clients.requests":{"state":"no_issues","entries":[]},"clients.outstanding-issues":{"state":"no_issues","entries":[]},"rosters.todays-issues":{"state":"no_issues","entries":[]},"rosters.tomorrows-cover":{"state":"no_issues","entries":[]},"rosters.next-weeks-gaps":{"state":"no_issues","entries":[]},"recruitment.applications-reviewed":{"state":"details","entries":[{"id":"recruitment.applications-reviewed-1","text":"6"}]},"recruitment.candidates-contacted":{"state":"na","entries":[]},"recruitment.interviews-arranged":{"state":"no_issues","entries":[]},"recruitment.new-starters":{"state":"na","entries":[]},"recruitment.outstanding-candidates":{"state":"na","entries":[]},"employee-files.files-updated":{"state":"no_issues","entries":[]},"employee-files.documents-received":{"state":"no_issues","entries":[]},"employee-files.missing-documents":{"state":"na","entries":[]},"employee-files.expiring-documents":{"state":"no_issues","entries":[]},"client-files.files-updated":{"state":"no_issues","entries":[]},"client-files.contracts":{"state":"no_issues","entries":[]},"client-files.contact-details":{"state":"no_issues","entries":[]},"client-files.outstanding-paperwork":{"state":"no_issues","entries":[]},"payroll.issues-identified":{"state":"no_issues","entries":[]},"payroll.corrections-required":{"state":"no_issues","entries":[]},"payroll.outstanding-information":{"state":"no_issues","entries":[]},"orders.orders-placed":{"state":"no_issues","entries":[]},"orders.deliveries-received":{"state":"no_issues","entries":[]},"orders.items-required":{"state":"no_issues","entries":[]},"orders.waiting-for-approval":{"state":"no_issues","entries":[]},"outstanding.tasks-not-completed":{"state":"no_issues","entries":[]},"outstanding.reason":{"state":"no_issues","entries":[]},"outstanding.action-required":{"state":"no_issues","entries":[]},"attention.decision-needed":{"state":"no_issues","entries":[]}},"comments":[{"at":"2026-10-13T09:10:00","by":"Lilianna Novak","text":"Reviewed. Thanks, follow-ups noted."}],"versions":[{"v":1,"at":"2026-10-12T16:15:00","by":"Grace Mensah","note":"Submitted"}]},{"id":"RPT-2026-10-12-security","date":"2026-10-12","dept":"Security","owner":"p-daniel","status":"reviewed","createdAt":"2026-10-12T08:14:00","updatedAt":"2026-10-13T09:10:00","submittedAt":"2026-10-12T17:48:00","nil":false,"fields":{"staff.call-outs":{"state":"no_issues","entries":[]},"staff.no-shows":{"state":"no_issues","entries":[]},"staff.cover-arranged":{"state":"details","entries":[{"id":"staff.cover-arranged-1","text":"Cover found from the reserve list"}]},"staff.outstanding-staff-issues":{"state":"na","entries":[]},"clients.client-contacted":{"state":"no_issues","entries":[]},"clients.complaints":{"state":"no_issues","entries":[]},"clients.requests":{"state":"na","entries":[]},"clients.outstanding-issues":{"state":"no_issues","entries":[]},"rosters.todays-issues":{"state":"na","entries":[]},"rosters.tomorrows-cover":{"state":"no_issues","entries":[]},"rosters.next-weeks-gaps":{"state":"no_issues","entries":[]},"recruitment.applications-reviewed":{"state":"details","entries":[{"id":"recruitment.applications-reviewed-1","text":"6"}]},"recruitment.candidates-contacted":{"state":"details","entries":[{"id":"recruitment.candidates-contacted-1","text":"3"}]},"recruitment.interviews-arranged":{"state":"no_issues","entries":[]},"recruitment.new-starters":{"state":"no_issues","entries":[]},"recruitment.outstanding-candidates":{"state":"no_issues","entries":[]},"employee-files.files-updated":{"state":"no_issues","entries":[]},"employee-files.documents-received":{"state":"no_issues","entries":[]},"employee-files.missing-documents":{"state":"details","entries":[{"id":"employee-files.missing-documents-1","text":"Right-to-work copy missing for new starter"}]},"employee-files.expiring-documents":{"state":"no_issues","entries":[]},"client-files.files-updated":{"state":"no_issues","entries":[]},"client-files.contracts":{"state":"no_issues","entries":[]},"client-files.contact-details":{"state":"na","entries":[]},"client-files.outstanding-paperwork":{"state":"na","entries":[]},"payroll.issues-identified":{"state":"no_issues","entries":[]},"payroll.corrections-required":{"state":"no_issues","entries":[]},"payroll.outstanding-information":{"state":"no_issues","entries":[]},"orders.orders-placed":{"state":"no_issues","entries":[]},"orders.deliveries-received":{"state":"no_issues","entries":[]},"orders.items-required":{"state":"na","entries":[]},"orders.waiting-for-approval":{"state":"no_issues","entries":[]},"outstanding.tasks-not-completed":{"state":"no_issues","entries":[]},"outstanding.reason":{"state":"no_issues","entries":[]},"outstanding.action-required":{"state":"no_issues","entries":[]},"attention.decision-needed":{"state":"no_issues","entries":[]}},"comments":[{"at":"2026-10-13T09:10:00","by":"Lilianna Novak","text":"Reviewed. Thanks, follow-ups noted."}],"versions":[{"v":1,"at":"2026-10-12T17:48:00","by":"Daniel Okafor","note":"Submitted"}]},{"id":"RPT-2026-10-11-cleaning","date":"2026-10-11","dept":"Cleaning","owner":"p-grace","status":"reviewed","createdAt":"2026-10-11T08:47:00","updatedAt":"2026-10-12T09:30:00","submittedAt":"2026-10-11T15:44:00","nil":true,"fields":{"staff.call-outs":{"state":"no_issues","entries":[]},"staff.no-shows":{"state":"no_issues","entries":[]},"staff.cover-arranged":{"state":"no_issues","entries":[]},"staff.outstanding-staff-issues":{"state":"no_issues","entries":[]},"clients.client-contacted":{"state":"na","entries":[]},"clients.complaints":{"state":"no_issues","entries":[]},"clients.requests":{"state":"no_issues","entries":[]},"clients.outstanding-issues":{"state":"no_issues","entries":[]},"rosters.todays-issues":{"state":"no_issues","entries":[]},"rosters.tomorrows-cover":{"state":"no_issues","entries":[]},"rosters.next-weeks-gaps":{"state":"na","entries":[]},"recruitment.applications-reviewed":{"state":"no_issues","entries":[]},"recruitment.candidates-contacted":{"state":"na","entries":[]},"recruitment.interviews-arranged":{"state":"no_issues","entries":[]},"recruitment.new-starters":{"state":"no_issues","entries":[]},"recruitment.outstanding-candidates":{"state":"no_issues","entries":[]},"employee-files.files-updated":{"state":"no_issues","entries":[]},"employee-files.documents-received":{"state":"no_issues","entries":[]},"employee-files.missing-documents":{"state":"no_issues","entries":[]},"employee-files.expiring-documents":{"state":"no_issues","entries":[]},"client-files.files-updated":{"state":"no_issues","entries":[]},"client-files.contracts":{"state":"no_issues","entries":[]},"client-files.contact-details":{"state":"na","entries":[]},"client-files.outstanding-paperwork":{"state":"na","entries":[]},"payroll.issues-identified":{"state":"no_issues","entries":[]},"payroll.corrections-required":{"state":"na","entries":[]},"payroll.outstanding-information":{"state":"no_issues","entries":[]},"orders.orders-placed":{"state":"no_issues","entries":[]},"orders.deliveries-received":{"state":"na","entries":[]},"orders.items-required":{"state":"no_issues","entries":[]},"orders.waiting-for-approval":{"state":"no_issues","entries":[]},"outstanding.tasks-not-completed":{"state":"no_issues","entries":[]},"outstanding.reason":{"state":"no_issues","entries":[]},"outstanding.action-required":{"state":"no_issues","entries":[]},"attention.decision-needed":{"state":"no_issues","entries":[]}},"comments":[],"versions":[{"v":1,"at":"2026-10-11T15:44:00","by":"Grace Mensah","note":"Submitted"}]},{"id":"RPT-2026-10-11-security","date":"2026-10-11","dept":"Security","owner":"p-daniel","status":"reviewed","createdAt":"2026-10-11T08:47:00","updatedAt":"2026-10-12T09:30:00","submittedAt":"2026-10-11T15:42:00","nil":true,"fields":{"staff.call-outs":{"state":"no_issues","entries":[]},"staff.no-shows":{"state":"no_issues","entries":[]},"staff.cover-arranged":{"state":"no_issues","entries":[]},"staff.outstanding-staff-issues":{"state":"na","entries":[]},"clients.client-contacted":{"state":"no_issues","entries":[]},"clients.complaints":{"state":"no_issues","entries":[]},"clients.requests":{"state":"no_issues","entries":[]},"clients.outstanding-issues":{"state":"no_issues","entries":[]},"rosters.todays-issues":{"state":"no_issues","entries":[]},"rosters.tomorrows-cover":{"state":"no_issues","entries":[]},"rosters.next-weeks-gaps":{"state":"no_issues","entries":[]},"recruitment.applications-reviewed":{"state":"na","entries":[]},"recruitment.candidates-contacted":{"state":"no_issues","entries":[]},"recruitment.interviews-arranged":{"state":"no_issues","entries":[]},"recruitment.new-starters":{"state":"no_issues","entries":[]},"recruitment.outstanding-candidates":{"state":"no_issues","entries":[]},"employee-files.files-updated":{"state":"no_issues","entries":[]},"employee-files.documents-received":{"state":"no_issues","entries":[]},"employee-files.missing-documents":{"state":"no_issues","entries":[]},"employee-files.expiring-documents":{"state":"no_issues","entries":[]},"client-files.files-updated":{"state":"no_issues","entries":[]},"client-files.contracts":{"state":"no_issues","entries":[]},"client-files.contact-details":{"state":"no_issues","entries":[]},"client-files.outstanding-paperwork":{"state":"no_issues","entries":[]},"payroll.issues-identified":{"state":"no_issues","entries":[]},"payroll.corrections-required":{"state":"na","entries":[]},"payroll.outstanding-information":{"state":"no_issues","entries":[]},"orders.orders-placed":{"state":"no_issues","entries":[]},"orders.deliveries-received":{"state":"no_issues","entries":[]},"orders.items-required":{"state":"no_issues","entries":[]},"orders.waiting-for-approval":{"state":"na","entries":[]},"outstanding.tasks-not-completed":{"state":"na","entries":[]},"outstanding.reason":{"state":"no_issues","entries":[]},"outstanding.action-required":{"state":"no_issues","entries":[]},"attention.decision-needed":{"state":"no_issues","entries":[]}},"comments":[],"versions":[{"v":1,"at":"2026-10-11T15:42:00","by":"Daniel Okafor","note":"Submitted"}]},{"id":"RPT-2026-10-10-cleaning","date":"2026-10-10","dept":"Cleaning","owner":"p-grace","status":"reviewed","createdAt":"2026-10-10T08:40:00","updatedAt":"2026-10-11T09:30:00","submittedAt":"2026-10-10T15:30:00","nil":true,"fields":{"staff.call-outs":{"state":"no_issues","entries":[]},"staff.no-shows":{"state":"no_issues","entries":[]},"staff.cover-arranged":{"state":"na","entries":[]},"staff.outstanding-staff-issues":{"state":"no_issues","entries":[]},"clients.client-contacted":{"state":"no_issues","entries":[]},"clients.complaints":{"state":"no_issues","entries":[]},"clients.requests":{"state":"no_issues","entries":[]},"clients.outstanding-issues":{"state":"no_issues","entries":[]},"rosters.todays-issues":{"state":"no_issues","entries":[]},"rosters.tomorrows-cover":{"state":"no_issues","entries":[]},"rosters.next-weeks-gaps":{"state":"no_issues","entries":[]},"recruitment.applications-reviewed":{"state":"no_issues","entries":[]},"recruitment.candidates-contacted":{"state":"no_issues","entries":[]},"recruitment.interviews-arranged":{"state":"no_issues","entries":[]},"recruitment.new-starters":{"state":"no_issues","entries":[]},"recruitment.outstanding-candidates":{"state":"no_issues","entries":[]},"employee-files.files-updated":{"state":"no_issues","entries":[]},"employee-files.documents-received":{"state":"no_issues","entries":[]},"employee-files.missing-documents":{"state":"no_issues","entries":[]},"employee-files.expiring-documents":{"state":"no_issues","entries":[]},"client-files.files-updated":{"state":"no_issues","entries":[]},"client-files.contracts":{"state":"no_issues","entries":[]},"client-files.contact-details":{"state":"no_issues","entries":[]},"client-files.outstanding-paperwork":{"state":"no_issues","entries":[]},"payroll.issues-identified":{"state":"no_issues","entries":[]},"payroll.corrections-required":{"state":"na","entries":[]},"payroll.outstanding-information":{"state":"no_issues","entries":[]},"orders.orders-placed":{"state":"no_issues","entries":[]},"orders.deliveries-received":{"state":"na","entries":[]},"orders.items-required":{"state":"no_issues","entries":[]},"orders.waiting-for-approval":{"state":"no_issues","entries":[]},"outstanding.tasks-not-completed":{"state":"na","entries":[]},"outstanding.reason":{"state":"no_issues","entries":[]},"outstanding.action-required":{"state":"no_issues","entries":[]},"attention.decision-needed":{"state":"no_issues","entries":[]}},"comments":[],"versions":[{"v":1,"at":"2026-10-10T15:30:00","by":"Grace Mensah","note":"Submitted"}]},{"id":"RPT-2026-10-10-security","date":"2026-10-10","dept":"Security","owner":"p-daniel","status":"reviewed","createdAt":"2026-10-10T08:40:00","updatedAt":"2026-10-11T09:30:00","submittedAt":"2026-10-10T15:50:00","nil":true,"fields":{"staff.call-outs":{"state":"no_issues","entries":[]},"staff.no-shows":{"state":"no_issues","entries":[]},"staff.cover-arranged":{"state":"no_issues","entries":[]},"staff.outstanding-staff-issues":{"state":"no_issues","entries":[]},"clients.client-contacted":{"state":"no_issues","entries":[]},"clients.complaints":{"state":"na","entries":[]},"clients.requests":{"state":"no_issues","entries":[]},"clients.outstanding-issues":{"state":"no_issues","entries":[]},"rosters.todays-issues":{"state":"no_issues","entries":[]},"rosters.tomorrows-cover":{"state":"no_issues","entries":[]},"rosters.next-weeks-gaps":{"state":"no_issues","entries":[]},"recruitment.applications-reviewed":{"state":"na","entries":[]},"recruitment.candidates-contacted":{"state":"no_issues","entries":[]},"recruitment.interviews-arranged":{"state":"no_issues","entries":[]},"recruitment.new-starters":{"state":"no_issues","entries":[]},"recruitment.outstanding-candidates":{"state":"no_issues","entries":[]},"employee-files.files-updated":{"state":"no_issues","entries":[]},"employee-files.documents-received":{"state":"no_issues","entries":[]},"employee-files.missing-documents":{"state":"no_issues","entries":[]},"employee-files.expiring-documents":{"state":"no_issues","entries":[]},"client-files.files-updated":{"state":"no_issues","entries":[]},"client-files.contracts":{"state":"na","entries":[]},"client-files.contact-details":{"state":"na","entries":[]},"client-files.outstanding-paperwork":{"state":"no_issues","entries":[]},"payroll.issues-identified":{"state":"no_issues","entries":[]},"payroll.corrections-required":{"state":"no_issues","entries":[]},"payroll.outstanding-information":{"state":"no_issues","entries":[]},"orders.orders-placed":{"state":"no_issues","entries":[]},"orders.deliveries-received":{"state":"na","entries":[]},"orders.items-required":{"state":"na","entries":[]},"orders.waiting-for-approval":{"state":"no_issues","entries":[]},"outstanding.tasks-not-completed":{"state":"na","entries":[]},"outstanding.reason":{"state":"no_issues","entries":[]},"outstanding.action-required":{"state":"no_issues","entries":[]},"attention.decision-needed":{"state":"no_issues","entries":[]}},"comments":[],"versions":[{"v":1,"at":"2026-10-10T15:50:00","by":"Daniel Okafor","note":"Submitted"}]},{"id":"RPT-2026-10-09-cleaning","date":"2026-10-09","dept":"Cleaning","owner":"p-grace","status":"reviewed","createdAt":"2026-10-09T08:33:00","updatedAt":"2026-10-10T09:30:00","submittedAt":"2026-10-09T16:22:00","nil":false,"fields":{"staff.call-outs":{"state":"no_issues","entries":[]},"staff.no-shows":{"state":"no_issues","entries":[]},"staff.cover-arranged":{"state":"details","entries":[{"id":"staff.cover-arranged-1","text":"Owen Price covered Block B himself"}]},"staff.outstanding-staff-issues":{"state":"no_issues","entries":[]},"clients.client-contacted":{"state":"no_issues","entries":[]},"clients.complaints":{"state":"no_issues","entries":[]},"clients.requests":{"state":"no_issues","entries":[]},"clients.outstanding-issues":{"state":"no_issues","entries":[]},"rosters.todays-issues":{"state":"no_issues","entries":[]},"rosters.tomorrows-cover":{"state":"na","entries":[]},"rosters.next-weeks-gaps":{"state":"na","entries":[]},"recruitment.applications-reviewed":{"state":"details","entries":[{"id":"recruitment.applications-reviewed-1","text":"6"}]},"recruitment.candidates-contacted":{"state":"no_issues","entries":[]},"recruitment.interviews-arranged":{"state":"details","entries":[{"id":"recruitment.interviews-arranged-1","text":"2"}]},"recruitment.new-starters":{"state":"no_issues","entries":[]},"recruitment.outstanding-candidates":{"state":"na","entries":[]},"employee-files.files-updated":{"state":"no_issues","entries":[]},"employee-files.documents-received":{"state":"no_issues","entries":[]},"employee-files.missing-documents":{"state":"na","entries":[]},"employee-files.expiring-documents":{"state":"no_issues","entries":[]},"client-files.files-updated":{"state":"no_issues","entries":[]},"client-files.contracts":{"state":"no_issues","entries":[]},"client-files.contact-details":{"state":"no_issues","entries":[]},"client-files.outstanding-paperwork":{"state":"na","entries":[]},"payroll.issues-identified":{"state":"na","entries":[]},"payroll.corrections-required":{"state":"no_issues","entries":[]},"payroll.outstanding-information":{"state":"no_issues","entries":[]},"orders.orders-placed":{"state":"no_issues","entries":[]},"orders.deliveries-received":{"state":"no_issues","entries":[]},"orders.items-required":{"state":"no_issues","entries":[]},"orders.waiting-for-approval":{"state":"no_issues","entries":[]},"outstanding.tasks-not-completed":{"state":"na","entries":[]},"outstanding.reason":{"state":"no_issues","entries":[]},"outstanding.action-required":{"state":"no_issues","entries":[]},"attention.decision-needed":{"state":"no_issues","entries":[]}},"comments":[{"at":"2026-10-10T09:30:00","by":"Lilianna Novak","text":"Reviewed. Thanks, follow-ups noted."}],"versions":[{"v":1,"at":"2026-10-09T16:22:00","by":"Grace Mensah","note":"Submitted"}]},{"id":"RPT-2026-10-09-security","date":"2026-10-09","dept":"Security","owner":"p-daniel","status":"reviewed","createdAt":"2026-10-09T08:33:00","updatedAt":"2026-10-10T09:30:00","submittedAt":"2026-10-09T16:33:00","nil":false,"fields":{"staff.call-outs":{"state":"no_issues","entries":[]},"staff.no-shows":{"state":"na","entries":[]},"staff.cover-arranged":{"state":"no_issues","entries":[]},"staff.outstanding-staff-issues":{"state":"no_issues","entries":[]},"clients.client-contacted":{"state":"no_issues","entries":[]},"clients.complaints":{"state":"no_issues","entries":[]},"clients.requests":{"state":"no_issues","entries":[]},"clients.outstanding-issues":{"state":"no_issues","entries":[]},"rosters.todays-issues":{"state":"details","entries":[{"id":"rosters.todays-issues-1","text":"Gate 2 short by one officer from 18:00"}]},"rosters.tomorrows-cover":{"state":"na","entries":[]},"rosters.next-weeks-gaps":{"state":"no_issues","entries":[]},"recruitment.applications-reviewed":{"state":"details","entries":[{"id":"recruitment.applications-reviewed-1","text":"6"}]},"recruitment.candidates-contacted":{"state":"details","entries":[{"id":"recruitment.candidates-contacted-1","text":"3"}]},"recruitment.interviews-arranged":{"state":"na","entries":[]},"recruitment.new-starters":{"state":"no_issues","entries":[]},"recruitment.outstanding-candidates":{"state":"no_issues","entries":[]},"employee-files.files-updated":{"state":"no_issues","entries":[]},"employee-files.documents-received":{"state":"na","entries":[]},"employee-files.missing-documents":{"state":"no_issues","entries":[]},"employee-files.expiring-documents":{"state":"na","entries":[]},"client-files.files-updated":{"state":"no_issues","entries":[]},"client-files.contracts":{"state":"no_issues","entries":[]},"client-files.contact-details":{"state":"no_issues","entries":[]},"client-files.outstanding-paperwork":{"state":"no_issues","entries":[]},"payroll.issues-identified":{"state":"no_issues","entries":[]},"payroll.corrections-required":{"state":"no_issues","entries":[]},"payroll.outstanding-information":{"state":"no_issues","entries":[]},"orders.orders-placed":{"state":"no_issues","entries":[]},"orders.deliveries-received":{"state":"no_issues","entries":[]},"orders.items-required":{"state":"no_issues","entries":[]},"orders.waiting-for-approval":{"state":"no_issues","entries":[]},"outstanding.tasks-not-completed":{"state":"details","entries":[{"id":"outstanding.tasks-not-completed-1","text":"Fire alarm log not reconciled","cells":{"Task":"Reconcile the fire alarm log","Owner":"Daniel Okafor","Target date":"2026-10-21"}}]},"outstanding.reason":{"state":"na","entries":[]},"outstanding.action-required":{"state":"no_issues","entries":[]},"attention.decision-needed":{"state":"na","entries":[]}},"comments":[{"at":"2026-10-10T09:30:00","by":"Lilianna Novak","text":"Reviewed. Thanks, follow-ups noted."}],"versions":[{"v":1,"at":"2026-10-09T16:33:00","by":"Daniel Okafor","note":"Submitted"}]},{"id":"RPT-2026-10-08-cleaning","date":"2026-10-08","dept":"Cleaning","owner":"p-grace","status":"reviewed","createdAt":"2026-10-08T08:26:00","updatedAt":"2026-10-09T09:30:00","submittedAt":"2026-10-08T17:05:00","nil":false,"fields":{"staff.call-outs":{"state":"no_issues","entries":[]},"staff.no-shows":{"state":"no_issues","entries":[]},"staff.cover-arranged":{"state":"details","entries":[{"id":"staff.cover-arranged-1","text":"Owen Price covered Block B himself"}]},"staff.outstanding-staff-issues":{"state":"no_issues","entries":[]},"clients.client-contacted":{"state":"no_issues","entries":[]},"clients.complaints":{"state":"no_issues","entries":[]},"clients.requests":{"state":"details","entries":[{"id":"clients.requests-1","text":"Deep clean of the kitchen area requested"}]},"clients.outstanding-issues":{"state":"na","entries":[]},"rosters.todays-issues":{"state":"no_issues","entries":[]},"rosters.tomorrows-cover":{"state":"na","entries":[]},"rosters.next-weeks-gaps":{"state":"no_issues","entries":[]},"recruitment.applications-reviewed":{"state":"details","entries":[{"id":"recruitment.applications-reviewed-1","text":"6"}]},"recruitment.candidates-contacted":{"state":"no_issues","entries":[]},"recruitment.interviews-arranged":{"state":"na","entries":[]},"recruitment.new-starters":{"state":"no_issues","entries":[]},"recruitment.outstanding-candidates":{"state":"no_issues","entries":[]},"employee-files.files-updated":{"state":"na","entries":[]},"employee-files.documents-received":{"state":"no_issues","entries":[]},"employee-files.missing-documents":{"state":"no_issues","entries":[]},"employee-files.expiring-documents":{"state":"no_issues","entries":[]},"client-files.files-updated":{"state":"no_issues","entries":[]},"client-files.contracts":{"state":"na","entries":[]},"client-files.contact-details":{"state":"no_issues","entries":[]},"client-files.outstanding-paperwork":{"state":"no_issues","entries":[]},"payroll.issues-identified":{"state":"no_issues","entries":[]},"payroll.corrections-required":{"state":"no_issues","entries":[]},"payroll.outstanding-information":{"state":"no_issues","entries":[]},"orders.orders-placed":{"state":"no_issues","entries":[]},"orders.deliveries-received":{"state":"no_issues","entries":[]},"orders.items-required":{"state":"no_issues","entries":[]},"orders.waiting-for-approval":{"state":"no_issues","entries":[]},"outstanding.tasks-not-completed":{"state":"no_issues","entries":[]},"outstanding.reason":{"state":"no_issues","entries":[]},"outstanding.action-required":{"state":"no_issues","entries":[]},"attention.decision-needed":{"state":"no_issues","entries":[]}},"comments":[],"versions":[{"v":1,"at":"2026-10-08T17:05:00","by":"Grace Mensah","note":"Submitted"}]},{"id":"RPT-2026-10-08-security","date":"2026-10-08","dept":"Security","owner":"p-daniel","status":"reviewed","createdAt":"2026-10-08T08:26:00","updatedAt":"2026-10-09T09:30:00","submittedAt":"2026-10-08T16:05:00","nil":false,"fields":{"staff.call-outs":{"state":"no_issues","entries":[]},"staff.no-shows":{"state":"no_issues","entries":[]},"staff.cover-arranged":{"state":"no_issues","entries":[]},"staff.outstanding-staff-issues":{"state":"no_issues","entries":[]},"clients.client-contacted":{"state":"no_issues","entries":[]},"clients.complaints":{"state":"no_issues","entries":[]},"clients.requests":{"state":"no_issues","entries":[]},"clients.outstanding-issues":{"state":"no_issues","entries":[]},"rosters.todays-issues":{"state":"details","entries":[{"id":"rosters.todays-issues-1","text":"Gate 2 short by one officer from 18:00"}]},"rosters.tomorrows-cover":{"state":"no_issues","entries":[]},"rosters.next-weeks-gaps":{"state":"no_issues","entries":[]},"recruitment.applications-reviewed":{"state":"no_issues","entries":[]},"recruitment.candidates-contacted":{"state":"details","entries":[{"id":"recruitment.candidates-contacted-1","text":"3"}]},"recruitment.interviews-arranged":{"state":"details","entries":[{"id":"recruitment.interviews-arranged-1","text":"2"}]},"recruitment.new-starters":{"state":"no_issues","entries":[]},"recruitment.outstanding-candidates":{"state":"no_issues","entries":[]},"employee-files.files-updated":{"state":"no_issues","entries":[]},"employee-files.documents-received":{"state":"no_issues","entries":[]},"employee-files.missing-documents":{"state":"no_issues","entries":[]},"employee-files.expiring-documents":{"state":"no_issues","entries":[]},"client-files.files-updated":{"state":"no_issues","entries":[]},"client-files.contracts":{"state":"no_issues","entries":[]},"client-files.contact-details":{"state":"na","entries":[]},"client-files.outstanding-paperwork":{"state":"na","entries":[]},"payroll.issues-identified":{"state":"na","entries":[]},"payroll.corrections-required":{"state":"no_issues","entries":[]},"payroll.outstanding-information":{"state":"no_issues","entries":[]},"orders.orders-placed":{"state":"na","entries":[]},"orders.deliveries-received":{"state":"no_issues","entries":[]},"orders.items-required":{"state":"details","entries":[{"id":"orders.items-required-1","text":"Radio batteries x6"},{"id":"orders.items-required-2","text":"High-visibility jackets x4"}]},"orders.waiting-for-approval":{"state":"na","entries":[]},"outstanding.tasks-not-completed":{"state":"no_issues","entries":[]},"outstanding.reason":{"state":"no_issues","entries":[]},"outstanding.action-required":{"state":"no_issues","entries":[]},"attention.decision-needed":{"state":"no_issues","entries":[]}},"comments":[],"versions":[{"v":1,"at":"2026-10-08T16:05:00","by":"Daniel Okafor","note":"Submitted"}]},{"id":"RPT-2026-10-07-cleaning","date":"2026-10-07","dept":"Cleaning","owner":"p-grace","status":"reviewed","createdAt":"2026-10-07T08:19:00","updatedAt":"2026-10-08T09:30:00","submittedAt":"2026-10-07T16:48:00","nil":false,"fields":{"staff.call-outs":{"state":"no_issues","entries":[]},"staff.no-shows":{"state":"no_issues","entries":[]},"staff.cover-arranged":{"state":"no_issues","entries":[]},"staff.outstanding-staff-issues":{"state":"no_issues","entries":[]},"clients.client-contacted":{"state":"na","entries":[]},"clients.complaints":{"state":"action_required","entries":[{"id":"clients.complaints-1","text":"Tower Hill: missed washroom restock on level 4","cells":{"Client / site":"Tower Hill","Details":"missed washroom restock on level 4","Urgency":"Medium"}}]},"clients.requests":{"state":"no_issues","entries":[]},"clients.outstanding-issues":{"state":"no_issues","entries":[]},"rosters.todays-issues":{"state":"no_issues","entries":[]},"rosters.tomorrows-cover":{"state":"no_issues","entries":[]},"rosters.next-weeks-gaps":{"state":"na","entries":[]},"recruitment.applications-reviewed":{"state":"no_issues","entries":[]},"recruitment.candidates-contacted":{"state":"no_issues","entries":[]},"recruitment.interviews-arranged":{"state":"details","entries":[{"id":"recruitment.interviews-arranged-1","text":"2"}]},"recruitment.new-starters":{"state":"no_issues","entries":[]},"recruitment.outstanding-candidates":{"state":"na","entries":[]},"employee-files.files-updated":{"state":"no_issues","entries":[]},"employee-files.documents-received":{"state":"no_issues","entries":[]},"employee-files.missing-documents":{"state":"no_issues","entries":[]},"employee-files.expiring-documents":{"state":"na","entries":[]},"client-files.files-updated":{"state":"no_issues","entries":[]},"client-files.contracts":{"state":"no_issues","entries":[]},"client-files.contact-details":{"state":"na","entries":[]},"client-files.outstanding-paperwork":{"state":"no_issues","entries":[]},"payroll.issues-identified":{"state":"no_issues","entries":[]},"payroll.corrections-required":{"state":"na","entries":[]},"payroll.outstanding-information":{"state":"no_issues","entries":[]},"orders.orders-placed":{"state":"no_issues","entries":[]},"orders.deliveries-received":{"state":"no_issues","entries":[]},"orders.items-required":{"state":"no_issues","entries":[]},"orders.waiting-for-approval":{"state":"no_issues","entries":[]},"outstanding.tasks-not-completed":{"state":"no_issues","entries":[]},"outstanding.reason":{"state":"no_issues","entries":[]},"outstanding.action-required":{"state":"no_issues","entries":[]},"attention.decision-needed":{"state":"action_required","entries":[{"id":"attention.decision-needed-1","text":"Supplier price rise needs a decision before next order","cells":{"Summary":"Supplier raised cleaning product prices","Decision requested":"Accept the new price or change supplier","Urgency":"Medium"}}]}},"comments":[],"versions":[{"v":1,"at":"2026-10-07T16:48:00","by":"Grace Mensah","note":"Submitted"}]},{"id":"RPT-2026-10-07-security","date":"2026-10-07","dept":"Security","owner":"p-daniel","status":"reviewed","createdAt":"2026-10-07T08:19:00","updatedAt":"2026-10-08T09:30:00","submittedAt":"2026-10-07T16:41:00","nil":false,"fields":{"staff.call-outs":{"state":"no_issues","entries":[]},"staff.no-shows":{"state":"na","entries":[]},"staff.cover-arranged":{"state":"na","entries":[]},"staff.outstanding-staff-issues":{"state":"no_issues","entries":[]},"clients.client-contacted":{"state":"no_issues","entries":[]},"clients.complaints":{"state":"action_required","entries":[{"id":"clients.complaints-1","text":"Canary Wharf: late patrol start reported by site manager","cells":{"Client / site":"Canary Wharf","Details":"late patrol start reported by site manager","Urgency":"Medium"}}]},"clients.requests":{"state":"no_issues","entries":[]},"clients.outstanding-issues":{"state":"no_issues","entries":[]},"rosters.todays-issues":{"state":"no_issues","entries":[]},"rosters.tomorrows-cover":{"state":"no_issues","entries":[]},"rosters.next-weeks-gaps":{"state":"na","entries":[]},"recruitment.applications-reviewed":{"state":"details","entries":[{"id":"recruitment.applications-reviewed-1","text":"6"}]},"recruitment.candidates-contacted":{"state":"no_issues","entries":[]},"recruitment.interviews-arranged":{"state":"details","entries":[{"id":"recruitment.interviews-arranged-1","text":"2"}]},"recruitment.new-starters":{"state":"details","entries":[{"id":"recruitment.new-starters-1","text":"1"}]},"recruitment.outstanding-candidates":{"state":"no_issues","entries":[]},"employee-files.files-updated":{"state":"no_issues","entries":[]},"employee-files.documents-received":{"state":"no_issues","entries":[]},"employee-files.missing-documents":{"state":"no_issues","entries":[]},"employee-files.expiring-documents":{"state":"details","entries":[{"id":"employee-files.expiring-documents-1","text":"SIA licence for Leo Fernandez expires in 21 days"}]},"client-files.files-updated":{"state":"no_issues","entries":[]},"client-files.contracts":{"state":"no_issues","entries":[]},"client-files.contact-details":{"state":"no_issues","entries":[]},"client-files.outstanding-paperwork":{"state":"no_issues","entries":[]},"payroll.issues-identified":{"state":"na","entries":[]},"payroll.corrections-required":{"state":"no_issues","entries":[]},"payroll.outstanding-information":{"state":"na","entries":[]},"orders.orders-placed":{"state":"na","entries":[]},"orders.deliveries-received":{"state":"na","entries":[]},"orders.items-required":{"state":"details","entries":[{"id":"orders.items-required-1","text":"Radio batteries x6"},{"id":"orders.items-required-2","text":"High-visibility jackets x4"}]},"orders.waiting-for-approval":{"state":"na","entries":[]},"outstanding.tasks-not-completed":{"state":"no_issues","entries":[]},"outstanding.reason":{"state":"no_issues","entries":[]},"outstanding.action-required":{"state":"no_issues","entries":[]},"attention.decision-needed":{"state":"details","entries":[{"id":"attention.decision-needed-1","text":"Overtime approval needed to cover the Canary Wharf gap","cells":{"Summary":"Canary Wharf gate is short of officers","Decision requested":"Approve overtime for 2 shifts","Urgency":"High"}}]}},"comments":[],"versions":[{"v":1,"at":"2026-10-07T16:41:00","by":"Daniel Okafor","note":"Submitted"}]},{"id":"RPT-2026-10-06-cleaning","date":"2026-10-06","dept":"Cleaning","owner":"p-grace","status":"reviewed","createdAt":"2026-10-06T08:12:00","updatedAt":"2026-10-07T09:30:00","submittedAt":"2026-10-06T16:10:00","nil":false,"fields":{"staff.call-outs":{"state":"no_issues","entries":[]},"staff.no-shows":{"state":"na","entries":[]},"staff.cover-arranged":{"state":"no_issues","entries":[]},"staff.outstanding-staff-issues":{"state":"no_issues","entries":[]},"clients.client-contacted":{"state":"no_issues","entries":[]},"clients.complaints":{"state":"no_issues","entries":[]},"clients.requests":{"state":"na","entries":[]},"clients.outstanding-issues":{"state":"na","entries":[]},"rosters.todays-issues":{"state":"no_issues","entries":[]},"rosters.tomorrows-cover":{"state":"no_issues","entries":[]},"rosters.next-weeks-gaps":{"state":"no_issues","entries":[]},"recruitment.applications-reviewed":{"state":"no_issues","entries":[]},"recruitment.candidates-contacted":{"state":"no_issues","entries":[]},"recruitment.interviews-arranged":{"state":"no_issues","entries":[]},"recruitment.new-starters":{"state":"details","entries":[{"id":"recruitment.new-starters-1","text":"1"}]},"recruitment.outstanding-candidates":{"state":"na","entries":[]},"employee-files.files-updated":{"state":"no_issues","entries":[]},"employee-files.documents-received":{"state":"na","entries":[]},"employee-files.missing-documents":{"state":"no_issues","entries":[]},"employee-files.expiring-documents":{"state":"no_issues","entries":[]},"client-files.files-updated":{"state":"na","entries":[]},"client-files.contracts":{"state":"no_issues","entries":[]},"client-files.contact-details":{"state":"no_issues","entries":[]},"client-files.outstanding-paperwork":{"state":"no_issues","entries":[]},"payroll.issues-identified":{"state":"na","entries":[]},"payroll.corrections-required":{"state":"no_issues","entries":[]},"payroll.outstanding-information":{"state":"no_issues","entries":[]},"orders.orders-placed":{"state":"no_issues","entries":[]},"orders.deliveries-received":{"state":"no_issues","entries":[]},"orders.items-required":{"state":"no_issues","entries":[]},"orders.waiting-for-approval":{"state":"no_issues","entries":[]},"outstanding.tasks-not-completed":{"state":"na","entries":[]},"outstanding.reason":{"state":"na","entries":[]},"outstanding.action-required":{"state":"na","entries":[]},"attention.decision-needed":{"state":"no_issues","entries":[]}},"comments":[{"at":"2026-10-07T09:30:00","by":"Lilianna Novak","text":"Reviewed. Thanks, follow-ups noted."}],"versions":[{"v":1,"at":"2026-10-06T16:10:00","by":"Grace Mensah","note":"Submitted"}]},{"id":"RPT-2026-10-06-security","date":"2026-10-06","dept":"Security","owner":"p-daniel","status":"reviewed","createdAt":"2026-10-06T08:12:00","updatedAt":"2026-10-07T09:30:00","submittedAt":"2026-10-06T16:20:00","nil":false,"fields":{"staff.call-outs":{"state":"na","entries":[]},"staff.no-shows":{"state":"na","entries":[]},"staff.cover-arranged":{"state":"details","entries":[{"id":"staff.cover-arranged-1","text":"Cover found from the reserve list"}]},"staff.outstanding-staff-issues":{"state":"no_issues","entries":[]},"clients.client-contacted":{"state":"na","entries":[]},"clients.complaints":{"state":"no_issues","entries":[]},"clients.requests":{"state":"no_issues","entries":[]},"clients.outstanding-issues":{"state":"no_issues","entries":[]},"rosters.todays-issues":{"state":"no_issues","entries":[]},"rosters.tomorrows-cover":{"state":"no_issues","entries":[]},"rosters.next-weeks-gaps":{"state":"no_issues","entries":[]},"recruitment.applications-reviewed":{"state":"na","entries":[]},"recruitment.candidates-contacted":{"state":"details","entries":[{"id":"recruitment.candidates-contacted-1","text":"3"}]},"recruitment.interviews-arranged":{"state":"details","entries":[{"id":"recruitment.interviews-arranged-1","text":"2"}]},"recruitment.new-starters":{"state":"no_issues","entries":[]},"recruitment.outstanding-candidates":{"state":"no_issues","entries":[]},"employee-files.files-updated":{"state":"no_issues","entries":[]},"employee-files.documents-received":{"state":"no_issues","entries":[]},"employee-files.missing-documents":{"state":"details","entries":[{"id":"employee-files.missing-documents-1","text":"Right-to-work copy missing for new starter"}]},"employee-files.expiring-documents":{"state":"no_issues","entries":[]},"client-files.files-updated":{"state":"no_issues","entries":[]},"client-files.contracts":{"state":"no_issues","entries":[]},"client-files.contact-details":{"state":"no_issues","entries":[]},"client-files.outstanding-paperwork":{"state":"no_issues","entries":[]},"payroll.issues-identified":{"state":"na","entries":[]},"payroll.corrections-required":{"state":"no_issues","entries":[]},"payroll.outstanding-information":{"state":"na","entries":[]},"orders.orders-placed":{"state":"no_issues","entries":[]},"orders.deliveries-received":{"state":"no_issues","entries":[]},"orders.items-required":{"state":"no_issues","entries":[]},"orders.waiting-for-approval":{"state":"no_issues","entries":[]},"outstanding.tasks-not-completed":{"state":"no_issues","entries":[]},"outstanding.reason":{"state":"na","entries":[]},"outstanding.action-required":{"state":"no_issues","entries":[]},"attention.decision-needed":{"state":"na","entries":[]}},"comments":[{"at":"2026-10-07T09:30:00","by":"Lilianna Novak","text":"Reviewed. Thanks, follow-ups noted."}],"versions":[{"v":1,"at":"2026-10-06T16:20:00","by":"Daniel Okafor","note":"Submitted"}]}]}
+{
+ "reports": [
+  {
+   "id": "p-daniel:pat-sec-day:2026-10-14",
+   "personId": "p-daniel",
+   "patternId": "pat-sec-day",
+   "date": "2026-10-14",
+   "status": "accepted",
+   "createdAt": "2026-10-14T14:20",
+   "updatedAt": "2026-10-15T09:10",
+   "submittedAt": "2026-10-14T14:55",
+   "reviewedBy": "Lilianna Novak",
+   "reviewedAt": "2026-10-15T09:10",
+   "items": [
+    {
+     "taskRef": "TSK-1007",
+     "status": "done",
+     "minutes": 95,
+     "note": "Footage exported to the client portal; link sent to the account manager."
+    }
+   ],
+   "summary": "Quiet day at Canary Wharf. CCTV export for the client finished and sent.",
+   "blockers": "None.",
+   "unplanned": [
+    {
+     "id": "u1",
+     "text": "Covered reception for 30 min during the lunch break",
+     "minutes": 30
+    }
+   ],
+   "attachments": [],
+   "extra": {
+    "handover.next-shift": "No open items.",
+    "handover.keys": "All keys returned"
+   },
+   "comments": [],
+   "versions": [
+    {
+     "v": 1,
+     "at": "2026-10-14T14:55",
+     "by": "Daniel Okafor",
+     "note": "Submitted"
+    }
+   ]
+  },
+  {
+   "id": "p-daniel:pat-sec-day:2026-10-15",
+   "personId": "p-daniel",
+   "patternId": "pat-sec-day",
+   "date": "2026-10-15",
+   "status": "accepted",
+   "createdAt": "2026-10-15T15:30",
+   "updatedAt": "2026-10-16T08:40",
+   "submittedAt": "2026-10-15T17:10",
+   "reviewedBy": "Lilianna Novak",
+   "reviewedAt": "2026-10-16T08:40",
+   "items": [
+    {
+     "taskRef": "TSK-1007",
+     "status": "done",
+     "minutes": 20,
+     "note": "Client confirmed they received the footage."
+    }
+   ],
+   "summary": "Fire panel fault at 11:00, engineer attended. Report sent late because of the panel call-out.",
+   "blockers": "Fire panel engineer only available after 15:00.",
+   "unplanned": [
+    {
+     "id": "u1",
+     "text": "Waited with the fire panel engineer",
+     "minutes": 75
+    }
+   ],
+   "attachments": [
+    {
+     "id": "a1",
+     "name": "fire-panel-fault.jpg",
+     "kind": "image",
+     "size": "1.2 MB"
+    }
+   ],
+   "extra": {
+    "handover.next-shift": "Panel reset done; check zone 4 light tomorrow.",
+    "handover.keys": "All keys returned"
+   },
+   "comments": [],
+   "versions": [
+    {
+     "v": 1,
+     "at": "2026-10-15T17:10",
+     "by": "Daniel Okafor",
+     "note": "Submitted"
+    }
+   ]
+  },
+  {
+   "id": "p-daniel:pat-sec-day:2026-10-16",
+   "personId": "p-daniel",
+   "patternId": "pat-sec-day",
+   "date": "2026-10-16",
+   "status": "returned",
+   "createdAt": "2026-10-16T14:50",
+   "updatedAt": "2026-10-19T11:10",
+   "submittedAt": "2026-10-16T15:40",
+   "reviewedBy": "Lilianna Novak",
+   "reviewedAt": "2026-10-19T11:10",
+   "items": [],
+   "summary": "Patrols done, nothing to report.",
+   "blockers": "",
+   "unplanned": [],
+   "attachments": [],
+   "extra": {
+    "handover.next-shift": "",
+    "handover.keys": ""
+   },
+   "comments": [
+    {
+     "at": "2026-10-19T11:10",
+     "by": "Lilianna Novak",
+     "text": "No tasks were listed for Friday but you logged the gate incident on the radio. Add it as unplanned work with the time, and the handover note."
+    }
+   ],
+   "versions": [
+    {
+     "v": 1,
+     "at": "2026-10-16T15:40",
+     "by": "Daniel Okafor",
+     "note": "Submitted"
+    }
+   ]
+  },
+  {
+   "id": "p-daniel:pat-sec-day:2026-10-19",
+   "personId": "p-daniel",
+   "patternId": "pat-sec-day",
+   "date": "2026-10-19",
+   "status": "draft",
+   "createdAt": "2026-10-19T14:40",
+   "updatedAt": "2026-10-19T14:52",
+   "items": [
+    {
+     "taskRef": "TSK-1033",
+     "status": "done",
+     "minutes": 40,
+     "note": "Stills and officer statement attached to the task."
+    },
+    {
+     "taskRef": "TSK-1043",
+     "status": "in_progress",
+     "minutes": 25,
+     "note": ""
+    }
+   ],
+   "summary": "",
+   "blockers": "",
+   "unplanned": [],
+   "attachments": [],
+   "extra": {},
+   "comments": [],
+   "versions": []
+  },
+  {
+   "id": "p-marcus:pat-sec-night:2026-10-14",
+   "personId": "p-marcus",
+   "patternId": "pat-sec-night",
+   "date": "2026-10-14",
+   "status": "accepted",
+   "createdAt": "2026-10-15T06:40",
+   "updatedAt": "2026-10-15T10:00",
+   "submittedAt": "2026-10-15T07:20",
+   "reviewedBy": "Daniel Okafor",
+   "reviewedAt": "2026-10-15T10:00",
+   "items": [
+    {
+     "taskRef": "TSK-1005",
+     "status": "done",
+     "minutes": 60,
+     "note": "Badges reconciled against the visitor log."
+    }
+   ],
+   "summary": "Shoreditch quiet. Badge reconciliation done.",
+   "blockers": "None.",
+   "unplanned": [],
+   "attachments": [],
+   "extra": {
+    "handover.next-shift": "Gate 2 lock is stiff.",
+    "handover.keys": "All keys returned"
+   },
+   "comments": [],
+   "versions": [
+    {
+     "v": 1,
+     "at": "2026-10-15T07:20",
+     "by": "Marcus Hill",
+     "note": "Submitted"
+    }
+   ]
+  },
+  {
+   "id": "p-marcus:pat-sec-night:2026-10-15",
+   "personId": "p-marcus",
+   "patternId": "pat-sec-night",
+   "date": "2026-10-15",
+   "status": "accepted",
+   "createdAt": "2026-10-16T06:50",
+   "updatedAt": "2026-10-16T09:30",
+   "submittedAt": "2026-10-16T07:45",
+   "reviewedBy": "Daniel Okafor",
+   "reviewedAt": "2026-10-16T09:30",
+   "items": [],
+   "summary": "Two alarm activations, both false. Patrol log up to date.",
+   "blockers": "",
+   "unplanned": [
+    {
+     "id": "u1",
+     "text": "Attended two false alarm activations",
+     "minutes": 40
+    }
+   ],
+   "attachments": [],
+   "extra": {
+    "handover.next-shift": "Alarm company to call back about zone 6.",
+    "handover.keys": "All keys returned"
+   },
+   "comments": [],
+   "versions": [
+    {
+     "v": 1,
+     "at": "2026-10-16T07:45",
+     "by": "Marcus Hill",
+     "note": "Submitted"
+    }
+   ]
+  },
+  {
+   "id": "p-marcus:pat-sec-night:2026-10-16",
+   "personId": "p-marcus",
+   "patternId": "pat-sec-night",
+   "date": "2026-10-16",
+   "status": "submitted",
+   "createdAt": "2026-10-17T07:10",
+   "updatedAt": "2026-10-17T09:30",
+   "submittedAt": "2026-10-17T09:30",
+   "items": [
+    {
+     "taskRef": "TSK-1027",
+     "status": "in_progress",
+     "minutes": 30,
+     "note": "Statement from the night officer still to add."
+    },
+    {
+     "taskRef": "TSK-1024",
+     "status": "in_progress",
+     "minutes": 45,
+     "note": "Zones 1 to 3 tested."
+    }
+   ],
+   "summary": "Alarm test started. Incident report still waiting for the officer statement.",
+   "blockers": "Waiting for the officer statement for the incident report.",
+   "unplanned": [],
+   "attachments": [],
+   "extra": {
+    "handover.next-shift": "Continue alarm test from zone 4.",
+    "handover.keys": "Keys handed to day team"
+   },
+   "comments": [],
+   "versions": [
+    {
+     "v": 1,
+     "at": "2026-10-17T09:30",
+     "by": "Marcus Hill",
+     "note": "Submitted"
+    }
+   ]
+  },
+  {
+   "id": "p-marcus:pat-sec-night:2026-10-17",
+   "personId": "p-marcus",
+   "patternId": "pat-sec-night",
+   "date": "2026-10-17",
+   "status": "submitted",
+   "createdAt": "2026-10-18T06:45",
+   "updatedAt": "2026-10-18T07:15",
+   "submittedAt": "2026-10-18T07:15",
+   "items": [
+    {
+     "taskRef": "TSK-1027",
+     "status": "in_progress",
+     "minutes": 30,
+     "note": "Statement from the night officer still to add."
+    },
+    {
+     "taskRef": "TSK-1024",
+     "status": "in_progress",
+     "minutes": 45,
+     "note": "Zones 1 to 3 tested."
+    },
+    {
+     "taskRef": "TSK-1053",
+     "status": "done",
+     "minutes": 50,
+     "note": "Visitor log audited, two gaps flagged."
+    }
+   ],
+   "summary": "Visitor log audit finished. Alarm test zones 4 to 6 done.",
+   "blockers": "",
+   "unplanned": [],
+   "attachments": [
+    {
+     "id": "a1",
+     "name": "visitor-log-gaps.pdf",
+     "kind": "file",
+     "size": "240 KB"
+    }
+   ],
+   "extra": {
+    "handover.next-shift": "Two visitor log gaps for the day team to follow up.",
+    "handover.keys": "All keys returned"
+   },
+   "comments": [],
+   "versions": [
+    {
+     "v": 1,
+     "at": "2026-10-18T07:15",
+     "by": "Marcus Hill",
+     "note": "Submitted"
+    }
+   ]
+  },
+  {
+   "id": "p-marcus:pat-sec-night:2026-10-18",
+   "personId": "p-marcus",
+   "patternId": "pat-sec-night",
+   "date": "2026-10-18",
+   "status": "accepted",
+   "createdAt": "2026-10-19T06:30",
+   "updatedAt": "2026-10-19T09:00",
+   "submittedAt": "2026-10-19T07:30",
+   "reviewedBy": "Daniel Okafor",
+   "reviewedAt": "2026-10-19T09:00",
+   "items": [
+    {
+     "taskRef": "TSK-1027",
+     "status": "in_progress",
+     "minutes": 30,
+     "note": "Statement from the night officer still to add."
+    },
+    {
+     "taskRef": "TSK-1024",
+     "status": "in_progress",
+     "minutes": 45,
+     "note": "Zones 1 to 3 tested."
+    },
+    {
+     "taskRef": "TSK-1053",
+     "status": "done",
+     "minutes": 10,
+     "note": "Gaps passed to the day supervisor."
+    },
+    {
+     "taskRef": "TSK-1018",
+     "status": "in_progress",
+     "minutes": 20,
+     "note": ""
+    },
+    {
+     "taskRef": "TSK-1055",
+     "status": "in_progress",
+     "minutes": 15,
+     "note": ""
+    },
+    {
+     "taskRef": "TSK-1041",
+     "status": "in_progress",
+     "minutes": 35,
+     "note": "Depot log rewritten with times."
+    }
+   ],
+   "summary": "Steady night. Depot patrol log rewritten.",
+   "blockers": "None.",
+   "unplanned": [],
+   "attachments": [],
+   "extra": {
+    "handover.next-shift": "Follow-up call for the Shoreditch incident is due Wednesday.",
+    "handover.keys": "All keys returned"
+   },
+   "comments": [],
+   "versions": [
+    {
+     "v": 1,
+     "at": "2026-10-19T07:30",
+     "by": "Marcus Hill",
+     "note": "Submitted"
+    }
+   ]
+  },
+  {
+   "id": "p-marcus:pat-sec-night:2026-10-19",
+   "personId": "p-marcus",
+   "patternId": "pat-sec-night",
+   "date": "2026-10-19",
+   "status": "submitted",
+   "createdAt": "2026-10-20T06:40",
+   "updatedAt": "2026-10-20T07:20",
+   "submittedAt": "2026-10-20T07:20",
+   "items": [
+    {
+     "taskRef": "TSK-1027",
+     "status": "in_progress",
+     "minutes": 20,
+     "note": "Officer statement received, uploading today."
+    },
+    {
+     "taskRef": "TSK-1024",
+     "status": "done",
+     "minutes": 40,
+     "note": "All zones tested."
+    },
+    {
+     "taskRef": "TSK-1018",
+     "status": "in_progress",
+     "minutes": 30,
+     "note": "Handover notes drafted."
+    },
+    {
+     "taskRef": "TSK-1055",
+     "status": "blocked",
+     "minutes": 0,
+     "note": "Client contact not answering; left a voicemail."
+    },
+    {
+     "taskRef": "TSK-1041",
+     "status": "in_progress",
+     "minutes": 25,
+     "note": ""
+    }
+   ],
+   "summary": "Alarm test finished. Handover notes for Shoreditch drafted.",
+   "blockers": "Incident follow-up call: client contact not answering.",
+   "unplanned": [
+    {
+     "id": "u1",
+     "text": "Escorted a contractor to the plant room",
+     "minutes": 25
+    }
+   ],
+   "attachments": [],
+   "extra": {
+    "handover.next-shift": "Call the Shoreditch client contact after 09:00.",
+    "handover.keys": "All keys returned"
+   },
+   "comments": [],
+   "versions": [
+    {
+     "v": 1,
+     "at": "2026-10-20T07:20",
+     "by": "Marcus Hill",
+     "note": "Submitted"
+    }
+   ]
+  },
+  {
+   "id": "p-owen:pat-sec-wkd:2026-10-17",
+   "personId": "p-owen",
+   "patternId": "pat-sec-wkd",
+   "date": "2026-10-17",
+   "status": "submitted",
+   "createdAt": "2026-10-17T19:40",
+   "updatedAt": "2026-10-17T20:30",
+   "submittedAt": "2026-10-17T20:30",
+   "items": [],
+   "summary": "Weekend day patrol at Shoreditch. No incidents.",
+   "blockers": "",
+   "unplanned": [
+    {
+     "id": "u1",
+     "text": "Checked fire exits on all floors",
+     "minutes": 60
+    }
+   ],
+   "attachments": [],
+   "extra": {
+    "handover.next-shift": "No open items.",
+    "handover.keys": "All keys returned"
+   },
+   "comments": [],
+   "versions": [
+    {
+     "v": 1,
+     "at": "2026-10-17T20:30",
+     "by": "Owen Price",
+     "note": "Submitted"
+    }
+   ]
+  },
+  {
+   "id": "p-amara:pat-cle-eve:2026-10-14",
+   "personId": "p-amara",
+   "patternId": "pat-cle-eve",
+   "date": "2026-10-14",
+   "status": "accepted",
+   "createdAt": "2026-10-14T22:40",
+   "updatedAt": "2026-10-15T09:15",
+   "submittedAt": "2026-10-14T23:20",
+   "reviewedBy": "Grace Mensah",
+   "reviewedAt": "2026-10-15T09:15",
+   "items": [],
+   "summary": "Evening clean of floors 1 and 2 done.",
+   "blockers": "None.",
+   "unplanned": [],
+   "attachments": [],
+   "extra": {},
+   "comments": [],
+   "versions": [
+    {
+     "v": 1,
+     "at": "2026-10-14T23:20",
+     "by": "Amara Kone",
+     "note": "Submitted"
+    }
+   ]
+  },
+  {
+   "id": "p-amara:pat-cle-eve:2026-10-15",
+   "personId": "p-amara",
+   "patternId": "pat-cle-eve",
+   "date": "2026-10-15",
+   "status": "returned",
+   "createdAt": "2026-10-15T22:30",
+   "updatedAt": "2026-10-16T10:20",
+   "submittedAt": "2026-10-15T23:10",
+   "reviewedBy": "Grace Mensah",
+   "reviewedAt": "2026-10-16T10:20",
+   "items": [],
+   "summary": "All done.",
+   "blockers": "",
+   "unplanned": [],
+   "attachments": [],
+   "extra": {},
+   "comments": [
+    {
+     "at": "2026-10-16T10:20",
+     "by": "Grace Mensah",
+     "text": "Please say which floors were cleaned and add the time for the spill on floor 2."
+    }
+   ],
+   "versions": [
+    {
+     "v": 1,
+     "at": "2026-10-15T23:10",
+     "by": "Amara Kone",
+     "note": "Submitted"
+    }
+   ]
+  },
+  {
+   "id": "p-amara:pat-cle-eve:2026-10-16",
+   "personId": "p-amara",
+   "patternId": "pat-cle-eve",
+   "date": "2026-10-16",
+   "status": "submitted",
+   "createdAt": "2026-10-16T23:05",
+   "updatedAt": "2026-10-17T00:40",
+   "submittedAt": "2026-10-17T00:40",
+   "items": [],
+   "summary": "Floors 1 to 3 cleaned. Spill on floor 2 handled.",
+   "blockers": "Out of floor cleaner on floor 3.",
+   "unplanned": [
+    {
+     "id": "u1",
+     "text": "Spill on floor 2 near the lifts",
+     "minutes": 25
+    }
+   ],
+   "attachments": [],
+   "extra": {},
+   "comments": [],
+   "versions": [
+    {
+     "v": 1,
+     "at": "2026-10-17T00:40",
+     "by": "Amara Kone",
+     "note": "Submitted"
+    }
+   ]
+  },
+  {
+   "id": "p-amara:pat-cle-eve:2026-10-19",
+   "personId": "p-amara",
+   "patternId": "pat-cle-eve",
+   "date": "2026-10-19",
+   "status": "submitted",
+   "createdAt": "2026-10-19T22:50",
+   "updatedAt": "2026-10-19T23:35",
+   "submittedAt": "2026-10-19T23:35",
+   "items": [
+    {
+     "taskRef": "TSK-1048",
+     "status": "done",
+     "minutes": 15,
+     "note": "Photos added to the task."
+    },
+    {
+     "taskRef": "TSK-1029",
+     "status": "in_progress",
+     "minutes": 40,
+     "note": "Floor 3 washrooms restocked, floor 4 tomorrow."
+    },
+    {
+     "taskRef": "TSK-1025",
+     "status": "in_progress",
+     "minutes": 50,
+     "note": ""
+    }
+   ],
+   "summary": "Washrooms on floors 2 and 3 done.",
+   "blockers": "",
+   "unplanned": [],
+   "attachments": [
+    {
+     "id": "a1",
+     "name": "floor-3-washroom.jpg",
+     "kind": "image",
+     "size": "860 KB"
+    }
+   ],
+   "extra": {},
+   "comments": [],
+   "versions": [
+    {
+     "v": 1,
+     "at": "2026-10-19T23:35",
+     "by": "Amara Kone",
+     "note": "Submitted"
+    }
+   ]
+  },
+  {
+   "id": "p-nadia:pat-cle-night:2026-10-14",
+   "personId": "p-nadia",
+   "patternId": "pat-cle-night",
+   "date": "2026-10-14",
+   "status": "accepted",
+   "createdAt": "2026-10-15T05:20",
+   "updatedAt": "2026-10-15T09:20",
+   "submittedAt": "2026-10-15T05:50",
+   "reviewedBy": "Grace Mensah",
+   "reviewedAt": "2026-10-15T09:20",
+   "items": [],
+   "summary": "Night clean of reception and floors 3 and 4.",
+   "blockers": "None.",
+   "unplanned": [],
+   "attachments": [],
+   "extra": {},
+   "comments": [],
+   "versions": [
+    {
+     "v": 1,
+     "at": "2026-10-15T05:50",
+     "by": "Nadia Rahman",
+     "note": "Submitted"
+    }
+   ]
+  },
+  {
+   "id": "p-nadia:pat-cle-night:2026-10-18",
+   "personId": "p-nadia",
+   "patternId": "pat-cle-night",
+   "date": "2026-10-18",
+   "status": "submitted",
+   "createdAt": "2026-10-19T05:40",
+   "updatedAt": "2026-10-19T06:10",
+   "submittedAt": "2026-10-19T06:10",
+   "items": [
+    {
+     "taskRef": "TSK-1016",
+     "status": "not_started",
+     "minutes": 0,
+     "note": "Waiting for the new schedule from the client."
+    },
+    {
+     "taskRef": "TSK-1040",
+     "status": "in_progress",
+     "minutes": 55,
+     "note": "Levels 1 and 2 done."
+    },
+    {
+     "taskRef": "TSK-1012",
+     "status": "done",
+     "minutes": 20,
+     "note": "Photos uploaded."
+    }
+   ],
+   "summary": "Touch points on levels 1 and 2 sanitised.",
+   "blockers": "",
+   "unplanned": [],
+   "attachments": [],
+   "extra": {},
+   "comments": [],
+   "versions": [
+    {
+     "v": 1,
+     "at": "2026-10-19T06:10",
+     "by": "Nadia Rahman",
+     "note": "Submitted"
+    }
+   ]
+  }
+ ]
+}

@@ -1,0 +1,11 @@
+{
+  "operatorId": "stf-1",
+  "staff": [
+    { "id": "stf-1", "name": "Aoife Brennan", "email": "aoife.brennan@opsdesk.app", "role": "owner", "mfa": true, "lastSignInAt": "2026-10-20T08:12:00", "status": "active" },
+    { "id": "stf-2", "name": "Priya Shah", "email": "priya.shah@opsdesk.app", "role": "support", "mfa": true, "lastSignInAt": "2026-10-20T07:48:00", "status": "active" },
+    { "id": "stf-3", "name": "Daniel Okafor", "email": "daniel.okafor@opsdesk.app", "role": "support", "mfa": false, "lastSignInAt": "2026-10-19T16:05:00", "status": "active" },
+    { "id": "stf-4", "name": "Sofia Marin", "email": "sofia.marin@opsdesk.app", "role": "billing", "mfa": true, "lastSignInAt": "2026-10-18T11:30:00", "status": "active" },
+    { "id": "stf-5", "name": "Ciarán Walsh", "email": "ciaran.walsh@opsdesk.app", "role": "viewer", "mfa": false, "lastSignInAt": null, "status": "invited" },
+    { "id": "stf-6", "name": "Hannah Reid", "email": "hannah.reid@opsdesk.app", "role": "billing", "mfa": true, "lastSignInAt": "2026-09-14T09:02:00", "status": "disabled" }
+  ]
+}

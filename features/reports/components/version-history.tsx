@@ -1,8 +1,8 @@
 import { When } from "@/components/when"
-import type { Report } from "../types"
+import type { ShiftReport } from "../types"
 
-// FR-REP-10: every submission is kept. The original submission time is v1's own `at` and is never rewritten by later versions.
-export function VersionHistory({ report, today, tzLabel }: { report: Report; today: string; tzLabel: string }) {
+// FR-M1-27/29: every submission is kept (version history). The original submission time is v1's own `at` and is never rewritten by later versions.
+export function VersionHistory({ report, today, tzLabel }: { report: ShiftReport; today: string; tzLabel: string }) {
   const versions = [...report.versions].sort((a, b) => b.v - a.v)
   const original = report.versions.find((v) => v.v === 1)?.at ?? report.submittedAt
   return (

@@ -5,7 +5,7 @@ import type { Access, Module, Role } from "@/lib/types"
 import { isInsideSearch, LAYER_ATTR } from "./containment"
 import { buildIndex, filterActionsForRole, filterIndexForRole, filterPopularForRole, type RawSources } from "./build"
 import { EMPTY_FILTERS, applyFilters, countFilters, filterChips, groupResults, highlight, removeLastFilter, scoreItem, searchItems } from "./match"
-import { RECENTS_KEY, pushRecent, readRecents, removeRecent, writeRecents } from "./recents"
+import { RECENTS_KEY, pushRecent, readRecents, recentsKey, removeRecent, writeRecents } from "./recents"
 import { isFilterShortcut, isMacPlatform, isNewTabEnter, isSlashShortcut, isToggleShortcut, isTypingTarget } from "./shortcuts"
 
 const mods: Module[] = ["dashboard", "tasks", "reports", "attention", "staff", "recruitment", "files", "payroll", "orders", "settings", "audit"]
@@ -44,7 +44,7 @@ describe("buildIndex", () => {
     const t = index.find((i) => i.ref === "TSK-1001")!
     expect(t).toEqual({
       id: "task:TSK-1001", type: "task", title: "Fire alarm test, Canary Wharf", ref: "TSK-1001", href: "/tasks/TSK-1001",
-      dept: "Security", owner: "Me Person", status: "completed", date: "2026-10-12T17:00:00",
+      dept: "Security", owner: "Me Person", owners: ["Me Person"], status: "completed", date: "2026-10-12T17:00:00",
     })
     expect(index.find((i) => i.type === "report")!.owner).toBe("Other Person")
     expect(new Set(index.map((i) => i.id)).size).toBe(index.length)
@@ -65,6 +65,19 @@ describe("filterIndexForRole", () => {
     const emp = role("staff", { tasks: "write", reports: "write", dashboard: "read" })
     const out = filterIndexForRole(index, emp, { name: "Me Person" })
     expect(out.map((i) => i.id)).toEqual(["task:TSK-1001"])
+  })
+  it("leaves archived tasks out and lets every assignee find a shared task", () => {
+    const more = buildIndex({
+      ...src,
+      tasks: [
+        ...src.tasks,
+        { ref: "TSK-1003", title: "Shared patrol", dept: "Security", assignee: "p-other", assignees: ["p-me"], status: "in_progress", due: "2026-10-21T17:00:00" },
+        { ref: "TSK-1004", title: "Old job", dept: "Security", assignee: "p-me", archivedAt: "2026-10-12T11:00:00", status: "not_started", due: "2026-10-21T17:00:00" },
+      ],
+    })
+    expect(more.some((i) => i.ref === "TSK-1004")).toBe(false)
+    const emp = role("staff", { tasks: "write", reports: "write", dashboard: "read" })
+    expect(filterIndexForRole(more, emp, { name: "Me Person" }).map((i) => i.id)).toEqual(["task:TSK-1001", "task:TSK-1003"])
   })
   it("filters quick actions by read / write access", () => {
     const actions = [
@@ -108,6 +121,14 @@ describe("matching and ranking", () => {
   it("matches owner / dept / status fields and is accent-insensitive", () => {
     expect(searchItems(index, "other person").map((i) => i.type)).toEqual(expect.arrayContaining(["task", "report", "issue"]))
     expect(searchItems(index, "licénce").map((i) => i.ref)).toEqual(["DOC-1"])
+  })
+  it("matches hidden keywords (ids, slugs) and ranks an exact keyword first", () => {
+    const base = { type: "tenant" as const, href: "/", dept: "", owner: "", status: "", date: "" }
+    const t1 = { ...base, id: "tenant:t1", title: "Northgate", ref: "northgate.example", keywords: "northgate t1" }
+    const t10 = { ...base, id: "tenant:t10", title: "Tenbury", ref: "tenbury.example", keywords: "tenbury t10" }
+    expect(scoreItem(t1, "t1")).toBeGreaterThan(0)
+    expect(searchItems([t10, t1], "t1").map((i) => i.id)).toEqual(["tenant:t1", "tenant:t10"])
+    expect(scoreItem({ ...t1, keywords: undefined }, "t1")).toBe(0)
   })
   it("returns nothing for an empty query without filters", () => {
     expect(searchItems(index, "  ")).toEqual([])
@@ -169,6 +190,15 @@ describe("recents", () => {
     expect(readRecents(s)).toEqual(["a", "b"])
     writeRecents([], s)
     expect(m.has(RECENTS_KEY)).toBe(false)
+  })
+  it("keeps a separate list per index scope", () => {
+    expect(recentsKey("app")).toBe(RECENTS_KEY)
+    expect(recentsKey("platform")).toBe(`${RECENTS_KEY}:platform`)
+    const m = new Map<string, string>()
+    const s = { getItem: (k: string) => m.get(k) ?? null, setItem: (k: string, v: string) => void m.set(k, v), removeItem: (k: string) => void m.delete(k) }
+    writeRecents(["tenant q"], s, recentsKey("platform"))
+    expect(readRecents(s)).toEqual([])
+    expect(readRecents(s, recentsKey("platform"))).toEqual(["tenant q"])
   })
   it("survives broken or unavailable storage", () => {
     const boom = { getItem: () => { throw new Error("denied") }, setItem: () => { throw new Error("denied") }, removeItem: () => { throw new Error("denied") } }

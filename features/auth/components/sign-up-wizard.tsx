@@ -16,12 +16,12 @@ import { Stepper } from "./stepper"
 const STEPS = ["Organisation", "Owner account", "Verify email", "Plan"]
 type Errors = Record<string, string>
 
-const money = (p: PlanOption) => new Intl.NumberFormat("en-GB", { style: "currency", currency: p.currency, maximumFractionDigits: 0 }).format(p.priceMonthly)
-const num = (n: number) => new Intl.NumberFormat("en-GB").format(n)
+const money = (p: PlanOption, locale: string) => new Intl.NumberFormat(locale, { style: "currency", currency: p.currency, maximumFractionDigits: 0 }).format(p.priceMonthly)
 
 // FR-SAAS-03: organisation, owner, email verification (mock), plan. Finish hands over to /onboarding.
 export function SignUpWizard({ defaults, plans }: { defaults: OnboardingDefaults; plans: PlanOption[] }) {
   const router = useRouter()
+  const num = (n: number) => new Intl.NumberFormat(defaults.locale).format(n)
   const [step, setStep] = useState(0)
   // Next step slides in from the right, going back from the left.
   const dir = useSlideDir(step)
@@ -171,7 +171,7 @@ export function SignUpWizard({ defaults, plans }: { defaults: OnboardingDefaults
             {plans.map((p) => (
               <button key={p.id} type="button" role="radio" aria-checked={p.id === plan} className="auth-plan" data-selected={p.id === plan ? "" : undefined} onClick={() => setPlan(p.id)}>
                 <span className="auth-plan-name">{p.name}</span>
-                <span className="auth-plan-price">{money(p)}<small> / month</small></span>
+                <span className="auth-plan-price">{money(p, defaults.locale)}<small> / month</small></span>
                 <ul>
                   <li>Up to {num(p.limits.activeUsers)} active users</li>
                   <li>{num(p.limits.storageGb)} GB storage</li>

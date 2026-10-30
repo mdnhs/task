@@ -225,6 +225,45 @@ export function preview(n: NotifyMessage, hideSensitive: boolean): { title: stri
   return { title: n.generic?.title ?? (n.generic ? n.title : GENERIC.title), body: n.generic?.body ?? GENERIC.body }
 }
 
+/** A shift report that was not submitted by its due time (FR-M1-30). Times are tenant wall clock. */
+export type MissingReport = {
+  /** Report id (shiftKey). */
+  key: string
+  member: Recipient
+  manager: Recipient | null
+  /** "Day patrol, Mon 19 Oct". */
+  shift: string
+  /** "YYYY-MM-DDTHH:MM". */
+  due: string
+}
+
+/**
+ * FR-M1-30: one alert to the member and one to their primary manager for each missing report whose due time is at or
+ * before `now`. Ids are stable per report and audience (`shift-missing:<key>:member|manager`), so adding them is idempotent.
+ */
+export function missingReportAlerts(missing: MissingReport[], now: string, channels: string[]): DueItem[] {
+  const n = now.slice(0, 16)
+  const out: DueItem[] = []
+  for (const m of missing) {
+    const due = m.due.slice(0, 16)
+    if (due > n) continue
+    const at = due.slice(11, 16)
+    out.push({
+      id: `shift-missing:${m.key}:member`, kind: "overdue", at, atIso: due, channels, audience: "submitters", recipients: [m.member], event: "attention",
+      message: { title: `Your shift report is missing: ${m.shift}`, body: `It was due at ${at}. Submit it now; it will be marked late.`, generic: { title: "A shift report is missing", body: "Open the shift reports to submit it." } },
+    })
+    if (m.manager)
+      out.push({
+        id: `shift-missing:${m.key}:manager`, kind: "overdue", at, atIso: due, channels, audience: "managers", recipients: [m.manager], event: "attention",
+        message: { title: `Missing shift report: ${m.member.name}, ${m.shift}`, body: `No report from ${m.member.name} by ${at}.`, generic: { title: "A shift report is missing", body: "A team member did not submit a shift report by the deadline." } },
+      })
+  }
+  return out
+}
+
+/** A ready-to-show feed alert (already filtered for the viewer and hide-sensitive applied on the server). */
+export type FeedAlert = { id: string; title: string; at: string; href: string }
+
 /** What the signed-in user's browser needs to raise in-app reminders (built on the server by lib/notify-data.ts). */
 export type NotifyContext = {
   today: string
@@ -237,4 +276,8 @@ export type NotifyContext = {
   /** This user holds a designated manager role (gets overdue alerts). */
   isManager: boolean
   hideSensitive: boolean
+  /** Missing shift report alerts for this viewer (FR-M1-30), added to the feed once. */
+  alerts?: FeedAlert[]
+  /** Who the bell belongs to, for task change notices (lib/task-notices.ts, FR-M1-12). */
+  me?: { tenantId: string; personId: string }
 }

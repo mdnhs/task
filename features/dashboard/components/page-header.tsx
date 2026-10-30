@@ -16,7 +16,7 @@ export function PageHeader({ data, perms, newTask }: { data: HeaderData; perms: 
         {perms.reports && (
           <Link href="/daily-reports" className="btn btn-outline">
             <Icon name="report" />
-            Start Daily Report
+            Start Shift Report
           </Link>
         )}
       </div>

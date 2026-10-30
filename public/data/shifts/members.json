@@ -1,0 +1,14 @@
+{
+  "members": [
+    { "personId": "p-lilianna", "teams": ["Security", "Cleaning"], "managerId": null },
+    { "personId": "p-daniel", "teams": ["Security"], "managerId": "p-lilianna" },
+    { "personId": "p-grace", "teams": ["Cleaning"], "managerId": "p-lilianna" },
+    { "personId": "p-priya", "teams": ["Security"], "managerId": "p-lilianna" },
+    { "personId": "p-marcus", "teams": ["Security"], "managerId": "p-daniel" },
+    { "personId": "p-leo", "teams": ["Security"], "managerId": "p-daniel" },
+    { "personId": "p-tomasz", "teams": ["Cleaning"], "managerId": "p-grace" },
+    { "personId": "p-amara", "teams": ["Cleaning"], "managerId": "p-grace" },
+    { "personId": "p-nadia", "teams": ["Cleaning"], "managerId": "p-grace" },
+    { "personId": "p-owen", "teams": ["Cleaning", "Security"], "managerId": "p-grace" }
+  ]
+}

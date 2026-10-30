@@ -4,6 +4,8 @@ import { cookies } from "next/headers"
 import { redirect } from "next/navigation"
 import { revalidatePath } from "next/cache"
 
+import { getDeviceContext } from "@/lib/device-session"
+import { parseAppearance, type Appearance } from "@/lib/appearance"
 import { canWrite, getSession } from "@/lib/session"
 
 const opts = { path: "/", sameSite: "lax" as const }
@@ -27,6 +29,17 @@ export async function setTenant(id: string) {
   revalidatePath("/", "layout")
 }
 
+// Demo "current device" switcher (CR-02): only ids from the signed-in person's register, or the unregistered browser.
+export async function setDevice(id: string) {
+  const session = await getSession()
+  if (!session.signedIn || typeof id !== "string") return
+  const { options } = await getDeviceContext(session)
+  if (!options.some((d) => d.id === id)) return
+  const jar = await cookies()
+  jar.set("od-device", id, opts)
+  revalidatePath("/", "layout")
+}
+
 export async function signIn(roleId?: string) {
   const { roles } = await getSession()
   const role = typeof roleId === "string" && roles.some((r) => r.id === roleId) ? roleId : undefined
@@ -37,14 +50,15 @@ export async function signIn(roleId?: string) {
 }
 
 // Mock persistence for tenant branding (FR-SAAS-11): a per-tenant cookie that getSession() merges over the seed.
-export async function saveBranding(input: { name: string; color: string }) {
+export async function saveBranding(input: { name: string; color: string; appearance?: Appearance }) {
   const session = await getSession()
   if (!canWrite(session, "settings")) return { ok: false as const }
   const name = input.name.trim().slice(0, 60)
   const color = input.color.toLowerCase()
   if (name.length < 2 || !/^#[0-9a-f]{6}$/.test(color)) return { ok: false as const }
   const jar = await cookies()
-  jar.set(`od-brand-${session.tenant.id}`, JSON.stringify({ name, color }), opts)
+  const appearance = parseAppearance(input.appearance ?? session.tenant.appearance)
+  jar.set(`od-brand-${session.tenant.id}`, JSON.stringify({ name, color, appearance }), opts)
   revalidatePath("/", "layout")
   return { ok: true as const }
 }
@@ -55,5 +69,6 @@ export async function signOut() {
   // Drop the role and company too, so nothing (e.g. the platform console) keeps working off a stale role cookie.
   jar.delete("od-role")
   jar.delete("od-tenant")
+  jar.delete("od-device")
   redirect("/sign-in")
 }

@@ -18,9 +18,9 @@
     {
       "href": "/daily-reports",
       "icon": "report",
-      "label": "Daily Reports",
-      "description": "The ten-section end-of-day report, submitted by 5:30 PM and reviewed by managers.",
-      "srs": "SRS §3.4–3.5"
+      "label": "Shift Reports",
+      "description": "Each member's end-of-shift report: their shift tasks with status, time and notes, reviewed by their manager.",
+      "srs": "FR-M1-22..31"
     },
     {
       "href": "/manager-attention",
@@ -39,6 +39,13 @@
       "label": "Staff & Rosters",
       "description": "Staff records, attendance incidents, rosters and coverage gaps.",
       "srs": "SRS §3.6, §3.8"
+    },
+    {
+      "href": "/shifts",
+      "icon": "clock",
+      "label": "Shifts",
+      "description": "Shift patterns, who works when, end-of-shift reporting per member and team, and reporting lines.",
+      "srs": "SRS FR-M1-20, FR-M1-21, FR-M0-07"
     },
     {
       "href": "/recruitment",

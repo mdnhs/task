@@ -13,6 +13,7 @@ export type AuditAction =
   | "decision"
   | "invite"
   | "billing"
+  | "purge"
 
 export type AuditEvent = {
   id: string
@@ -28,6 +29,8 @@ export type AuditEvent = {
   sensitive: boolean
   /** Key/value metadata shown in the expanded row. */
   meta: Record<string, string>
+  /** lib/audit-outbox key of an event recorded on another screen, so it is merged once. */
+  sourceKey?: string
 }
 
 export const ACTION: Record<AuditAction, { label: string; tone: Tone }> = {
@@ -43,6 +46,7 @@ export const ACTION: Record<AuditAction, { label: string; tone: Tone }> = {
   decision: { label: "Decision", tone: "ok" },
   invite: { label: "Invite", tone: "info" },
   billing: { label: "Billing", tone: "warn" },
+  purge: { label: "Deleted for good", tone: "bad" },
 }
 
 export type AuditFilters = { q: string; actor: string; action: string; recordType: string; from: string; to: string }

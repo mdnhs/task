@@ -1,5 +1,6 @@
-import { TaskDetail, getTaskSeed, ME_ID } from "@/features/tasks"
+import { TaskDetail, getProjects, getTaskSeed, ME_ID } from "@/features/tasks"
 import { AccessRestricted, getUser } from "@/features/shell"
+import { getDeviceContext } from "@/lib/device-session"
 import { getOrg } from "@/lib/org"
 import { can } from "@/lib/permissions"
 import { canWrite, getSession } from "@/lib/session"
@@ -9,7 +10,8 @@ import { canWrite, getSession } from "@/lib/session"
 export default async function Page({ params }: { params: Promise<{ ref: string }> }) {
   const [{ ref }, session, org, user] = await Promise.all([params, getSession(), getOrg(), getUser()])
   if (!can(session.role, "tasks")) return <AccessRestricted moduleLabel="Tasks" />
-  const { people, staff, seed, scopeKey, refFloor } = await getTaskSeed(session)
+  const [{ people, staff, seed, scopeKey, refFloor }, projects] = await Promise.all([getTaskSeed(session), getProjects()])
+  const { canDrive } = await getDeviceContext(session)
   let taskRef = ref
   try {
     taskRef = decodeURIComponent(ref)
@@ -26,12 +28,14 @@ export default async function Page({ params }: { params: Promise<{ ref: string }
       seed={seed}
       scopeKey={scopeKey}
       people={people}
+      projects={projects}
       today={org.today}
       tzLabel={org.tzLabel}
       actor={canEdit && manager ? "reviewer" : "assignee"}
       canEdit={canEdit}
       me={me}
       refFloor={refFloor}
+      driveAllowed={canDrive}
     />
   )
 }

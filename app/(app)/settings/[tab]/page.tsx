@@ -1,14 +1,16 @@
 import type { Metadata } from "next"
+import { DEFAULT_APPEARANCE } from "@/lib/appearance"
 import { notFound } from "next/navigation"
 
-import { BillingView, getBilling, getSeatLimit } from "@/features/billing"
+import { BillingView, getBilling, getEntitlements, getSeatLimit } from "@/features/billing"
 import {
-  BrandingPanel, DepartmentsPanel, IntegrationsPanel, NotificationsPanel, OrganisationForm, PrivacyPanel, RolesMatrix, SETTINGS_TABS,
+  BrandingPanel, DepartmentsPanel, DevicePolicyCard, DevicesPanel, IntegrationsPanel, MfaPolicyCard, NotificationsPanel, OrganisationForm, PrivacyPanel, RolesMatrix, SETTINGS_TABS,
   SettingsLayout, TemplatePanel, UsersPanel, getBranding, getDeliveryLog, getDepartments, getIntegrations, getNotificationSettings, getOrganisation,
   getPrivacy, getRolesMatrix, getTemplate, getUsersAndInvites, isTab,
 } from "@/features/settings"
 import type { SettingsTabId } from "@/features/settings"
 import { AccessRestricted, getUser } from "@/features/shell"
+import { getDeviceRegister } from "@/lib/device-session"
 import { getOrg } from "@/lib/org"
 import { can } from "@/lib/permissions"
 import { canWrite, getSession } from "@/lib/session"
@@ -61,16 +63,34 @@ export default async function Page({ params }: { params: Promise<{ tab: string }
           />
         )
       }
-      case "roles":
-        return <RolesMatrix data={await getRolesMatrix()} canWrite={write} scopeKey={scopeKey} />
+      case "roles": {
+        const [matrix, reg] = await Promise.all([getRolesMatrix(), getDeviceRegister(session)])
+        return (
+          <>
+            <RolesMatrix data={matrix} canWrite={write} scopeKey={scopeKey} />
+            <MfaPolicyCard policy={reg.mfaPolicy} roles={session.roles.filter((r) => !r.platform).map((r) => ({ id: r.id, label: r.label }))} canWrite={write} scopeKey={scopeKey} />
+          </>
+        )
+      }
       case "template":
         return <TemplatePanel data={await getTemplate()} canWrite={write} scopeKey={scopeKey} />
       case "notifications":
         return <NotificationsPanel data={await getNotificationSettings()} deadline={org.deadline} tzLabel={org.tzLabel} today={org.today} timezone={org.timezone} log={await getDeliveryLog()} canWrite={write} scopeKey={scopeKey} />
-      case "integrations":
-        return <IntegrationsPanel integrations={await getIntegrations()} today={org.today} tzLabel={org.tzLabel} canWrite={write} scopeKey={scopeKey} />
+      case "integrations": {
+        const [integrations, reg] = await Promise.all([getIntegrations(), getDeviceRegister(session)])
+        return (
+          <>
+            <IntegrationsPanel integrations={integrations} today={org.today} tzLabel={org.tzLabel} canWrite={write} scopeKey={scopeKey} />
+            <DevicePolicyCard policies={reg.policies} canWrite={write} scopeKey={scopeKey} />
+          </>
+        )
+      }
+      case "devices": {
+        const [reg, { users }] = await Promise.all([getDeviceRegister(session), getUsersAndInvites()])
+        return <DevicesPanel devices={reg.devices} users={users.filter((u) => u.status === "active").map((u) => ({ id: u.id, name: u.name }))} today={org.today} tzLabel={org.tzLabel} canWrite={write} scopeKey={scopeKey} />
+      }
       case "branding":
-        return <BrandingPanel tenantId={tenant.id} name={tenant.name} color={tenant.brand} presets={(await getBranding()).presets} canWrite={write} />
+        return <BrandingPanel tenantId={tenant.id} name={tenant.name} color={tenant.brand} appearance={tenant.appearance ?? DEFAULT_APPEARANCE} presets={(await getBranding()).presets} canWrite={write} />
       case "billing": {
         const b = await getBilling(tenant.id)
         if (!b.subscription) return null
@@ -91,6 +111,8 @@ export default async function Page({ params }: { params: Promise<{ tab: string }
             tzLabel={org.tzLabel}
             // Not canWrite: a suspended (read-only) tenant owner must still reach billing to pay; read-only roles stay excluded.
             canManage={can(session.role, "settings", "write")}
+            locale={org.locale}
+            entitlements={await getEntitlements()}
           />
         )
       }

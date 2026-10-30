@@ -9,6 +9,7 @@ export const SETTINGS_TABS = [
   { id: "template", label: "Report template", icon: "report" },
   { id: "notifications", label: "Notifications", icon: "bell" },
   { id: "integrations", label: "Integrations", icon: "sliders" },
+  { id: "devices", label: "Devices", icon: "phone" },
   { id: "branding", label: "Branding", icon: "brand" },
   { id: "billing", label: "Billing", icon: "wallet" },
   { id: "privacy", label: "Data & privacy", icon: "lock" },

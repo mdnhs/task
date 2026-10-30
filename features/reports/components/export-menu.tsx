@@ -9,19 +9,19 @@ import type { ExportDoc } from "../export-rows"
 
 export type ExportGroup = { key: string; label: string; doc: ExportDoc | null }
 
-// Export menu (FR-REP-12): PDF or Excel for each group. The export libraries load on click, never with the page.
+// Export menu (FR-M1-31): PDF, Excel or CSV for each group. The export libraries load on click, never with the page.
 // The trigger is disabled with a spinner while a file is being made; a toast confirms the download.
 export function ExportMenu({ groups, meta, className = "" }: { groups: ExportGroup[]; meta: ExportMeta; className?: string }) {
   const [busy, setBusy] = useState(false)
   const usable = groups.filter((g) => g.doc)
 
-  const run = async (g: ExportGroup, kind: "pdf" | "xlsx") => {
+  const run = async (g: ExportGroup, kind: "pdf" | "xlsx" | "csv") => {
     if (!g.doc || busy) return
     setBusy(true)
     try {
       const mod = await import("../export")
-      await (kind === "pdf" ? mod.exportPdf : mod.exportXlsx)(g.doc, meta)
-      toast.success(`${kind === "pdf" ? "PDF" : "Excel"} exported`, { description: `${g.doc.fileBase}.${kind}` })
+      await (kind === "pdf" ? mod.exportPdf(g.doc, meta) : kind === "xlsx" ? mod.exportXlsx(g.doc, meta) : mod.exportCsv(g.doc))
+      toast.success(`${kind === "pdf" ? "PDF" : kind === "xlsx" ? "Excel" : "CSV"} exported`, { description: `${g.doc.fileBase}.${kind}` })
     } catch {
       toast.error("Could not create the file. Try again.")
     } finally {
@@ -45,6 +45,7 @@ export function ExportMenu({ groups, meta, className = "" }: { groups: ExportGro
             {usable.length > 1 && <DropdownMenuLabel>{g.label}</DropdownMenuLabel>}
             <DropdownMenuItem onClick={() => void run(g, "pdf")}>{usable.length > 1 ? "PDF" : `${g.label} as PDF`}</DropdownMenuItem>
             <DropdownMenuItem onClick={() => void run(g, "xlsx")}>{usable.length > 1 ? "Excel" : `${g.label} as Excel`}</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => void run(g, "csv")}>{usable.length > 1 ? "CSV" : `${g.label} as CSV`}</DropdownMenuItem>
           </DropdownMenuGroup>
         ))}
       </DropdownMenuContent>

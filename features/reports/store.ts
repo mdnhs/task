@@ -1,4 +1,5 @@
 import { createStore } from "@/lib/store"
-import type { Report } from "./types"
+import type { ShiftReport } from "./types"
 
-export const reportsStore = createStore<Report[]>()
+// In-memory shift reports (edits, submits and reviews survive client navigation, reset on reload).
+export const reportsStore = createStore<ShiftReport[]>()

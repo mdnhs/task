@@ -1,0 +1,19 @@
+[
+  {"path": "/", "cookies": {"od-tenant": "t1"}, "expect": ["href=\"/payroll-issues\"", "href=\"/orders-stock\"", "href=\"/whatsapp\"", "href=\"/shifts\"", "href=\"/recruitment\"", "href=\"/staff-rosters\""]},
+  {"path": "/payroll-issues", "cookies": {"od-tenant": "t1", "od-role": "owner"}, "notExpect": ["Not in your plan"]},
+  {"path": "/", "cookies": {"od-tenant": "t2"}, "expect": ["href=\"/tasks\"", "href=\"/shifts\"", "href=\"/whatsapp\""], "notExpect": ["href=\"/payroll-issues\"", "href=\"/orders-stock\"", "href=\"/recruitment\"", "href=\"/staff-rosters\"", "href=\"/files\""]},
+  {"path": "/payroll-issues", "cookies": {"od-tenant": "t2", "od-role": "owner"}, "expect": ["Not in your plan", "/settings/billing"]},
+  {"path": "/orders-stock", "cookies": {"od-tenant": "t2", "od-role": "owner"}, "expect": ["Not in your plan"]},
+  {"path": "/recruitment", "cookies": {"od-tenant": "t2", "od-role": "owner"}, "expect": ["Not in your plan"]},
+  {"path": "/staff-rosters", "cookies": {"od-tenant": "t2", "od-role": "owner"}, "expect": ["Not in your plan"]},
+  {"path": "/files", "cookies": {"od-tenant": "t2", "od-role": "owner"}, "expect": ["Not in your plan"]},
+  {"path": "/tasks", "cookies": {"od-tenant": "t2", "od-role": "owner"}, "notExpect": ["Not in your plan"]},
+  {"path": "/shifts", "cookies": {"od-tenant": "t2", "od-role": "owner"}, "notExpect": ["Not in your plan"]},
+  {"path": "/whatsapp", "cookies": {"od-tenant": "t2", "od-role": "owner"}, "notExpect": ["Not in your plan"]},
+  {"path": "/payroll-issues", "cookies": {"od-tenant": "t2", "od-role": "employee"}, "expect": ["Access restricted"], "notExpect": ["Not in your plan"]},
+  {"path": "/settings/billing", "cookies": {"od-tenant": "t2", "od-role": "owner"}, "expect": ["Included modules", "Not in plan", "Starter", "€"]},
+  {"path": "/settings/billing", "cookies": {"od-tenant": "t1", "od-role": "owner"}, "expect": ["Included modules", "AI assistant", "Payroll", "€"], "notExpect": ["Not in plan", "£"]},
+  {"path": "/platform/tenants/t2/modules", "cookies": {"od-role": "platform"}, "expect": ["Modules", "Not in plan"]},
+  {"path": "/platform/tenants/t1/modules", "cookies": {"od-role": "platform"}, "expect": ["Modules", "8 of 8 included"]},
+  {"path": "/account/profile", "expect": ["Irish time"], "notExpect": ["UK time"]}
+]

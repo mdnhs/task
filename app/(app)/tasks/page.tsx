@@ -1,35 +1,35 @@
-import { TasksView, getTaskSeed, getTemplates, taskCreator, ME_ID, parseFilters, parsePage } from "@/features/tasks"
+import { redirect } from "next/navigation"
+
+import { TasksView, getProjects, getTaskSeed, ME_ID, parseFilters, parsePage } from "@/features/tasks"
 import { AccessRestricted, getUser } from "@/features/shell"
 import { getOrg } from "@/lib/org"
+import { todayUserId } from "@/lib/today-data"
 import { can } from "@/lib/permissions"
 import { canWrite, getSession } from "@/lib/session"
 
 export default async function Page({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const [sp, session, org, user] = await Promise.all([searchParams, getSession(), getOrg(), getUser()])
   if (!can(session.role, "tasks")) return <AccessRestricted moduleLabel="Tasks" />
-  const [{ people, staff, seed, scopeKey, refFloor }, templates] = await Promise.all([getTaskSeed(session), getTemplates()])
-  const initialFilters = parseFilters(sp, people.map((p) => p.id))
+  // Old "New task" links (/tasks?new=1) now open the New task page.
+  if (sp.new === "1" && canWrite(session, "tasks")) redirect("/tasks/new")
+  const [{ people, staff, seed, scopeKey, refFloor }, projects] = await Promise.all([getTaskSeed(session), getProjects()])
+  const initialFilters = parseFilters(sp, people.map((p) => p.id), projects.map((p) => p.id))
   const page = parsePage(sp)
-  const initialCreate = sp.new === "1"
-  const creator = taskCreator(people, staff, user.name)
   return (
     <TasksView
-      key={JSON.stringify(initialFilters) + (initialCreate ? "+new" : "")}
+      key={JSON.stringify(initialFilters)}
       tasks={seed}
       people={people}
-      departments={org.departments}
       today={org.today}
       tzLabel={org.tzLabel}
       canCreate={canWrite(session, "tasks")}
       initialFilters={initialFilters}
       initialPage={page}
-      initialCreate={initialCreate}
       onlyAssignee={staff ? ME_ID : undefined}
-      creator={creator}
+      reviewerId={staff ? undefined : todayUserId(session, people, user.name)}
       scopeKey={scopeKey}
       refFloor={refFloor}
-      templates={templates}
-      canManageTemplates={canWrite(session, "tasks") && session.role.home === "manager"}
+      projects={projects}
     />
   )
 }

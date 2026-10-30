@@ -1,4 +1,5 @@
 import { can, moduleForHref } from "@/lib/permissions"
+import { activeTasks, assigneesOf } from "@/lib/task-scope"
 import type { Module, Role } from "@/lib/types"
 
 import type { QuickAction, SearchItem } from "./types"
@@ -7,8 +8,8 @@ import type { QuickAction, SearchItem } from "./types"
 type P = { id: string; name: string }
 export type RawSources = {
   people: P[]
-  tasks: { ref: string; title: string; dept: string; assignee: string; status: string; due: string }[]
-  reports: { id: string; date: string; dept: string; owner: string; status: string }[]
+  tasks: { ref: string; title: string; dept: string; assignee: string; assignees?: string[]; archivedAt?: string; status: string; due: string }[]
+  reports: { id: string; date: string; dept: string; owner: string; status: string; title?: string }[]
   issues: { id: string; title: string; dept: string; owner: string; status: string; due?: string }[]
   payroll: { ref: string; staff: string; dept: string; type: string; owner: string; status: string; target?: string; createdAt?: string }[]
   orders: { ref: string; item: string; supplier: string; dept: string; requester: string; approval: string; delivery: string; requested?: string; expected?: string }[]
@@ -25,9 +26,10 @@ export function buildIndex(src: RawSources): SearchItem[] {
   const name = new Map(src.people.map((p) => [p.id, p.name]))
   const who = (id: string) => name.get(id) ?? id
   return [
-    ...src.tasks.map((t) => ({ id: `task:${t.ref}`, type: "task" as const, title: t.title, ref: t.ref, href: `/tasks/${q(t.ref)}`, dept: t.dept, owner: who(t.assignee), status: t.status, date: t.due })),
+    // Archived tasks are not searchable (FR-M1-13); every assignee counts as an owner for the staff scope.
+    ...activeTasks(src.tasks).map((t) => ({ id: `task:${t.ref}`, type: "task" as const, title: t.title, ref: t.ref, href: `/tasks/${q(t.ref)}`, dept: t.dept, owner: who(t.assignee), owners: assigneesOf(t).map(who), status: t.status, date: t.due })),
     ...src.reports.map((r) => ({
-      id: `report:${r.id}`, type: "report" as const, title: `${r.dept} daily report, ${r.date}`, ref: r.id, href: `/daily-reports/${q(r.id)}`,
+      id: `report:${r.id}`, type: "report" as const, title: r.title ?? `${r.dept} shift report, ${r.date}`, ref: r.id, href: `/daily-reports/${q(r.id)}`,
       dept: r.dept, owner: who(r.owner), status: r.status, date: r.date,
     })),
     ...src.issues.map((i) => ({ id: `issue:${i.id}`, type: "issue" as const, title: i.title, ref: i.id, href: `/manager-attention?q=${q(i.id)}`, dept: i.dept, owner: i.owner, status: i.status, date: i.due ?? "" })),
@@ -64,7 +66,7 @@ export function filterIndexForRole(items: SearchItem[], role: Role, me: { name: 
   return items.filter((i) => {
     const m = moduleForHref(i.href)
     if (!m || !can(role, m)) return false
-    if (staff && (i.type === "task" || i.type === "report")) return i.owner === me.name
+    if (staff && (i.type === "task" || i.type === "report")) return (i.owners ?? [i.owner]).includes(me.name)
     return true
   })
 }

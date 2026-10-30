@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest"
 
+import { legacyRule } from "@/lib/task-evidence"
+
 import { describeRepeat, materialiseRecurring, nextOccurrences, repeatError, weekdayOf } from "./recurrence"
 import type { Task } from "./types"
 
@@ -36,9 +38,9 @@ describe("nextOccurrences", () => {
 
 const series = (over: Partial<Task> = {}): Task => ({
   ref: "TSK-1", title: "Fire test", description: "d", dept: "Security", assignee: "p1", creator: "p2", priority: 2,
-  start: "2026-10-12T09:00:00", due: "2026-10-12T17:00:00", status: "completed", evidenceRequired: true, tags: ["fire"],
+  start: "2026-10-12T09:00:00", due: "2026-10-12T17:00:00", status: "completed", evidenceRule: legacyRule(true), tags: ["fire"],
   repeat: { freq: "weekly", days: [1] }, completedAt: "2026-10-12T10:00:00",
-  notes: [{ at: "x", by: "y", text: "n" }], evidence: [{ id: "TSK-1-E1", kind: "file", name: "a", by: "b", at: "c", review: "accepted" }], timeline: [],
+  notes: [{ at: "x", by: "y", text: "n" }], evidence: [{ id: "TSK-1-E1", kind: "pdf", name: "a", by: "b", at: "c", review: "accepted" }], timeline: [],
   ...over,
 })
 
@@ -48,7 +50,7 @@ describe("materialiseRecurring", () => {
     expect(out).toHaveLength(3)
     const added = out.filter((t) => t.seriesId)
     expect(added.map((t) => t.due).sort()).toEqual(["2026-10-19T17:00:00", "2026-10-26T17:00:00"])
-    expect(added[0]).toMatchObject({ status: "not_started", seriesId: "TSK-1", evidence: [], notes: [], evidenceRequired: true, assignee: "p1", tags: ["fire"] })
+    expect(added[0]).toMatchObject({ status: "not_started", seriesId: "TSK-1", evidence: [], notes: [], evidenceRule: legacyRule(true), assignee: "p1", tags: ["fire"] })
     expect(added[0].repeat).toBeUndefined()
     expect(added[0].completedAt).toBeUndefined()
     expect(added.map((t) => t.ref).sort()).toEqual(["TSK-2", "TSK-3"])

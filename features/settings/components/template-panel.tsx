@@ -9,7 +9,8 @@ import { Switch } from "@/components/ui/switch"
 import { templateStore } from "../store"
 import type { TemplateData } from "../types"
 
-// Report template (FR-ORG-04, NFR-MAINT-01): per department, which sections are enabled and which fields are required.
+// Shift report template (FR-M1-25, was FR-ORG-04): per team, which sections are enabled and which fields are required.
+// The end-of-shift report (lib/shift-report.ts templateFor) reads the same settings/template.json seed.
 // The tabs pick a department; the global department filter preselects it.
 export function TemplatePanel({ data, canWrite, scopeKey }: { data: TemplateData; canWrite: boolean; scopeKey: string }) {
   const [depts, setDepts] = templateStore.useStore(data.departments, scopeKey)

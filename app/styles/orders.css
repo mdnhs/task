@@ -4,7 +4,7 @@
 .ord-table .ord-link:hover{color:var(--brand-deep)}
 :root[data-theme="dark"] .ord-table .ord-link:hover{color:var(--brand-3)}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .ord-table .ord-link:hover{color:var(--brand-3)}}
-.ord-table .ord-link:focus-visible{outline:2px solid var(--brand);outline-offset:2px;border-radius:4px}
+.ord-table .ord-link:focus-visible{outline:2px solid var(--brand);outline-offset:2px;border-radius:calc(4px * var(--radius-scale,1))}
 .ord-deliv{display:flex;flex-direction:column;align-items:flex-start;gap:4px}
 @media (max-width:720px){.ord-table.rtable{min-width:0}.ord-deliv{align-items:flex-end}}
 /* Detail sheet */

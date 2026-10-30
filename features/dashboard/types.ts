@@ -1,3 +1,4 @@
+import type { ReportDeadline } from "@/lib/report-deadline"
 import type { Dept, Status, Tone } from "@/lib/types"
 
 export type HeaderData = { title: string; subtitle: string }
@@ -6,14 +7,18 @@ export type DashboardPerms = { tasks: boolean; reports: boolean; attention: bool
 export type SummaryData = {
   stats: {
     title: string
+    /** Sprite icon name for the chip beside the title (components/icons.tsx). */
+    icon?: string
     ariaLabel: string
     href: string
     value: string
     valueSuffix?: string
     hero?: boolean
     note: { tone?: "up" | "down"; highlight?: string; text: string }
+    /** Last 7 days, oldest first, ending on today's value: the sparkline beside the figure. */
+    trend?: number[]
     /** Per-department figures (keyed by department name), shown when the topbar filter picks one. Missing = the overall figure. */
-    byDept?: Record<string, { value: string; valueSuffix?: string; note?: { tone?: "up" | "down"; highlight?: string; text: string } }>
+    byDept?: Record<string, { value: string; valueSuffix?: string; trend?: number[]; note?: { tone?: "up" | "down"; highlight?: string; text: string } }>
   }[]
 }
 export type TasksClosedData = {
@@ -32,14 +37,6 @@ export type TasksClosedData = {
     topCloser: { name: string; count: number }
     tasks: { ref: string; title: string; dept: string; by: string }[]
   }[]
-}
-export type DailyReportData = {
-  title: string
-  dueLabel: string
-  timezoneNote: string
-  deadline: { hour: number; minute: number; timeZone: string }
-  reports: { dept: string; detail: string; progress?: number; status: Status }[]
-  action: string
 }
 export type ManagerAttentionData = {
   title: string
@@ -100,18 +97,18 @@ export type StaffEvidenceData = {
   subtitle: string
   items: { ref: string; title: string; state: "review" | "returned"; at: string; reviewer: string; reason?: string; status: Status }[]
 }
-export type StaffReportData = {
-  title: string
-  owner: boolean
-  section: string
-  detail: string
-  progress: number
-  status: Status
-  action: string
-  href: string
-}
 export type StaffCommentsData = {
   title: string
   subtitle: string
   items: { ref: string; title: string; kind: "submission" | "comment"; by: string; text: string; at: string }[]
+}
+
+/** Shift report deadline card (FR-M1-22, FR-M1-28): built on the server by getReportDeadline (features/dashboard/api.ts). */
+export type ReportDeadlineCardData = ReportDeadline & {
+  /** member = the viewer's own report; team = one row per team in the viewer's report scope. */
+  kind: "member" | "team"
+  title: string
+  note: string
+  /** Seconds from the tenant's now to `dueAt` (0 when none). */
+  seconds: number
 }

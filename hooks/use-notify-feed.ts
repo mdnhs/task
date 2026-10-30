@@ -4,6 +4,7 @@ import { useEffect } from "react"
 
 import { createStore } from "@/lib/store"
 import { clockAt, dueReminders, preview, type NotifyContext } from "@/lib/notify"
+import { noticeFeedItems, taskNotices } from "@/lib/task-notices"
 
 // The shell notification list as a store (it was component state), so generated reminders and read state survive navigation.
 export type FeedItem = { id: string; type: string; title: string; at: string; read: boolean; href: string }
@@ -25,15 +26,33 @@ export function useNotifyFeed<T extends FeedItem>(items: T[], scope: string, ctx
     const now = clock ? clockAt(ctx.today, clock) : ctx.today
     const due = dueReminders(ctx.schedule, now, { pending: ctx.pending, deadline: ctx.deadline, managers: [{ id: "me", name: "me" }], submitters: [{ id: "me", name: "me" }] })
       .filter((d) => d.channels.includes("inapp") && (d.kind === "reminder" ? ctx.canSubmit : ctx.isManager))
-    if (due.length === 0) return
+    // Missing shift reports (FR-M1-30), already filtered for this viewer on the server; only those due by the mock clock.
+    const alerts = (ctx.alerts ?? []).filter((a) => a.at.slice(0, 16) <= now.slice(0, 16))
+    if (due.length === 0 && alerts.length === 0) return
     setList((prev) => {
       const have = new Set(prev.map((n) => n.id))
-      const fresh = due
-        .filter((d) => !have.has(d.id))
-        .map((d) => ({ id: d.id, type: "reminder", title: preview(d.message, ctx.hideSensitive).title, at: `${d.atIso}:00`, read: false, href: d.kind === "reminder" ? "/daily-reports" : "/manager-attention" }))
+      const fresh = [
+        ...due.map((d) => ({ id: d.id, type: "reminder", title: preview(d.message, ctx.hideSensitive).title, at: `${d.atIso}:00`, read: false, href: d.kind === "reminder" ? "/daily-reports" : "/manager-attention" })),
+        ...alerts.map((a) => ({ id: a.id, type: "deadline", title: a.title, at: a.at, read: false, href: a.href })),
+      ].filter((d) => !have.has(d.id))
       return fresh.length === 0 ? prev : [...fresh, ...prev].sort((a, b) => b.at.localeCompare(a.at))
     })
   }, [ctx, clock, setList])
+
+  // Task change notices for this person (FR-M1-12): added now and whenever the tasks feature pushes a new one. Idempotent.
+  const tenantId = ctx?.me?.tenantId
+  const personId = ctx?.me?.personId
+  const hide = ctx?.hideSensitive ?? false
+  useEffect(() => {
+    if (!tenantId || !personId) return
+    const pull = () =>
+      setList((prev) => {
+        const fresh = noticeFeedItems(taskNotices.forPerson(tenantId, personId), new Set(prev.map((n) => n.id)), hide)
+        return fresh.length === 0 ? prev : [...fresh, ...prev].sort((a, b) => b.at.localeCompare(a.at))
+      })
+    pull()
+    return taskNotices.subscribe(pull)
+  }, [tenantId, personId, hide, setList])
 
   return [list as FeedItem[], setList] as const
 }

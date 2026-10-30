@@ -3,10 +3,11 @@
     {
       "id": "PAU-8",
       "at": "2026-10-20T08:50:00",
-      "actor": "Priya Shah (Platform Support)",
+      "actor": "Priya Shah",
       "action": "support.requested",
       "target": "Pinnacle Site Security",
-      "detail": "Support access requested: trial extension request"
+      "detail": "Support access requested: trial extension request",
+      "staffRole": "support"
     },
     {
       "id": "PAU-7",
@@ -38,7 +39,8 @@
       "actor": "Priya Shah",
       "action": "support.revoked",
       "target": "Lantern Hospitality Services",
-      "detail": "Support access revoked by the tenant"
+      "detail": "Support access revoked by Priya Shah: the ticket was resolved",
+      "staffRole": "support"
     },
     {
       "id": "PAU-3",
@@ -59,10 +61,18 @@
     {
       "id": "PAU-1",
       "at": "2026-09-30T14:20:00",
-      "actor": "Platform Super Admin",
+      "actor": "Aoife Brennan",
       "action": "tenant.suspended",
       "target": "Kestrel Estates",
-      "detail": "Suspended: non-payment after grace period"
+      "detail": "Suspended: non-payment after grace period",
+      "staffRole": "owner",
+      "before": {
+        "status": "past_due"
+      },
+      "after": {
+        "status": "suspended"
+      },
+      "reason": "Non-payment after grace period"
     }
   ]
 }

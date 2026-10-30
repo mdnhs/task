@@ -7,7 +7,7 @@
 .files-link:hover{color:var(--brand-deep)}
 :root[data-theme="dark"] .files-link:hover{color:var(--brand-3)}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .files-link:hover{color:var(--brand-3)}}
-.files-link:focus-visible{outline:2px solid var(--brand);outline-offset:2px;border-radius:4px}
+.files-link:focus-visible{outline:2px solid var(--brand);outline-offset:2px;border-radius:calc(4px * var(--radius-scale,1))}
 .files-actions{display:flex;gap:8px;flex-wrap:wrap}
 .files-btn{justify-content:center;cursor:pointer;border:1.6px solid transparent;padding:6px 14px;font-size:12.5px}
 .files-btn.btn-outline{border-color:var(--brand)}

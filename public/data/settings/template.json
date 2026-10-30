@@ -4,247 +4,84 @@
    "dept": "Security",
    "sections": [
     {
-     "id": "staff",
-     "title": "Staff / Attendance",
+     "id": "tasks",
+     "title": "Tasks in the shift",
      "enabled": true,
      "fields": [
       {
-       "id": "call-outs",
-       "label": "Call-outs",
+       "id": "time",
+       "label": "Time spent on done and in-progress tasks",
        "required": true
       },
       {
-       "id": "no-shows",
-       "label": "No-shows",
-       "required": true
-      },
-      {
-       "id": "cover-arranged",
-       "label": "Cover arranged",
-       "required": true
-      },
-      {
-       "id": "outstanding-staff-issues",
-       "label": "Outstanding staff issues",
+       "id": "note",
+       "label": "Note on blocked tasks",
        "required": true
       }
      ]
     },
     {
-     "id": "clients",
-     "title": "Client Issues",
+     "id": "summary",
+     "title": "Summary",
      "enabled": true,
      "fields": [
       {
-       "id": "client-contacted",
-       "label": "Client contacted",
-       "required": true
-      },
-      {
-       "id": "complaints",
-       "label": "Complaints",
-       "required": true
-      },
-      {
-       "id": "requests",
-       "label": "Requests",
-       "required": true
-      },
-      {
-       "id": "outstanding-issues",
-       "label": "Outstanding issues",
+       "id": "summary",
+       "label": "Shift summary",
        "required": true
       }
      ]
     },
     {
-     "id": "rosters",
-     "title": "Rosters",
+     "id": "blockers",
+     "title": "Blockers",
      "enabled": true,
      "fields": [
       {
-       "id": "todays-issues",
-       "label": "Today's issues",
-       "required": true
-      },
-      {
-       "id": "tomorrows-cover",
-       "label": "Tomorrow's cover",
-       "required": true
-      },
-      {
-       "id": "next-weeks-gaps",
-       "label": "Next week's gaps",
+       "id": "blockers",
+       "label": "Blockers",
        "required": false
       }
      ]
     },
     {
-     "id": "recruitment",
-     "title": "Recruitment",
+     "id": "unplanned",
+     "title": "Unplanned work",
      "enabled": true,
      "fields": [
       {
-       "id": "applications-reviewed",
-       "label": "Applications reviewed",
-       "required": true
-      },
-      {
-       "id": "candidates-contacted",
-       "label": "Candidates contacted",
-       "required": true
-      },
-      {
-       "id": "interviews-arranged",
-       "label": "Interviews arranged",
-       "required": true
-      },
-      {
-       "id": "new-starters",
-       "label": "New starters",
-       "required": true
-      },
-      {
-       "id": "outstanding-candidates",
-       "label": "Outstanding candidates",
+       "id": "unplanned",
+       "label": "Unplanned work rows",
        "required": false
       }
      ]
     },
     {
-     "id": "employee-files",
-     "title": "Employee Files",
+     "id": "attachments",
+     "title": "Attachments",
      "enabled": true,
      "fields": [
       {
-       "id": "files-updated",
-       "label": "Files updated",
-       "required": true
-      },
-      {
-       "id": "documents-received",
-       "label": "Documents received",
-       "required": true
-      },
-      {
-       "id": "missing-documents",
-       "label": "Missing documents",
-       "required": true
-      },
-      {
-       "id": "expiring-documents",
-       "label": "Expiring documents",
-       "required": true
-      }
-     ]
-    },
-    {
-     "id": "client-files",
-     "title": "Client Files",
-     "enabled": true,
-     "fields": [
-      {
-       "id": "files-updated",
-       "label": "Files updated",
-       "required": true
-      },
-      {
-       "id": "contracts",
-       "label": "Contracts",
-       "required": true
-      },
-      {
-       "id": "contact-details",
-       "label": "Contact details",
-       "required": true
-      },
-      {
-       "id": "outstanding-paperwork",
-       "label": "Outstanding paperwork",
-       "required": true
-      }
-     ]
-    },
-    {
-     "id": "payroll",
-     "title": "Payroll",
-     "enabled": false,
-     "fields": [
-      {
-       "id": "issues-identified",
-       "label": "Issues identified",
-       "required": true
-      },
-      {
-       "id": "corrections-required",
-       "label": "Corrections required",
-       "required": true
-      },
-      {
-       "id": "outstanding-information",
-       "label": "Outstanding information",
-       "required": true
-      }
-     ]
-    },
-    {
-     "id": "orders",
-     "title": "Orders / Stock",
-     "enabled": false,
-     "fields": [
-      {
-       "id": "orders-placed",
-       "label": "Orders placed",
-       "required": true
-      },
-      {
-       "id": "deliveries-received",
-       "label": "Deliveries received",
-       "required": true
-      },
-      {
-       "id": "items-required",
-       "label": "Items required",
-       "required": true
-      },
-      {
-       "id": "waiting-for-approval",
-       "label": "Waiting for approval",
-       "required": true
-      }
-     ]
-    },
-    {
-     "id": "outstanding",
-     "title": "Outstanding",
-     "enabled": true,
-     "fields": [
-      {
-       "id": "tasks-not-completed",
-       "label": "Tasks not completed",
-       "required": true
-      },
-      {
-       "id": "reason",
-       "label": "Reason",
-       "required": false
-      },
-      {
-       "id": "action-required",
-       "label": "Action required",
+       "id": "attachments",
+       "label": "Photos and files",
        "required": false
       }
      ]
     },
     {
-     "id": "attention",
-     "title": "Manager Attention Required",
+     "id": "handover",
+     "title": "Handover",
      "enabled": true,
      "fields": [
       {
-       "id": "decision-needed",
-       "label": "Decision needed",
+       "id": "next-shift",
+       "label": "Notes for the next shift",
        "required": true
+      },
+      {
+       "id": "keys",
+       "label": "Keys and equipment",
+       "required": false
       }
      ]
     }
@@ -254,247 +91,84 @@
    "dept": "Cleaning",
    "sections": [
     {
-     "id": "staff",
-     "title": "Staff / Attendance",
+     "id": "tasks",
+     "title": "Tasks in the shift",
      "enabled": true,
      "fields": [
       {
-       "id": "call-outs",
-       "label": "Call-outs",
+       "id": "time",
+       "label": "Time spent on done and in-progress tasks",
        "required": true
       },
       {
-       "id": "no-shows",
-       "label": "No-shows",
-       "required": true
-      },
-      {
-       "id": "cover-arranged",
-       "label": "Cover arranged",
-       "required": true
-      },
-      {
-       "id": "outstanding-staff-issues",
-       "label": "Outstanding staff issues",
+       "id": "note",
+       "label": "Note on blocked tasks",
        "required": true
       }
      ]
     },
     {
-     "id": "clients",
-     "title": "Client Issues",
+     "id": "summary",
+     "title": "Summary",
      "enabled": true,
      "fields": [
       {
-       "id": "client-contacted",
-       "label": "Client contacted",
-       "required": true
-      },
-      {
-       "id": "complaints",
-       "label": "Complaints",
-       "required": true
-      },
-      {
-       "id": "requests",
-       "label": "Requests",
-       "required": true
-      },
-      {
-       "id": "outstanding-issues",
-       "label": "Outstanding issues",
+       "id": "summary",
+       "label": "Shift summary",
        "required": true
       }
      ]
     },
     {
-     "id": "rosters",
-     "title": "Rosters",
+     "id": "blockers",
+     "title": "Blockers",
      "enabled": true,
      "fields": [
       {
-       "id": "todays-issues",
-       "label": "Today's issues",
-       "required": true
-      },
-      {
-       "id": "tomorrows-cover",
-       "label": "Tomorrow's cover",
-       "required": true
-      },
-      {
-       "id": "next-weeks-gaps",
-       "label": "Next week's gaps",
+       "id": "blockers",
+       "label": "Blockers",
        "required": false
       }
      ]
     },
     {
-     "id": "recruitment",
-     "title": "Recruitment",
+     "id": "unplanned",
+     "title": "Unplanned work",
+     "enabled": true,
+     "fields": [
+      {
+       "id": "unplanned",
+       "label": "Unplanned work rows",
+       "required": false
+      }
+     ]
+    },
+    {
+     "id": "attachments",
+     "title": "Attachments",
+     "enabled": true,
+     "fields": [
+      {
+       "id": "attachments",
+       "label": "Photos and files",
+       "required": false
+      }
+     ]
+    },
+    {
+     "id": "handover",
+     "title": "Handover",
      "enabled": false,
      "fields": [
       {
-       "id": "applications-reviewed",
-       "label": "Applications reviewed",
+       "id": "next-shift",
+       "label": "Notes for the next shift",
        "required": true
       },
       {
-       "id": "candidates-contacted",
-       "label": "Candidates contacted",
-       "required": true
-      },
-      {
-       "id": "interviews-arranged",
-       "label": "Interviews arranged",
-       "required": true
-      },
-      {
-       "id": "new-starters",
-       "label": "New starters",
-       "required": true
-      },
-      {
-       "id": "outstanding-candidates",
-       "label": "Outstanding candidates",
+       "id": "keys",
+       "label": "Keys and equipment",
        "required": false
-      }
-     ]
-    },
-    {
-     "id": "employee-files",
-     "title": "Employee Files",
-     "enabled": true,
-     "fields": [
-      {
-       "id": "files-updated",
-       "label": "Files updated",
-       "required": true
-      },
-      {
-       "id": "documents-received",
-       "label": "Documents received",
-       "required": true
-      },
-      {
-       "id": "missing-documents",
-       "label": "Missing documents",
-       "required": true
-      },
-      {
-       "id": "expiring-documents",
-       "label": "Expiring documents",
-       "required": true
-      }
-     ]
-    },
-    {
-     "id": "client-files",
-     "title": "Client Files",
-     "enabled": true,
-     "fields": [
-      {
-       "id": "files-updated",
-       "label": "Files updated",
-       "required": true
-      },
-      {
-       "id": "contracts",
-       "label": "Contracts",
-       "required": true
-      },
-      {
-       "id": "contact-details",
-       "label": "Contact details",
-       "required": true
-      },
-      {
-       "id": "outstanding-paperwork",
-       "label": "Outstanding paperwork",
-       "required": true
-      }
-     ]
-    },
-    {
-     "id": "payroll",
-     "title": "Payroll",
-     "enabled": true,
-     "fields": [
-      {
-       "id": "issues-identified",
-       "label": "Issues identified",
-       "required": true
-      },
-      {
-       "id": "corrections-required",
-       "label": "Corrections required",
-       "required": true
-      },
-      {
-       "id": "outstanding-information",
-       "label": "Outstanding information",
-       "required": true
-      }
-     ]
-    },
-    {
-     "id": "orders",
-     "title": "Orders / Stock",
-     "enabled": true,
-     "fields": [
-      {
-       "id": "orders-placed",
-       "label": "Orders placed",
-       "required": true
-      },
-      {
-       "id": "deliveries-received",
-       "label": "Deliveries received",
-       "required": true
-      },
-      {
-       "id": "items-required",
-       "label": "Items required",
-       "required": true
-      },
-      {
-       "id": "waiting-for-approval",
-       "label": "Waiting for approval",
-       "required": true
-      }
-     ]
-    },
-    {
-     "id": "outstanding",
-     "title": "Outstanding",
-     "enabled": true,
-     "fields": [
-      {
-       "id": "tasks-not-completed",
-       "label": "Tasks not completed",
-       "required": true
-      },
-      {
-       "id": "reason",
-       "label": "Reason",
-       "required": false
-      },
-      {
-       "id": "action-required",
-       "label": "Action required",
-       "required": false
-      }
-     ]
-    },
-    {
-     "id": "attention",
-     "title": "Manager Attention Required",
-     "enabled": true,
-     "fields": [
-      {
-       "id": "decision-needed",
-       "label": "Decision needed",
-       "required": true
       }
      ]
     }

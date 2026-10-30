@@ -1,6 +1,6 @@
 {
   "title": "Manager Attention Required",
-  "subtitle": "Items waiting for your decision",
+  "subtitle": "Your call",
   "items": [
     {
       "dep": "Security",
@@ -42,7 +42,7 @@
       "dep": "Cleaning",
       "kind": "blue",
       "icon": "box",
-      "title": "Supplies order £640 waiting for approval",
+      "title": "Supplies order €640 waiting for approval",
       "by": "Tomasz Wójcik",
       "note": "Orders & Stock · Supplier: Bunzl",
       "status": {

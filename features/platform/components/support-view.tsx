@@ -5,6 +5,7 @@ import { toast } from "sonner"
 
 import { ConfirmDialog } from "@/components/confirm-dialog"
 import { DataPagination, PagedBody } from "@/components/data-pagination"
+import { CopyId } from "@/components/copy-id"
 import { EmptyState } from "@/components/empty-state"
 import { FilterBar, FilterSearch, FilterSelect } from "@/components/filter-bar"
 import { Icon } from "@/components/icons"
@@ -13,11 +14,16 @@ import { StatusPill } from "@/components/status-pill"
 import { When } from "@/components/when"
 import { paginate } from "@/lib/paginate"
 import { SUPPORT_PAGE_SIZE } from "../constants"
-import { auditEntry, effectiveStatus, nowIso } from "../logic"
-import { usePlatform } from "../store"
+import { useSupportAccess } from "@/hooks/use-support-access"
+import { auditEntry, effectiveStatus, nowIso, sensitiveEntry } from "../logic"
+import { foldAudit } from "../patches"
+import { auditOutbox, knownAudit, requestsStore, useOutbox } from "../store"
+import { isSupportAction, type SupportData } from "../support"
 import { REQUEST_STATUS } from "../types"
-import type { PlatformSeed, RequestStatus, SupportRequest } from "../types"
+import type { AuditEntry, RequestStatus, SupportRequest } from "../types"
 import { AuditList } from "./audit-list"
+import { SlugConfirmDialog } from "./slug-confirm-dialog"
+import type { Operator } from "./tenants-view"
 import { Countdown } from "./countdown"
 import { useOrgNow } from "./clock"
 import { RequestDialog } from "./request-dialog"
@@ -27,13 +33,23 @@ const STATUS_OPTIONS: { value: "all" | RequestStatus; label: string }[] = [
   ...(Object.keys(REQUEST_STATUS) as RequestStatus[]).map((s) => ({ value: s, label: REQUEST_STATUS[s].label })),
 ]
 
-export function SupportView({ seed, today, tz, tzLabel, actor }: { seed: PlatformSeed; today: string; tz: string; tzLabel: string; actor: string }) {
-  const { tenants, requests, setRequests, audit, setAudit } = usePlatform(seed)
+// `requestFor`: a tenant id from `?request=` (the tenants list's row action) opens the request dialog for that tenant.
+// Renders from the slim server view model (support.ts). Every audit line names the operator and their staff role (D7)
+// and goes to auditOutbox; the audit card lists only support-access lines and only with audit.read (data.audit !== null).
+export function SupportView({ data, operator, today, tz, tzLabel, requestFor }: { data: SupportData; operator: Operator; today: string; tz: string; tzLabel: string; requestFor?: string }) {
+  const { tenants } = data
+  const [requests] = useSupportAccess(data.requests)
+  const outbox = useOutbox()
+  const audit = useMemo(
+    () => (data.audit === null ? null : foldAudit(data.audit as AuditEntry[], outbox.filter((e) => isSupportAction(e.action)))),
+    [data.audit, outbox],
+  )
   const now = useOrgNow(today, tz)
   const [q, setQ] = useState("")
   const [status, setStatus] = useState<"all" | RequestStatus>("all")
   const [page, setPage] = useState(1)
-  const [creating, setCreating] = useState(false)
+  const preset = requestFor && tenants.some((t) => t.id === requestFor) ? requestFor : ""
+  const [creating, setCreating] = useState(preset !== "")
   const [viewing, setViewing] = useState<SupportRequest | undefined>()
   const [revoking, setRevoking] = useState<SupportRequest | undefined>()
 
@@ -51,19 +67,22 @@ export function SupportView({ seed, today, tz, tzLabel, actor }: { seed: Platfor
   const paged = paginate(rows, page, SUPPORT_PAGE_SIZE)
   const filtered = q !== "" || status !== "all"
 
-  function record(action: string, r: SupportRequest, detail: string) {
-    const at = nowIso(today)
-    setAudit((all) => [auditEntry(all, at, actor, action, names.get(r.tenantId) ?? r.tenantId, detail), ...all])
-  }
+  const target = (r: SupportRequest) => names.get(r.tenantId) ?? r.tenantId
 
   function startSession(r: SupportRequest) {
-    record("support.session_started", r, `Support session started under ${r.id}`)
+    const line = auditEntry(knownAudit(), nowIso(today), operator.name, "support.session_started", target(r), `Support session started under ${r.id}`)
+    auditOutbox.set((list) => [{ ...line, tenantId: r.tenantId, staffRole: operator.role }, ...list])
     toast.success(`Support session started for ${names.get(r.tenantId)}. It is being audited.`)
   }
 
-  function revoke(r: SupportRequest) {
-    setRequests((all) => all.map((x) => (x.id === r.id ? { ...x, status: "revoked" } : x)))
-    record("support.revoked", r, `Support access ${r.id} revoked by a platform administrator`)
+  // D7: revoking needs a reason; the line records the status before and after.
+  function revoke(r: SupportRequest, reason: string) {
+    const line = sensitiveEntry(knownAudit(), {
+      at: nowIso(today), actor: operator.name, staffRole: operator.role, tenantId: r.tenantId, action: "support.revoked", target: target(r),
+      detail: `Support access ${r.id} revoked by ${operator.name}: ${reason}`, before: { status: r.status }, after: { status: "revoked" }, reason,
+    })
+    requestsStore.set((all) => all.map((x) => (x.id === r.id ? { ...x, status: "revoked" } : x)))
+    auditOutbox.set((list) => [line, ...list])
     toast.success(`Access ${r.id} revoked`)
   }
 
@@ -97,7 +116,7 @@ export function SupportView({ seed, today, tz, tzLabel, actor }: { seed: Platfor
                     return (
                       <tr key={r.id}>
                         <td data-label="Request">
-                          <div className="tt num">{r.id}</div>
+                          <div className="tt num">{r.id} <CopyId value={r.id} what="request ID" className="od-copy-inline" /></div>
                           <div className="tm num"><When iso={r.requestedAt} today={today} tzLabel={tzLabel} /></div>
                         </td>
                         <td data-label="Tenant" className="tt">{names.get(r.tenantId) ?? r.tenantId}</td>
@@ -136,9 +155,20 @@ export function SupportView({ seed, today, tz, tzLabel, actor }: { seed: Platfor
           />
         )}
       </div>
-      <AuditList entries={audit} today={today} tzLabel={tzLabel} />
+      {audit && <AuditList entries={audit} today={today} tzLabel={tzLabel} title="Support access audit" sub="Every support request, grant, session and revoke" />}
 
-      <RequestDialog tenants={tenants} open={creating} onOpenChange={setCreating} actor={actor} today={today} />
+      <RequestDialog
+        tenants={tenants}
+        open={creating}
+        onOpenChange={(o) => {
+          setCreating(o)
+          // Drop `?request=` once the dialog closes, so a reload doesn't open it again.
+          if (!o && preset) window.history.replaceState(null, "", window.location.pathname)
+        }}
+        operator={operator}
+        today={today}
+        initialTenantId={preset}
+      />
       <ConfirmDialog
         open={!!viewing}
         onOpenChange={(o) => !o && setViewing(undefined)}
@@ -147,14 +177,15 @@ export function SupportView({ seed, today, tz, tzLabel, actor }: { seed: Platfor
         confirmLabel="View as support"
         onConfirm={() => viewing && startSession(viewing)}
       />
-      <ConfirmDialog
+      <SlugConfirmDialog
         open={!!revoking}
         onOpenChange={(o) => !o && setRevoking(undefined)}
         title="Revoke support access?"
-        text={`${revoking?.id ?? "This access"} ends immediately and the support session closes. This is recorded in the audit trail.`}
+        text={`${revoking?.id ?? "This access"} ends immediately and the support session closes. The reason is recorded in the audit trail.`}
+        reason
         confirmLabel="Revoke access"
         destructive
-        onConfirm={() => revoking && revoke(revoking)}
+        onConfirm={(reason) => revoking && revoke(revoking, reason)}
       />
     </>
   )

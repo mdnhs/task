@@ -65,7 +65,7 @@
     --border: var(--line);
     --input: var(--line);
     --ring: var(--brand);
-    --radius: 1rem;
+    --radius: calc(1rem * var(--radius-scale,1)); /* follows the Corners preset (lib/appearance.ts) */
 }
 
 @layer base {

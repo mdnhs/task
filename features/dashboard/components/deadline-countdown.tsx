@@ -8,32 +8,20 @@ const pad = (n: number) => String(n).padStart(2, "0")
 // Last stretch before the deadline: the countdown's accent eases from brand to the warn token (CSS transition, no flashing).
 const WARN_SECS = 15 * 60
 
-function zonedNow(timeZone: string) {
-  const p = new Intl.DateTimeFormat("en-GB", {
-    timeZone,
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hourCycle: "h23",
-  }).formatToParts(new Date())
-  const g = (k: string) => +p.find((x) => x.type === k)!.value
-  return g("hour") * 3600 + g("minute") * 60 + g("second")
-}
-
-// Hours / mins / secs left until the next occurrence of hour:minute in `timeZone`. Shared by the owner and staff dashboards.
-export function DeadlineCountdown({ hour, minute, timeZone }: { hour: number; minute: number; timeZone: string }) {
-  const [left, setLeft] = React.useState(0)
+/**
+ * Hours / mins / secs left. `seconds` is computed on the server against the tenant's now (lib/report-deadline secondsUntil),
+ * so the first paint matches the server render; from then on it ticks down with the real clock.
+ */
+export function DeadlineCountdown({ seconds }: { seconds: number }) {
+  const [left, setLeft] = React.useState(seconds)
 
   React.useEffect(() => {
-    const tick = () => {
-      let l = hour * 3600 + minute * 60 - zonedNow(timeZone)
-      if (l < 0) l += 86400
-      setLeft(l)
-    }
+    const start = Date.now()
+    const tick = () => setLeft(Math.max(0, seconds - Math.floor((Date.now() - start) / 1000)))
     tick()
     const t = setInterval(tick, 1000)
     return () => clearInterval(t)
-  }, [hour, minute, timeZone])
+  }, [seconds])
 
   return (
     <div className="countdown" aria-live="polite" data-warn={left > 0 && left <= WARN_SECS ? "" : undefined}>

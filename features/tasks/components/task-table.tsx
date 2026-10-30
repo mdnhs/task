@@ -9,6 +9,8 @@ import { When } from "@/components/when"
 import { isLate } from "../lifecycle"
 import { describeRepeat } from "../recurrence"
 import { morphToRecord } from "../record-transition"
+import { EVIDENCE_STATE, evidenceState } from "@/lib/task-evidence"
+import { assigneesOf, checklistProgress } from "../planning"
 import { STATUS } from "../types"
 import type { Person, Task } from "../types"
 
@@ -26,6 +28,9 @@ export function TaskTable({ tasks, people, today, tzLabel, page }: { tasks: Task
         <PagedBody page={page}>
             {tasks.map((t) => {
               const a = people.get(t.assignee)
+              const more = assigneesOf(t).length - 1
+              const ev = evidenceState(t.evidenceRule, t.evidence, t.status)
+              const cl = checklistProgress(t)
               const late = isLate(t, today)
               return (
                 <tr key={t.ref}>
@@ -41,13 +46,13 @@ export function TaskTable({ tasks, people, today, tzLabel, page }: { tasks: Task
                     >
                       {t.title}
                     </Link>
-                    <div className="tm num">{t.ref}{(t.repeat || t.seriesId) && <span className="rp-badge" title={t.repeat ? describeRepeat(t.repeat) : `Repeats from ${t.seriesId}`}><span aria-hidden="true">↻ </span>{t.repeat ? "Repeats" : "Recurring"}</span>}</div>
+                    <div className="tm num">{t.ref}{(t.repeat || t.seriesId) && <span className="rp-badge" title={t.repeat ? describeRepeat(t.repeat) : `Repeats from ${t.seriesId}`}><span aria-hidden="true">↻ </span>{t.repeat ? "Repeats" : "Recurring"}</span>}{t.parentRef && <span className="rp-badge">↳ {t.parentRef}</span>}{cl && <span className="rp-badge num">☑ {cl.done}/{cl.total}</span>}</div>
                   </td>
                   <td data-label="Assignee">
                     {a && (
                       <div className="pers">
                         <span className={`avatar ${a.avatar}`}>{a.initials}</span>
-                        <div><div className="tt">{a.name}</div><div className="tm">{a.role}</div></div>
+                        <div><div className="tt">{a.name}{more > 0 && <span className="tm"> +{more}</span>}</div><div className="tm">{a.role}</div></div>
                       </div>
                     )}
                   </td>
@@ -59,7 +64,10 @@ export function TaskTable({ tasks, people, today, tzLabel, page }: { tasks: Task
                     <When iso={t.due} today={today} tzLabel={tzLabel} />
                     {late ? " · late" : ""}
                   </td>
-                  <td data-label="Status"><StatusPill status={STATUS[t.status]} /></td>
+                  <td data-label="Status">
+                    <StatusPill status={STATUS[t.status]} />
+                    {ev && ev !== "awaiting" && <div className={`ev-tag ${EVIDENCE_STATE[ev].tone}`}>{EVIDENCE_STATE[ev].label}</div>}
+                  </td>
                 </tr>
               )
             })}

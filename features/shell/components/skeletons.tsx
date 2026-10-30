@@ -2,8 +2,8 @@ import { IconSprite } from "@/components/icons"
 import { Sk, SkGroup } from "@/components/sk"
 
 import { SEG_MAX } from "../constants"
-import type { NavigationData } from "../types"
-import { AppPromo, Logo } from "./sidebar-parts"
+import type { NavItemData, NavigationData } from "../types"
+import { AppPromo, Logo, PlatformContext } from "./sidebar-parts"
 
 // Mirrors AppShell: static parts (logo, nav labels, promo card) render for real, data parts are blocks.
 // Nav item counts match public/data/shell/navigation.json (9 menu, 2 general).
@@ -40,13 +40,46 @@ function NavSkeleton({ widths }: { widths: number[] }) {
   )
 }
 
+// The platform console's grouped nav (D2): section labels are static and render for real. Rows reuse the real `.nav a` box
+// (no href, so not focusable) with the label as ghost text, so heights and widths match the loaded sidebar exactly.
+function GroupedNavSkeleton({ items }: { items: NavItemData[] }) {
+  const groups: { section?: string; items: NavItemData[] }[] = []
+  for (const n of items) {
+    const g = groups.find((o) => o.section === n.section)
+    if (g) g.items.push(n)
+    else groups.push({ section: n.section, items: [n] })
+  }
+  groups.sort((a, b) => Number(!!a.section) - Number(!!b.section))
+  return groups.map((g) => (
+    <div key={g.section ?? ""}>
+      {g.section && <div className="nav-label">{g.section}</div>}
+      <div className="nav">
+        {g.items.map((n) => (
+          <a key={n.href}>
+            <Sk w={20} h={20} r={6} />
+            <span className="lbl"><span className="sk-ghost">{n.label}</span></span>
+          </a>
+        ))}
+      </div>
+    </div>
+  ))
+}
+
 // No subscription banner here: route loading.tsx renders inside the real layout, so the banner is already present.
 export function AppShellSkeleton({
   departments,
+  assistant = true,
+  whatsapp = true,
+  platform,
   children,
 }: {
   // `false` = no department filter (the platform console), so neither the desktop pills nor the phone row render.
   departments: NavigationData["departments"] | false
+  /** Topbar icons shown by the real shell: the AI assistant (plan module) and the WhatsApp shortcut (role + plan). */
+  assistant?: boolean
+  whatsapp?: boolean
+  /** The platform console variant (AppShell variant="platform"): its filtered menu and environment pill; no promo card. */
+  platform?: { menu: NavItemData[]; env?: { label: string; live: boolean } }
   children: React.ReactNode
 }) {
   return (
@@ -56,16 +89,22 @@ export function AppShellSkeleton({
         <aside className="sidebar" aria-hidden="true">
           <Logo />
           <div className="sidebar-scroll">
-            <div>
-              <div className="nav-label">Menu</div>
-              <NavSkeleton widths={NAV_WIDTHS.menu} />
-            </div>
-            <div>
-              <div className="nav-label">General</div>
-              <NavSkeleton widths={NAV_WIDTHS.general} />
-            </div>
+            {platform ? (
+              <GroupedNavSkeleton items={platform.menu} />
+            ) : (
+              <>
+                <div>
+                  <div className="nav-label">Menu</div>
+                  <NavSkeleton widths={NAV_WIDTHS.menu} />
+                </div>
+                <div>
+                  <div className="nav-label">General</div>
+                  <NavSkeleton widths={NAV_WIDTHS.general} />
+                </div>
+              </>
+            )}
           </div>
-          <AppPromo />
+          {!platform && <AppPromo />}
         </aside>
 
         <div className="main">
@@ -74,9 +113,10 @@ export function AppShellSkeleton({
               <Sk w={50} h={50} r="circle" className="sk-on-panel" />
               <Sk h={50} r="pill" className="sk-on-panel sk-search" />
               {departments !== false && <DeptSegSkeleton departments={departments} />}
+              {platform && <PlatformContext env={platform.env} />}
               <div className="top-actions">
-                <Sk w={50} h={50} r="circle" className="sk-on-panel" />
-                <Sk w={50} h={50} r="circle" className="sk-on-panel" />
+                {assistant && <Sk w={50} h={50} r="circle" className="sk-on-panel" />}
+                {whatsapp && <Sk w={50} h={50} r="circle" className="sk-on-panel" />}
                 <Sk w={50} h={50} r="circle" className="sk-on-panel" />
                 <Sk w={null} h={50} r="pill" className="sk-on-panel sk-user" />
               </div>

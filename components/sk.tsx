@@ -1,5 +1,6 @@
 import type { CSSProperties } from "react"
 
+import { scaledRadius } from "@/lib/appearance"
 import { cn } from "@/lib/utils"
 
 // Skeleton block. Used inside the real component classes (.card, .stat, .item…) so the
@@ -37,7 +38,7 @@ export function Sk({
       style={{
         width: w ?? undefined,
         height: h,
-        borderRadius: r === "pill" ? 999 : r === "circle" ? "50%" : r,
+        borderRadius: scaledRadius(r),
         ...style,
       }}
     />
@@ -49,6 +50,17 @@ export function SkGroup({ label, className, children }: { label: string; classNa
   return (
     <div className={className} role="status" aria-live="polite" aria-busy="true">
       <span className="sr-only">{label}</span>
+      {children}
+    </div>
+  )
+}
+
+// Exact skeleton for pages whose layout depends on one record (a task, a shift report): loading.tsx looks the record up and renders
+// the real component with its real data, masked (CSS `.sk-mask` in kit.css: text transparent, text blocks tinted) and inert.
+// Layout, wrapping and counts are then identical to the loaded page by construction.
+export function SkMask({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="sk-mask" role="status" aria-label={label} aria-busy="true" inert>
       {children}
     </div>
   )

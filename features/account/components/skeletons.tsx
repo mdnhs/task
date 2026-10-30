@@ -3,11 +3,26 @@ import { PagerSkeleton, needsPager, pageRows } from "@/components/pager-skeleton
 import { Sk, SkGroup } from "@/components/sk"
 import { ACTIVITY_PAGE_SIZE } from "../constants"
 import { ACCOUNT_TABS } from "../types"
-import type { AccountTabId } from "../types"
+import { formatDue } from "@/lib/dates"
+import type { AccountTabId, DeviceSession } from "../types"
 
 // Mirrors AccountLayout (PageHead, .set-layout tab list, .set-body) and each tab's panel with the seed's row counts.
 // Heights reuse the settings measures (h2 line 28, .sub line 17, field label 18, control 44, hint 18, button 48; small button 38).
-export type AccountCounts = { sessions: number; others: number; activity: number; events: number; channels: number }
+export type AccountCounts = {
+  sessions: number
+  others: number
+  activity: number
+  events: number
+  channels: number
+  /** The security tab's real text (loading.tsx reads it from the same seed): ghost text wraps like the loaded rows. */
+  /** The notification table's real labels (ghost text; the stacked rows on phones show them). */
+  prefs?: { channels: { id: string; label: string }[]; events: { id: string; label: string; hint: string }[] }
+  security?: { mfaHint: string; sessions: DeviceSession[]; activity: { text: string; at: string }[]; today: string; tzLabel: string }
+}
+const whenText = (iso: string, today: string, tzLabel: string) => {
+  const t = formatDue(iso, today)
+  return t.includes(":") && tzLabel ? `${t} ${tzLabel}` : t
+}
 
 // `wrap`: the subtitle wraps to a second line on phones (≤640, .sk-wrap); browser-measured at 390.
 const CardHead = ({ title, sub, button, wrap }: { title: number; sub: number; button?: number; wrap?: boolean }) => (
@@ -59,17 +74,38 @@ function Security({ counts }: { counts: AccountCounts }) {
         <CardHead title={90} sub={330} button={144} wrap />
         <div className="set-switch-row acc-mfa">
           <Sk w={40} h={24} r="pill" />
-          <span className="acc-mfa-text">
-            <Sk w={140} h={13} lh={19.6} />
-            <Sk w={260} h={10} lh={16} />
-            <Sk w={120} h={10} lh={16} className="sk-wrap" />
-          </span>
+          {counts.security ? (
+            <span className="acc-mfa-text">
+              <span className="sk-ghost">Two-step verification</span>
+              <span className="tm sk-ghost">{counts.security.mfaHint}</span>
+            </span>
+          ) : (
+            <span className="acc-mfa-text">
+              <Sk w={140} h={13} lh={19.6} />
+              <Sk w={260} h={10} lh={16} />
+              <Sk w={120} h={10} lh={16} className="sk-wrap" />
+            </span>
+          )}
         </div>
       </section>
       <section className="card set-card">
         <CardHead title={130} sub={90} button={206} />
         <ul className="set-list">
-          {Array.from({ length: counts.sessions }, (_, i) => (
+          {counts.security
+            ? counts.security.sessions.map((x) => (
+                <li key={x.id} className="acc-sess">
+                  <Sk w={40} h={40} r={12} />
+                  <div className="acc-sess-main">
+                    <span className="acc-sess-top">
+                      <b className="sk-ghost">{x.device}</b>
+                      {x.current && <Sk w={102} h={34} r={8} />}
+                    </span>
+                    <span className="tm sk-ghost">{x.location} · {whenText(x.lastActive, counts.security!.today, counts.security!.tzLabel)}</span>
+                  </div>
+                  {!x.current && <Sk w={81} h={36.8} r={12} className="sk-btn" />}
+                </li>
+              ))
+            : Array.from({ length: counts.sessions }, (_, i) => (
             <li key={i} className="acc-sess">
               <Sk w={40} h={40} r={12} />
               <div className="acc-sess-main">
@@ -99,12 +135,19 @@ function Security({ counts }: { counts: AccountCounts }) {
       <section className="card set-card">
         <CardHead title={140} sub={290} />
         <ul className="set-list">
-          {Array.from({ length: acts }, (_, i) => (
-            <li key={i} className="acc-act">
-              <Sk w={200} h={13} lh={20} />
-              <Sk w={110} h={10} lh={16} />
-            </li>
-          ))}
+          {counts.security
+            ? counts.security.activity.slice(0, acts).map((x, i) => (
+                <li key={i} className="acc-act">
+                  <span className="acc-act-text sk-ghost">{x.text}</span>
+                  <span className="tm sk-ghost">{whenText(x.at, counts.security!.today, counts.security!.tzLabel)}</span>
+                </li>
+              ))
+            : Array.from({ length: acts }, (_, i) => (
+                <li key={i} className="acc-act">
+                  <Sk w={200} h={13} lh={20} />
+                  <Sk w={110} h={10} lh={16} />
+                </li>
+              ))}
         </ul>
         {needsPager(counts.activity, ACTIVITY_PAGE_SIZE) && <PagerSkeleton rows={counts.activity} size={ACTIVITY_PAGE_SIZE} />}
       </section>
@@ -126,15 +169,25 @@ function Notifications({ counts }: { counts: AccountCounts }) {
               </tr>
             </thead>
             <tbody>
-              {Array.from({ length: counts.events }, (_, r) => (
-                <tr key={r}>
-                  <td>
-                    <Sk w={150} h={13} lh={19} className="sk-2l" />
-                    <Sk w={190} h={10} lh={16} style={{ marginTop: 2 }} className="sk-2s" />
-                  </td>
-                  {Array.from({ length: counts.channels }, (_, i) => <td key={i}><Sk w={40} h={24} r="pill" /></td>)}
-                </tr>
-              ))}
+              {counts.prefs
+                ? counts.prefs.events.map((e) => (
+                    <tr key={e.id}>
+                      <td data-label="Event">
+                        <span className="tt sk-ghost">{e.label}</span>
+                        <span className="tm acc-hint sk-ghost">{e.hint}</span>
+                      </td>
+                      {counts.prefs!.channels.map((c) => <td key={c.id} data-label={c.label}><Sk w={40} h={24} r="pill" /></td>)}
+                    </tr>
+                  ))
+                : Array.from({ length: counts.events }, (_, r) => (
+                    <tr key={r}>
+                      <td>
+                        <Sk w={150} h={13} lh={19} className="sk-2l" />
+                        <Sk w={190} h={10} lh={16} style={{ marginTop: 2 }} className="sk-2s" />
+                      </td>
+                      {Array.from({ length: counts.channels }, (_, i) => <td key={i}><Sk w={40} h={24} r="pill" /></td>)}
+                    </tr>
+                  ))}
             </tbody>
           </table>
         </div>
@@ -143,6 +196,23 @@ function Notifications({ counts }: { counts: AccountCounts }) {
         <CardHead title={120} sub={250} />
         <div className="od-form set-form">
           <div className="od-row2"><FieldSk label={70} hint={210} /></div>
+        </div>
+      </section>
+      <section className="card set-card">
+        <CardHead title={80} sub={210} />
+        <div className="acc-prefs">
+          {[
+            ["Show the Today card automatically", "Counts and Play my day at the top of home on your first visit each working day. Off keeps a small entry to open it."],
+            ["Send \"Your day is ready\"", "A push at shift start on the mobile app. Not sent on leave or days off."],
+          ].map(([title, hint]) => (
+            <div key={title} className="acc-pref">
+              <span>
+                <span className="tt sk-ghost">{title}</span>
+                <span className="tm acc-hint sk-ghost">{hint}</span>
+              </span>
+              <Sk w={32} h={18.4} r="pill" />
+            </div>
+          ))}
         </div>
       </section>
     </>

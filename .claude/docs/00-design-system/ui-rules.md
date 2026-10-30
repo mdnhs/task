@@ -148,8 +148,8 @@ No GSAP. CSS covers most cases. The `motion` library (`motion/react`) is used on
     - Page change: use `<PagedBody page={page}>` instead of `<tbody>` (or `key={page}` + `od-slide` on a paged list). Rows slide in from the side of travel.
     - Filter and search: when the set of rows changes, `PagedBody` remounts and the whole body slides in from the right, like a next page.
       Rows stay plain `<tr>`, with no per-row enter/exit and no layout glide, because those made the table jump.
-    - Column sort (none yet): when one is added, rows glide to their new place (FLIP, `motion.tr layout="position"`), but only while
-      the sort changes, never on a filter.
+    - Column sort (`SortHeader`, first used on `/platform/tenants`): rows glide to their new place (FLIP, `motion.tr layout="position"`), but only while
+      the sort changes, never on a filter. Pass `reorder` to `PagedBody` so a new order of the same rows doesn't remount the body.
     - Row → detail: the title morphs into the heading (rule 19).
 23. **Progress fills that change after mount** (stepper, password strength) use `transform: scaleX()` with a transition, and `animation:none` on that bar,
     because a held `od-fill` keyframe blocks the transition.
@@ -172,12 +172,18 @@ No GSAP. CSS covers most cases. The `motion` library (`motion/react`) is used on
     `onDone` runs right after success and is for changes that remove the button (next task status, closing a sheet), so the status change
     and toast are immediate. `type="submit"` submits its form at once and skips the ✓ if a field is invalid.
     **Mistake to avoid:** a fixed minimum spinner made validation errors appear 0.4s late and status changes ~1.1s late. Press on every `.btn` / shadcn Button is `scale(.97)`; disabled = `cursor:not-allowed`, no press.
-29. **Status changes:** `StatusPill` crossfades its tone colours (CSS), fades the new label and eases its width (`layout="size"`, children counter-scaled).
+29. **Status changes:** `StatusPill` crossfades its tone colours (CSS), fades the new label; the width snaps. Never give it (or anything inside a
+    `layout`-animated list row) its own motion `layout`: nested projection left labels stuck off their pills when the row moved.
     A change after mount shows a brief ✓ (pass `tick={false}` for changes the user didn't make). Never animates on mount.
+30. **In-page tabs:** every tab or view switch inside a page, card or panel is `FilterSeg` (`components/filter-bar.tsx`):
+    grey `--mute-bg` track, green sliding pill. Never hand-rolled chip or underline tabs. On the grey page background
+    (task view tabs) the track is `--card`. Labels may carry a count (`<span className="num">`). Skeleton: one `Sk h={50} r="pill"`.
 30. **Small feedback:** the invalid control shakes once (~6px, `--dur-slow`); a new error row opens with grid rows 0fr→1fr; an error replacing a hint only
     fades. Unread dots clear top→bottom `STAGGER` apart; the badge count rolls. The deadline countdown eases brand → warn in its last 15 minutes
     (`[data-warn]`). The chart tip is one element moved by transform (glides between bars, follows bars per frame while they animate).
-    Copy actions (none exist yet) should swap their icon to ✓ the same way (`od-act-in` + `od-draw`).
+    Copy actions swap their icon to ✓ the same way (`od-act-in` + `od-draw`; e.g. the tenant ID copy button on `/platform/tenants`).
+31. **Long forms are pages:** a dialog that would need scrolling at 1568×698 becomes its own route (form page + exact skeleton); dialogs are for short confirmations and small forms.
+    Form pages use `.od-form-cols` with two `.od-form-col` children (kit.css): two columns above 1100px, one below; the `.od-form-foot` sits after them, full width. Card uses the full content width.
 
 ## Data
 Mock API lives in `public/data/<feature>/<name>.json`. Each feature's `features/<feature>/api.ts` reads it with `getData()`

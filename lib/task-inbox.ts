@@ -1,4 +1,4 @@
-// Hand-off for tasks created outside /tasks (WhatsApp, FR-WA-02). Features can't import each other, so the creating
+// Hand-off for tasks created or changed outside /tasks (WhatsApp FR-WA-02, end-of-shift report FR-M1-26). Features can't import each other, so the creating
 // feature pushes here and the tasks store merges these in when a tasks screen mounts (features/tasks/store.ts).
 // Module state like lib/store.ts: survives client navigation, resets on reload.
 export type IncomingTask = {
@@ -20,7 +20,31 @@ export type IncomingTask = {
   source: string
 }
 
+/**
+ * A change to an existing task made outside /tasks: the end-of-shift report (FR-M1-26) sets the status and logs time; the
+ * Today card (FR-M1-74) marks a task done or snoozes it for the day (`snooze`: timeline line only, status unchanged).
+ * `itemStatus` is the report row status; the tasks store maps it with taskStatusFor() (lib/shift-report.ts). `id` is unique
+ * per report version and task, so the store applies each update once.
+ */
+export type TaskUpdate = {
+  id: string
+  tenantId: string
+  ref: string
+  itemStatus: "done" | "in_progress" | "blocked" | "not_started"
+  minutes: number
+  note: string
+  /** YYYY-MM-DDTHH:mm, tenant time. */
+  at: string
+  /** Display name of who submitted. */
+  by: string
+  /** Where it came from, for the timeline, e.g. "shift report Day patrol, 2026-10-19". */
+  source: string
+  /** Snoozed for the day: no status change and no time entry, just the timeline line. */
+  snooze?: boolean
+}
+
 const items: IncomingTask[] = []
+const updates: TaskUpdate[] = []
 /** Known refs per tenant id: each tenant has its own ref sequence. */
 const seen = new Map<string, Set<string>>()
 
@@ -43,9 +67,16 @@ export const taskInbox = {
     refs.forEach((r) => set.add(r))
   },
   knownRefs: (tenantId: string): string[] => [...(seen.get(tenantId) ?? [])],
+  /** Queues task changes (same id twice is ignored). */
+  pushUpdates(list: TaskUpdate[]) {
+    for (const u of list) if (!updates.some((x) => x.id === u.id)) updates.push(u)
+  },
+  /** Only the given tenant's updates, oldest first. */
+  updates: (tenantId: string): TaskUpdate[] => updates.filter((u) => u.tenantId === tenantId),
   /** Tests only. */
   reset() {
     items.length = 0
+    updates.length = 0
     seen.clear()
   },
 }

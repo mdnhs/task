@@ -1,6 +1,8 @@
 "use client"
 
 import { useMemo, useState } from "react"
+import Link from "next/link"
+import { useSearchParams } from "next/navigation"
 import { toast } from "sonner"
 
 import { CountUp } from "@/components/count-up"
@@ -14,19 +16,18 @@ import { StatusPill } from "@/components/status-pill"
 import { useDept } from "@/hooks/use-dept"
 import { nowInTz } from "@/lib/dates"
 import { paginate } from "@/lib/paginate"
+import { rostersHref, rostersTab } from "../logic"
+import type { RostersTab } from "../logic"
 import { rosterStats } from "../stats"
 import { gapsStore, incidentsStore } from "../store"
 import { COVERAGE, INCIDENT_STATUS, INCIDENT_TYPE, STAFF_PAGE_SIZE, WHEN_ORDER } from "../types"
 import type { Coverage, HistoryEntry, Incident, IncidentStatus, IncidentType, RosterGap, StaffMember } from "../types"
 import { AttendanceList } from "./attendance-list"
 import { CoverDialog } from "./cover-dialog"
-import { GapDialog } from "./gap-dialog"
-import { GapDetail, IncidentDetail } from "./details"
-import { IncidentDialog } from "./incident-dialog"
-import type { IncidentInput } from "./incident-dialog"
+import { IncidentDetail } from "./details"
 import { GapsList } from "./gaps-list"
 
-type Tab = "attendance" | "gaps"
+type Tab = RostersTab
 const TABS: { value: Tab; label: string }[] = [
   { value: "attendance", label: "Attendance" },
   { value: "gaps", label: "Roster gaps" },
@@ -68,8 +69,10 @@ export function StaffRostersView({
 }) {
   const dept = useDept()
   const [allIncidents, setIncidents] = incidentsStore.useStore(incidents, scopeKey)
-  const [allGaps, setGaps] = gapsStore.useStore(gaps, scopeKey)
-  const [tab, setTab] = useState<Tab>("attendance")
+  const [allGaps] = gapsStore.useStore(gaps, scopeKey)
+  // `?tab=gaps` opens Roster gaps: the gap page and Log incident return to the tab they came from.
+  const urlTab = rostersTab(useSearchParams().get("tab"))
+  const [tab, setTab] = useState<Tab>(urlTab)
   const [q, setQ] = useState("")
   const [type, setType] = useState("all")
   const [status, setStatus] = useState("all")
@@ -77,14 +80,19 @@ export function StaffRostersView({
   const [pages, setPages] = useState<Record<Tab, number>>({ attendance: 1, gaps: 1 })
   const [seenDept, setSeenDept] = useState(dept)
   const [openIncident, setOpenIncident] = useState<string>()
-  const [openGap, setOpenGap] = useState<string>()
   const [incidentSheet, setIncidentSheet] = useState(false)
-  const [gapSheet, setGapSheet] = useState(false)
-  const [logging, setLogging] = useState(false)
   const [covering, setCovering] = useState(false)
-  const [editingGap, setEditingGap] = useState(false)
 
   const resetPage = () => setPages({ attendance: 1, gaps: 1 })
+  // A link to /staff-rosters(?tab=…) while the page is open (sidebar, back link) switches the tab too.
+  const [seenTab, setSeenTab] = useState(urlTab)
+  if (seenTab !== urlTab) {
+    setSeenTab(urlTab)
+    if (tab !== urlTab) {
+      setTab(urlTab)
+      resetPage()
+    }
+  }
   if (seenDept !== dept) {
     setSeenDept(dept)
     resetPage()
@@ -117,7 +125,6 @@ export function StaffRostersView({
   const tabDir = useSlideDir(TABS.findIndex((t) => t.value === tab))
 
   const incident = allIncidents.find((i) => i.id === openIncident)
-  const gap = allGaps.find((g) => g.id === openGap)
   // Local filters only: "Clear filters" cannot reset the global department filter.
   const local = tab === "attendance" ? !!q || type !== "all" || status !== "all" : !!q || coverage !== "all"
   const filtered = local || dept !== "all"
@@ -127,25 +134,6 @@ export function StaffRostersView({
   const patchIncident = (id: string, patch: Partial<Incident>, h: HistoryEntry) =>
     setIncidents((prev) => prev.map((i) => (i.id === id ? { ...i, ...patch, history: [...i.history, h] } : i)))
 
-  function logIncident(v: IncidentInput) {
-    let id = ""
-    const dept = staff.find((s) => s.name === v.staff)?.dept ?? ""
-    setIncidents((prev) => {
-      const max = prev.reduce((m, i) => Math.max(m, parseInt(i.id.replace(/\D/g, ""), 10) || 0), 0)
-      id = `INC-${max + 1}`
-      const h = entry("Incident logged")
-      const created: Incident = {
-        id, type: v.type, staff: v.staff, dept, shift: v.shift, site: v.site, client: v.client, cover: null, status: "open",
-        owner: actor, action: v.action, reportedAt: h.at, history: [h],
-        ...(v.contact ? { contact: v.contact } : {}), ...(v.notes ? { notes: v.notes } : {}),
-      }
-      return [created, ...prev]
-    })
-    toast.success(`${id} logged`)
-    setTab("attendance")
-    resetPage()
-  }
-
   function recordCover(id: string, cover: string, action: string) {
     patchIncident(id, { cover, action, status: "covered" }, entry("Cover recorded", `${cover} is covering`))
     toast.success(`Cover recorded: ${cover}`)
@@ -154,12 +142,6 @@ export function StaffRostersView({
     patchIncident(i.id, { status: next }, entry(label))
     toast.success(`${i.id}: ${label.toLowerCase()}`)
   }
-  function saveGap(id: string, v: { coverage: Coverage; assigned: string; nextAction: string }) {
-    const note = v.assigned ? `${COVERAGE[v.coverage].label}, ${v.assigned}` : COVERAGE[v.coverage].label
-    setGaps((prev) => prev.map((g) => (g.id === id ? { ...g, ...v, history: [...g.history, entry("Cover updated", note)] } : g)))
-    toast.success(`${id} updated: ${COVERAGE[v.coverage].label.toLowerCase()}`)
-  }
-
   const statCards: { key: string; title: string; value: number; note: string; hero?: boolean }[] = [
     { key: "unc", title: "Uncovered tomorrow", value: stats.uncoveredTomorrow, note: "Shifts with nobody assigned" },
     { key: "gap", title: "Gaps next week", value: stats.gapsNextWeek, note: "Uncovered or partly covered" },
@@ -174,10 +156,10 @@ export function StaffRostersView({
         subtitle={`${scopedIncidents.length} incidents · ${scopedGaps.length} roster gaps`}
         actions={
           canWrite && (
-            <button type="button" className="btn btn-primary" onClick={() => setLogging(true)}>
+            <Link href="/staff-rosters/incidents/new" className="btn btn-primary">
               <Icon name="plus" />
               Log incident
-            </button>
+            </Link>
           )
         }
       />
@@ -199,6 +181,8 @@ export function StaffRostersView({
             onChange={(v) => {
               setTab(v)
               resetPage()
+              // Keep the URL on the open tab (no server round trip), so Back and reload land on it.
+              window.history.replaceState(null, "", rostersHref(v))
             }}
           />
           <FilterSearch value={q} onChange={filter(setQ)} placeholder={tab === "attendance" ? "Search incidents" : "Search roster gaps"} />
@@ -218,7 +202,7 @@ export function StaffRostersView({
               {tab === "attendance" ? (
                 <AttendanceList rows={pagedIncidents.rows} page={pagedIncidents.page} today={today} tzLabel={tzLabel} onOpen={(id) => { setOpenIncident(id); setIncidentSheet(true) }} />
               ) : (
-                <GapsList rows={pagedGaps.rows} page={pagedGaps.page} tzLabel={tzLabel} onOpen={(id) => { setOpenGap(id); setGapSheet(true) }} />
+                <GapsList rows={pagedGaps.rows} page={pagedGaps.page} tzLabel={tzLabel} />
               )}
             </div>
             <DataPagination
@@ -278,27 +262,7 @@ export function StaffRostersView({
       >
         {incident && <IncidentDetail incident={incident} sensitive={sensitive} today={today} tzLabel={tzLabel} />}
       </DetailSheet>
-      <DetailSheet
-        open={gapSheet && !!gap}
-        onOpenChange={setGapSheet}
-        title={gap ? `${gap.site} · ${gap.role}` : "Roster gap"}
-        subtitle={gap && <span className="sr-sheet-pills"><StatusPill status={COVERAGE[gap.coverage]} /><span className="sr-ref num">{gap.id}</span></span>}
-        footer={
-          gap && canWrite ? (
-            <button type="button" className="btn btn-primary" onClick={() => { setGapSheet(false); setEditingGap(true) }}>Update cover</button>
-          ) : undefined
-        }
-      >
-        {gap && <GapDetail gap={gap} sensitive={sensitive} today={today} tzLabel={tzLabel} />}
-      </DetailSheet>
-
-      {canWrite && (
-        <>
-          <IncidentDialog open={logging} onOpenChange={setLogging} staff={staff} onCreate={logIncident} />
-          <CoverDialog incident={incident} open={covering} onOpenChange={setCovering} staff={staff} onSave={recordCover} />
-          <GapDialog gap={gap} open={editingGap} onOpenChange={setEditingGap} staff={staff} onSave={saveGap} />
-        </>
-      )}
+      {canWrite && <CoverDialog incident={incident} open={covering} onOpenChange={setCovering} staff={staff} onSave={recordCover} />}
     </>
   )
 }

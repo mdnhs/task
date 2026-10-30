@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { EMPTY_FILTERS, exportEvent, filterEvents, toCsv } from "./filters"
+import { EMPTY_FILTERS, exportEvent, filterEvents, mergeOutbox, toCsv } from "./filters"
 import type { AuditEvent } from "./types"
 
 const ev = (o: Partial<AuditEvent>): AuditEvent => ({
@@ -34,5 +34,13 @@ describe("audit filters", () => {
   it("exportEvent builds a sensitive export event with the next id", () => {
     const e = exportEvent(list, { actor: "Me", role: "Admin" }, "2026-10-28T09:00:00", 2, "audit-log-2026-10-28.csv")
     expect(e).toMatchObject({ id: "AUD-3", action: "export", actor: "Me", sensitive: true, recordRef: "audit-log-2026-10-28.csv", meta: { Rows: "2" } })
+  })
+  it("mergeOutbox adds events from other screens once, with the next ids", () => {
+    const o = { key: "purge:TSK-9", tenantId: "t1", at: "2026-10-28T10:00:00", actor: "Lil", actorRole: "Owner", action: "purge", recordType: "Task", recordRef: "TSK-9", sensitive: true, meta: { Reason: "Deleted from the archive" } }
+    const out = mergeOutbox(list, [o, { ...o, key: "x", action: "nope" }])
+    expect(out).toHaveLength(list.length + 1)
+    expect(out[0]).toMatchObject({ action: "purge", recordRef: "TSK-9", sourceKey: "purge:TSK-9", sensitive: true })
+    expect(out[0].id).not.toBe(list[0].id)
+    expect(mergeOutbox(out, [o])).toBe(out)
   })
 })

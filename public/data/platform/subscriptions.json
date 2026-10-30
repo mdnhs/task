@@ -1,0 +1,156 @@
+{
+ "events": [
+  {
+   "id": "SUB-1",
+   "tenantId": "t10",
+   "at": "2024-09-13T09:00:00",
+   "kind": "start",
+   "plan": "business",
+   "mrrDelta": 149
+  },
+  {
+   "id": "SUB-2",
+   "tenantId": "t5",
+   "at": "2024-11-18T09:00:00",
+   "kind": "start",
+   "plan": "enterprise",
+   "mrrDelta": 399
+  },
+  {
+   "id": "SUB-3",
+   "tenantId": "t7",
+   "at": "2025-02-10T09:00:00",
+   "kind": "start",
+   "plan": "business",
+   "mrrDelta": 149
+  },
+  {
+   "id": "SUB-4",
+   "tenantId": "t9",
+   "at": "2025-02-28T09:00:00",
+   "kind": "start",
+   "plan": "starter",
+   "mrrDelta": 49
+  },
+  {
+   "id": "SUB-5",
+   "tenantId": "t1",
+   "at": "2025-03-26T09:00:00",
+   "kind": "start",
+   "plan": "business",
+   "mrrDelta": 149
+  },
+  {
+   "id": "SUB-6",
+   "tenantId": "t13",
+   "at": "2025-05-06T09:00:00",
+   "kind": "start",
+   "plan": "business",
+   "mrrDelta": 149
+  },
+  {
+   "id": "SUB-7",
+   "tenantId": "t3",
+   "at": "2025-06-16T09:00:00",
+   "kind": "start",
+   "plan": "business",
+   "mrrDelta": 149
+  },
+  {
+   "id": "SUB-8",
+   "tenantId": "t10",
+   "at": "2025-06-20T10:30:00",
+   "kind": "upgrade",
+   "plan": "enterprise",
+   "mrrDelta": 250
+  },
+  {
+   "id": "SUB-9",
+   "tenantId": "t8",
+   "at": "2025-07-23T09:00:00",
+   "kind": "start",
+   "plan": "starter",
+   "mrrDelta": 49
+  },
+  {
+   "id": "SUB-10",
+   "tenantId": "t4",
+   "at": "2025-10-02T09:00:00",
+   "kind": "start",
+   "plan": "business",
+   "mrrDelta": 149
+  },
+  {
+   "id": "SUB-11",
+   "tenantId": "t11",
+   "at": "2025-10-15T09:00:00",
+   "kind": "start",
+   "plan": "starter",
+   "mrrDelta": 49
+  },
+  {
+   "id": "SUB-12",
+   "tenantId": "t14",
+   "at": "2025-12-19T09:00:00",
+   "kind": "start",
+   "plan": "starter",
+   "mrrDelta": 49
+  },
+  {
+   "id": "SUB-13",
+   "tenantId": "t13",
+   "at": "2026-01-10T15:40:00",
+   "kind": "cancel",
+   "plan": "business",
+   "mrrDelta": -149
+  },
+  {
+   "id": "SUB-14",
+   "tenantId": "t13",
+   "at": "2026-02-15T10:05:00",
+   "kind": "reactivate",
+   "plan": "business",
+   "mrrDelta": 149
+  },
+  {
+   "id": "SUB-15",
+   "tenantId": "t9",
+   "at": "2026-03-05T11:15:00",
+   "kind": "upgrade",
+   "plan": "business",
+   "mrrDelta": 100
+  },
+  {
+   "id": "SUB-16",
+   "tenantId": "t4",
+   "at": "2026-05-12T13:00:00",
+   "kind": "downgrade",
+   "plan": "starter",
+   "mrrDelta": -100
+  },
+  {
+   "id": "SUB-17",
+   "tenantId": "t8",
+   "at": "2026-09-30T14:20:00",
+   "kind": "cancel",
+   "plan": "starter",
+   "mrrDelta": -49
+  },
+  {
+   "id": "SUB-18",
+   "tenantId": "t14",
+   "at": "2026-09-30T14:20:00",
+   "kind": "cancel",
+   "plan": "starter",
+   "mrrDelta": -49
+  },
+  {
+   "id": "SUB-19",
+   "tenantId": "t4",
+   "at": "2026-10-14T11:30:00",
+   "kind": "upgrade",
+   "plan": "business",
+   "mrrDelta": 100
+  }
+ ]
+}

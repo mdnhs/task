@@ -1,16 +1,17 @@
 {
   "domain": "opsdesk.app",
   "defaultPlan": "business",
+  "locale": "en-IE",
   "countries": [
-    { "code": "GB", "name": "United Kingdom", "timezone": "Europe/London" },
     { "code": "IE", "name": "Ireland", "timezone": "Europe/Dublin" },
+    { "code": "GB", "name": "United Kingdom", "timezone": "Europe/London" },
     { "code": "DE", "name": "Germany", "timezone": "Europe/Berlin" },
     { "code": "US", "name": "United States", "timezone": "America/New_York" },
     { "code": "AE", "name": "United Arab Emirates", "timezone": "Asia/Dubai" }
   ],
   "timezones": [
-    { "value": "Europe/London", "label": "UK time (Europe/London)" },
     { "value": "Europe/Dublin", "label": "Irish time (Europe/Dublin)" },
+    { "value": "Europe/London", "label": "UK time (Europe/London)" },
     { "value": "Europe/Berlin", "label": "Central European time (Europe/Berlin)" },
     { "value": "America/New_York", "label": "US Eastern time (America/New_York)" },
     { "value": "Asia/Dubai", "label": "Gulf time (Asia/Dubai)" }

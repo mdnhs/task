@@ -1,7 +1,8 @@
 @AGENTS.md
 
 # Product
-Multi-tenant **SaaS** (SRS v1.1 §3.20). Billing goes through Stripe now, behind a provider-agnostic billing module so more payment methods can be added later.
+Modular multi-tenant **SaaS** ("AI Business OS", modules M0–M9; see SRS). Phase 1 = M0 platform + M1 tasks and shift reports for the first client.
+Billing goes through Stripe now, behind a provider-agnostic billing module so more payment methods can be added later (FR-M0-14).
 Never hard-code tenant-specific values (company, departments, deadline, timezone, branding).
 
 # Architecture: read first
@@ -17,4 +18,5 @@ Never hard-code tenant-specific values (company, departments, deadline, timezone
 - `.claude/docs/00-design-system/brief.md`: design tokens and hard rules
 - `.claude/docs/README.md`: index of per-feature docs
 - Mock data lives in `public/data/<feature>/*.json`, read by `features/<feature>/api.ts` via `lib/data.ts`
-- `.claude/docs/requirements/SRS.md`: full project requirements (SRS v1.1, incl. SaaS). Check it before building any feature.
+- `.claude/docs/requirements/SRS.md`: the main spec (AI Business OS, by the BA). Check it before building any feature; Appendix A has build status and the Phase 1 plan.
+  `SRS-v1.2-built.md` is the old OpsDesk spec, kept as the record of what was built (old IDs like `FR-TASK-14` in code comments point there).

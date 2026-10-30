@@ -8,9 +8,10 @@ import { Field } from "@/components/field"
 import { FilterSelect } from "@/components/filter-bar"
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
-import { auditEntry, nextId, nowIso } from "../logic"
-import { auditStore, requestsStore } from "../store"
+import { nextId, nowIso, sensitiveEntry } from "../logic"
+import { auditOutbox, knownAudit, requestsStore } from "../store"
 import type { PlatformTenant } from "../types"
+import type { Operator } from "./tenants-view"
 
 const schema = z.object({
   tenantId: z.string().min(1, "Choose a tenant"),
@@ -19,8 +20,10 @@ const schema = z.object({
 type Errors = Partial<Record<"tenantId" | "reason", string>>
 
 // The tenant's admin has to grant it before anything is visible (FR-SAAS-09); this only files the request.
-export function RequestDialog({ tenants, open, onOpenChange, actor, today }: { tenants: PlatformTenant[]; open: boolean; onOpenChange(o: boolean): void; actor: string; today: string }) {
-  const [tenantId, setTenantId] = useState("")
+// `initialTenantId`: preselected when opened from a tenant (the tenants list's "Request support access").
+// The requester and the audit actor are the operator (name + staff role, D7), never the session role's label.
+export function RequestDialog({ tenants, open, onOpenChange, operator, today, initialTenantId = "" }: { tenants: Pick<PlatformTenant, "id" | "name">[]; open: boolean; onOpenChange(o: boolean): void; operator: Operator; today: string; initialTenantId?: string }) {
+  const [tenantId, setTenantId] = useState(initialTenantId)
   const [reason, setReason] = useState("")
   const [errors, setErrors] = useState<Errors>({})
 
@@ -48,11 +51,16 @@ export function RequestDialog({ tenants, open, onOpenChange, actor, today }: { t
     const tenant = tenants.find((t) => t.id === parsed.data.tenantId)
     if (!tenant) return
     const at = nowIso(today)
+    const id = nextId("SUP", (requestsStore.get() ?? []).map((r) => r.id))
+    const line = sensitiveEntry(knownAudit(), {
+      at, actor: operator.name, staffRole: operator.role, tenantId: tenant.id, action: "support.requested", target: tenant.name,
+      detail: `Support access requested: ${parsed.data.reason}`, before: {}, after: { request: id, status: "requested" }, reason: parsed.data.reason,
+    })
     requestsStore.set((all) => [
-      { id: nextId("SUP", all.map((r) => r.id)), tenantId: tenant.id, requester: actor, reason: parsed.data.reason, status: "requested", requestedAt: at, expiresAt: null, grantedBy: null },
+      { id, tenantId: tenant.id, requester: operator.name, reason: parsed.data.reason, status: "requested", requestedAt: at, expiresAt: null, grantedBy: null },
       ...all,
     ])
-    auditStore.set((all) => [auditEntry(all, at, actor, "support.requested", tenant.name, `Support access requested: ${parsed.data.reason}`), ...all])
+    auditOutbox.set((list) => [line, ...list])
     toast.success(`Support access requested from ${tenant.name}`)
     close(false)
   }

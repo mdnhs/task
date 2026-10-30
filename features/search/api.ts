@@ -1,16 +1,33 @@
 import { getData } from "@/lib/data"
-import { ME_ID } from "@/lib/people"
+import { getOrg } from "@/lib/org"
+import { ME_ID, getPeople } from "@/lib/people"
+import { reportScope } from "@/lib/permissions"
+import { reportState, scopeReports } from "@/lib/shift-report"
+import { getShiftReportData } from "@/lib/shift-reports-data"
 import type { Module, Role } from "@/lib/types"
 
 import { buildIndex, filterActionsForRole, filterIndexForRole, filterPopularForRole, type RawSources } from "./build"
 import type { QuickAction, SearchConfig, SearchItem } from "./types"
 
 // Reads the JSON files directly (not other features' api.ts) so features stay independent.
-async function getSources(): Promise<RawSources> {
+// Shift reports (FR-M1-28) come from the shared report model, cut to what the role may see (own / team / all).
+async function getShiftReports(role: Role): Promise<RawSources["reports"]> {
+  const org = await getOrg()
+  const [{ rows, shifts }, people] = await Promise.all([getShiftReportData(org), getPeople()])
+  const scope = reportScope(role, ME_ID)
+  if (!scope) return []
+  const name = (id: string) => people.find((p) => p.id === id)?.name ?? id
+  return scopeReports(rows, scope, shifts.members).map((r) => ({
+    id: r.id, date: r.date, dept: r.team, owner: r.personId, status: reportState(r, org.today, org.timezone),
+    title: `Shift report: ${name(r.personId)}, ${r.shiftName}, ${r.date}`,
+  }))
+}
+
+async function getSources(role: Role): Promise<RawSources> {
   const [people, tasks, reports, issues, payroll, orders, staff, candidates, clients, documents] = await Promise.all([
     getData<{ people: RawSources["people"] }>("tasks/people.json"),
     getData<{ tasks: RawSources["tasks"] }>("tasks/tasks.json"),
-    getData<{ reports: RawSources["reports"] }>("reports/reports.json"),
+    getShiftReports(role),
     getData<{ items: RawSources["issues"] }>("attention/items.json"),
     getData<{ issues: RawSources["payroll"] }>("payroll/issues.json"),
     getData<{ orders: RawSources["orders"] }>("orders/orders.json"),
@@ -22,7 +39,7 @@ async function getSources(): Promise<RawSources> {
   return {
     people: people.people,
     tasks: tasks.tasks,
-    reports: reports.reports,
+    reports,
     issues: issues.items,
     payroll: payroll.issues,
     orders: orders.orders,
@@ -36,7 +53,7 @@ async function getSources(): Promise<RawSources> {
 /** The role-filtered index plus quick actions and popular searches. Call on the server only. */
 export async function getSearchData(role: Role): Promise<{ items: SearchItem[]; config: SearchConfig }> {
   const [src, popular, actions] = await Promise.all([
-    getSources(),
+    getSources(role),
     getData<{ popular: { term: string; module: Module }[] }>("search/popular.json"),
     getData<{ actions: QuickAction[] }>("search/actions.json"),
   ])

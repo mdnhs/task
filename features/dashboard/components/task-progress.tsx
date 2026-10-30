@@ -23,6 +23,7 @@ export function TaskProgress({ data }: { data: TaskProgressData }) {
   const inView = useInView(ref, { once: true, margin: "0px 0px -10% 0px" })
   const reduce = useReducedMotion()
   const k = w / 220
+  const total = data.legend.reduce((n, l) => n + l.count, 0) || 1
   return (
     <div className="card">
       <div className="card-head"><h2>{data.title}</h2></div>
@@ -44,11 +45,11 @@ export function TaskProgress({ data }: { data: TaskProgressData }) {
                 endAngle={180 - 180 * l.to}
                 cx={110 * k}
                 cy={124 * k}
-                innerRadius={60 * k}
+                innerRadius={74 * k}
                 outerRadius={104 * k}
                 stroke="var(--card)"
                 strokeWidth={3}
-                cornerRadius={22 * k}
+                cornerRadius={15 * k}
                 fill={l.fill}
                 isAnimationActive={!reduce}
                 animationBegin={150}
@@ -63,11 +64,26 @@ export function TaskProgress({ data }: { data: TaskProgressData }) {
             <div className="gauge-lbl">{data.label}</div>
           </div>
         </div>
-        <div className="gauge-legend">
-          {data.legend.map((l) => (
-            <span key={l.key}><i className={`sw ${l.key}`} />{l.label} <b className="num">{l.count}</b></span>
-          ))}
-        </div>
+        {/* Breakdown: each status with its count, share of the week and a thin meter (fills once in view, like the arcs). */}
+        <ul className="gauge-list">
+          {data.legend.map((l, i) => {
+            const pct = Math.round((l.count / total) * 100)
+            return (
+              <li key={l.key}>
+                <div className="gl-row">
+                  <i className={`sw ${l.key}`} />
+                  <span className="gl-lbl">{l.label}</span>
+                  <b className="num"><CountUp value={String(l.count)} delay={0.15} duration={1} /></b>
+                  <span className="gl-pct num">{pct}%</span>
+                </div>
+                {/* scaleX fill (transform only), staggered 60ms per row, held until the gauge is in view */}
+                <div className="gl-track">
+                  <span className={`gl-fill ${l.key}`} data-on={inView || undefined} style={{ width: `${pct}%`, transitionDelay: `${150 + i * 60}ms` }} />
+                </div>
+              </li>
+            )
+          })}
+        </ul>
       </div>
     </div>
   )

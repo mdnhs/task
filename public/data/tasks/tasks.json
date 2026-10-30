@@ -11,7 +11,19 @@
    "start": "2026-10-09T09:00:00",
    "due": "2026-10-12T17:00:00",
    "status": "completed",
-   "evidenceRequired": true,
+   "evidenceRule": {
+    "mode": "required",
+    "types": [
+     "photo",
+     "image",
+     "pdf",
+     "office",
+     "note"
+    ],
+    "min": 1,
+    "instruction": "",
+    "review": "manager"
+   },
    "client": "Canary Wharf",
    "tags": [
     "fire",
@@ -23,19 +35,34 @@
    "evidence": [
     {
      "id": "TSK-1001-E1",
-     "kind": "image",
+     "kind": "photo",
      "name": "photo-1.jpg",
      "by": "Daniel Okafor",
      "at": "2026-10-19T15:00:00",
-     "review": "accepted"
+     "review": "accepted",
+     "source": "camera",
+     "round": 1,
+     "locked": true
     },
     {
      "id": "TSK-1001-E2",
-     "kind": "file",
+     "kind": "pdf",
      "name": "checklist.pdf",
      "by": "Daniel Okafor",
      "at": "2026-10-19T15:00:00",
-     "review": "accepted"
+     "review": "accepted",
+     "round": 1,
+     "locked": true
+    },
+    {
+     "id": "TSK-1001-E3",
+     "kind": "drive",
+     "name": "https://drive.google.com/file/d/1fireAlarmLog/view",
+     "by": "Daniel Okafor",
+     "at": "2026-10-19T15:10:00",
+     "review": "accepted",
+     "round": 1,
+     "locked": true
     }
    ],
    "timeline": [
@@ -65,7 +92,9 @@
     "days": [
      1
     ]
-   }
+   },
+   "projectId": "PRJ-1",
+   "milestoneId": "PRJ-1-M1"
   },
   {
    "ref": "TSK-1002",
@@ -78,7 +107,19 @@
    "start": "2026-10-10T09:00:00",
    "due": "2026-10-13T12:00:00",
    "status": "completed",
-   "evidenceRequired": true,
+   "evidenceRule": {
+    "mode": "required",
+    "types": [
+     "photo",
+     "image",
+     "pdf",
+     "office",
+     "note"
+    ],
+    "min": 1,
+    "instruction": "",
+    "review": "manager"
+   },
    "client": "Riverside House",
    "tags": [
     "deep-clean"
@@ -89,19 +130,24 @@
    "evidence": [
     {
      "id": "TSK-1002-E1",
-     "kind": "image",
+     "kind": "photo",
      "name": "photo-1.jpg",
      "by": "Amara Kone",
      "at": "2026-10-19T15:00:00",
-     "review": "accepted"
+     "review": "accepted",
+     "source": "camera",
+     "round": 1,
+     "locked": true
     },
     {
      "id": "TSK-1002-E2",
      "kind": "note",
-     "name": "site-note",
+     "name": "Area finished, supplies restocked, nothing unusual.",
      "by": "Amara Kone",
      "at": "2026-10-19T15:00:00",
-     "review": "accepted"
+     "review": "accepted",
+     "round": 1,
+     "locked": true
     }
    ],
    "timeline": [
@@ -125,7 +171,9 @@
      "by": "Lilianna Novak",
      "text": "Completed, approved by Lilianna Novak"
     }
-   ]
+   ],
+   "projectId": "PRJ-2",
+   "milestoneId": "PRJ-2-M1"
   },
   {
    "ref": "TSK-1003",
@@ -138,7 +186,13 @@
    "start": "2026-10-10T09:00:00",
    "due": "2026-10-13T17:00:00",
    "status": "completed",
-   "evidenceRequired": false,
+   "evidenceRule": {
+    "mode": "none",
+    "types": [],
+    "min": 0,
+    "instruction": "",
+    "review": "manager"
+   },
    "tags": [
     "rota"
    ],
@@ -180,7 +234,19 @@
    "start": "2026-10-11T09:00:00",
    "due": "2026-10-14T15:00:00",
    "status": "completed",
-   "evidenceRequired": true,
+   "evidenceRule": {
+    "mode": "required",
+    "types": [
+     "photo",
+     "image",
+     "pdf",
+     "office",
+     "note"
+    ],
+    "min": 1,
+    "instruction": "",
+    "review": "manager"
+   },
    "client": "Shoreditch",
    "tags": [
     "carpet"
@@ -191,19 +257,24 @@
    "evidence": [
     {
      "id": "TSK-1004-E1",
-     "kind": "image",
+     "kind": "photo",
      "name": "photo-1.jpg",
      "by": "Nadia Rahman",
      "at": "2026-10-19T15:00:00",
-     "review": "accepted"
+     "review": "accepted",
+     "source": "camera",
+     "round": 1,
+     "locked": true
     },
     {
      "id": "TSK-1004-E2",
      "kind": "note",
-     "name": "site-note",
+     "name": "Area finished, supplies restocked, nothing unusual.",
      "by": "Nadia Rahman",
      "at": "2026-10-19T15:00:00",
-     "review": "accepted"
+     "review": "accepted",
+     "round": 1,
+     "locked": true
     }
    ],
    "timeline": [
@@ -240,7 +311,13 @@
    "start": "2026-10-11T09:00:00",
    "due": "2026-10-14T11:00:00",
    "status": "completed",
-   "evidenceRequired": false,
+   "evidenceRule": {
+    "mode": "none",
+    "types": [],
+    "min": 0,
+    "instruction": "",
+    "review": "manager"
+   },
    "client": "Shoreditch",
    "tags": [
     "access"
@@ -283,7 +360,13 @@
    "start": "2026-10-12T09:00:00",
    "due": "2026-10-15T10:00:00",
    "status": "completed",
-   "evidenceRequired": false,
+   "evidenceRule": {
+    "mode": "none",
+    "types": [],
+    "min": 0,
+    "instruction": "",
+    "review": "manager"
+   },
    "tags": [
     "stock"
    ],
@@ -325,7 +408,19 @@
    "start": "2026-10-12T09:00:00",
    "due": "2026-10-15T16:00:00",
    "status": "completed",
-   "evidenceRequired": true,
+   "evidenceRule": {
+    "mode": "required",
+    "types": [
+     "photo",
+     "image",
+     "pdf",
+     "office",
+     "note"
+    ],
+    "min": 1,
+    "instruction": "",
+    "review": "manager"
+   },
    "client": "Canary Wharf",
    "tags": [
     "cctv"
@@ -336,19 +431,24 @@
    "evidence": [
     {
      "id": "TSK-1007-E1",
-     "kind": "image",
+     "kind": "photo",
      "name": "photo-1.jpg",
      "by": "Daniel Okafor",
      "at": "2026-10-19T15:00:00",
-     "review": "accepted"
+     "review": "accepted",
+     "source": "camera",
+     "round": 1,
+     "locked": true
     },
     {
      "id": "TSK-1007-E2",
-     "kind": "file",
+     "kind": "pdf",
      "name": "checklist.pdf",
      "by": "Daniel Okafor",
      "at": "2026-10-19T15:00:00",
-     "review": "accepted"
+     "review": "accepted",
+     "round": 1,
+     "locked": true
     }
    ],
    "timeline": [
@@ -385,7 +485,19 @@
    "start": "2026-10-13T09:00:00",
    "due": "2026-10-16T14:00:00",
    "status": "completed",
-   "evidenceRequired": true,
+   "evidenceRule": {
+    "mode": "required",
+    "types": [
+     "photo",
+     "image",
+     "pdf",
+     "office",
+     "note"
+    ],
+    "min": 1,
+    "instruction": "",
+    "review": "manager"
+   },
    "client": "Riverside House",
    "tags": [
     "windows"
@@ -396,19 +508,24 @@
    "evidence": [
     {
      "id": "TSK-1008-E1",
-     "kind": "image",
+     "kind": "photo",
      "name": "photo-1.jpg",
      "by": "Owen Price",
      "at": "2026-10-19T15:00:00",
-     "review": "accepted"
+     "review": "accepted",
+     "source": "camera",
+     "round": 1,
+     "locked": true
     },
     {
      "id": "TSK-1008-E2",
      "kind": "note",
-     "name": "site-note",
+     "name": "Area finished, supplies restocked, nothing unusual.",
      "by": "Owen Price",
      "at": "2026-10-19T15:00:00",
-     "review": "accepted"
+     "review": "accepted",
+     "round": 1,
+     "locked": true
     }
    ],
    "timeline": [
@@ -445,7 +562,13 @@
    "start": "2026-10-13T09:00:00",
    "due": "2026-10-16T12:00:00",
    "status": "completed",
-   "evidenceRequired": false,
+   "evidenceRule": {
+    "mode": "none",
+    "types": [],
+    "min": 0,
+    "instruction": "",
+    "review": "manager"
+   },
    "tags": [
     "hr",
     "induction"
@@ -488,7 +611,13 @@
    "start": "2026-10-14T09:00:00",
    "due": "2026-10-17T17:00:00",
    "status": "cancelled",
-   "evidenceRequired": false,
+   "evidenceRule": {
+    "mode": "none",
+    "types": [],
+    "min": 0,
+    "instruction": "",
+    "review": "manager"
+   },
    "client": "Aldgate",
    "tags": [
     "trial"
@@ -519,7 +648,13 @@
    "start": "2026-10-14T09:00:00",
    "due": "2026-10-17T12:00:00",
    "status": "cancelled",
-   "evidenceRequired": false,
+   "evidenceRule": {
+    "mode": "none",
+    "types": [],
+    "min": 0,
+    "instruction": "",
+    "review": "manager"
+   },
    "tags": [
     "hr"
    ],
@@ -549,7 +684,17 @@
    "start": "2026-10-17T09:00:00",
    "due": "2026-10-20T16:00:00",
    "status": "submitted",
-   "evidenceRequired": true,
+   "evidenceRule": {
+    "mode": "required",
+    "types": [
+     "photo",
+     "image",
+     "note"
+    ],
+    "min": 2,
+    "instruction": "Photo of the cleaned area, wide angle",
+    "review": "manager"
+   },
    "client": "Riverside House",
    "tags": [
     "carpet"
@@ -559,19 +704,24 @@
    "evidence": [
     {
      "id": "TSK-1012-E1",
-     "kind": "image",
+     "kind": "photo",
      "name": "photo-1.jpg",
      "by": "Nadia Rahman",
      "at": "2026-10-19T15:00:00",
-     "review": "pending"
+     "review": "pending",
+     "source": "camera",
+     "round": 1,
+     "locked": true
     },
     {
      "id": "TSK-1012-E2",
      "kind": "note",
-     "name": "site-note",
+     "name": "Area finished, supplies restocked, nothing unusual.",
      "by": "Nadia Rahman",
      "at": "2026-10-19T15:00:00",
-     "review": "pending"
+     "review": "pending",
+     "round": 1,
+     "locked": true
     }
    ],
    "timeline": [
@@ -603,7 +753,13 @@
    "start": "2026-10-20T09:00:00",
    "due": "2026-10-23T12:00:00",
    "status": "in_progress",
-   "evidenceRequired": false,
+   "evidenceRule": {
+    "mode": "none",
+    "types": [],
+    "min": 0,
+    "instruction": "",
+    "review": "manager"
+   },
    "tags": [
     "safety"
    ],
@@ -633,7 +789,19 @@
    "start": "2026-10-19T09:00:00",
    "due": "2026-10-22T17:00:00",
    "status": "not_started",
-   "evidenceRequired": true,
+   "evidenceRule": {
+    "mode": "required",
+    "types": [
+     "photo",
+     "image",
+     "pdf",
+     "office",
+     "note"
+    ],
+    "min": 1,
+    "instruction": "",
+    "review": "manager"
+   },
    "client": "Docklands",
    "tags": [
     "access"
@@ -646,7 +814,10 @@
      "by": "Lilianna Novak",
      "text": "Created by Lilianna Novak"
     }
-   ]
+   ],
+   "projectId": "PRJ-1",
+   "milestoneId": "PRJ-1-M1",
+   "estimate": 90
   },
   {
    "ref": "TSK-1015",
@@ -659,7 +830,13 @@
    "start": "2026-10-21T09:00:00",
    "due": "2026-10-24T11:00:00",
    "status": "not_started",
-   "evidenceRequired": false,
+   "evidenceRule": {
+    "mode": "none",
+    "types": [],
+    "min": 0,
+    "instruction": "",
+    "review": "manager"
+   },
    "client": "Riverside House",
    "tags": [
     "pest"
@@ -685,7 +862,13 @@
    "start": "2026-10-15T09:00:00",
    "due": "2026-10-18T17:00:00",
    "status": "not_started",
-   "evidenceRequired": false,
+   "evidenceRule": {
+    "mode": "none",
+    "types": [],
+    "min": 0,
+    "instruction": "",
+    "review": "manager"
+   },
    "client": "Canary Wharf",
    "tags": [
     "windows"
@@ -717,7 +900,13 @@
    "start": "2026-10-22T09:00:00",
    "due": "2026-10-25T16:00:00",
    "status": "in_progress",
-   "evidenceRequired": false,
+   "evidenceRule": {
+    "mode": "none",
+    "types": [],
+    "min": 0,
+    "instruction": "",
+    "review": "manager"
+   },
    "tags": [
     "hr"
    ],
@@ -747,7 +936,13 @@
    "start": "2026-10-18T09:00:00",
    "due": "2026-10-21T07:30:00",
    "status": "in_progress",
-   "evidenceRequired": false,
+   "evidenceRule": {
+    "mode": "none",
+    "types": [],
+    "min": 0,
+    "instruction": "",
+    "review": "manager"
+   },
    "client": "Shoreditch",
    "tags": [
     "handover"
@@ -778,7 +973,19 @@
    "start": "2026-10-16T09:00:00",
    "due": "2026-10-19T10:00:00",
    "status": "blocked",
-   "evidenceRequired": true,
+   "evidenceRule": {
+    "mode": "required",
+    "types": [
+     "photo",
+     "image",
+     "pdf",
+     "office",
+     "note"
+    ],
+    "min": 1,
+    "instruction": "",
+    "review": "manager"
+   },
    "tags": [
     "sia",
     "compliance"
@@ -807,7 +1014,9 @@
     "nextAction": "Retry once portal reopens, escalate if still down",
     "owner": "Priya Shah",
     "revisedDue": "2026-10-22T17:00:00"
-   }
+   },
+   "projectId": "PRJ-1",
+   "milestoneId": "PRJ-1-M1"
   },
   {
    "ref": "TSK-1020",
@@ -820,7 +1029,13 @@
    "start": "2026-10-23T09:00:00",
    "due": "2026-10-26T13:00:00",
    "status": "not_started",
-   "evidenceRequired": false,
+   "evidenceRule": {
+    "mode": "none",
+    "types": [],
+    "min": 0,
+    "instruction": "",
+    "review": "manager"
+   },
    "tags": [
     "equipment"
    ],
@@ -845,7 +1060,19 @@
    "start": "2026-10-17T09:00:00",
    "due": "2026-10-20T15:00:00",
    "status": "submitted",
-   "evidenceRequired": true,
+   "evidenceRule": {
+    "mode": "required",
+    "types": [
+     "photo",
+     "image",
+     "pdf",
+     "office",
+     "note"
+    ],
+    "min": 1,
+    "instruction": "",
+    "review": "manager"
+   },
    "tags": [
     "stock",
     "weekly"
@@ -855,19 +1082,24 @@
    "evidence": [
     {
      "id": "TSK-1021-E1",
-     "kind": "image",
+     "kind": "photo",
      "name": "photo-1.jpg",
      "by": "Tomasz Wójcik",
      "at": "2026-10-19T15:00:00",
-     "review": "pending"
+     "review": "pending",
+     "source": "camera",
+     "round": 1,
+     "locked": true
     },
     {
      "id": "TSK-1021-E2",
-     "kind": "file",
+     "kind": "pdf",
      "name": "checklist.pdf",
      "by": "Tomasz Wójcik",
      "at": "2026-10-19T15:00:00",
-     "review": "pending"
+     "review": "pending",
+     "round": 1,
+     "locked": true
     }
    ],
    "timeline": [
@@ -899,7 +1131,13 @@
    "start": "2026-10-24T09:00:00",
    "due": "2026-10-27T10:00:00",
    "status": "not_started",
-   "evidenceRequired": false,
+   "evidenceRule": {
+    "mode": "none",
+    "types": [],
+    "min": 0,
+    "instruction": "",
+    "review": "manager"
+   },
    "client": "Riverside House",
    "tags": [
     "training"
@@ -925,7 +1163,13 @@
    "start": "2026-10-25T09:00:00",
    "due": "2026-10-28T12:00:00",
    "status": "not_started",
-   "evidenceRequired": false,
+   "evidenceRule": {
+    "mode": "none",
+    "types": [],
+    "min": 0,
+    "instruction": "",
+    "review": "manager"
+   },
    "tags": [
     "access"
    ],
@@ -937,7 +1181,13 @@
      "by": "Lilianna Novak",
      "text": "Created by Lilianna Novak"
     }
-   ]
+   ],
+   "projectId": "PRJ-1",
+   "milestoneId": "PRJ-1-M1",
+   "dependsOn": [
+    "TSK-1014"
+   ],
+   "estimate": 60
   },
   {
    "ref": "TSK-1024",
@@ -950,7 +1200,19 @@
    "start": "2026-10-16T09:00:00",
    "due": "2026-10-19T18:00:00",
    "status": "in_progress",
-   "evidenceRequired": true,
+   "evidenceRule": {
+    "mode": "required",
+    "types": [
+     "photo",
+     "image",
+     "pdf",
+     "office",
+     "note"
+    ],
+    "min": 1,
+    "instruction": "",
+    "review": "manager"
+   },
    "client": "Shoreditch",
    "tags": [
     "alarm",
@@ -988,7 +1250,16 @@
    "start": "2026-10-18T09:00:00",
    "due": "2026-10-21T16:00:00",
    "status": "in_progress",
-   "evidenceRequired": true,
+   "evidenceRule": {
+    "mode": "required",
+    "types": [
+     "photo",
+     "checklist"
+    ],
+    "min": 2,
+    "instruction": "Before and after photo of each floor, then the checklist",
+    "review": "manager"
+   },
    "client": "Aldgate",
    "tags": [
     "deep-clean"
@@ -1006,6 +1277,34 @@
      "by": "Amara Kone",
      "text": "Started by Amara Kone"
     }
+   ],
+   "assignees": [
+    "p-nadia"
+   ],
+   "estimate": 240,
+   "projectId": "PRJ-2",
+   "milestoneId": "PRJ-2-M1",
+   "checklist": [
+    {
+     "id": "c1",
+     "text": "Level 1",
+     "done": true
+    },
+    {
+     "id": "c2",
+     "text": "Level 2",
+     "done": true
+    },
+    {
+     "id": "c3",
+     "text": "Level 3",
+     "done": false
+    },
+    {
+     "id": "c4",
+     "text": "Restock supplies",
+     "done": false
+    }
    ]
   },
   {
@@ -1019,7 +1318,13 @@
    "start": "2026-10-26T09:00:00",
    "due": "2026-10-29T15:00:00",
    "status": "not_started",
-   "evidenceRequired": false,
+   "evidenceRule": {
+    "mode": "none",
+    "types": [],
+    "min": 0,
+    "instruction": "",
+    "review": "manager"
+   },
    "tags": [
     "policy"
    ],
@@ -1044,7 +1349,19 @@
    "start": "2026-10-16T09:00:00",
    "due": "2026-10-19T13:00:00",
    "status": "changes_requested",
-   "evidenceRequired": true,
+   "evidenceRule": {
+    "mode": "required",
+    "types": [
+     "photo",
+     "image",
+     "pdf",
+     "office",
+     "note"
+    ],
+    "min": 1,
+    "instruction": "",
+    "review": "manager"
+   },
    "client": "Shoreditch",
    "tags": [
     "incident"
@@ -1053,20 +1370,25 @@
    "evidence": [
     {
      "id": "TSK-1027-E1",
-     "kind": "image",
+     "kind": "photo",
      "name": "photo-1.jpg",
      "by": "Marcus Hill",
      "at": "2026-10-19T15:00:00",
      "review": "rejected",
-     "reason": "Photo is unclear, please re-upload."
+     "reason": "Photo is unclear, please re-upload.",
+     "source": "camera",
+     "round": 1,
+     "locked": true
     },
     {
      "id": "TSK-1027-E2",
-     "kind": "file",
+     "kind": "pdf",
      "name": "checklist.pdf",
      "by": "Marcus Hill",
      "at": "2026-10-19T15:00:00",
-     "review": "pending"
+     "review": "pending",
+     "round": 1,
+     "locked": true
     }
    ],
    "timeline": [
@@ -1104,7 +1426,19 @@
    "start": "2026-10-19T09:00:00",
    "due": "2026-10-22T11:00:00",
    "status": "changes_requested",
-   "evidenceRequired": true,
+   "evidenceRule": {
+    "mode": "required",
+    "types": [
+     "photo",
+     "image",
+     "pdf",
+     "office",
+     "note"
+    ],
+    "min": 1,
+    "instruction": "",
+    "review": "manager"
+   },
    "client": "Canary Wharf",
    "tags": [
     "client"
@@ -1113,20 +1447,25 @@
    "evidence": [
     {
      "id": "TSK-1028-E1",
-     "kind": "image",
+     "kind": "photo",
      "name": "photo-1.jpg",
      "by": "Daniel Okafor",
      "at": "2026-10-19T15:00:00",
      "review": "rejected",
-     "reason": "Photo is unclear, please re-upload."
+     "reason": "Photo is unclear, please re-upload.",
+     "source": "camera",
+     "round": 1,
+     "locked": true
     },
     {
      "id": "TSK-1028-E2",
      "kind": "note",
-     "name": "site-note",
+     "name": "Area finished, supplies restocked, nothing unusual.",
      "by": "Daniel Okafor",
      "at": "2026-10-19T15:00:00",
-     "review": "pending"
+     "review": "pending",
+     "round": 1,
+     "locked": true
     }
    ],
    "timeline": [
@@ -1158,7 +1497,13 @@
    "start": "2026-10-17T09:00:00",
    "due": "2026-10-20T17:00:00",
    "status": "not_started",
-   "evidenceRequired": false,
+   "evidenceRule": {
+    "mode": "none",
+    "types": [],
+    "min": 0,
+    "instruction": "",
+    "review": "manager"
+   },
    "client": "Riverside House",
    "tags": [
     "restock"
@@ -1184,7 +1529,17 @@
    "start": "2026-10-18T09:00:00",
    "due": "2026-10-21T14:00:00",
    "status": "in_progress",
-   "evidenceRequired": true,
+   "evidenceRule": {
+    "mode": "required",
+    "types": [
+     "photo",
+     "image",
+     "video"
+    ],
+    "min": 1,
+    "instruction": "Short video walk-through of the store room",
+    "review": "auto"
+   },
    "client": "Riverside House",
    "tags": [
     "audit"
@@ -1202,7 +1557,9 @@
      "by": "Owen Price",
      "text": "Started by Owen Price"
     }
-   ]
+   ],
+   "projectId": "PRJ-2",
+   "estimate": 45
   },
   {
    "ref": "TSK-1031",
@@ -1215,7 +1572,13 @@
    "start": "2026-10-16T09:00:00",
    "due": "2026-10-19T16:00:00",
    "status": "blocked",
-   "evidenceRequired": false,
+   "evidenceRule": {
+    "mode": "none",
+    "types": [],
+    "min": 0,
+    "instruction": "",
+    "review": "manager"
+   },
    "tags": [
     "stock"
    ],
@@ -1262,7 +1625,13 @@
    "start": "2026-10-19T09:00:00",
    "due": "2026-10-22T09:30:00",
    "status": "not_started",
-   "evidenceRequired": false,
+   "evidenceRule": {
+    "mode": "none",
+    "types": [],
+    "min": 0,
+    "instruction": "",
+    "review": "manager"
+   },
    "tags": [
     "stock"
    ],
@@ -1274,7 +1643,9 @@
      "by": "Lilianna Novak",
      "text": "Created by Lilianna Novak"
     }
-   ]
+   ],
+   "parentRef": "TSK-1031",
+   "estimate": 30
   },
   {
    "ref": "TSK-1033",
@@ -1287,7 +1658,19 @@
    "start": "2026-10-17T09:00:00",
    "due": "2026-10-20T12:00:00",
    "status": "submitted",
-   "evidenceRequired": true,
+   "evidenceRule": {
+    "mode": "required",
+    "types": [
+     "photo",
+     "image",
+     "pdf",
+     "office",
+     "note"
+    ],
+    "min": 1,
+    "instruction": "",
+    "review": "manager"
+   },
    "client": "Canary Wharf",
    "tags": [
     "incident"
@@ -1303,19 +1686,24 @@
    "evidence": [
     {
      "id": "TSK-1033-E1",
-     "kind": "image",
+     "kind": "photo",
      "name": "photo-1.jpg",
      "by": "Daniel Okafor",
      "at": "2026-10-19T15:00:00",
-     "review": "pending"
+     "review": "pending",
+     "source": "camera",
+     "round": 1,
+     "locked": true
     },
     {
      "id": "TSK-1033-E2",
-     "kind": "file",
+     "kind": "pdf",
      "name": "checklist.pdf",
      "by": "Daniel Okafor",
      "at": "2026-10-19T15:00:00",
-     "review": "pending"
+     "review": "pending",
+     "round": 1,
+     "locked": true
     }
    ],
    "timeline": [
@@ -1347,7 +1735,16 @@
    "start": "2026-10-20T09:00:00",
    "due": "2026-10-23T16:00:00",
    "status": "in_progress",
-   "evidenceRequired": false,
+   "evidenceRule": {
+    "mode": "optional",
+    "types": [
+     "photo",
+     "note"
+    ],
+    "min": 0,
+    "instruction": "",
+    "review": "auto"
+   },
    "client": "Docklands",
    "tags": [
     "patrol"
@@ -1378,7 +1775,13 @@
    "start": "2026-10-18T09:00:00",
    "due": "2026-10-21T17:00:00",
    "status": "in_progress",
-   "evidenceRequired": false,
+   "evidenceRule": {
+    "mode": "none",
+    "types": [],
+    "min": 0,
+    "instruction": "",
+    "review": "manager"
+   },
    "tags": [
     "recruitment"
    ],
@@ -1408,7 +1811,19 @@
    "start": "2026-10-17T09:00:00",
    "due": "2026-10-20T14:00:00",
    "status": "submitted",
-   "evidenceRequired": true,
+   "evidenceRule": {
+    "mode": "required",
+    "types": [
+     "photo",
+     "image",
+     "pdf",
+     "office",
+     "note"
+    ],
+    "min": 1,
+    "instruction": "",
+    "review": "manager"
+   },
    "client": "Riverside House",
    "tags": [
     "audit"
@@ -1418,19 +1833,24 @@
    "evidence": [
     {
      "id": "TSK-1036-E1",
-     "kind": "image",
+     "kind": "photo",
      "name": "photo-1.jpg",
      "by": "Daniel Okafor",
      "at": "2026-10-19T15:00:00",
-     "review": "pending"
+     "review": "pending",
+     "source": "camera",
+     "round": 1,
+     "locked": true
     },
     {
      "id": "TSK-1036-E2",
      "kind": "note",
-     "name": "site-note",
+     "name": "Area finished, supplies restocked, nothing unusual.",
      "by": "Daniel Okafor",
      "at": "2026-10-19T15:00:00",
-     "review": "pending"
+     "review": "pending",
+     "round": 1,
+     "locked": true
     }
    ],
    "timeline": [
@@ -1462,7 +1882,13 @@
    "start": "2026-10-21T09:00:00",
    "due": "2026-10-24T14:00:00",
    "status": "not_started",
-   "evidenceRequired": false,
+   "evidenceRule": {
+    "mode": "none",
+    "types": [],
+    "min": 0,
+    "instruction": "",
+    "review": "manager"
+   },
    "tags": [
     "induction"
    ],
@@ -1487,7 +1913,19 @@
    "start": "2026-10-16T09:00:00",
    "due": "2026-10-19T17:00:00",
    "status": "submitted",
-   "evidenceRequired": true,
+   "evidenceRule": {
+    "mode": "required",
+    "types": [
+     "photo",
+     "image",
+     "pdf",
+     "office",
+     "note"
+    ],
+    "min": 1,
+    "instruction": "",
+    "review": "manager"
+   },
    "client": "Riverside House",
    "tags": [
     "deep-clean"
@@ -1497,19 +1935,24 @@
    "evidence": [
     {
      "id": "TSK-1038-E1",
-     "kind": "image",
+     "kind": "photo",
      "name": "photo-1.jpg",
      "by": "Grace Mensah",
      "at": "2026-10-19T15:00:00",
-     "review": "pending"
+     "review": "pending",
+     "source": "camera",
+     "round": 1,
+     "locked": true
     },
     {
      "id": "TSK-1038-E2",
      "kind": "note",
-     "name": "site-note",
+     "name": "Area finished, supplies restocked, nothing unusual.",
      "by": "Grace Mensah",
      "at": "2026-10-19T15:00:00",
-     "review": "pending"
+     "review": "pending",
+     "round": 1,
+     "locked": true
     }
    ],
    "timeline": [
@@ -1534,7 +1977,9 @@
     "nextAction": "Reviewer to approve today",
     "owner": "Grace Mensah",
     "revisedDue": "2026-10-20T17:00:00"
-   }
+   },
+   "projectId": "PRJ-2",
+   "milestoneId": "PRJ-2-M1"
   },
   {
    "ref": "TSK-1039",
@@ -1547,7 +1992,13 @@
    "start": "2026-10-20T09:00:00",
    "due": "2026-10-23T10:00:00",
    "status": "not_started",
-   "evidenceRequired": false,
+   "evidenceRule": {
+    "mode": "none",
+    "types": [],
+    "min": 0,
+    "instruction": "",
+    "review": "manager"
+   },
    "client": "Shoreditch",
    "tags": [
     "admin"
@@ -1560,7 +2011,15 @@
      "by": "Lilianna Novak",
      "text": "Created by Lilianna Novak"
     }
-   ]
+   ],
+   "estimate": 60,
+   "proposal": {
+    "start": "2026-10-20T09:00:00",
+    "due": "2026-10-27T10:00:00",
+    "reason": "Waiting for the new visitor badges to arrive.",
+    "by": "Daniel Okafor",
+    "at": "2026-10-19T16:10:00"
+   }
   },
   {
    "ref": "TSK-1040",
@@ -1573,7 +2032,13 @@
    "start": "2026-10-17T09:00:00",
    "due": "2026-10-20T13:00:00",
    "status": "in_progress",
-   "evidenceRequired": false,
+   "evidenceRule": {
+    "mode": "none",
+    "types": [],
+    "min": 0,
+    "instruction": "",
+    "review": "manager"
+   },
    "client": "Riverside House",
    "tags": [
     "hygiene"
@@ -1604,7 +2069,19 @@
    "start": "2026-10-18T09:00:00",
    "due": "2026-10-21T18:00:00",
    "status": "changes_requested",
-   "evidenceRequired": true,
+   "evidenceRule": {
+    "mode": "required",
+    "types": [
+     "photo",
+     "image",
+     "pdf",
+     "office",
+     "note"
+    ],
+    "min": 1,
+    "instruction": "",
+    "review": "manager"
+   },
    "tags": [
     "patrol"
    ],
@@ -1612,20 +2089,25 @@
    "evidence": [
     {
      "id": "TSK-1041-E1",
-     "kind": "image",
+     "kind": "photo",
      "name": "photo-1.jpg",
      "by": "Marcus Hill",
      "at": "2026-10-19T15:00:00",
      "review": "rejected",
-     "reason": "Photo is unclear, please re-upload."
+     "reason": "Photo is unclear, please re-upload.",
+     "source": "camera",
+     "round": 1,
+     "locked": true
     },
     {
      "id": "TSK-1041-E2",
-     "kind": "file",
+     "kind": "pdf",
      "name": "checklist.pdf",
      "by": "Marcus Hill",
      "at": "2026-10-19T15:00:00",
-     "review": "pending"
+     "review": "pending",
+     "round": 1,
+     "locked": true
     }
    ],
    "timeline": [
@@ -1657,7 +2139,19 @@
    "start": "2026-10-17T09:00:00",
    "due": "2026-10-20T15:00:00",
    "status": "completed",
-   "evidenceRequired": true,
+   "evidenceRule": {
+    "mode": "required",
+    "types": [
+     "photo",
+     "image",
+     "pdf",
+     "office",
+     "note"
+    ],
+    "min": 1,
+    "instruction": "",
+    "review": "manager"
+   },
    "client": "Canary Wharf",
    "tags": [
     "patrol"
@@ -1668,19 +2162,24 @@
    "evidence": [
     {
      "id": "TSK-1042-E1",
-     "kind": "image",
+     "kind": "photo",
      "name": "photo-1.jpg",
      "by": "Daniel Okafor",
      "at": "2026-10-19T15:00:00",
-     "review": "accepted"
+     "review": "accepted",
+     "source": "camera",
+     "round": 1,
+     "locked": true
     },
     {
      "id": "TSK-1042-E2",
      "kind": "note",
-     "name": "site-note",
+     "name": "Area finished, supplies restocked, nothing unusual.",
      "by": "Daniel Okafor",
      "at": "2026-10-19T15:00:00",
-     "review": "accepted"
+     "review": "accepted",
+     "round": 1,
+     "locked": true
     }
    ],
    "timeline": [
@@ -1717,7 +2216,13 @@
    "start": "2026-10-18T09:00:00",
    "due": "2026-10-21T09:30:00",
    "status": "in_progress",
-   "evidenceRequired": false,
+   "evidenceRule": {
+    "mode": "none",
+    "types": [],
+    "min": 0,
+    "instruction": "",
+    "review": "manager"
+   },
    "client": "Canary Wharf",
    "tags": [
     "briefing"
@@ -1735,7 +2240,8 @@
      "by": "Daniel Okafor",
      "text": "Started by Daniel Okafor"
     }
-   ]
+   ],
+   "estimate": 20
   },
   {
    "ref": "TSK-1044",
@@ -1748,7 +2254,13 @@
    "start": "2026-10-15T09:00:00",
    "due": "2026-10-18T12:00:00",
    "status": "blocked",
-   "evidenceRequired": false,
+   "evidenceRule": {
+    "mode": "none",
+    "types": [],
+    "min": 0,
+    "instruction": "",
+    "review": "manager"
+   },
    "tags": [
     "stock",
     "ppe"
@@ -1790,7 +2302,13 @@
    "start": "2026-10-19T09:00:00",
    "due": "2026-10-22T12:00:00",
    "status": "in_progress",
-   "evidenceRequired": false,
+   "evidenceRule": {
+    "mode": "none",
+    "types": [],
+    "min": 0,
+    "instruction": "",
+    "review": "manager"
+   },
    "tags": [
     "rota"
    ],
@@ -1820,7 +2338,19 @@
    "start": "2026-10-17T09:00:00",
    "due": "2026-10-20T17:00:00",
    "status": "submitted",
-   "evidenceRequired": true,
+   "evidenceRule": {
+    "mode": "required",
+    "types": [
+     "photo",
+     "image",
+     "pdf",
+     "office",
+     "note"
+    ],
+    "min": 1,
+    "instruction": "",
+    "review": "manager"
+   },
    "client": "Docklands",
    "tags": [
     "patrol",
@@ -1831,19 +2361,24 @@
    "evidence": [
     {
      "id": "TSK-1046-E1",
-     "kind": "image",
+     "kind": "photo",
      "name": "photo-1.jpg",
      "by": "Leo Fernandez",
      "at": "2026-10-19T15:00:00",
-     "review": "pending"
+     "review": "pending",
+     "source": "camera",
+     "round": 1,
+     "locked": true
     },
     {
      "id": "TSK-1046-E2",
      "kind": "note",
-     "name": "site-note",
+     "name": "Area finished, supplies restocked, nothing unusual.",
      "by": "Leo Fernandez",
      "at": "2026-10-19T15:00:00",
-     "review": "pending"
+     "review": "pending",
+     "round": 1,
+     "locked": true
     }
    ],
    "timeline": [
@@ -1875,7 +2410,15 @@
    "start": "2026-10-19T09:00:00",
    "due": "2026-10-22T15:00:00",
    "status": "in_progress",
-   "evidenceRequired": true,
+   "evidenceRule": {
+    "mode": "required",
+    "types": [
+     "pdf"
+    ],
+    "min": 2,
+    "instruction": "Signed fire test sheet and the call point log, both as PDF",
+    "review": "manager"
+   },
    "client": "Canary Wharf",
    "tags": [
     "fire"
@@ -1893,6 +2436,29 @@
      "by": "Daniel Okafor",
      "text": "Started by Daniel Okafor"
     }
+   ],
+   "assignees": [
+    "p-leo"
+   ],
+   "estimate": 120,
+   "projectId": "PRJ-1",
+   "milestoneId": "PRJ-1-M2",
+   "checklist": [
+    {
+     "id": "c1",
+     "text": "Test every call point",
+     "done": true
+    },
+    {
+     "id": "c2",
+     "text": "Log results in the fire book",
+     "done": false
+    },
+    {
+     "id": "c3",
+     "text": "Reset the panel and sign off",
+     "done": false
+    }
    ]
   },
   {
@@ -1906,7 +2472,19 @@
    "start": "2026-10-17T09:00:00",
    "due": "2026-10-20T15:30:00",
    "status": "submitted",
-   "evidenceRequired": true,
+   "evidenceRule": {
+    "mode": "required",
+    "types": [
+     "photo",
+     "image",
+     "pdf",
+     "office",
+     "note"
+    ],
+    "min": 1,
+    "instruction": "",
+    "review": "manager"
+   },
    "client": "Riverside House",
    "tags": [
     "deep-clean"
@@ -1916,19 +2494,24 @@
    "evidence": [
     {
      "id": "TSK-1048-E1",
-     "kind": "image",
+     "kind": "photo",
      "name": "photo-1.jpg",
      "by": "Amara Kone",
      "at": "2026-10-19T15:00:00",
-     "review": "pending"
+     "review": "pending",
+     "source": "camera",
+     "round": 1,
+     "locked": true
     },
     {
      "id": "TSK-1048-E2",
      "kind": "note",
-     "name": "site-note",
+     "name": "Area finished, supplies restocked, nothing unusual.",
      "by": "Amara Kone",
      "at": "2026-10-19T15:00:00",
-     "review": "pending"
+     "review": "pending",
+     "round": 1,
+     "locked": true
     }
    ],
    "timeline": [
@@ -1947,7 +2530,9 @@
      "by": "Amara Kone",
      "text": "Submitted for review by Amara Kone"
     }
-   ]
+   ],
+   "projectId": "PRJ-2",
+   "milestoneId": "PRJ-2-M2"
   },
   {
    "ref": "TSK-1049",
@@ -1960,7 +2545,13 @@
    "start": "2026-10-22T09:00:00",
    "due": "2026-10-25T12:00:00",
    "status": "in_progress",
-   "evidenceRequired": false,
+   "evidenceRule": {
+    "mode": "none",
+    "types": [],
+    "min": 0,
+    "instruction": "",
+    "review": "manager"
+   },
    "tags": [
     "equipment"
    ],
@@ -1990,7 +2581,17 @@
    "start": "2026-10-21T09:00:00",
    "due": "2026-10-24T10:00:00",
    "status": "not_started",
-   "evidenceRequired": false,
+   "evidenceRule": {
+    "mode": "optional",
+    "types": [
+     "photo",
+     "image",
+     "note"
+    ],
+    "min": 0,
+    "instruction": "A photo if anything is damaged",
+    "review": "manager"
+   },
    "tags": [
     "equipment"
    ],
@@ -2002,7 +2603,9 @@
      "by": "Lilianna Novak",
      "text": "Created by Lilianna Novak"
     }
-   ]
+   ],
+   "parentRef": "TSK-1047",
+   "estimate": 30
   },
   {
    "ref": "TSK-1051",
@@ -2015,7 +2618,19 @@
    "start": "2026-10-18T09:00:00",
    "due": "2026-10-21T12:00:00",
    "status": "blocked",
-   "evidenceRequired": true,
+   "evidenceRule": {
+    "mode": "required",
+    "types": [
+     "photo",
+     "image",
+     "pdf",
+     "office",
+     "note"
+    ],
+    "min": 1,
+    "instruction": "",
+    "review": "manager"
+   },
    "client": "Canary Wharf",
    "tags": [
     "cctv"
@@ -2051,7 +2666,13 @@
    "start": "2026-10-27T09:00:00",
    "due": "2026-10-30T12:00:00",
    "status": "not_started",
-   "evidenceRequired": false,
+   "evidenceRule": {
+    "mode": "none",
+    "types": [],
+    "min": 0,
+    "instruction": "",
+    "review": "manager"
+   },
    "tags": [
     "hr"
    ],
@@ -2076,7 +2697,19 @@
    "start": "2026-10-17T09:00:00",
    "due": "2026-10-20T14:00:00",
    "status": "submitted",
-   "evidenceRequired": true,
+   "evidenceRule": {
+    "mode": "required",
+    "types": [
+     "photo",
+     "image",
+     "pdf",
+     "office",
+     "note"
+    ],
+    "min": 1,
+    "instruction": "",
+    "review": "manager"
+   },
    "client": "Canary Wharf",
    "tags": [
     "audit"
@@ -2086,19 +2719,24 @@
    "evidence": [
     {
      "id": "TSK-1053-E1",
-     "kind": "image",
+     "kind": "photo",
      "name": "photo-1.jpg",
      "by": "Marcus Hill",
      "at": "2026-10-19T15:00:00",
-     "review": "pending"
+     "review": "pending",
+     "source": "camera",
+     "round": 1,
+     "locked": true
     },
     {
      "id": "TSK-1053-E2",
-     "kind": "file",
+     "kind": "pdf",
      "name": "checklist.pdf",
      "by": "Marcus Hill",
      "at": "2026-10-19T15:00:00",
-     "review": "pending"
+     "review": "pending",
+     "round": 1,
+     "locked": true
     }
    ],
    "timeline": [
@@ -2130,7 +2768,13 @@
    "start": "2026-10-23T09:00:00",
    "due": "2026-10-26T16:00:00",
    "status": "not_started",
-   "evidenceRequired": false,
+   "evidenceRule": {
+    "mode": "none",
+    "types": [],
+    "min": 0,
+    "instruction": "",
+    "review": "manager"
+   },
    "client": "Aldgate",
    "tags": [
     "floors"
@@ -2143,7 +2787,10 @@
      "by": "Lilianna Novak",
      "text": "Created by Lilianna Novak"
     }
-   ]
+   ],
+   "projectId": "PRJ-2",
+   "milestoneId": "PRJ-2-M2",
+   "estimate": 150
   },
   {
    "ref": "TSK-1055",
@@ -2156,7 +2803,13 @@
    "start": "2026-10-18T09:00:00",
    "due": "2026-10-21T11:00:00",
    "status": "in_progress",
-   "evidenceRequired": false,
+   "evidenceRule": {
+    "mode": "none",
+    "types": [],
+    "min": 0,
+    "instruction": "",
+    "review": "manager"
+   },
    "client": "Shoreditch",
    "tags": [
     "incident"
@@ -2187,7 +2840,18 @@
    "start": "2026-10-20T09:00:00",
    "due": "2026-10-23T15:00:00",
    "status": "not_started",
-   "evidenceRequired": true,
+   "evidenceRule": {
+    "mode": "required",
+    "types": [
+     "photo",
+     "signature",
+     "note"
+    ],
+    "min": 1,
+    "instruction": "Photo of the posted notice, signed off on site",
+    "review": "named",
+    "reviewer": "p-grace"
+   },
    "tags": [
     "safety"
    ],
@@ -2212,7 +2876,13 @@
    "start": "2026-10-18T09:00:00",
    "due": "2026-10-21T10:00:00",
    "status": "submitted",
-   "evidenceRequired": false,
+   "evidenceRule": {
+    "mode": "none",
+    "types": [],
+    "min": 0,
+    "instruction": "",
+    "review": "manager"
+   },
    "tags": [
     "hr"
    ],
@@ -2248,7 +2918,17 @@
    "start": "2026-10-24T09:00:00",
    "due": "2026-10-27T17:00:00",
    "status": "not_started",
-   "evidenceRequired": true,
+   "evidenceRule": {
+    "mode": "required",
+    "types": [
+     "pdf",
+     "office",
+     "drive"
+    ],
+    "min": 1,
+    "instruction": "The risk assessment document",
+    "review": "creator"
+   },
    "client": "Docklands",
    "tags": [
     "risk"
@@ -2261,7 +2941,13 @@
      "by": "Lilianna Novak",
      "text": "Created by Lilianna Novak"
     }
-   ]
+   ],
+   "projectId": "PRJ-1",
+   "milestoneId": "PRJ-1-M2",
+   "dependsOn": [
+    "TSK-1023"
+   ],
+   "estimate": 180
   },
   {
    "ref": "TSK-1059",
@@ -2274,7 +2960,13 @@
    "start": "2026-10-19T09:00:00",
    "due": "2026-10-22T16:00:00",
    "status": "not_started",
-   "evidenceRequired": false,
+   "evidenceRule": {
+    "mode": "none",
+    "types": [],
+    "min": 0,
+    "instruction": "",
+    "review": "manager"
+   },
    "client": "Shoreditch",
    "tags": [
     "rota"
@@ -2300,7 +2992,13 @@
    "start": "2026-10-21T09:00:00",
    "due": "2026-10-24T17:00:00",
    "status": "in_progress",
-   "evidenceRequired": false,
+   "evidenceRule": {
+    "mode": "none",
+    "types": [],
+    "min": 0,
+    "instruction": "",
+    "review": "manager"
+   },
    "client": "Shoreditch",
    "tags": [
     "rota"
@@ -2317,6 +3015,66 @@
      "at": "2026-10-21T10:00:00",
      "by": "Marcus Hill",
      "text": "Started by Marcus Hill"
+    }
+   ]
+  },
+  {
+   "ref": "TSK-1061",
+   "title": "Old visitor log template",
+   "description": "Replace the paper visitor log with the new template. Superseded by the digital sign-in.",
+   "dept": "Security",
+   "assignee": "p-marcus",
+   "creator": "p-lilianna",
+   "priority": 1,
+   "start": "2026-10-05T09:00:00",
+   "due": "2026-10-09T17:00:00",
+   "status": "cancelled",
+   "evidenceRule": {
+    "mode": "none",
+    "types": [],
+    "min": 0,
+    "instruction": "",
+    "review": "manager"
+   },
+   "tags": [
+    "admin"
+   ],
+   "archivedAt": "2026-10-12T11:00:00",
+   "archivedBy": "Lilianna Novak",
+   "notes": [],
+   "evidence": [],
+   "timeline": [
+    {
+     "at": "2026-10-05T08:30:00",
+     "by": "Lilianna Novak",
+     "text": "Created by Lilianna Novak"
+    },
+    {
+     "at": "2026-10-08T10:00:00",
+     "by": "Lilianna Novak",
+     "text": "Status changed Not Started → Cancelled",
+     "changes": [
+      {
+       "field": "Status",
+       "from": "Not Started",
+       "to": "Cancelled"
+      }
+     ]
+    },
+    {
+     "at": "2026-10-12T11:00:00",
+     "by": "Lilianna Novak",
+     "text": "Task archived (restorable for 30 days)",
+     "changes": [
+      {
+       "field": "Archived",
+       "from": "No",
+       "to": "Yes"
+      }
+     ],
+     "notified": [
+      "Marcus Hill"
+     ]
     }
    ]
   }

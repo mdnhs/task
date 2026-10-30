@@ -1,29 +1,35 @@
-import { getData } from "@/lib/data"
-import type { Session } from "@/lib/session"
+import { getOrg } from "@/lib/org"
 import { ME_ID, getPeople } from "@/lib/people"
-import type { Report, TemplateSection } from "./types"
-
-export async function getReports() {
-  const [{ sections }, { reports }, people] = await Promise.all([
-    getData<{ sections: TemplateSection[] }>("reports/template.json"),
-    getData<{ reports: Report[] }>("reports/reports.json"),
-    getPeople(),
-  ])
-  return { template: sections, reports, people }
-}
+import { reportScope } from "@/lib/permissions"
+import type { Session } from "@/lib/session"
+import { scopeReports, templateFor, type TemplateSection } from "@/lib/shift-report"
+import { getShiftReportData } from "@/lib/shift-reports-data"
+import type { ReportsSeed } from "./types"
 
 /**
- * The one place that decides what the reports store is seeded with (Task 10's /daily-reports/[id] reuses it, so the same
- * seed + scopeKey keeps local edits). Staff roles only get the reports they own; they act as "me" (mock).
+ * Server only. The one place that decides what the reports store is seeded with (/daily-reports and /daily-reports/[id]
+ * share it, so the same seed + scopeKey keeps in-session edits). Staff get only their own reports and their own tasks;
+ * a team-scoped manager only their team's. Nothing else reaches the client.
  */
-export async function getReportSeed(session: Session) {
-  const { template, reports, people } = await getReports()
-  const staff = session.role.home === "staff"
+export async function getReportSeed(session: Session): Promise<ReportsSeed | null> {
+  const scope = reportScope(session.role, ME_ID)
+  if (!scope) return null
+  const org = await getOrg()
+  const [{ rows, template, shifts, range }, people] = await Promise.all([getShiftReportData(org), getPeople()])
+  const reports = scopeReports(rows, scope, shifts.members)
+  const meId = scope.kind === "own" ? scope.personId : session.role.person ?? ""
+  const ids = new Set([...reports.map((r) => r.personId), meId])
+  const teams = org.departments.filter((t) => reports.some((r) => r.team === t))
+  const templates: Record<string, TemplateSection[]> = Object.fromEntries(teams.map((t) => [t, templateFor(t, template)]))
   return {
-    template,
-    people,
-    staff,
-    seed: staff ? reports.filter((r) => r.owner === ME_ID) : reports,
-    scopeKey: `${session.tenant.id}:${staff ? ME_ID : "all"}`,
+    reports,
+    templates,
+    people: people.filter((p) => ids.has(p.id)),
+    teams,
+    scope: scope.kind,
+    meId,
+    scopeKey: `${session.tenant.id}:${session.role.id}`,
+    range,
+    dueAfterMinutes: shifts.reporting.dueAfterMinutes,
   }
 }

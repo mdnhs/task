@@ -1,8 +1,8 @@
 /* auth feature styles: sign-in, forgot password, sign-up, onboarding. Card on --panel, no AppShell. */
-.auth{min-height:100dvh;background:var(--panel);display:grid;place-items:center;padding:24px 16px}
+.auth{min-height:calc(100dvh / var(--text-scale,1));background:var(--panel);display:grid;place-items:center;padding:24px 16px}
 .auth-card{width:min(560px,100%);background:var(--card);border-radius:var(--r-xl);padding:32px;display:flex;flex-direction:column;gap:24px;min-width:0}
 .auth-logo{display:flex;align-items:center;gap:12px;min-width:0}
-.auth-logo-mark{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;color:#fff;font-weight:700;font-size:14px;flex:none}
+.auth-logo-mark{width:38px;height:38px;border-radius:calc(12px * var(--radius-scale,1));display:grid;place-items:center;color:#fff;font-weight:700;font-size:14px;flex:none}
 .auth-logo-name{font-weight:700;font-size:15px;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .auth-form{display:flex;flex-direction:column;gap:16px;min-width:0}
 .auth-head h1{margin:0;font-size:24px;font-weight:700;letter-spacing:-.02em;line-height:32px;color:var(--ink)}
@@ -84,3 +84,13 @@
   .auth-list>li:not(.auth-invite){flex-wrap:wrap}
   .auth-matrix-head,.auth-matrix-row{grid-template-columns:minmax(0,1fr) repeat(var(--auth-cols,2),minmax(52px,auto));gap:8px}
 }
+
+/* Single sign-on buttons (mock) and the divider before the email form */
+.auth-sso{display:flex;flex-direction:column;gap:10px}
+.auth-sso .btn{justify-content:center;width:100%;min-height:48px;gap:10px;cursor:pointer}
+.auth-sso .btn:disabled{opacity:.55;cursor:not-allowed}
+.auth-sso-mark{width:20px;height:20px;border-radius:calc(6px * var(--radius-scale,1));display:grid;place-items:center;background:var(--shell);font-size:12px;font-weight:800}
+.auth-or{margin:0;display:flex;align-items:center;gap:12px;font-size:12.5px;line-height:20px;color:var(--ink-3)}
+.auth-or::before,.auth-or::after{content:"";flex:1;height:1px;background:color-mix(in srgb,var(--ink) 10%,transparent)}
+.auth-or>span{flex:none}
+.auth-or>.sk-line{flex:1}

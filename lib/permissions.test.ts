@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest"
-import { can, canReview, canWriteFor, filterNav, moduleForHref } from "./permissions"
+import { can, canReview, canWriteFor, filterNav, moduleForHref, reportScope, shiftScope } from "./permissions"
 import type { Access, Module, Role } from "./types"
 
-const mods: Module[] = ["dashboard", "tasks", "reports", "attention", "staff", "recruitment", "files", "payroll", "orders", "settings", "audit"]
+const mods: Module[] = ["dashboard", "tasks", "reports", "attention", "staff", "shifts", "recruitment", "files", "payroll", "orders", "settings", "audit"]
 const mk = (id: string, over: Partial<Record<Module, Access>>): Role => ({
   id,
   label: id,
@@ -50,4 +50,20 @@ describe("canReview", () => {
   it("staff-home writer does not", () => expect(canReview(mk("supervisor", { reports: "write" }))).toBe(false))
   it("manager-home reader does not", () => expect(canReview({ ...auditor, home: "manager" })).toBe(false))
   it("suspended tenant does not", () => expect(canReview(manager, "suspended")).toBe(false))
+})
+
+describe("shiftScope", () => {
+  it("maps /shifts to the shifts module", () => expect(moduleForHref("/shifts")).toBe("shifts"))
+  it("write roles see everyone", () => expect(shiftScope(mk("ops", { shifts: "write" }))).toBe("all"))
+  it("staff-home readers see only their own", () => expect(shiftScope(mk("employee", { shifts: "read" }))).toBe("own"))
+  it("manager-home readers (auditor) see everyone read-only", () => expect(shiftScope({ ...mk("auditor", { shifts: "read" }), home: "manager" })).toBe("all"))
+  it("no access", () => expect(shiftScope(mk("platform", {}))).toBe("none"))
+})
+
+describe("reportScope (FR-M1-28)", () => {
+  it("staff-home roles see their own", () => expect(reportScope(mk("employee", { reports: "read" }), "p-me")).toEqual({ kind: "own", personId: "p-me" }))
+  it("a team-scoped manager sees the people below their person", () =>
+    expect(reportScope({ ...mk("manager", { reports: "write" }), home: "manager", person: "p-lead", reportScope: "team" }, "p-me")).toEqual({ kind: "team", managerId: "p-lead" }))
+  it("other manager-home roles see all", () => expect(reportScope({ ...mk("ops", { reports: "write" }), home: "manager" }, "p-me")).toEqual({ kind: "all" }))
+  it("no access", () => expect(reportScope(mk("hr", {}), "p-me")).toBeNull())
 })

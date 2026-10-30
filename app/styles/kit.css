@@ -11,6 +11,10 @@
 .od-filters [data-slot="select-trigger"].od-filter-select{height:auto;min-width:140px;padding:10px 14px;border:0;border-radius:var(--r-pill);background:var(--mute-bg);color:var(--ink);font-size:13.5px;font-weight:600;box-shadow:none}
 .od-filters [data-slot="select-trigger"].od-filter-select:focus-visible{box-shadow:0 0 0 2px var(--brand);outline:none}
 /* The topbar hides .seg on phones; a filter pill group must stay visible and scroll instead */
+/* In-page tabs: one look everywhere, a grey track inside cards and panels with the green sliding pill (FilterSeg). */
+.seg.od-seg{background:var(--mute-bg);max-width:100%;overflow-x:auto;scrollbar-width:none}
+.seg.od-seg::-webkit-scrollbar{display:none}
+.seg.od-seg button{white-space:nowrap}
 .od-filters .seg.od-seg{display:flex;background:var(--mute-bg);max-width:100%;overflow-x:auto;scrollbar-width:none}
 .od-filters .seg.od-seg::-webkit-scrollbar{display:none}
 .od-filters .seg.od-seg button{white-space:nowrap}
@@ -25,7 +29,7 @@
 
 /* ---------- Dialog (alert dialog + dialog) ---------- */
 [data-slot="alert-dialog-overlay"]{animation-duration:var(--dur);animation-fill-mode:both;background:rgba(10,20,14,.35)}
-.od-dialog{background:var(--card);color:var(--ink);border:0;border-radius:var(--r-xl);padding:28px;gap:20px;width:min(440px,calc(100vw - 24px));max-width:none;box-shadow:0 24px 60px rgba(16,40,24,.18);--tw-ring-shadow:0 0 #0000;outline:none;animation-duration:var(--dur);animation-fill-mode:both;font-family:var(--font)}
+.od-dialog{background:var(--card);color:var(--ink);border:0;border-radius:var(--r-xl);padding:28px;gap:20px;width:min(440px,calc(calc(100vw / var(--text-scale,1)) - 24px));max-width:none;box-shadow:0 24px 60px rgba(16,40,24,.18);--tw-ring-shadow:0 0 #0000;outline:none;animation-duration:var(--dur);animation-fill-mode:both;font-family:var(--font)}
 :root[data-theme="dark"] .od-dialog{box-shadow:0 24px 60px rgba(0,0,0,.55)}
 .od-dialog [data-slot="alert-dialog-title"]{margin:0;font-size:20px;font-weight:700;letter-spacing:-.01em;color:var(--ink)}
 .od-dialog [data-slot="alert-dialog-description"]{margin:6px 0 0;font-size:14px;line-height:1.5;color:var(--ink-2)}
@@ -38,7 +42,7 @@
 @media (max-width:640px){.od-dialog{padding:22px}.od-dialog [data-slot="alert-dialog-footer"] .btn{flex:1}}
 
 /* ---------- Detail sheet (right panel; bottom sheet on phones) ---------- */
-.od-sheet{top:18px;bottom:18px;right:18px;height:auto;width:min(480px,calc(100vw - 24px));max-width:none;border:0;border-radius:var(--r-xl);background:var(--shell);color:var(--ink);padding:0;gap:0;overflow:hidden;box-shadow:0 24px 60px rgba(16,40,24,.18);font-family:var(--font);transition-duration:var(--dur-slow);transition-timing-function:var(--ease)}
+.od-sheet{top:18px;bottom:18px;right:18px;height:auto;width:min(480px,calc(calc(100vw / var(--text-scale,1)) - 24px));max-width:none;border:0;border-radius:var(--r-xl);background:var(--shell);color:var(--ink);padding:0;gap:0;overflow:hidden;box-shadow:0 24px 60px rgba(16,40,24,.18);font-family:var(--font);transition-duration:var(--dur-slow);transition-timing-function:var(--ease)}
 .od-sheet:focus-visible{outline:none}
 .od-sheet-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:24px 24px 16px}
 .od-sheet-head [data-slot="sheet-title"]{margin:0;font-size:20px;font-weight:700;letter-spacing:-.01em;color:var(--ink)}
@@ -51,7 +55,7 @@
 :root[data-theme="dark"] .od-sheet-x:hover{color:var(--brand-3)}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .od-sheet-x:hover{color:var(--brand-3)}}
 @media (max-width:720px){
-  .od-sheet[data-side="right"]{top:auto;left:12px;right:12px;bottom:12px;width:auto;height:auto;max-height:85dvh;border-radius:var(--r-xl)}
+  .od-sheet[data-side="right"]{top:auto;left:12px;right:12px;bottom:12px;width:auto;height:auto;max-height:calc(85dvh / var(--text-scale,1));border-radius:var(--r-xl)}
   .od-sheet[data-side="right"][data-starting-style],.od-sheet[data-side="right"][data-ending-style]{translate:0 2.5rem}
 }
 
@@ -179,13 +183,17 @@
 :root[data-theme="dark"] .od-pop[data-slot="popover-content"]{box-shadow:0 16px 40px rgba(0,0,0,.55)}
 
 /* Form dialogs (Dialog primitive wearing .od-dialog): tasks, reports, dashboard */
-.od-form-dialog{width:min(600px,calc(100vw - 24px));max-height:calc(100dvh - 32px);overflow-y:auto;overscroll-behavior:contain}
+.od-form-dialog{width:min(600px,calc(calc(100vw / var(--text-scale,1)) - 24px));max-height:calc(calc(100dvh / var(--text-scale,1)) - 32px);overflow-y:auto;overscroll-behavior:contain}
 .od-form-dialog [data-slot="dialog-header"]{display:block;text-align:left}
 .od-form-dialog [data-slot="dialog-title"]{margin:0;font-size:20px;font-weight:700;letter-spacing:-.01em;color:var(--ink)}
 .od-form-dialog [data-slot="dialog-description"]{margin:6px 0 0;font-size:14px;line-height:1.5;color:var(--ink-2)}
 .od-form{display:flex;flex-direction:column;gap:16px}
 .od-row2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 .od-row3{display:grid;grid-template-columns:1.3fr 1.3fr 1fr;gap:14px}
+/* Form pages: two columns on wide screens so most of the form shows in the first view; the foot spans both. */
+.od-form-cols{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px 32px;align-items:start}
+.od-form-col{display:flex;flex-direction:column;gap:16px;min-width:0}
+@media (max-width:1100px){.od-form-cols{grid-template-columns:minmax(0,1fr)}}
 .od-form-foot{display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap}
 .od-form-foot .btn{justify-content:center;padding:11px 20px;cursor:pointer;border:1.6px solid transparent}
 .od-form-foot .btn-outline{border-color:var(--brand)}
@@ -350,7 +358,80 @@
 
 /* Ghost text for skeleton tables: the real text, transparent, on the skeleton tint. It wraps like the loaded text, so
    table column widths and row heights match. .st / .dep-tag keep their own padding and pill shape. */
-.sk-ghost{color:transparent !important;background:color-mix(in srgb,var(--ink) 8%,transparent);border-radius:4px;-webkit-box-decoration-break:clone;box-decoration-break:clone;user-select:none}
+.sk-ghost{color:transparent !important;background:color-mix(in srgb,var(--ink) 8%,transparent);border-radius:calc(4px * var(--radius-scale,1));-webkit-box-decoration-break:clone;box-decoration-break:clone;user-select:none}
+.sk-ghost .od-tz{color:transparent}
+/* SkMask (components/sk.tsx): the real page, masked. Leaf elements (text, pills, inputs) become tinted blocks, everything else keeps its own surface. */
+.sk-mask{display:contents}
+.sk-mask *{color:transparent !important;border-color:transparent !important;text-shadow:none !important;caret-color:transparent;animation:none !important;transition:none !important}
+.sk-mask :is(:not(:has(*)),.btn,.pill-btn,.st,.dep-tag,.avatar){background:color-mix(in srgb,var(--ink) 8%,transparent) !important;border-radius:calc(6px * var(--radius-scale,1));box-shadow:none !important}
+.sk-mask :is(.btn,.pill-btn){border-radius:calc(14px * var(--radius-scale,1))}
+.sk-mask :is(.st,.dep-tag){border-radius:calc(8px * var(--radius-scale,1))}
+.sk-mask :is(svg,img,.avatar){visibility:hidden}
+.sk-mask .avatar{visibility:visible}
 .st.sk-ghost,.dep-tag.sk-ghost{border-color:transparent;background:color-mix(in srgb,var(--ink) 8%,transparent)}
 .btn.sk-ghost-btn{color:transparent !important;pointer-events:none;background:color-mix(in srgb,var(--ink) 8%,transparent);border-color:transparent}
 .sk-ghost-btn .pf-count{border-color:transparent}
+
+/* Voice instructions (components/voice-note.tsx): recorder + player. Same language as the WhatsApp voice note (.wa-voice). */
+.vn-player{display:flex;align-items:center;gap:10px;min-width:0}
+.vn-play{width:36px;height:36px;flex:none;border-radius:50%;display:grid;place-items:center;background:var(--brand);color:var(--on-brand);transition:background var(--dur-fast) var(--ease)}
+.vn-play:hover{background:var(--brand-deep)}
+.vn-play:focus-visible,.vn-mic:focus-visible,.vn-stop:focus-visible,.vn-link:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+.vn-play svg{width:16px;height:16px;fill:currentColor}
+.vn-track{position:relative;flex:1;min-width:90px;height:30px;display:flex;align-items:center;border-radius:calc(6px * var(--radius-scale,1))}
+.vn-track:has(.vn-seek:focus-visible){outline:2px solid var(--brand);outline-offset:3px}
+.vn-bar{position:relative;width:100%;height:6px;border-radius:var(--r-pill);background:color-mix(in srgb,var(--ink-3) 35%,transparent);overflow:hidden;pointer-events:none}
+.vn-bar i,.vn-meter i{position:absolute;inset:0;border-radius:inherit;background:var(--brand);transform-origin:left center;transition:transform var(--dur-fast) linear}
+.vn-seek{position:absolute;inset:0;width:100%;height:100%;margin:0;opacity:0;cursor:pointer}
+.vn-dur{flex:none;font-size:12px;color:var(--ink-3);text-align:right;white-space:nowrap}
+.vn-idle{display:flex;flex-direction:column;align-items:flex-start;gap:8px}
+.vn-mic,.vn-stop{display:inline-flex;align-items:center;gap:8px;min-height:40px;padding:8px 16px;border-radius:var(--r-pill);font-size:13.5px;font-weight:600;cursor:pointer;transition:background var(--dur-fast) var(--ease),color var(--dur-fast) var(--ease)}
+.vn-mic{background:var(--card);color:var(--brand-deep)}
+.vn-mic:hover{background:var(--brand-soft)}
+.vn-mic:disabled{cursor:default;color:var(--ink-3);background:var(--card)}
+.vn-mic svg,.vn-stop svg{width:16px;height:16px;flex:none}
+.vn-stop{background:var(--bad-bg);color:var(--bad);margin-left:auto}
+.vn-stop svg{fill:currentColor}
+.vn-hint{margin:0;font-size:12.5px;line-height:18px;color:var(--ink-2)}
+.vn-rec{display:flex;align-items:center;flex-wrap:wrap;gap:8px 10px;min-height:40px}
+.vn-dot{width:10px;height:10px;border-radius:50%;background:var(--bad);flex:none;animation:vn-pulse 1.2s var(--ease) infinite}
+@keyframes vn-pulse{50%{opacity:.35}}
+.vn-rec-t{font-size:13.5px;font-weight:700;color:var(--ink)}
+.vn-time{font-size:13px;color:var(--ink-2)}
+.vn-meter{position:relative;flex:1 1 80px;min-width:60px;height:6px;border-radius:var(--r-pill);background:color-mix(in srgb,var(--ink-3) 35%,transparent);overflow:hidden}
+.vn-preview{display:flex;flex-direction:column;gap:8px;min-width:0}
+.vn-row{display:flex;align-items:center;flex-wrap:wrap;gap:6px 14px}
+.vn-cap{font-size:12.5px;font-weight:600;color:var(--warn)}
+.vn-link{font-size:13px;font-weight:600;color:var(--brand-deep);cursor:pointer;border-radius:calc(6px * var(--radius-scale,1))}
+.vn-link:hover{text-decoration:underline}
+.vn-link.bad{color:var(--bad)}
+:root[data-theme="dark"] .vn-mic,:root[data-theme="dark"] .vn-link:not(.bad){color:var(--brand-3)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .vn-mic,:root:not([data-theme="light"]) .vn-link:not(.bad){color:var(--brand-3)}}
+.sk-mask .vn-play{background:color-mix(in srgb,var(--ink) 8%,transparent)}
+.sk-mask .vn-bar i{visibility:hidden}
+
+/* Sortable column header (components/sort-header.tsx): the label is a button in the th's type; the arrow is faint until
+   hover/focus and solid on the active column, pointing the sort's way. Hover changes text colour only. */
+.od-sort{display:inline-flex;align-items:center;gap:4px;padding:0;margin:0;border:0;background:none;font:inherit;letter-spacing:inherit;text-transform:inherit;color:inherit;cursor:pointer;transition:color var(--dur-fast) var(--ease)}
+.od-sort:hover,.od-sort[data-active]{color:var(--ink)}
+.od-sort:focus-visible{outline:2px solid var(--brand);outline-offset:3px;border-radius:calc(4px * var(--radius-scale,1))}
+.od-sort svg{width:12px;height:12px;flex:none;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;opacity:0;transition:opacity var(--dur-fast) var(--ease),transform var(--dur) var(--ease)}
+.od-sort:hover svg,.od-sort:focus-visible svg{opacity:.45}
+.od-sort[data-active] svg{opacity:1}
+.od-sort[data-dir="asc"] svg{transform:rotate(180deg)}
+
+/* Tooltip skin (components/ui/tooltip.tsx gives behaviour only): ink surface, card text, no arrow. */
+[data-slot="tooltip-content"].od-tip{display:block;background:var(--ink);color:var(--card);border-radius:var(--r-md);padding:8px 12px;font-size:12.5px;font-weight:500;line-height:18px;max-width:260px;box-shadow:var(--shadow)}
+.od-tip [data-slot="tooltip-arrow"],.od-tip>svg,.od-tip>span[class*="rotate-45"]{display:none}
+.od-tip-list{margin:0;padding:0 0 0 14px}
+.od-tip-list li+li{margin-top:2px}
+
+/* CopyId (components/copy-id.tsx): a quiet copy button next to an ID; the tick is the shared od-act-ico draw. */
+.od-copy{position:relative;width:22px;height:22px;flex:none;display:inline-grid;place-items:center;vertical-align:middle;border-radius:calc(6px * var(--radius-scale,1));color:var(--ink-3);cursor:pointer;transition:color var(--dur-fast) var(--ease)}
+.od-copy:hover{color:var(--ink)}
+.od-copy:focus-visible{outline:2px solid var(--brand);outline-offset:1px}
+.od-copy .ico{width:14px;height:14px}
+.od-copy .od-act-ico{color:var(--ok)}
+.od-copy .od-act-ico svg{width:14px;height:14px}
+/* Inside a text line: the box overhangs so the line keeps its height (skeletons stay exact). */
+.od-copy-inline{width:20px;height:20px;margin-block:-4px;margin-left:2px}

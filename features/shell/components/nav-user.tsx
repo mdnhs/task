@@ -3,7 +3,7 @@
 import { useSyncExternalStore, useTransition, type MouseEvent } from "react"
 import Link from "next/link"
 import { flushSync } from "react-dom"
-import { BadgeCheck, Bell, Building2, Check, ChevronsUpDown, CircleHelp, LogOut, Moon, Settings, UserCog } from "lucide-react"
+import { BadgeCheck, Bell, Building2, Check, ChevronsUpDown, CircleHelp, LogOut, Moon, MonitorSmartphone, Settings, UserCog } from "lucide-react"
 import { useTheme } from "next-themes"
 
 import {
@@ -18,18 +18,21 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { setRole, setTenant, signOut } from "@/app/actions/session"
+import { setDevice, setRole, setTenant, signOut } from "@/app/actions/session"
 import type { ShellSession, UserData } from "../types"
 
 const noop = () => () => {}
 
-export function NavUser({ user, session }: { user: UserData; session: ShellSession }) {
+// variant "platform": the operator (platform staff), so the role line is their staff role, Settings is the console's,
+// and the tenant-only items (account pages, device, company switch) are left out.
+export function NavUser({ user, session, variant = "app" }: { user: UserData; session: ShellSession; variant?: "app" | "platform" }) {
+  const platform = variant === "platform"
   const { resolvedTheme, setTheme } = useTheme()
   // resolvedTheme is unknown on the server; wait for mount to avoid a hydration mismatch.
   const mounted = useSyncExternalStore(noop, () => true, () => false)
   const [, startTransition] = useTransition()
   // The default owner keeps the signed-in person's own title; other roles show the previewed role.
-  const roleLine = session.role.id === "owner" ? user.role : session.role.label
+  const roleLine = platform || session.role.id === "owner" ? user.role : session.role.label
   const dark = mounted && resolvedTheme === "dark"
 
   // Circular reveal from the click point via the View Transitions API.
@@ -59,7 +62,7 @@ export function NavUser({ user, session }: { user: UserData; session: ShellSessi
       <DropdownMenuTrigger
         render={<button type="button" className="user user-trigger" aria-label="Account menu" />}
       >
-        <span className="avatar av1">{user.initials}</span>
+        <span className="avatar av-me">{user.initials}</span>
         <span className="who" title={`${user.name} · ${roleLine}`}>
           <b>{user.name}</b>
           <small>{roleLine}</small>
@@ -70,7 +73,7 @@ export function NavUser({ user, session }: { user: UserData; session: ShellSessi
         <DropdownMenuGroup>
           <DropdownMenuLabel className="p-0 font-normal">
             <div className="flex items-center gap-2.5 px-2 py-2 text-left">
-              <span className="avatar av1 !size-9 !text-xs">{user.initials}</span>
+              <span className="avatar av-me !size-9 !text-xs">{user.initials}</span>
               <div className="grid flex-1 leading-tight">
                 <span className="od-menu-name truncate">{user.name}</span>
                 <span className="od-menu-sub truncate">{user.email}</span>
@@ -80,15 +83,19 @@ export function NavUser({ user, session }: { user: UserData; session: ShellSessi
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <DropdownMenuGroup>
-          <DropdownMenuItem render={<Link href="/account/profile" />}>
-            <BadgeCheck />
-            Account
-          </DropdownMenuItem>
-          <DropdownMenuItem render={<Link href="/account/notifications" />}>
-            <Bell />
-            Notifications
-          </DropdownMenuItem>
-          <DropdownMenuItem render={<Link href="/settings" />}>
+          {!platform && (
+            <>
+              <DropdownMenuItem render={<Link href="/account/profile" />}>
+                <BadgeCheck />
+                Account
+              </DropdownMenuItem>
+              <DropdownMenuItem render={<Link href="/account/notifications" />}>
+                <Bell />
+                Notifications
+              </DropdownMenuItem>
+            </>
+          )}
+          <DropdownMenuItem render={<Link href={platform ? "/platform/settings" : "/settings"} />}>
             <Settings />
             Settings
           </DropdownMenuItem>
@@ -119,6 +126,24 @@ export function NavUser({ user, session }: { user: UserData; session: ShellSessi
             ))}
           </DropdownMenuSubContent>
         </DropdownMenuSub>
+        {!platform && session.devices && (
+          <DropdownMenuSub>
+            <DropdownMenuSubTrigger>
+              <MonitorSmartphone />
+              Device (preview)
+            </DropdownMenuSubTrigger>
+            <DropdownMenuSubContent className="od-menu min-w-56">
+              <div className="od-menu-sub-hint">Demo: open the app from another device</div>
+              {session.devices.options.map((d) => (
+                <DropdownMenuItem key={d.id} onClick={() => startTransition(() => setDevice(d.id))}>
+                  {d.label}
+                  {d.id === session.devices?.current && <Check className="od-check" />}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuSubContent>
+          </DropdownMenuSub>
+        )}
+        {!platform && (
         <DropdownMenuSub>
           <DropdownMenuSubTrigger>
             <Building2 />
@@ -133,6 +158,7 @@ export function NavUser({ user, session }: { user: UserData; session: ShellSessi
             ))}
           </DropdownMenuSubContent>
         </DropdownMenuSub>
+        )}
         <DropdownMenuSeparator />
         <DropdownMenuItem>
           <CircleHelp />

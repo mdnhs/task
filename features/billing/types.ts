@@ -1,5 +1,5 @@
 export type PlanLimits = { activeUsers: number; storageGb: number; messages: number; transcriptionMinutes: number }
-export type Plan = { id: string; name: string; priceMonthly: number; currency: string; trialDays: number; limits: PlanLimits; modules: string[] }
+export type Plan = { id: string; name: string; priceMonthly: number; currency: string; trialDays: number; limits: PlanLimits }
 export type SubscriptionRecord = { planId: string; status: string; renewsOn: string; cardLast4: string | null }
 export type Usage = PlanLimits
 export type InvoiceStatus = "paid" | "failed" | "open"

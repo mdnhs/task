@@ -8,6 +8,7 @@ import { EmptyState } from "@/components/empty-state"
 import { Icon } from "@/components/icons"
 import { StatusPill } from "@/components/status-pill"
 import { When } from "@/components/when"
+import { planModules, type EntitlementsData } from "@/lib/entitlements"
 import { paginate } from "@/lib/paginate"
 import type { Status } from "@/lib/types"
 import { INVOICES_PAGE_SIZE } from "../constants"
@@ -27,7 +28,6 @@ const INVOICE_STATUS: Record<InvoiceStatus, Status> = {
   open: { tone: "warn", label: "Open" },
 }
 
-export const money = (amount: number, currency: string) => new Intl.NumberFormat("en-GB", { style: "currency", currency }).format(amount)
 const level = (used: number, limit: number) => (used >= limit ? "full" : used / limit >= 0.8 ? "high" : "ok")
 
 // Billing tab (FR-SAAS-06/07/07a): plan and status, renewal, usage against limits, plans, invoices.
@@ -47,6 +47,8 @@ export function BillingView({
   today,
   tzLabel,
   canManage,
+  locale,
+  entitlements,
 }: {
   plans: Plan[]
   tenantId: string
@@ -64,9 +66,15 @@ export function BillingView({
   today: string
   tzLabel: string
   canManage: boolean
+  /** Tenant locale (org.locale) for money and numbers. */
+  locale: string
+  entitlements: EntitlementsData
 }) {
   const [page, setPage] = useState(1)
   const plan = plans.find((p) => p.id === planId) ?? plans[0]
+  const money = (amount: number, currency: string) => new Intl.NumberFormat(locale, { style: "currency", currency }).format(amount)
+  const num = (n: number) => n.toLocaleString(locale)
+  const mods = planModules(entitlements, plan.id)
   const paged = paginate(invoices, page, INVOICES_PAGE_SIZE)
   const pastDue = status === "past_due"
   const billing = getBillingProvider(providerKey)
@@ -134,7 +142,7 @@ export function BillingView({
               <li key={r.key}>
                 <div className="bill-usage-row">
                   <span className="tt">{r.label}</span>
-                  <span className="num">{used.toLocaleString("en-GB")}{r.unit} of {limit.toLocaleString("en-GB")}{r.unit}</span>
+                  <span className="num">{num(used)}{r.unit} of {num(limit)}{r.unit}</span>
                 </div>
                 <div suppressHydrationWarning className="progress bill-bar" data-level={level(used, limit)} role="progressbar" aria-label={`${r.label} used`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct}>
                   <i style={{ width: `${pct}%` }} />
@@ -143,6 +151,26 @@ export function BillingView({
               </li>
             )
           })}
+        </ul>
+      </section>
+
+      <section className="card set-card" aria-labelledby="bill-mods-h">
+        <div className="card-head">
+          <div>
+            <h2 id="bill-mods-h">Included modules</h2>
+            <div className="sub">What the {plan.name} plan includes. Other modules are hidden from your workspace.</div>
+          </div>
+        </div>
+        <ul className="bill-mods">
+          {mods.map((m) => (
+            <li key={m.id} data-included={m.included ? "" : undefined}>
+              <div>
+                <span className="tt">{m.label}</span>
+                <div className="tm">{m.description}</div>
+              </div>
+              <StatusPill status={m.included ? { tone: "ok", label: "Included" } : { tone: "mute", label: "Not in plan" }} />
+            </li>
+          ))}
         </ul>
       </section>
 
@@ -164,11 +192,11 @@ export function BillingView({
                 </div>
                 <p className="bill-price num">{money(p.priceMonthly, p.currency)}<small> / month</small></p>
                 <ul className="bill-limits num">
-                  <li>{p.limits.activeUsers.toLocaleString("en-GB")} active users</li>
-                  <li>{p.limits.storageGb.toLocaleString("en-GB")} GB storage</li>
-                  <li>{p.limits.messages.toLocaleString("en-GB")} messages</li>
-                  <li>{p.limits.transcriptionMinutes.toLocaleString("en-GB")} transcription minutes</li>
-                  <li>{p.modules.length} modules</li>
+                  <li>{num(p.limits.activeUsers)} active users</li>
+                  <li>{num(p.limits.storageGb)} GB storage</li>
+                  <li>{num(p.limits.messages)} messages</li>
+                  <li>{num(p.limits.transcriptionMinutes)} transcription minutes</li>
+                  <li>{planModules(entitlements, p.id).filter((m) => m.included).length} modules</li>
                 </ul>
                 {canManage && !current && (
                   <button type="button" className="btn btn-outline" onClick={() => checkout(p.id)}>Switch to {p.name}</button>

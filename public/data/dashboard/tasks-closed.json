@@ -1,13 +1,13 @@
 {
   "title": "Tasks Closed",
-  "subtitle": "Last 7 days · hover for on-time rate, click for details",
+  "subtitle": "Last 7 days",
   "days": [
     {
       "d": "W",
       "n": 18,
       "on": 94,
       "t": "s1",
-      "date": "Wednesday, 14 October 2026",
+      "date": "14 Oct, 2026",
       "byDept": {
         "Security": 10,
         "Cleaning": 8
@@ -44,7 +44,7 @@
       "n": 22,
       "on": 91,
       "t": "s2",
-      "date": "Thursday, 15 October 2026",
+      "date": "15 Oct, 2026",
       "byDept": {
         "Security": 11,
         "Cleaning": 11
@@ -81,7 +81,7 @@
       "n": 25,
       "on": 88,
       "t": "s1",
-      "date": "Friday, 16 October 2026",
+      "date": "16 Oct, 2026",
       "byDept": {
         "Security": 13,
         "Cleaning": 12
@@ -118,7 +118,7 @@
       "n": 9,
       "on": 100,
       "t": "weekend",
-      "date": "Saturday, 17 October 2026",
+      "date": "17 Oct, 2026",
       "byDept": {
         "Security": 6,
         "Cleaning": 3
@@ -149,7 +149,7 @@
       "n": 7,
       "on": 86,
       "t": "weekend",
-      "date": "Sunday, 18 October 2026",
+      "date": "18 Oct, 2026",
       "byDept": {
         "Security": 5,
         "Cleaning": 2
@@ -180,7 +180,7 @@
       "n": 20,
       "on": 90,
       "t": "s2",
-      "date": "Monday, 19 October 2026",
+      "date": "19 Oct, 2026",
       "byDept": {
         "Security": 9,
         "Cleaning": 11
@@ -217,7 +217,7 @@
       "n": 16,
       "on": 82,
       "t": "today",
-      "date": "Tuesday, 20 October 2026 (today)",
+      "date": "20 Oct, 2026",
       "byDept": {
         "Security": 7,
         "Cleaning": 9

@@ -1,6 +1,6 @@
 "use client"
 
-import { Fragment, useMemo, useState } from "react"
+import { Fragment, useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
 
 import { DataPagination, PagedBody } from "@/components/data-pagination"
@@ -11,8 +11,9 @@ import { Icon } from "@/components/icons"
 import { PageHead } from "@/components/page-head"
 import { StatusPill } from "@/components/status-pill"
 import { When } from "@/components/when"
+import { auditOutbox } from "@/lib/audit-outbox"
 import { paginate } from "@/lib/paginate"
-import { AUDIT_PAGE_SIZE, EMPTY_FILTERS, exportEvent, filterEvents, toCsv } from "../filters"
+import { AUDIT_PAGE_SIZE, EMPTY_FILTERS, exportEvent, filterEvents, mergeOutbox, toCsv } from "../filters"
 import { auditStore } from "../store"
 import { ACTION } from "../types"
 import type { AuditAction, AuditEvent, AuditFilters } from "../types"
@@ -35,6 +36,10 @@ export function AuditView({
   scopeKey: string
 }) {
   const [events, setEvents] = auditStore.useStore(seed, scopeKey)
+  // Events recorded on other screens this session (FR-M0-13), e.g. a task purged from the archive. Idempotent.
+  useEffect(() => {
+    setEvents((all) => mergeOutbox(all, auditOutbox.list(scopeKey)))
+  }, [scopeKey, setEvents])
   const [filters, setFilters] = useState<AuditFilters>(EMPTY_FILTERS)
   const [page, setPage] = useState(1)
   const [open, setOpen] = useState<string | null>(null)

@@ -1,4 +1,6 @@
+import { normaliseRule } from "@/lib/task-evidence"
 import { addDays } from "./recurrence"
+import type { EvidenceRule } from "./types"
 import type { Task, TaskTemplate } from "./types"
 
 // Pure template helpers (FR-TASK-10). Templates never hold tenant names in code: departments and people come from data.
@@ -12,7 +14,7 @@ export type TemplateForm = {
   start: string
   dueDate: string
   dueTime: string
-  evidenceRequired: boolean
+  evidenceRule: EvidenceRule
   tags: string
 }
 
@@ -26,7 +28,7 @@ export function applyTemplate(t: TaskTemplate, start: string): Partial<TemplateF
     priority: String(t.priority),
     dueDate: addDays(start, t.dueOffset),
     dueTime: t.dueTime,
-    evidenceRequired: t.evidenceRequired,
+    evidenceRule: { ...t.evidenceRule, types: [...t.evidenceRule.types] },
     tags: t.tags.join(", "),
   }
 }
@@ -43,7 +45,7 @@ export function templateFromForm(name: string, f: TemplateForm, id: string): Tas
     ...(f.assignee ? { assignee: f.assignee } : {}),
     priority: Number(f.priority) as Task["priority"],
     tags: f.tags.split(",").map((s) => s.trim()).filter(Boolean),
-    evidenceRequired: f.evidenceRequired,
+    evidenceRule: normaliseRule(f.evidenceRule),
     dueOffset: Math.max(0, gap),
     dueTime: f.dueTime || "17:00",
   }

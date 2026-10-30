@@ -11,18 +11,16 @@
 .od-menu-sub-hint{font-size:11px;color:var(--ink-3);padding:4px 10px 6px}
 
 /* ===== Notifications panel (popover, re-skinned like .od-menu) ===== */
-.od-notif{background:var(--card);color:var(--ink);border:0;border-radius:var(--r-lg);box-shadow:var(--shadow),0 16px 40px rgba(16,40,24,.12);padding:8px;gap:6px;width:360px;max-width:calc(100vw - 24px);outline:none !important;--tw-ring-shadow:0 0 #0000;animation-duration:var(--dur);animation-fill-mode:both;transition-duration:var(--dur-slow);transition-timing-function:var(--ease)}
+.od-notif{background:var(--card);color:var(--ink);border:0;border-radius:var(--r-lg);box-shadow:var(--shadow),0 16px 40px rgba(16,40,24,.12);padding:8px;gap:6px;width:360px;max-width:calc(calc(100vw / var(--text-scale,1)) - 24px);outline:none !important;--tw-ring-shadow:0 0 #0000;animation-duration:var(--dur);animation-fill-mode:both;transition-duration:var(--dur-slow);transition-timing-function:var(--ease)}
 :root[data-theme="dark"] .od-notif{box-shadow:0 12px 32px rgba(0,0,0,.5)}
 .od-notif-head{display:flex;align-items:center;justify-content:space-between;padding:4px 10px}
 .od-notif-mark{font-size:12px;font-weight:700;color:var(--brand-deep);border-radius:var(--r-pill);padding:4px 10px;cursor:pointer;transition:background var(--dur-fast)}
 .od-notif-mark:hover:not(:disabled){background:var(--brand-soft)}
 .od-notif-mark:disabled{color:var(--ink-3);cursor:default}
-.od-notif-tabs{display:flex;gap:4px;padding:0 4px}
-.od-notif-tabs button{border-radius:var(--r-pill);padding:6px 12px;font-size:12.5px;font-weight:600;color:var(--ink-2);cursor:pointer;transition:background var(--dur-fast)}
-.od-notif-tabs button:hover{background:var(--brand-soft)}
-.od-notif-tabs button[aria-pressed="true"]{background:var(--brand-soft);color:var(--brand-deep)}
-.od-notif-tabs button[aria-pressed="true"]:hover{background:var(--line)}
-.od-notif-list{display:flex;flex-direction:column;gap:2px;max-height:min(420px,60vh);overflow-y:auto}
+.od-notif-tabs{display:flex;padding:0 4px}
+.od-notif-tabs .seg.od-seg{padding:3px}
+.od-notif-tabs .seg.od-seg button{height:32px;padding:0 12px;font-size:12.5px}
+.od-notif-list{display:flex;flex-direction:column;gap:2px;max-height:min(420px,calc(60vh / var(--text-scale,1)));overflow-y:auto}
 .od-notif-row{display:flex;align-items:flex-start;gap:10px;padding:8px 10px;border-radius:var(--r-pill);color:var(--ink-2);transition:background var(--dur-fast)}
 .od-notif-row:hover,.od-notif-row:focus-visible{background:var(--brand-soft);color:var(--brand-deep);outline:none}
 .od-notif-ico{flex:none;display:grid;place-items:center;width:28px;height:28px;border-radius:50%;background:var(--mute-bg);color:var(--ink-3)}
@@ -33,10 +31,10 @@
 .od-notif-row:hover .od-notif-title{color:inherit}
 .od-notif-pip{flex:none;align-self:center;width:8px;height:8px;border-radius:50%;background:var(--brand)}
 /* Dark: --brand-deep is near-black green, so hovered/selected text uses --brand-3 (as .od-menu) */
-:root[data-theme="dark"] .od-notif :is(.od-notif-row:hover,.od-notif-row:focus-visible,.od-notif-tabs button[aria-pressed="true"],.od-notif-mark){color:var(--brand-3)}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .od-notif :is(.od-notif-row:hover,.od-notif-row:focus-visible,.od-notif-tabs button[aria-pressed="true"],.od-notif-mark){color:var(--brand-3)}}
+:root[data-theme="dark"] .od-notif :is(.od-notif-row:hover,.od-notif-row:focus-visible,.od-notif-mark){color:var(--brand-3)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .od-notif :is(.od-notif-row:hover,.od-notif-row:focus-visible,.od-notif-mark){color:var(--brand-3)}}
 /* Phones: full width, no horizontal overflow */
-@media (max-width:639px){.od-notif{width:calc(100vw - 24px)}}
+@media (max-width:639px){.od-notif{width:calc(calc(100vw / var(--text-scale,1)) - 24px)}}
 
 /* ---------- Department filter carousel (more than SEG_MAX pills) ---------- */
 /* Same pill track as .seg; the viewport shows about four pills, arrows sit inside the pill */
@@ -83,9 +81,19 @@
 
 /* ---------- Sidebar badges in the icon-collapsed rail: same counts, pinned to the icon's top-right corner ---------- */
 @media (min-width:1081px){
-  .app.collapsed .nav a .badge{display:block;position:absolute;top:2px;right:8px;margin:0;min-width:18px;padding:1px 5px;text-align:center;font-size:10px;line-height:14px;border-radius:8px}
+  .app.collapsed .nav a .badge{display:block;position:absolute;top:2px;right:8px;margin:0;min-width:18px;padding:1px 5px;text-align:center;font-size:10px;line-height:14px;border-radius:calc(8px * var(--radius-scale,1))}
 }
 
 /* ===== Tenant logo mark (FR-SAAS-11): same 38px box as the brand icon, logo contain-fit on a neutral chip ===== */
 .logo-mark.has-logo{background:var(--card);padding:4px;overflow:hidden}
 .logo-mark.has-logo img{width:100%;height:100%;object-fit:contain;display:block}
+/* D10: platform announcement banner (components/platform-notice.tsx), above every tenant page and in the console preview */
+.od-notice{display:flex;align-items:flex-start;gap:10px;padding:12px 14px 12px 18px;border-radius:var(--r-lg);font-size:13.5px;line-height:20px;font-weight:600;background:var(--info-bg);color:var(--info);margin-bottom:18px}
+.od-notice[data-kind="maintenance"]{background:var(--warn-bg);color:var(--warn)}
+.od-notice > svg{flex:none;width:18px;height:18px;margin-top:1px}
+.od-notice p{margin:0;flex:1;min-width:0;overflow-wrap:anywhere}
+.od-notice-end{font-weight:500;opacity:.85;white-space:nowrap}
+.od-notice-x{flex:none;display:grid;place-items:center;width:28px;height:28px;margin:-4px -4px -4px 0;border:0;border-radius:var(--r-pill);background:transparent;color:inherit;cursor:pointer;transition:background-color var(--dur-fast) var(--ease)}
+.od-notice-x:hover{background:color-mix(in oklab,currentColor 12%,transparent)}
+.od-notice-x:focus-visible{outline:2px solid currentColor;outline-offset:1px}
+.od-notice-x svg{width:16px;height:16px}

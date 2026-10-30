@@ -1,6 +1,7 @@
 export { AccountLayout } from "./components/account-layout"
 export { ProfilePanel } from "./components/profile-panel"
 export { SecurityPanel } from "./components/security-panel"
+export { MfaGate } from "./components/mfa-gate"
 export { AccountNotificationsPanel } from "./components/notifications-panel"
 export { AccountSkeleton } from "./components/skeletons"
 export { AccountLoading } from "./components/account-loading"

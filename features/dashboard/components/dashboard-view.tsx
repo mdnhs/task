@@ -1,13 +1,15 @@
 import type { ReactNode } from "react"
 
 import type { getDashboard } from "../api"
-import type { DashboardPerms } from "../types"
+import type { TodayData } from "@/lib/today-data"
+import type { DashboardPerms, ReportDeadlineCardData } from "../types"
 import { CoverageFiles } from "./coverage-files"
-import { DailyReportDeadline } from "./daily-report-deadline"
 import { ManagerAttention } from "./manager-attention"
 import { PageHeader } from "./page-header"
+import { ReportDeadlineCard } from "./report-deadline-card"
 import { SectionCards } from "./section-cards"
 import { TaskProgress } from "./task-progress"
+import { TodayCard } from "./today-card"
 import { TasksClosedChart } from "./tasks-closed-chart"
 import { TeamTasksTable } from "./team-tasks-table"
 
@@ -20,28 +22,33 @@ export function DashboardView({
   perms,
   newTask,
   assignTask,
+  today,
+  deadline,
 }: {
   data: Awaited<ReturnType<typeof getDashboard>>
   perms: DashboardPerms
   newTask?: ReactNode
   assignTask?: ReactNode
+  /** The Today card data (FR-M1-70), cut to this user on the server. */
+  today?: TodayData
+  /** Shift report deadline for the teams in the viewer's scope; undefined = no card. */
+  deadline?: ReportDeadlineCardData
 }) {
   return (
     <>
       <PageHeader data={data.header} perms={perms} newTask={newTask} />
+      {today && <TodayCard data={today} />}
       <SectionCards data={data.summary} />
-      <section className="grid-2 dash-fix dash-fix-a">
+      <section className="grid-3 dash-fix dash-fix-a">
         <TasksClosedChart data={data.tasksClosed} />
-        <DailyReportDeadline data={data.dailyReport} canRemind={perms.reports} />
-      </section>
-      <section className="grid-2 dash-fix dash-fix-b">
-        <ManagerAttention data={data.attention} canDecide={perms.attention} />
         <TaskProgress data={data.progress} />
+        {deadline && <ReportDeadlineCard data={deadline} canRemind={perms.reports} />}
       </section>
-      <section className="grid-2">
-        <TeamTasksTable data={data.teamTasks} assignTask={perms.tasks && assignTask} />
+      <section className="grid-2 dash-fix dash-fix-c">
+        <ManagerAttention data={data.attention} canDecide={perms.attention} />
         <CoverageFiles data={data.coverage} />
       </section>
+      <TeamTasksTable data={data.teamTasks} assignTask={perms.tasks && assignTask} />
     </>
   )
 }

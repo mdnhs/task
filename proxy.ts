@@ -7,7 +7,14 @@ import type { NextRequest } from "next/server"
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
   if (pathname === "/data" || pathname.startsWith("/data/")) return new NextResponse("Not found", { status: 404 })
-  if (request.cookies.get("od-auth")?.value !== "out") return NextResponse.next()
+  if (request.cookies.get("od-auth")?.value !== "out") {
+    // loading.tsx gets no route params or search params: pass the pathname (a detail skeleton looks the record up) and the
+    // query (a list skeleton opens on the same saved view) on (lib/request-path.ts).
+    const headers = new Headers(request.headers)
+    headers.set("x-od-path", pathname)
+    headers.set("x-od-search", request.nextUrl.search)
+    return NextResponse.next({ request: { headers } })
+  }
   return NextResponse.redirect(new URL("/sign-in", request.url))
 }
 

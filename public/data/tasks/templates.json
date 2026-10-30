@@ -7,8 +7,20 @@
       "description": "Test every call point on site. Follow the site checklist and record anything unusual.",
       "dept": "Security",
       "priority": 3,
-      "tags": ["fire", "weekly"],
-      "evidenceRequired": true,
+      "tags": [
+        "fire",
+        "weekly"
+      ],
+      "evidenceRule": {
+        "mode": "required",
+        "types": [
+          "pdf",
+          "photo"
+        ],
+        "min": 2,
+        "instruction": "Signed test sheet as PDF and a photo of the panel",
+        "review": "manager"
+      },
       "dueOffset": 0,
       "dueTime": "17:00"
     },
@@ -19,8 +31,20 @@
       "description": "Deep clean the floor, restock supplies and photograph the finished areas.",
       "dept": "Cleaning",
       "priority": 2,
-      "tags": ["deep-clean"],
-      "evidenceRequired": true,
+      "tags": [
+        "deep-clean"
+      ],
+      "evidenceRule": {
+        "mode": "required",
+        "types": [
+          "photo",
+          "image",
+          "note"
+        ],
+        "min": 2,
+        "instruction": "Photo of the cleaned area, wide angle",
+        "review": "manager"
+      },
       "dueOffset": 2,
       "dueTime": "12:00"
     },
@@ -31,8 +55,16 @@
       "description": "Count stock, note what is low and send the reorder list to the manager.",
       "dept": "Cleaning",
       "priority": 1,
-      "tags": ["stock"],
-      "evidenceRequired": false,
+      "tags": [
+        "stock"
+      ],
+      "evidenceRule": {
+        "mode": "none",
+        "types": [],
+        "min": 0,
+        "instruction": "",
+        "review": "manager"
+      },
       "dueOffset": 1,
       "dueTime": "16:00"
     }

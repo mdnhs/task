@@ -1,15 +1,18 @@
 "use client"
 
+import Link from "next/link"
+
 import { Icon } from "@/components/icons"
 import { useTenantLogo } from "@/hooks/use-branding"
 
 // Static sidebar pieces, shared by AppShell and AppShellSkeleton so the skeleton matches exactly.
 
 // The mark is a fixed 38px box. A saved tenant logo (FR-SAAS-11) sits contain-fit on a neutral chip; without one, the brand icon shows.
-export function Logo({ tenantId }: { tenantId?: string }) {
+// `href` is the home of the area (the platform console passes /platform; it never shows a tenant logo).
+export function Logo({ tenantId, href = "/", onNavigate }: { tenantId?: string; href?: string; onNavigate?: () => void }) {
   const [logo] = useTenantLogo(tenantId)
   return (
-    <div className="logo">
+    <Link href={href} className="logo" aria-label={href === "/" ? "OpsDesk, go to dashboard" : "OpsDesk, go to overview"} onClick={onNavigate}>
       <span className={logo ? "logo-mark has-logo" : "logo-mark"}>
         {logo ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -19,26 +22,43 @@ export function Logo({ tenantId }: { tenantId?: string }) {
         )}
       </span>
       <span className="lbl">OpsDesk</span>
+    </Link>
+  )
+}
+
+// Platform console topbar context (D1): which console this is, and the payment environment (Live / Test mode).
+export function PlatformContext({ env }: { env?: { label: string; live: boolean } }) {
+  return (
+    <div className="pf-ctx">
+      <span className="pf-badge">Platform</span>
+      {env && (
+        <span className="pf-env" data-live={env.live || undefined} title={`Payments: ${env.label}`}>
+          <i aria-hidden="true" />
+          <span className="pf-env-lbl">{env.label}</span>
+        </span>
+      )}
     </div>
   )
 }
 
 export function AppPromo() {
   return (
-    <div className="app-card">
-      <h4>Work from anywhere</h4>
-      <p>Get the OpsDesk app on Android and iOS.</p>
-      <div className="store-btns">
-        <button type="button" aria-label="Get it on Google Play">
-          <PlayStoreIcon />
-          Android
-        </button>
-        <button type="button" aria-label="Download on the App Store">
-          <AppleIcon />
-          iOS
-        </button>
+    <div className="app-card-clip">
+      <div className="app-card">
+        <h4>Work from anywhere</h4>
+        <p>Get the OpsDesk app on Android and iOS.</p>
+        <div className="store-btns">
+          <button type="button" aria-label="Get it on Google Play">
+            <PlayStoreIcon />
+            Android
+          </button>
+          <button type="button" aria-label="Download on the App Store">
+            <AppleIcon />
+            iOS
+          </button>
+        </div>
+        <div className="powered">Powered by Raynx</div>
       </div>
-      <div className="powered">Powered by Raynx</div>
     </div>
   )
 }

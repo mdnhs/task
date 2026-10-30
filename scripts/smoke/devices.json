@@ -1,0 +1,169 @@
+[
+ {
+  "path": "/sign-in",
+  "expect": [
+   "Continue with Google",
+   "Continue with Microsoft",
+   "Work email"
+  ]
+ },
+ {
+  "path": "/settings/devices",
+  "expect": [
+   "Registered devices",
+   "Work PC",
+   "Android phone",
+   "Add device",
+   "Lilianna Novak"
+  ],
+  "notExpect": [
+   "Access restricted"
+  ]
+ },
+ {
+  "path": "/settings/devices",
+  "cookies": {
+   "od-role": "auditor"
+  },
+  "expect": [
+   "Registered devices",
+   "Work PC"
+  ],
+  "notExpect": [
+   "Add device",
+   "Remove"
+  ]
+ },
+ {
+  "path": "/settings/devices",
+  "cookies": {
+   "od-role": "employee"
+  },
+  "expect": [
+   "Access restricted"
+  ],
+  "notExpect": [
+   "Registered devices",
+   "Add device"
+  ]
+ },
+ {
+  "path": "/settings/integrations",
+  "expect": [
+   "Device access",
+   "Google Drive: allowed only on trusted company PCs"
+  ]
+ },
+ {
+  "path": "/settings/roles",
+  "expect": [
+   "Two-step verification",
+   "Two-step verification is optional"
+  ]
+ },
+ {
+  "path": "/account/security",
+  "expect": [
+   "Two-step verification",
+   "Active sessions"
+  ],
+  "notExpect": [
+   "Set up two-step verification"
+  ]
+ },
+ {
+  "path": "/tasks/TSK-1001",
+  "expect": [
+   "class=\"drive-link ev-name\""
+  ],
+  "notExpect": [
+   "Available on your work PC"
+  ]
+ },
+ {
+  "path": "/tasks/TSK-1001",
+  "cookies": {
+   "od-device": "dev-u3-android"
+  },
+  "expect": [
+   "drive-locked ev-name",
+   "Available on your work PC"
+  ],
+  "notExpect": [
+   "class=\"drive-link"
+  ]
+ },
+ {
+  "path": "/tasks/TSK-1001",
+  "cookies": {
+   "od-device": "unregistered"
+  },
+  "expect": [
+   "Available on your work PC"
+  ],
+  "notExpect": [
+   "class=\"drive-link"
+  ]
+ },
+ {
+  "path": "/tasks/TSK-1001",
+  "cookies": {
+   "od-device": "dev-u1-pc"
+  },
+  "expect": [
+   "class=\"drive-link ev-name\""
+  ],
+  "notExpect": [
+   "Available on your work PC"
+  ]
+ },
+ {
+  "path": "/",
+  "cookies": {
+   "od-mfareq-t1": "{\"mode\":\"all\",\"roles\":[]}"
+  },
+  "expect": [
+   "Set up two-step verification",
+   "Your workspace administrator requires"
+  ]
+ },
+ {
+  "path": "/",
+  "cookies": {
+   "od-mfareq-t1": "{\"mode\":\"all\",\"roles\":[]}",
+   "od-mfa": "1"
+  },
+  "notExpect": [
+   "Set up two-step verification"
+  ]
+ },
+ {
+  "path": "/",
+  "cookies": {
+   "od-mfareq-t1": "{\"mode\":\"roles\",\"roles\":[\"employee\"]}"
+  },
+  "notExpect": [
+   "Set up two-step verification"
+  ]
+ },
+ {
+  "path": "/",
+  "cookies": {
+   "od-mfareq-t1": "{\"mode\":\"roles\",\"roles\":[\"employee\"]}",
+   "od-role": "employee"
+  },
+  "expect": [
+   "Set up two-step verification"
+  ]
+ },
+ {
+  "path": "/account/security",
+  "cookies": {
+   "od-mfareq-t1": "{\"mode\":\"all\",\"roles\":[]}",
+   "od-mfa": "1"
+  },
+  "expect": [
+   "required by your workspace administrator"
+  ]
+ }
+]

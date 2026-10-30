@@ -1,0 +1,14 @@
+{
+  "assignments": [
+    { "personId": "p-daniel", "patternId": "pat-sec-day", "from": "2026-09-01" },
+    { "personId": "p-marcus", "patternId": "pat-sec-night", "from": "2026-09-01" },
+    { "personId": "p-leo", "patternId": "pat-sec-eve", "from": "2026-09-01", "until": "2026-10-25" },
+    { "personId": "p-leo", "patternId": "pat-sec-night", "from": "2026-10-26" },
+    { "personId": "p-grace", "patternId": "pat-cle-day", "from": "2026-09-01" },
+    { "personId": "p-tomasz", "patternId": "pat-cle-day", "from": "2026-09-14" },
+    { "personId": "p-amara", "patternId": "pat-cle-eve", "from": "2026-09-01" },
+    { "personId": "p-nadia", "patternId": "pat-cle-night", "from": "2026-09-01" },
+    { "personId": "p-owen", "patternId": "pat-cle-day", "from": "2026-09-01" },
+    { "personId": "p-owen", "patternId": "pat-sec-wkd", "from": "2026-10-03" }
+  ]
+}

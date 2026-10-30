@@ -26,7 +26,7 @@ export function TeamTasksTable({ data, assignTask }: { data: TeamTasksData; assi
       <div className="card-head">
         <div>
           <h2>{data.title}</h2>
-          <div className="sub">{dep === "all" ? "Showing all departments" : `Showing ${dep} only`}</div>
+          <div className="sub">{dep === "all" ? "All departments" : dep}</div>
         </div>
         {assignTask}
       </div>

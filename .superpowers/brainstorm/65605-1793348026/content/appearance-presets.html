@@ -1,0 +1,80 @@
+<style>
+  .od{--brand:#2f7d52;--soft:#e3efe6;--ink:#1f2a24;--ink2:#56625b;--page:#e8ebe6;--card:#fcfdfa;font-family:"Plus Jakarta Sans",system-ui,sans-serif;color:var(--ink)}
+  .od .stage{background:var(--page);padding:var(--gap);display:grid;grid-template-columns:1fr 1fr;gap:var(--gap);border-radius:10px}
+  .od .c{background:var(--card);border-radius:var(--r);padding:var(--pad);display:flex;flex-direction:column;gap:calc(var(--pad) * .55)}
+  .od .t{font-size:calc(13px * var(--fs));font-weight:600}
+  .od .v{font-size:calc(30px * var(--fs));font-weight:600;line-height:1}
+  .od .n{font-size:calc(11px * var(--fs));color:var(--ink2)}
+  .od .b{align-self:flex-start;background:var(--brand);color:#fff;border-radius:var(--rb);padding:calc(var(--pad)*.35) calc(var(--pad)*.7);font-size:calc(11.5px * var(--fs));font-weight:600}
+  .od .pill{display:inline-block;background:var(--soft);color:var(--brand);border-radius:var(--rb);padding:2px 8px;font-size:calc(10.5px * var(--fs));font-weight:700}
+  .row-h{margin:26px 0 8px}
+</style>
+
+<h2>Appearance presets: what an admin would pick from</h2>
+<p class="subtitle">Each row is one setting with 3 ready-made options. The middle one is today's look. Click the ones that feel right for your clients.</p>
+
+<h3 class="row-h">1. Corners (rounded)</h3>
+<div class="cards">
+  <div class="card" data-choice="corners-sharp" onclick="toggleSelect(this)">
+    <div class="card-image od" style="--gap:10px;--pad:14px;--fs:1;--r:6px;--rb:6px">
+      <div class="stage"><div class="c"><div class="t">Open Tasks</div><div class="v">48</div><span class="pill">+6 new</span></div><div class="c"><div class="t">Overdue</div><div class="v">7</div><span class="b">View</span></div></div>
+    </div>
+    <div class="card-body"><h3>Sharp</h3><p>Small corners. Corporate, formal brands.</p></div>
+  </div>
+  <div class="card" data-choice="corners-soft" onclick="toggleSelect(this)">
+    <div class="card-image od" style="--gap:10px;--pad:14px;--fs:1;--r:14px;--rb:999px">
+      <div class="stage"><div class="c"><div class="t">Open Tasks</div><div class="v">48</div><span class="pill">+6 new</span></div><div class="c"><div class="t">Overdue</div><div class="v">7</div><span class="b">View</span></div></div>
+    </div>
+    <div class="card-body"><h3>Soft (today)</h3><p>The current OpsDesk look.</p></div>
+  </div>
+  <div class="card" data-choice="corners-round" onclick="toggleSelect(this)">
+    <div class="card-image od" style="--gap:10px;--pad:14px;--fs:1;--r:24px;--rb:999px">
+      <div class="stage"><div class="c"><div class="t">Open Tasks</div><div class="v">48</div><span class="pill">+6 new</span></div><div class="c"><div class="t">Overdue</div><div class="v">7</div><span class="b">View</span></div></div>
+    </div>
+    <div class="card-body"><h3>Round</h3><p>Big, friendly curves.</p></div>
+  </div>
+</div>
+
+<h3 class="row-h">2. Text size</h3>
+<div class="cards">
+  <div class="card" data-choice="text-small" onclick="toggleSelect(this)">
+    <div class="card-image od" style="--gap:10px;--pad:14px;--fs:.9;--r:14px;--rb:999px">
+      <div class="stage"><div class="c"><div class="t">Open Tasks</div><div class="v">48</div><span class="n">assigned since yesterday</span></div><div class="c"><div class="t">Overdue</div><div class="v">7</div><span class="b">View</span></div></div>
+    </div>
+    <div class="card-body"><h3>Small</h3><p>More fits on screen.</p></div>
+  </div>
+  <div class="card" data-choice="text-default" onclick="toggleSelect(this)">
+    <div class="card-image od" style="--gap:10px;--pad:14px;--fs:1;--r:14px;--rb:999px">
+      <div class="stage"><div class="c"><div class="t">Open Tasks</div><div class="v">48</div><span class="n">assigned since yesterday</span></div><div class="c"><div class="t">Overdue</div><div class="v">7</div><span class="b">View</span></div></div>
+    </div>
+    <div class="card-body"><h3>Default (today)</h3><p>The current size.</p></div>
+  </div>
+  <div class="card" data-choice="text-large" onclick="toggleSelect(this)">
+    <div class="card-image od" style="--gap:10px;--pad:14px;--fs:1.12;--r:14px;--rb:999px">
+      <div class="stage"><div class="c"><div class="t">Open Tasks</div><div class="v">48</div><span class="n">assigned since yesterday</span></div><div class="c"><div class="t">Overdue</div><div class="v">7</div><span class="b">View</span></div></div>
+    </div>
+    <div class="card-body"><h3>Large</h3><p>Easier to read.</p></div>
+  </div>
+</div>
+
+<h3 class="row-h">3. Spacing (space inside cards + gap between them, together)</h3>
+<div class="cards">
+  <div class="card" data-choice="space-compact" onclick="toggleSelect(this)">
+    <div class="card-image od" style="--gap:6px;--pad:9px;--fs:1;--r:14px;--rb:999px">
+      <div class="stage"><div class="c"><div class="t">Open Tasks</div><div class="v">48</div><span class="pill">+6 new</span></div><div class="c"><div class="t">Overdue</div><div class="v">7</div><span class="b">View</span></div></div>
+    </div>
+    <div class="card-body"><h3>Compact</h3><p>Tight, data-dense.</p></div>
+  </div>
+  <div class="card" data-choice="space-comfortable" onclick="toggleSelect(this)">
+    <div class="card-image od" style="--gap:10px;--pad:14px;--fs:1;--r:14px;--rb:999px">
+      <div class="stage"><div class="c"><div class="t">Open Tasks</div><div class="v">48</div><span class="pill">+6 new</span></div><div class="c"><div class="t">Overdue</div><div class="v">7</div><span class="b">View</span></div></div>
+    </div>
+    <div class="card-body"><h3>Comfortable (today)</h3><p>The current spacing.</p></div>
+  </div>
+  <div class="card" data-choice="space-spacious" onclick="toggleSelect(this)">
+    <div class="card-image od" style="--gap:16px;--pad:20px;--fs:1;--r:14px;--rb:999px">
+      <div class="stage"><div class="c"><div class="t">Open Tasks</div><div class="v">48</div><span class="pill">+6 new</span></div><div class="c"><div class="t">Overdue</div><div class="v">7</div><span class="b">View</span></div></div>
+    </div>
+    <div class="card-body"><h3>Spacious</h3><p>Airy, calm.</p></div>
+  </div>
+</div>

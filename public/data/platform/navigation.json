@@ -1,20 +1,14 @@
 {
   "menu": [
-    {
-      "href": "/platform",
-      "icon": "grid",
-      "label": "Tenants"
-    },
-    {
-      "href": "/platform/plans",
-      "icon": "wallet",
-      "label": "Plans"
-    },
-    {
-      "href": "/platform/support",
-      "icon": "help",
-      "label": "Support access"
-    }
+    { "href": "/platform", "icon": "grid", "label": "Overview" },
+    { "href": "/platform/tenants", "icon": "building", "label": "Tenants", "section": "Customers" },
+    { "href": "/platform/billing", "icon": "receipt", "label": "Billing", "section": "Revenue" },
+    { "href": "/platform/plans", "icon": "layers", "label": "Plans", "section": "Revenue" },
+    { "href": "/platform/support", "icon": "help", "label": "Support access", "section": "Trust" },
+    { "href": "/platform/data-requests", "icon": "download", "label": "Data requests", "section": "Trust" },
+    { "href": "/platform/audit", "icon": "shield", "label": "Audit log", "section": "Trust" },
+    { "href": "/platform/team", "icon": "users", "label": "Team", "section": "Admin" },
+    { "href": "/platform/settings", "icon": "gear", "label": "Settings", "section": "Admin" }
   ],
   "general": [],
   "departments": []

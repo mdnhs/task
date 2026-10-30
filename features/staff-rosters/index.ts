@@ -1,4 +1,6 @@
 export { StaffRostersView } from "./components/staff-rosters-view"
-export { StaffRostersSkeleton } from "./components/skeletons"
+export { IncidentForm } from "./components/incident-form"
+export { GapPage } from "./components/gap-page"
+export { StaffRostersSkeleton, GapPageSkeleton, gapGroups } from "./components/skeletons"
 export { getRosters } from "./api"
 export type * from "./types"

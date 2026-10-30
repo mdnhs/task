@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest"
 
 import {
-  channelStates, deliveries, designatedManagers, dueReminders, eventChannels, minutesLabel, nextReminder, preview, reminderSchedule,
+  channelStates, deliveries, designatedManagers, dueReminders, eventChannels, minutesLabel, missingReportAlerts, nextReminder, preview, reminderSchedule,
   type DueState, type OrgTiming, type TenantNotify, type UserNotifyPrefs,
 } from "./notify"
 
-const org: OrgTiming = { today: "2026-10-20T09:00:00", deadline: "17:30", timezone: "Europe/London", tzLabel: "UK time" }
+const org: OrgTiming = { today: "2026-10-20T09:00:00", deadline: "17:30", timezone: "Europe/Dublin", tzLabel: "Irish time" }
 const tenant: TenantNotify = {
   intervals: [60, 30, 10],
   intervalOptions: [120, 90, 60, 45, 30, 15, 10, 5],
@@ -186,5 +186,23 @@ describe("minutesLabel", () => {
     expect(minutesLabel(60)).toBe("1 hour")
     expect(minutesLabel(90)).toBe("1 h 30 min")
     expect(minutesLabel(120)).toBe("2 hours")
+  })
+})
+
+describe("missingReportAlerts (FR-M1-30)", () => {
+  const m = { key: "p-a:day:2026-10-19", member: { id: "p-a", name: "Ann" }, manager: { id: "p-m", name: "Max" }, shift: "Day patrol, Mon 19 Oct", due: "2026-10-19T16:00" }
+  it("alerts member and manager once the due time has passed", () => {
+    const out = missingReportAlerts([m], "2026-10-20T09:00:00", ["inapp"])
+    expect(out.map((d) => [d.id, d.audience, d.recipients[0].id])).toEqual([
+      ["shift-missing:p-a:day:2026-10-19:member", "submitters", "p-a"],
+      ["shift-missing:p-a:day:2026-10-19:manager", "managers", "p-m"],
+    ])
+    expect(out[0].message.title).toBe("Your shift report is missing: Day patrol, Mon 19 Oct")
+    expect(out[1].message.body).toBe("No report from Ann by 16:00.")
+    expect(out[0].atIso).toBe("2026-10-19T16:00")
+  })
+  it("nothing before the due time; no manager alert without a manager", () => {
+    expect(missingReportAlerts([m], "2026-10-19T15:59", ["inapp"])).toEqual([])
+    expect(missingReportAlerts([{ ...m, manager: null }], "2026-10-19T16:00", ["inapp"]).map((d) => d.audience)).toEqual(["submitters"])
   })
 })

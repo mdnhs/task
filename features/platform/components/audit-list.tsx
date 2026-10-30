@@ -6,10 +6,11 @@ import { DataPagination, useSlideDir } from "@/components/data-pagination"
 import { When } from "@/components/when"
 import { paginate } from "@/lib/paginate"
 import { AUDIT_PAGE_SIZE } from "../constants"
-import type { AuditEntry } from "../types"
+import type { SupportAuditLine } from "../support"
 
-// FR-SAAS-10: the platform audit trail. Newest first, 5 per page inside the card.
-export function AuditList({ entries, today, tzLabel }: { entries: AuditEntry[]; today: string; tzLabel: string }) {
+// FR-SAAS-10: audit lines in a card. Newest first, 5 per page inside the card. Takes only the fields it shows, so a
+// slim view model (support.ts) can feed it.
+export function AuditList({ entries, today, tzLabel, title, sub }: { entries: SupportAuditLine[]; today: string; tzLabel: string; title: string; sub: string }) {
   const [page, setPage] = useState(1)
   const paged = paginate(entries, page, AUDIT_PAGE_SIZE)
   const dir = useSlideDir(paged.page)
@@ -17,8 +18,8 @@ export function AuditList({ entries, today, tzLabel }: { entries: AuditEntry[]; 
     <section className="card pf-card" aria-labelledby="pf-aud-h">
       <div className="card-head">
         <div>
-          <h2 id="pf-aud-h">Platform audit trail</h2>
-          <div className="sub">Every support request, session and tenant change</div>
+          <h2 id="pf-aud-h">{title}</h2>
+          <div className="sub">{sub}</div>
         </div>
       </div>
       <ul key={paged.page} className="pf-audit od-slide" data-slide={dir}>

@@ -1,0 +1,20 @@
+[
+  {"path": "/daily-reports", "expect": ["Shift Reports", "Report inbox", "Marcus Hill", "Amara Kone", "Missing", "Late", "Accepted", "Returned"], "notExpect": ["Access restricted", "My shift report"]},
+  {"path": "/daily-reports?status=missing", "expect": ["Report inbox", "Missing"]},
+  {"path": "/daily-reports", "cookies": {"od-role": "manager"}, "expect": ["Your team&#x27;s report per person and shift", "Amara Kone", "Nadia Rahman", "Owen Price"], "notExpect": ["Marcus Hill", "p-marcus", "p-daniel", "Day patrol"]},
+  {"path": "/daily-reports", "cookies": {"od-role": "supervisor"}, "expect": ["My shift report", "need you", "My reports", "Day patrol"], "notExpect": ["Marcus Hill", "p-marcus", "p-amara", "p-nadia", "Report inbox"]},
+  {"path": "/daily-reports", "cookies": {"od-role": "employee"}, "expect": ["My shift report"], "notExpect": ["p-marcus", "TSK-1027"]},
+  {"path": "/daily-reports", "cookies": {"od-role": "auditor"}, "expect": ["Report inbox", "Marcus Hill"]},
+  {"path": "/daily-reports", "cookies": {"od-role": "hr"}, "expect": ["Access restricted"]},
+  {"path": "/daily-reports/p-daniel%3Apat-sec-day%3A2026-10-19", "cookies": {"od-role": "supervisor"}, "expect": [">Save draft<", ">Submit<", "This report is missing", "Tasks in the shift", "TSK-1051", "Add unplanned work"]},
+  {"path": "/daily-reports/p-daniel%3Apat-sec-day%3A2026-10-16", "cookies": {"od-role": "supervisor"}, "expect": [">Resubmit<", "Returned by", "Lilianna Novak"]},
+  {"path": "/daily-reports/p-daniel%3Apat-sec-day%3A2026-10-14", "cookies": {"od-role": "supervisor"}, "expect": ["Version history", "Accepted"], "notExpect": [">Save draft<", ">Accept<"]},
+  {"path": "/daily-reports/p-marcus%3Apat-sec-night%3A2026-10-19", "expect": [">Accept<", ">Return with comment<", "Version history", "Export", "Night patrol"], "notExpect": [">Save draft<"]},
+  {"path": "/daily-reports/p-marcus%3Apat-sec-night%3A2026-10-19", "cookies": {"od-role": "auditor"}, "expect": ["Version history"], "notExpect": [">Accept<", ">Return with comment<"]},
+  {"path": "/daily-reports/p-marcus%3Apat-sec-night%3A2026-10-19", "cookies": {"od-role": "supervisor"}, "expect": ["Report not found"], "notExpect": ["Officer statement received", "Marcus Hill"]},
+  {"path": "/daily-reports/p-marcus%3Apat-sec-night%3A2026-10-19", "cookies": {"od-role": "manager"}, "expect": ["Report not found"]},
+  {"path": "/daily-reports/p-amara%3Apat-cle-eve%3A2026-10-19", "cookies": {"od-role": "manager"}, "expect": [">Accept<", "Amara Kone"]},
+  {"path": "/daily-reports/p-owen%3Apat-sec-wkd%3A2026-10-18", "expect": ["Missing: not submitted"]},
+  {"path": "/daily-reports/RPT-0000", "expect": ["Report not found"]},
+  {"path": "/", "expect": ["Shift Reports"], "notExpect": ["Daily Reports"]}
+]

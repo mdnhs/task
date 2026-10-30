@@ -4,6 +4,8 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 import { useInView, useReducedMotion } from "motion/react"
 import { Bar, BarChart, Cell, ResponsiveContainer, XAxis } from "recharts"
 
+import { cssZoom, unzoom } from "@/lib/zoom"
+
 import { useDept } from "@/hooks/use-dept"
 import { DUR } from "@/lib/motion"
 import { DayDetailsDialog } from "./day-details-dialog"
@@ -13,7 +15,7 @@ type Day = TasksClosedData["days"][number]
 
 const fills: Record<Day["t"], string> = {
   s1: "var(--brand-2)",
-  s2: "#3c7a4a",
+  s2: "var(--brand-shade)",
   today: "var(--brand-3)",
   weekend: "url(#bar-stripes)",
 }
@@ -40,7 +42,9 @@ function placeTip(wrap: HTMLElement, tip: HTMLElement, i: number) {
   if (!bar) return
   const b = bar.getBoundingClientRect()
   const w = wrap.getBoundingClientRect()
-  tip.style.transform = `translate(${b.left - w.left + b.width / 2}px,${b.top - w.top}px)`
+  // Rects are on-screen px; the translate is zoomed again by the Text size preset, so divide it back (lib/zoom.ts).
+  const z = cssZoom(wrap)
+  tip.style.transform = `translate(${unzoom(b.left - w.left + b.width / 2, z)}px,${unzoom(b.top - w.top, z)}px)`
 }
 
 const ENTER_MS = 900
@@ -119,10 +123,10 @@ export function TasksClosedChart({ data }: { data: TasksClosedData }) {
       </div>
       <div className="rc-bars" ref={ref}>
         <div ref={tipRef} className="rc-tip" data-show={inView && (ready || active !== last) ? "" : undefined} aria-hidden="true">
-          <span className="tip tip-static num">{d.n} · {d.on}% on time</span>
+          <span className="tip tip-static tip-2l num"><b>{d.n}</b><span>{d.on}% on time</span></span>
         </div>
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart accessibilityLayer={false} data={days} margin={{ top: 44, right: 8, bottom: 0, left: 8 }} barCategoryGap="14%">
+          <BarChart accessibilityLayer={false} data={days} margin={{ top: 60, right: 8, bottom: 0, left: 8 }} barCategoryGap="26%">
             <defs>
               <pattern id="bar-stripes" width="15" height="15" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
                 <rect width="8" height="15" style={{ fill: "var(--stripe)" }} />

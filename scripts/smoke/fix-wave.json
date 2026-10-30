@@ -1,0 +1,12 @@
+[
+  {"path": "/platform/plans", "cookies": {"od-role": "platform"}, "expect": ["Core platform", "AI assistant", "Tasks and shifts"]},
+  {"path": "/daily-reports/p-daniel%3Apat-sec-day%3A2026-10-19", "cookies": {"od-role": "employee"}, "expect": [">Save draft<", ">Submit<"], "notExpect": ["Marcus Hill"]},
+  {"path": "/daily-reports/p-marcus%3Apat-sec-night%3A2026-10-19", "cookies": {"od-role": "employee"}, "expect": ["Report not found"], "notExpect": ["Officer statement received", ">Accept<"]},
+  {"path": "/", "expect": ["Shift report deadline", "Irish time · due 60 min after each shift ends", "/daily-reports?team=Security"], "notExpect": ["Daily Report Deadline", "Remind Cleaning Lead"]},
+  {"path": "/", "cookies": {"od-role": "employee"}, "expect": ["My shift report", "Open my report", "Day patrol"], "notExpect": ["Shift report deadline", "p-marcus%3A"]},
+  {"path": "/", "cookies": {"od-role": "hr"}, "notExpect": ["Shift report deadline", "My shift report"]},
+  {"path": "/tasks?status=review", "expect": ["Waiting for my review"]},
+  {"path": "/tasks/TSK-1001", "cookies": {"od-device": "dev-u3-android"}, "notExpect": ["drive.google.com"]},
+  {"path": "/tasks", "cookies": {"od-device": "dev-u3-android"}, "notExpect": ["drive.google.com"]},
+  {"path": "/tasks/TSK-1001", "cookies": {"od-device": "dev-u1-pc"}, "expect": ["drive.google.com"]}
+]

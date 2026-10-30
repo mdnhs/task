@@ -1,0 +1,21 @@
+[
+  {"path": "/tasks", "expect": ["of 60 tasks", "All projects", "/tasks/board", "/tasks/calendar", "/tasks/archive"]},
+  {"path": "/tasks?project=PRJ-1", "expect": ["6 of 60 tasks", "TSK-1047"]},
+  {"path": "/tasks/board", "expect": ["tasks on the board", "Awaiting verification", "Move to…", "Not Started"], "notExpect": ["Access restricted"]},
+  {"path": "/tasks/board", "cookies": {"od-role": "auditor"}, "expect": ["tasks on the board"], "notExpect": ["Move to…"]},
+  {"path": "/tasks/board", "cookies": {"od-role": "employee"}, "expect": ["TSK-1042", "TSK-1047"], "notExpect": ["TSK-1038", "All assignees"]},
+  {"path": "/tasks/calendar", "expect": ["October 2026", "Today", "Month", "Week"], "notExpect": ["Access restricted"]},
+  {"path": "/tasks/projects", "expect": ["Site compliance Q4", "Winter deep clean", "Access control reviewed", "View tasks"]},
+  {"path": "/tasks/archive", "expect": ["TSK-1061", "Restorable", "days left", "Restore", "Delete now"]},
+  {"path": "/tasks/archive", "cookies": {"od-role": "manager"}, "expect": ["TSK-1061", "Restore"], "notExpect": ["Delete now"]},
+  {"path": "/tasks/archive", "cookies": {"od-role": "admin"}, "expect": ["Delete now"], "notExpect": [">Restore<"]},
+  {"path": "/tasks/archive", "cookies": {"od-role": "employee"}, "expect": ["The archive is empty"], "notExpect": ["TSK-1061"]},
+  {"path": "/tasks/TSK-1047", "expect": ["Required · at least 2 · PDF", "Signed fire test sheet", "Checklist", "Subtasks", "TSK-1050", "Leo Fernandez", "Site compliance Q4", "Reschedule", "Reassign", "Remove"]},
+  {"path": "/tasks/TSK-1047", "cookies": {"od-role": "employee"}, "expect": ["Complete", "Propose new dates", "0 of 2 attached"], "notExpect": ["Reschedule", "Reassign"]},
+  {"path": "/tasks/TSK-1012", "expect": ["Awaiting verification", "Verify and complete", "Reject…", "Photo of the cleaned area, wide angle"]},
+  {"path": "/tasks/TSK-1043", "cookies": {"od-role": "employee"}, "expect": ["Not needed for this task. It closes with one tap.", "Complete"]},
+  {"path": "/tasks/TSK-1039", "expect": ["proposes new dates", "Review and approve", "Waiting for the new visitor badges"]},
+  {"path": "/tasks/TSK-1023", "expect": ["Depends on", "TSK-1014", "Blocks", "TSK-1058"]},
+  {"path": "/tasks/TSK-1027", "expect": ["Earlier versions", "Evidence rejected"]},
+  {"path": "/tasks/TSK-1061", "expect": ["Archived", "Restorable for"]}
+]

@@ -66,7 +66,7 @@ export function FilterSeg<V extends string>({
 }: {
   label: string
   value: V
-  options: Option<V>[]
+  options: { value: V; label: React.ReactNode }[]
   onChange(v: V): void
 }) {
   const id = useId()

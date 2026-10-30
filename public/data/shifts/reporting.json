@@ -1,0 +1,5 @@
+{
+  "reportDueAfterMinutes": 60,
+  "teamDefaults": { "Security": true, "Cleaning": false },
+  "overrides": { "p-leo": false, "p-amara": true, "p-nadia": true }
+}

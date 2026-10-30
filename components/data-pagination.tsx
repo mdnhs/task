@@ -133,10 +133,11 @@ export function useSlideDir(index: number): SlideDir | undefined {
 // whole body moves as one; rows are plain <tr>, because per-row enter/exit made the table jump. The table clips
 // horizontally only while the slide runs (`table:has(>tbody[data-slide])` in settings.css), so no horizontal scrollbar
 // flashes; the attribute is dropped at the end.
-export function PagedBody({ page, children, className }: { page: number; children: React.ReactNode; className?: string }) {
-  const rows = Children.toArray(children)
-    .map((c) => (isValidElement(c) ? c.key : ""))
-    .join()
+// `reorder`: a new order of the same rows (a column sort) is not a new set, so the body stays and the rows can glide
+// to their places (motion.tr layout, rule 22); only a change of which rows are shown slides the body.
+export function PagedBody({ page, children, className, reorder = false }: { page: number; children: React.ReactNode; className?: string; reorder?: boolean }) {
+  const keys = Children.toArray(children).map((c) => (isValidElement(c) ? String(c.key) : ""))
+  const rows = (reorder ? [...keys].sort() : keys).join()
   const [s, setS] = useState<{ page: number; rows: string; n: number; dir?: SlideDir }>({ page, rows, n: 0 })
   let cur = s
   if (s.page !== page || s.rows !== rows) {

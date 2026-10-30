@@ -8,14 +8,15 @@ import { DUR, EASE, numDir } from "@/lib/motion"
 
 // Counts a numeric value up from 0 once, when it first scrolls into view (ui-rules.md rule 20).
 // The server renders the final value, so no-JS and reduced-motion users see it as-is.
-// Non-numeric values ("—", "4.2k") render unchanged.
+// Non-numeric values ("—", "4.2k") render unchanged. With `decimals`, plain decimals ("1.6") count too, keeping their decimal places.
 // After that first count, a new value (e.g. the department filter changed) rolls per digit (<RollNumber>) instead of
 // counting from 0 again: once the count settles, the number is handed to RollNumber, which then animates every change.
-export function CountUp({ value, delay = 0.1, duration = DUR.count }: { value: string; delay?: number; duration?: number }) {
+export function CountUp({ value, delay = 0.1, duration = DUR.count, decimals: allowDecimals = false }: { value: string; delay?: number; duration?: number; decimals?: boolean }) {
   const ref = useRef<HTMLSpanElement>(null)
   const reduce = useReducedMotion()
   const inView = useInView(ref, { once: true, margin: "0px 0px -10% 0px" })
-  const target = /^\d+$/.test(value) ? Number(value) : null
+  const target = (allowDecimals ? /^\d+(\.\d+)?$/ : /^\d+$/).test(value) ? Number(value) : null
+  const decimals = value.split(".")[1]?.length ?? 0
   const animated = target !== null && !reduce
   // Settled = the count-up is over (or never ran). Only then does RollNumber take over.
   const [settled, setSettled] = useState(target === null)
@@ -29,8 +30,8 @@ export function CountUp({ value, delay = 0.1, duration = DUR.count }: { value: s
 
   // Before paint: show 0 so an off-screen number is waiting at the start, not already finished.
   useLayoutEffect(() => {
-    if (animated && !settled && ref.current) ref.current.textContent = "0"
-  }, [animated, settled])
+    if (animated && !settled && ref.current) ref.current.textContent = (0).toFixed(decimals)
+  }, [animated, settled, decimals])
 
   useEffect(() => {
     const el = ref.current
@@ -40,14 +41,14 @@ export function CountUp({ value, delay = 0.1, duration = DUR.count }: { value: s
       duration,
       delay,
       ease: EASE,
-      onUpdate: (v) => (el.textContent = String(Math.round(v))),
+      onUpdate: (v) => (el.textContent = v.toFixed(decimals)),
     })
     controls.then(() => live && setSettled(true))
     return () => {
       live = false
       controls.stop()
     }
-  }, [animated, inView, target, delay, duration, settled])
+  }, [animated, inView, target, decimals, delay, duration, settled])
 
   // A value that changed before the count settled (or under reduced motion) just swaps in place.
   if (settled || value !== first) return <RollNumber value={value} dir={dir} />

@@ -20,7 +20,7 @@
 - shadcn (base-nova / base-ui), `motion/react`, Recharts, sonner, zod
 - vitest, added for pure-logic tests
 
-**Spec:** `.claude/docs/superpowers/specs/2026-10-28-full-frontend-ui-design.md`. Read it first. Section refs like §3.3 point to `.claude/docs/requirements/SRS.md`.
+**Spec:** `.claude/docs/superpowers/specs/2026-10-28-full-frontend-ui-design.md`. Read it first. Section refs like §3.3 point to `.claude/docs/requirements/SRS-v1.2-built.md`.
 
 ## Global Constraints
 **Read before any work**

@@ -25,6 +25,12 @@ export function formatDate(iso: string): string {
   return `${DAYS[(dayNum(iso) + 4) % 7]} ${d} ${MONTHS[mo - 1]}`
 }
 
+/** Short date with year: "20 Oct, 2026". */
+export function formatDateYear(iso: string): string {
+  const { y, mo, d } = parts(iso)
+  return `${d} ${MONTHS[mo - 1]}, ${y}`
+}
+
 export function formatTime(iso: string): string {
   const { h, mi } = parts(iso)
   return `${h % 12 || 12}:${String(mi).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`

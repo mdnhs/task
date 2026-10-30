@@ -10,7 +10,7 @@
   },
   {
    "id": "reports",
-   "label": "Daily Reports"
+   "label": "Shift Reports"
   },
   {
    "id": "attention",
@@ -19,6 +19,10 @@
   {
    "id": "staff",
    "label": "Staff & Rosters"
+  },
+  {
+   "id": "shifts",
+   "label": "Shifts"
   },
   {
    "id": "recruitment",
@@ -55,6 +59,7 @@
     "reports": "write",
     "attention": "write",
     "staff": "write",
+    "shifts": "write",
     "recruitment": "write",
     "files": "write",
     "payroll": "write",
@@ -72,6 +77,7 @@
     "reports": "read",
     "attention": "read",
     "staff": "read",
+    "shifts": "write",
     "recruitment": "read",
     "files": "read",
     "payroll": "none",
@@ -89,6 +95,7 @@
     "reports": "write",
     "attention": "write",
     "staff": "write",
+    "shifts": "write",
     "recruitment": "write",
     "files": "write",
     "payroll": "read",
@@ -106,6 +113,7 @@
     "reports": "write",
     "attention": "write",
     "staff": "write",
+    "shifts": "write",
     "recruitment": "write",
     "files": "write",
     "payroll": "none",
@@ -123,6 +131,7 @@
     "reports": "write",
     "attention": "none",
     "staff": "write",
+    "shifts": "read",
     "recruitment": "none",
     "files": "none",
     "payroll": "none",
@@ -137,9 +146,10 @@
    "access": {
     "dashboard": "read",
     "tasks": "write",
-    "reports": "read",
+    "reports": "write",
     "attention": "none",
     "staff": "none",
+    "shifts": "read",
     "recruitment": "none",
     "files": "none",
     "payroll": "none",
@@ -157,6 +167,7 @@
     "reports": "none",
     "attention": "none",
     "staff": "none",
+    "shifts": "read",
     "recruitment": "write",
     "files": "write",
     "payroll": "none",
@@ -174,6 +185,7 @@
     "reports": "none",
     "attention": "none",
     "staff": "none",
+    "shifts": "read",
     "recruitment": "none",
     "files": "none",
     "payroll": "write",
@@ -191,6 +203,7 @@
     "reports": "read",
     "attention": "read",
     "staff": "read",
+    "shifts": "read",
     "recruitment": "read",
     "files": "read",
     "payroll": "read",

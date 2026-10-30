@@ -1,259 +1,121 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
-import { flushSync } from "react-dom"
+import { useState } from "react"
 import { toast } from "sonner"
 
 import { ActionButton } from "@/components/action-button"
 import { Field } from "@/components/field"
 import { PageHead } from "@/components/page-head"
-import { StatusPill } from "@/components/status-pill"
-import { Accordion } from "@/components/ui/accordion"
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import { When } from "@/components/when"
-import { formatDate, formatTime, nowInTz } from "@/lib/dates"
-import type { Org } from "@/lib/org"
-import type { Person } from "@/lib/types"
-import type { ExportMeta } from "../export"
+import { formatDate, formatTime } from "@/lib/dates"
+import { acceptReport, canReviewReport, extraSections, returnReport, windowLabel } from "@/lib/shift-report"
 import { buildReportDoc } from "../export-rows"
-import { reportProgress } from "../lifecycle"
-import { REPORT_STATUS } from "../types"
-import type { Report, TemplateSection } from "../types"
+import type { ReportState, ShiftReport, TemplateSection } from "../types"
 import { ExportMenu } from "./export-menu"
-import { FollowUpDialog } from "./follow-up-dialog"
-import { ReportProgress } from "./report-progress"
-import { ReportSection } from "./report-section"
+import type { ReportPageProps } from "./report-page"
+import { ItemsView, NotesView, ReportMeta } from "./report-parts"
 import { VersionHistory } from "./version-history"
 
-const noop = () => {}
-
-// Read-only report view (owners after submitting, read-only roles, reviewers). Same head / meta / nil / progress structure
-// as the edit form so one loading skeleton fits both. Reviewers can comment per section, accept (FR-REP-09) or return.
+/**
+ * Read-only shift report (FR-M1-27/28): the owner after submitting, read-only roles, and managers. A manager with review
+ * rights accepts a submitted report or returns it with a comment (FR-M1-29); the member is told either way.
+ */
 export function ReportReview({
-  report,
-  template,
+  report: r,
   owner,
-  people,
-  org,
-  skip,
-  canReview,
-  canComment,
-  me,
+  template,
+  state,
   apply,
   back,
+  now,
+  tz,
+  tzLabel,
+  canReview,
+  me,
   exportMeta,
-}: {
-  report: Report
-  template: TemplateSection[]
+  seed,
+}: ReportPageProps & {
+  report: ShiftReport
   owner: string
-  people: Person[]
-  org: Org
-  /** Accept / Return / follow-up buttons: reviewer role and the report is submitted or resubmitted. */
-  canReview: boolean
-  canComment: boolean
-  /** Restricted sections this role cannot read. */
-  skip: string[]
-  me: string
-  apply(fn: (r: Report) => Report): void
+  template: TemplateSection[]
+  state: ReportState
+  apply(fn: (r: ShiftReport) => ShiftReport): void
   back: React.ReactNode
-  /** Company, date label and brand colour for the export file header. */
-  exportMeta: ExportMeta
 }) {
-  const [open, setOpen] = useState<string[]>([])
   const [returning, setReturning] = useState(false)
-  const [followUp, setFollowUp] = useState(false)
-  const visible = useMemo(() => template.filter((s) => !skip.includes(s.id)), [template, skip])
-  const now = () => nowInTz(org.today, org.timezone)
-  const deadlineText = formatTime(`${report.date}T${org.deadline}:00`)
-  const title = `${report.dept} report`
-
-  // Print renders every section expanded (the print stylesheet also overrides the panel's hidden state).
-  const expandAll = useCallback(() => flushSync(() => setOpen(template.map((s) => s.id))), [template])
-  useEffect(() => {
-    window.addEventListener("beforeprint", expandAll)
-    return () => window.removeEventListener("beforeprint", expandAll)
-  }, [expandAll])
-
-  const { done, total } = reportProgress({ ...report, fields: Object.fromEntries(Object.entries(report.fields).filter(([k]) => !skip.includes(k.split(".")[0]))) }, visible)
-  const attention = visible.filter((s) =>
-    s.fields.some((f) => {
-      if (!f.required) return false
-      const v = report.fields[`${s.id}.${f.id}`]
-      return !v?.state
-    }),
-  )
-
-  const jump = (sid: string) => {
-    setOpen((o) => (o.includes(sid) ? o : [...o, sid]))
-    requestAnimationFrame(() => document.getElementById(`sec-${sid}`)?.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" }))
-  }
-
+  const review = canReview && seed.scope !== "own" && canReviewReport(r)
+  const first = owner.split(" ")[0]
   const accept = () => {
-    const at = now()
-    apply((r) => ({ ...r, status: "reviewed", reviewedBy: me, reviewedAt: at, updatedAt: at }))
-    toast.success(`Report accepted ${formatTime(at)} ${org.tzLabel}`)
+    apply((x) => acceptReport(x, now.slice(0, 16), me))
+    toast.success("Report accepted", { description: `${first} has been notified.` })
   }
-  const returnReport = (text: string) => {
-    const at = now()
-    apply((r) => ({ ...r, status: "returned", updatedAt: at, comments: [...r.comments, { at, by: me, text }] }))
-    toast.success("Report returned for correction")
+  const doReturn = (text: string) => {
+    apply((x) => returnReport(x, now.slice(0, 16), me, text))
+    toast.success("Report returned", { description: `${first} has been notified and can edit and resubmit it.` })
   }
-  const addComment = (section: string, text: string) => {
-    const at = now()
-    apply((r) => ({ ...r, updatedAt: at, comments: [...r.comments, { at, by: me, text, section }] }))
-  }
-  const general = report.comments.filter((c) => !c.section)
+  const extraLabels = Object.fromEntries(extraSections(template).flatMap((s) => s.fields.map((f) => [`${s.id}.${f.id}`, f.label])))
+  const pending = r.status === "draft"
 
   return (
     <>
       {back}
       <PageHead
-        title={title}
-        subtitle={`${formatDate(report.date)} · due ${deadlineText} ${org.tzLabel}`}
+        title={`${r.shiftName} report`}
+        subtitle={`${owner} · ${formatDate(r.date)} ${windowLabel(r)} · due ${formatTime(r.due)} ${tzLabel}`}
         actions={
-          canReview && (
+          review && (
             <>
-              <button type="button" className="btn btn-outline rf-btn" onClick={() => setReturning(true)}>
-                Return for correction
-              </button>
-              <ActionButton className="btn btn-primary rf-btn" onDone={accept}>
-                Accept
-              </ActionButton>
+              <button type="button" className="btn btn-outline rf-btn" onClick={() => setReturning(true)}>Return with comment</button>
+              <ActionButton className="btn btn-primary rf-btn" onDone={accept}>Accept</ActionButton>
             </>
           )
         }
       />
-      <div className="rf-grid">
-        <div className="rf-col">
-          <section className="card rf-meta" aria-label="Report details">
-            <dl className="td-meta">
-              <div><dt>Date</dt><dd>{formatDate(report.date)}</dd></div>
-              <div><dt>Department</dt><dd>{report.dept}</dd></div>
-              <div><dt>Owner</dt><dd>{owner}</dd></div>
-              <div><dt>Status</dt><dd><StatusPill status={REPORT_STATUS[report.status]} /></dd></div>
-              <div><dt>Created</dt><dd><When iso={report.createdAt} today={org.today} tzLabel={org.tzLabel} /></dd></div>
-              <div><dt>Last updated</dt><dd><When iso={report.updatedAt} today={org.today} tzLabel={org.tzLabel} /></dd></div>
-              <div><dt>Submitted</dt><dd>{report.submittedAt ? <When iso={report.submittedAt} today={org.today} tzLabel={org.tzLabel} /> : "Not yet"}</dd></div>
-              <div><dt>Deadline</dt><dd>{deadlineText} {org.tzLabel}</dd></div>
-              {report.reviewedAt && (
-                <div><dt>Reviewed</dt><dd>{report.reviewedBy} · <When iso={report.reviewedAt} today={org.today} tzLabel={org.tzLabel} /></dd></div>
-              )}
-            </dl>
-          </section>
-          <section className="card rf-nil">
-            <div>
-              <h2 className="td-h" id="rf-nil-h">Nil / clear report</h2>
-              <p className="td-muted">Nothing to report today. Marks every field as No issues.</p>
-            </div>
-            <Switch aria-labelledby="rf-nil-h" checked={report.nil} disabled />
-          </section>
-          <Accordion multiple className="rf-secs" value={open} onValueChange={(v) => setOpen(v as string[])}>
-            {template.map((s) => (
-              <ReportSection
-                key={s.id}
-                section={s}
-                report={report}
-                errors={{}}
-                restricted={skip.includes(s.id)}
-                readOnly
-                onField={noop}
-                extra={<SectionComments sid={s.id} title={s.title} comments={report.comments.filter((c) => c.section === s.id)} canComment={canComment} org={org} onAdd={addComment} />}
-              />
-            ))}
-          </Accordion>
-          {general.length > 0 && (
-            <section className="card" aria-labelledby="rf-notes-h">
-              <h2 className="td-h" id="rf-notes-h">Review notes</h2>
-              <ul className="rf-comments">
-                {general.map((c, i) => (
-                  <li key={i}>
-                    <span className="rf-cm-by">{c.by} · <When iso={c.at} today={org.today} tzLabel={org.tzLabel} /></span>
-                    <span>{c.text}</span>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          )}
-          <VersionHistory report={report} today={org.today} tzLabel={org.tzLabel} />
-          <section className="card rf-tools" aria-label="Print and export">
-            <button type="button" className="btn btn-outline rf-btn" onClick={() => { expandAll(); window.print() }}>
-              Print
-            </button>
-            <ExportMenu
-              className="rf-btn"
-              groups={[{ key: "report", label: "This report", doc: buildReportDoc({ report, template, owner, skip, deadline: org.deadline, tzLabel: org.tzLabel }) }]}
-              meta={exportMeta}
-            />
-            {canComment && (
-              <button type="button" className="btn btn-outline rf-btn" onClick={() => setFollowUp(true)}>
-                Assign follow-up task
-              </button>
-            )}
-          </section>
+      {pending && (
+        <div className={`td-state ${state === "missing" ? "warn" : "mute"} sr-banner`}>
+          <strong>{state === "missing" ? "Missing: not submitted by the due time" : "Not submitted yet"}</strong>
+          <span>
+            Due <When iso={r.due} today={now} tzLabel={tzLabel} />. The rows below are the tasks in the shift
+            {r.updatedAt > r.createdAt ? " with the member's draft so far" : ""}.
+          </span>
         </div>
-        <ReportProgress done={done} total={total} attention={attention} onJump={jump} />
+      )}
+      <div className="sr-col">
+        <ReportMeta report={r} owner={owner} state={state} now={now} tzLabel={tzLabel} />
+        <ItemsView report={r} canOpenTasks={seed.scope !== "own" || r.personId === seed.meId} />
+        <NotesView report={r} template={template} />
+        {r.comments.length > 0 && (
+          <section className="card" aria-labelledby="sr-notes-h">
+            <h2 className="td-h" id="sr-notes-h">Review comments</h2>
+            <ul className="rf-comments">
+              {r.comments.map((c, i) => (
+                <li key={i}>
+                  <span className="rf-cm-by">{c.by} · <When iso={c.at} today={now} tzLabel={tzLabel} /></span>
+                  <span>{c.text}</span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+        <VersionHistory report={r} today={now} tzLabel={tzLabel} />
+        <section className="card rf-tools" aria-label="Print and export">
+          <button type="button" className="btn btn-outline rf-btn" onClick={() => window.print()}>Print</button>
+          <ExportMenu
+            className="rf-btn"
+            groups={[{ key: "report", label: "This report", doc: buildReportDoc({ report: r, owner, state, tz, tzLabel, extraLabels }) }]}
+            meta={exportMeta}
+          />
+        </section>
       </div>
-      <ReturnDialog open={returning} onOpenChange={setReturning} onReturn={returnReport} />
-      <FollowUpDialog open={followUp} onOpenChange={setFollowUp} people={people} today={org.today} reportTitle={`${title}, ${formatDate(report.date)}`} />
+      <ReturnDialog open={returning} onOpenChange={setReturning} who={first} onReturn={doReturn} />
     </>
   )
 }
 
-function SectionComments({
-  sid,
-  title,
-  comments,
-  canComment,
-  org,
-  onAdd,
-}: {
-  sid: string
-  title: string
-  comments: Report["comments"]
-  canComment: boolean
-  org: Org
-  onAdd(section: string, text: string): void
-}) {
-  const [text, setText] = useState("")
-  if (!canComment && comments.length === 0) return null
-  const id = `rf-cm-${sid}`
-  return (
-    <div className="rf-cm">
-      <h3>Comments</h3>
-      {comments.length > 0 && (
-        <ul className="rf-comments">
-          {comments.map((c, i) => (
-            <li key={i}>
-              <span className="rf-cm-by">{c.by} · <When iso={c.at} today={org.today} tzLabel={org.tzLabel} /></span>
-              <span>{c.text}</span>
-            </li>
-          ))}
-        </ul>
-      )}
-      {canComment && (
-        <form
-          className="rf-cm-form"
-          onSubmit={(e) => {
-            e.preventDefault()
-            if (!text.trim()) return
-            onAdd(sid, text.trim())
-            setText("")
-          }}
-        >
-          <Textarea id={id} aria-label={`Comment on ${title}`} placeholder="Add a comment" value={text} onChange={(e) => setText(e.target.value)} />
-          <button type="submit" className="btn btn-outline rf-btn" disabled={!text.trim()}>
-            Add comment
-          </button>
-        </form>
-      )}
-    </div>
-  )
-}
-
-// FR-REP-09: returning a report needs a comment explaining what to fix.
-function ReturnDialog({ open, onOpenChange, onReturn }: { open: boolean; onOpenChange(o: boolean): void; onReturn(text: string): void }) {
+// FR-M1-29: returning a report needs a comment explaining what to change.
+function ReturnDialog({ open, onOpenChange, who, onReturn }: { open: boolean; onOpenChange(o: boolean): void; who: string; onReturn(text: string): void }) {
   const [text, setText] = useState("")
   const [error, setError] = useState("")
   const close = (o: boolean) => {
@@ -267,28 +129,21 @@ function ReturnDialog({ open, onOpenChange, onReturn }: { open: boolean; onOpenC
     <Dialog open={open} onOpenChange={close}>
       <DialogContent className="od-dialog od-form-dialog" showCloseButton={false}>
         <DialogHeader>
-          <DialogTitle>Return for correction</DialogTitle>
-          <DialogDescription>The owner will see your comment and can edit and resubmit the report.</DialogDescription>
+          <DialogTitle>Return with comment</DialogTitle>
+          <DialogDescription>{who} will see your comment and can edit and resubmit the report.</DialogDescription>
         </DialogHeader>
         <form
           className="od-form"
           noValidate
           onSubmit={(e) => {
             e.preventDefault()
-            if (!text.trim()) return setError("Explain what needs to be corrected")
+            if (!text.trim()) return setError("Say what needs to change")
             onReturn(text.trim())
             close(false)
           }}
         >
-          <Field label="Comment" htmlFor="rf-return-text" error={error} required>
-            <Textarea
-              id="rf-return-text"
-              value={text}
-              onChange={(e) => {
-                setText(e.target.value)
-                setError("")
-              }}
-            />
+          <Field label="Comment" htmlFor="sr-return-text" error={error} required>
+            <Textarea id="sr-return-text" value={text} onChange={(e) => { setText(e.target.value); setError("") }} />
           </Field>
           <div className="od-form-foot">
             <DialogClose render={<button type="button" className="btn btn-outline" />}>Cancel</DialogClose>

@@ -1,0 +1,11 @@
+{
+  "payments": {
+    "provider": "Stripe",
+    "mode": "test",
+    "status": "connected"
+  },
+  "defaultTrialDays": 14,
+  "retentionDays": 90,
+  "supportAccessHours": 24,
+  "announcement": null
+}

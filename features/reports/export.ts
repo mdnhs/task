@@ -1,13 +1,13 @@
 "use client"
 
-// FR-REP-12: browser-side PDF and Excel files. jspdf / jspdf-autotable / exceljs are loaded with dynamic import() only when the
+// FR-M1-31 (was FR-REP-12): browser-side PDF, Excel and CSV files. jspdf / jspdf-autotable / exceljs are loaded with dynamic import() only when the
 // user clicks export, so they never land in the page bundle. Rows come from export-rows.ts (pure, tested).
-import type { ExportDoc } from "./export-rows"
+import { toCsv, type ExportDoc } from "./export-rows"
 
 export type ExportMeta = {
   /** Tenant name, from the session. */
   company: string
-  /** "Tue 20 Oct · UK time" (tenant today and timezone label). */
+  /** "Tue 20 Oct · Irish time" (tenant today and timezone label). */
   generated: string
   /** Tenant brand colour (#rrggbb); plain when missing or invalid. */
   brand?: string
@@ -126,4 +126,9 @@ export async function exportXlsx(doc: ExportDoc, meta: ExportMeta) {
   widths.forEach((w, i) => (ws.getColumn(i + 1).width = w))
   const buf = await wb.xlsx.writeBuffer()
   save(new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), `${doc.fileBase}.xlsx`)
+}
+
+/** CSV (UTF-8 with BOM so Excel reads accents, CRLF). No library needed. */
+export async function exportCsv(doc: ExportDoc) {
+  save(new Blob(["\uFEFF" + toCsv(doc)], { type: "text/csv;charset=utf-8" }), `${doc.fileBase}.csv`)
 }

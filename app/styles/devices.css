@@ -1,0 +1,44 @@
+/* Device policy (CR-02, CR-06): Drive link states, demo device switcher, device register, MFA gate. */
+.drive-link,.drive-locked{display:inline-flex;align-items:center;gap:6px;min-width:0;font-size:13px;font-weight:600;overflow-wrap:anywhere}
+.drive-link{color:var(--brand-deep);text-decoration:underline;text-underline-offset:3px;transition:color var(--dur-fast) var(--ease)}
+.drive-link:hover{color:var(--brand)}
+.drive-locked{color:var(--ink-3)}
+.drive-link .ico,.drive-locked .ico{width:15px;height:15px;flex:none}
+
+.dev-note{margin:0 0 14px;font-size:13px;line-height:1.5;color:var(--ink-2)}
+.dev-policy{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:16px 18px;border-radius:var(--r-lg);background:var(--shell)}
+.dev-policy-text{display:flex;flex-direction:column;gap:4px;min-width:0}
+.dev-policy-text b{font-size:14.5px}
+.dev-policy-text span{font-size:13px;line-height:1.5;color:var(--ink-2)}
+.dev-policy .od-filters{margin:0}
+.dev-policy-list{display:flex;flex-direction:column;gap:10px;margin-top:14px}
+.dev-roles{display:flex;flex-wrap:wrap;gap:8px 18px;margin-top:12px}
+
+/* MFA setup (account security and the gate) */
+.mfa-setup{display:grid;grid-template-columns:auto minmax(0,1fr);gap:20px;align-items:start}
+.mfa-qr{width:156px;height:156px;padding:10px;border-radius:var(--r-lg);background:#fff;color:#111;display:block}
+.mfa-qr svg{display:block;width:100%;height:100%}
+.mfa-steps{display:flex;flex-direction:column;gap:12px;min-width:0}
+.mfa-steps p{margin:0;font-size:13.5px;line-height:1.5;color:var(--ink-2)}
+.mfa-secret{display:inline-block;padding:8px 12px;border-radius:calc(12px * var(--radius-scale,1));background:var(--shell);font-family:ui-monospace,monospace;font-size:14px;letter-spacing:.06em;color:var(--ink);overflow-wrap:anywhere}
+.mfa-code{max-width:200px;letter-spacing:.4em;text-align:center;font-size:18px;font-variant-numeric:tabular-nums}
+.mfa-codes{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.mfa-codes li{padding:8px 12px;border-radius:calc(12px * var(--radius-scale,1));background:var(--shell);font-family:ui-monospace,monospace;font-size:13.5px;letter-spacing:.05em;text-align:center}
+.mfa-gate{max-width:640px;margin:calc(8vh / var(--text-scale,1)) auto 0;display:flex;flex-direction:column;gap:18px}
+@media (max-width:600px){.mfa-setup{grid-template-columns:minmax(0,1fr)}.mfa-qr{width:140px;height:140px}}
+
+/* Demo device switcher, in the user menu */
+.dev-switch-ico{width:16px;height:16px}
+.mfa-gate-h{margin:0;display:flex;align-items:center;gap:10px;font-size:20px;font-weight:700;letter-spacing:-.01em}
+.mfa-gate-h .ico{width:20px;height:20px}
+
+/* Device register rows */
+.dev-row{display:flex;align-items:center;gap:14px;padding:14px 18px;border-radius:var(--r-lg);background:var(--shell)}
+.dev-ico{width:40px;height:40px;border-radius:calc(12px * var(--radius-scale,1));display:grid;place-items:center;background:var(--card);color:var(--ink-2);flex:none}
+.dev-ico .ico{width:18px;height:18px}
+.dev-main{display:flex;flex-direction:column;gap:4px;min-width:0;flex:1}
+.dev-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.dev-name{font-size:14.5px;font-weight:700}
+.dev-trust{display:flex;align-items:center;gap:10px;font-size:13px;font-weight:600;color:var(--ink-2);cursor:pointer}
+.dev-trust:has([data-disabled]),.dev-trust:has([data-disabled]) *{cursor:not-allowed}
+@media (max-width:600px){.dev-row{flex-wrap:wrap}.dev-main{flex-basis:calc(100% - 60px)}}

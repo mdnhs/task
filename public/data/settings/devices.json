@@ -1,0 +1,14 @@
+{
+  "devices": [
+    { "id": "dev-u1-pc", "userId": "u1", "type": "pc", "owner": "company", "label": "Owner PC (Office)", "trusted": true, "lastSeen": "2026-10-20T08:12:00" },
+    { "id": "dev-u3-pc", "userId": "u3", "type": "pc", "owner": "company", "label": "Work PC", "trusted": true, "lastSeen": "2026-10-20T08:55:00" },
+    { "id": "dev-u3-android", "userId": "u3", "type": "android", "owner": "personal", "label": "Android phone", "trusted": false, "lastSeen": "2026-10-19T18:12:00" },
+    { "id": "dev-u4-pc", "userId": "u4", "type": "pc", "owner": "company", "label": "Supervisor PC (Control room)", "trusted": true, "lastSeen": "2026-10-20T07:30:00" },
+    { "id": "dev-u4-android", "userId": "u4", "type": "android", "owner": "personal", "label": "Android phone", "trusted": false, "lastSeen": "2026-10-20T06:58:00" },
+    { "id": "dev-u7-android", "userId": "u7", "type": "android", "owner": "personal", "label": "Android phone", "trusted": false, "lastSeen": "2026-10-19T21:40:00" }
+  ],
+  "policies": [
+    { "feature": "drive", "allow": "trusted-company-pc" }
+  ],
+  "mfaPolicy": { "mode": "off", "roles": [] }
+}

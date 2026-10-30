@@ -1,0 +1,2362 @@
+{
+ "invoices": [
+  {
+   "id": "INV-1001",
+   "tenantId": "t1",
+   "number": "OD-1001",
+   "issuedAt": "2025-11-02T08:00:00",
+   "dueAt": "2025-11-16T08:00:00",
+   "amount": 149,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Business plan, November 2025",
+     "amount": 149
+    }
+   ]
+  },
+  {
+   "id": "INV-1002",
+   "tenantId": "t3",
+   "number": "OD-1002",
+   "issuedAt": "2025-11-02T08:00:00",
+   "dueAt": "2025-11-16T08:00:00",
+   "amount": 149,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Business plan, November 2025",
+     "amount": 149
+    }
+   ]
+  },
+  {
+   "id": "INV-1003",
+   "tenantId": "t4",
+   "number": "OD-1003",
+   "issuedAt": "2025-11-02T08:00:00",
+   "dueAt": "2025-11-16T08:00:00",
+   "amount": 149,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Business plan, November 2025",
+     "amount": 149
+    }
+   ]
+  },
+  {
+   "id": "INV-1004",
+   "tenantId": "t5",
+   "number": "OD-1004",
+   "issuedAt": "2025-11-02T08:00:00",
+   "dueAt": "2025-11-16T08:00:00",
+   "amount": 399,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Enterprise plan, November 2025",
+     "amount": 399
+    }
+   ]
+  },
+  {
+   "id": "INV-1005",
+   "tenantId": "t7",
+   "number": "OD-1005",
+   "issuedAt": "2025-11-02T08:00:00",
+   "dueAt": "2025-11-16T08:00:00",
+   "amount": 149,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Business plan, November 2025",
+     "amount": 149
+    }
+   ]
+  },
+  {
+   "id": "INV-1006",
+   "tenantId": "t8",
+   "number": "OD-1006",
+   "issuedAt": "2025-11-02T08:00:00",
+   "dueAt": "2025-11-16T08:00:00",
+   "amount": 49,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Starter plan, November 2025",
+     "amount": 49
+    }
+   ]
+  },
+  {
+   "id": "INV-1007",
+   "tenantId": "t9",
+   "number": "OD-1007",
+   "issuedAt": "2025-11-02T08:00:00",
+   "dueAt": "2025-11-16T08:00:00",
+   "amount": 49,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Starter plan, November 2025",
+     "amount": 49
+    }
+   ]
+  },
+  {
+   "id": "INV-1008",
+   "tenantId": "t10",
+   "number": "OD-1008",
+   "issuedAt": "2025-11-02T08:00:00",
+   "dueAt": "2025-11-16T08:00:00",
+   "amount": 399,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Enterprise plan, November 2025",
+     "amount": 399
+    }
+   ]
+  },
+  {
+   "id": "INV-1009",
+   "tenantId": "t11",
+   "number": "OD-1009",
+   "issuedAt": "2025-11-02T08:00:00",
+   "dueAt": "2025-11-16T08:00:00",
+   "amount": 49,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Starter plan, November 2025",
+     "amount": 49
+    }
+   ]
+  },
+  {
+   "id": "INV-1010",
+   "tenantId": "t13",
+   "number": "OD-1010",
+   "issuedAt": "2025-11-02T08:00:00",
+   "dueAt": "2025-11-16T08:00:00",
+   "amount": 149,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Business plan, November 2025",
+     "amount": 149
+    }
+   ]
+  },
+  {
+   "id": "INV-1011",
+   "tenantId": "t1",
+   "number": "OD-1011",
+   "issuedAt": "2025-12-02T08:00:00",
+   "dueAt": "2025-12-16T08:00:00",
+   "amount": 149,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Business plan, December 2025",
+     "amount": 149
+    }
+   ]
+  },
+  {
+   "id": "INV-1012",
+   "tenantId": "t3",
+   "number": "OD-1012",
+   "issuedAt": "2025-12-02T08:00:00",
+   "dueAt": "2025-12-16T08:00:00",
+   "amount": 149,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Business plan, December 2025",
+     "amount": 149
+    }
+   ]
+  },
+  {
+   "id": "INV-1013",
+   "tenantId": "t4",
+   "number": "OD-1013",
+   "issuedAt": "2025-12-02T08:00:00",
+   "dueAt": "2025-12-16T08:00:00",
+   "amount": 149,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Business plan, December 2025",
+     "amount": 149
+    }
+   ]
+  },
+  {
+   "id": "INV-1014",
+   "tenantId": "t5",
+   "number": "OD-1014",
+   "issuedAt": "2025-12-02T08:00:00",
+   "dueAt": "2025-12-16T08:00:00",
+   "amount": 399,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Enterprise plan, December 2025",
+     "amount": 399
+    }
+   ]
+  },
+  {
+   "id": "INV-1015",
+   "tenantId": "t7",
+   "number": "OD-1015",
+   "issuedAt": "2025-12-02T08:00:00",
+   "dueAt": "2025-12-16T08:00:00",
+   "amount": 149,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Business plan, December 2025",
+     "amount": 149
+    }
+   ]
+  },
+  {
+   "id": "INV-1016",
+   "tenantId": "t8",
+   "number": "OD-1016",
+   "issuedAt": "2025-12-02T08:00:00",
+   "dueAt": "2025-12-16T08:00:00",
+   "amount": 49,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Starter plan, December 2025",
+     "amount": 49
+    }
+   ]
+  },
+  {
+   "id": "INV-1017",
+   "tenantId": "t9",
+   "number": "OD-1017",
+   "issuedAt": "2025-12-02T08:00:00",
+   "dueAt": "2025-12-16T08:00:00",
+   "amount": 49,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Starter plan, December 2025",
+     "amount": 49
+    }
+   ]
+  },
+  {
+   "id": "INV-1018",
+   "tenantId": "t10",
+   "number": "OD-1018",
+   "issuedAt": "2025-12-02T08:00:00",
+   "dueAt": "2025-12-16T08:00:00",
+   "amount": 399,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Enterprise plan, December 2025",
+     "amount": 399
+    }
+   ]
+  },
+  {
+   "id": "INV-1019",
+   "tenantId": "t11",
+   "number": "OD-1019",
+   "issuedAt": "2025-12-02T08:00:00",
+   "dueAt": "2025-12-16T08:00:00",
+   "amount": 49,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Starter plan, December 2025",
+     "amount": 49
+    }
+   ]
+  },
+  {
+   "id": "INV-1020",
+   "tenantId": "t13",
+   "number": "OD-1020",
+   "issuedAt": "2025-12-02T08:00:00",
+   "dueAt": "2025-12-16T08:00:00",
+   "amount": 149,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Business plan, December 2025",
+     "amount": 149
+    }
+   ]
+  },
+  {
+   "id": "INV-1021",
+   "tenantId": "t1",
+   "number": "OD-1021",
+   "issuedAt": "2026-01-02T08:00:00",
+   "dueAt": "2026-01-16T08:00:00",
+   "amount": 149,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Business plan, January 2026",
+     "amount": 149
+    }
+   ]
+  },
+  {
+   "id": "INV-1022",
+   "tenantId": "t3",
+   "number": "OD-1022",
+   "issuedAt": "2026-01-02T08:00:00",
+   "dueAt": "2026-01-16T08:00:00",
+   "amount": 149,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Business plan, January 2026",
+     "amount": 149
+    }
+   ]
+  },
+  {
+   "id": "INV-1023",
+   "tenantId": "t4",
+   "number": "OD-1023",
+   "issuedAt": "2026-01-02T08:00:00",
+   "dueAt": "2026-01-16T08:00:00",
+   "amount": 149,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Business plan, January 2026",
+     "amount": 149
+    }
+   ]
+  },
+  {
+   "id": "INV-1024",
+   "tenantId": "t5",
+   "number": "OD-1024",
+   "issuedAt": "2026-01-02T08:00:00",
+   "dueAt": "2026-01-16T08:00:00",
+   "amount": 399,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Enterprise plan, January 2026",
+     "amount": 399
+    }
+   ]
+  },
+  {
+   "id": "INV-1025",
+   "tenantId": "t7",
+   "number": "OD-1025",
+   "issuedAt": "2026-01-02T08:00:00",
+   "dueAt": "2026-01-16T08:00:00",
+   "amount": 149,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Business plan, January 2026",
+     "amount": 149
+    }
+   ]
+  },
+  {
+   "id": "INV-1026",
+   "tenantId": "t8",
+   "number": "OD-1026",
+   "issuedAt": "2026-01-02T08:00:00",
+   "dueAt": "2026-01-16T08:00:00",
+   "amount": 49,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Starter plan, January 2026",
+     "amount": 49
+    }
+   ]
+  },
+  {
+   "id": "INV-1027",
+   "tenantId": "t9",
+   "number": "OD-1027",
+   "issuedAt": "2026-01-02T08:00:00",
+   "dueAt": "2026-01-16T08:00:00",
+   "amount": 49,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Starter plan, January 2026",
+     "amount": 49
+    }
+   ]
+  },
+  {
+   "id": "INV-1028",
+   "tenantId": "t10",
+   "number": "OD-1028",
+   "issuedAt": "2026-01-02T08:00:00",
+   "dueAt": "2026-01-16T08:00:00",
+   "amount": 399,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Enterprise plan, January 2026",
+     "amount": 399
+    }
+   ]
+  },
+  {
+   "id": "INV-1029",
+   "tenantId": "t11",
+   "number": "OD-1029",
+   "issuedAt": "2026-01-02T08:00:00",
+   "dueAt": "2026-01-16T08:00:00",
+   "amount": 49,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Starter plan, January 2026",
+     "amount": 49
+    }
+   ]
+  },
+  {
+   "id": "INV-1030",
+   "tenantId": "t13",
+   "number": "OD-1030",
+   "issuedAt": "2026-01-02T08:00:00",
+   "dueAt": "2026-01-16T08:00:00",
+   "amount": 149,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Business plan, January 2026",
+     "amount": 149
+    }
+   ]
+  },
+  {
+   "id": "INV-1031",
+   "tenantId": "t14",
+   "number": "OD-1031",
+   "issuedAt": "2026-01-02T08:00:00",
+   "dueAt": "2026-01-16T08:00:00",
+   "amount": 49,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Starter plan, January 2026",
+     "amount": 49
+    }
+   ]
+  },
+  {
+   "id": "INV-1032",
+   "tenantId": "t1",
+   "number": "OD-1032",
+   "issuedAt": "2026-02-02T08:00:00",
+   "dueAt": "2026-02-16T08:00:00",
+   "amount": 149,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Business plan, February 2026",
+     "amount": 149
+    }
+   ]
+  },
+  {
+   "id": "INV-1033",
+   "tenantId": "t3",
+   "number": "OD-1033",
+   "issuedAt": "2026-02-02T08:00:00",
+   "dueAt": "2026-02-16T08:00:00",
+   "amount": 149,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Business plan, February 2026",
+     "amount": 149
+    }
+   ]
+  },
+  {
+   "id": "INV-1034",
+   "tenantId": "t4",
+   "number": "OD-1034",
+   "issuedAt": "2026-02-02T08:00:00",
+   "dueAt": "2026-02-16T08:00:00",
+   "amount": 149,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Business plan, February 2026",
+     "amount": 149
+    }
+   ]
+  },
+  {
+   "id": "INV-1035",
+   "tenantId": "t5",
+   "number": "OD-1035",
+   "issuedAt": "2026-02-02T08:00:00",
+   "dueAt": "2026-02-16T08:00:00",
+   "amount": 399,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Enterprise plan, February 2026",
+     "amount": 399
+    }
+   ]
+  },
+  {
+   "id": "INV-1036",
+   "tenantId": "t7",
+   "number": "OD-1036",
+   "issuedAt": "2026-02-02T08:00:00",
+   "dueAt": "2026-02-16T08:00:00",
+   "amount": 149,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Business plan, February 2026",
+     "amount": 149
+    }
+   ]
+  },
+  {
+   "id": "INV-1037",
+   "tenantId": "t8",
+   "number": "OD-1037",
+   "issuedAt": "2026-02-02T08:00:00",
+   "dueAt": "2026-02-16T08:00:00",
+   "amount": 49,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Starter plan, February 2026",
+     "amount": 49
+    }
+   ]
+  },
+  {
+   "id": "INV-1038",
+   "tenantId": "t9",
+   "number": "OD-1038",
+   "issuedAt": "2026-02-02T08:00:00",
+   "dueAt": "2026-02-16T08:00:00",
+   "amount": 49,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Starter plan, February 2026",
+     "amount": 49
+    }
+   ]
+  },
+  {
+   "id": "INV-1039",
+   "tenantId": "t10",
+   "number": "OD-1039",
+   "issuedAt": "2026-02-02T08:00:00",
+   "dueAt": "2026-02-16T08:00:00",
+   "amount": 399,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Enterprise plan, February 2026",
+     "amount": 399
+    }
+   ]
+  },
+  {
+   "id": "INV-1040",
+   "tenantId": "t11",
+   "number": "OD-1040",
+   "issuedAt": "2026-02-02T08:00:00",
+   "dueAt": "2026-02-16T08:00:00",
+   "amount": 49,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Starter plan, February 2026",
+     "amount": 49
+    }
+   ]
+  },
+  {
+   "id": "INV-1041",
+   "tenantId": "t14",
+   "number": "OD-1041",
+   "issuedAt": "2026-02-02T08:00:00",
+   "dueAt": "2026-02-16T08:00:00",
+   "amount": 49,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Starter plan, February 2026",
+     "amount": 49
+    }
+   ]
+  },
+  {
+   "id": "INV-1042",
+   "tenantId": "t1",
+   "number": "OD-1042",
+   "issuedAt": "2026-03-02T08:00:00",
+   "dueAt": "2026-03-16T08:00:00",
+   "amount": 149,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Business plan, March 2026",
+     "amount": 149
+    }
+   ]
+  },
+  {
+   "id": "INV-1043",
+   "tenantId": "t3",
+   "number": "OD-1043",
+   "issuedAt": "2026-03-02T08:00:00",
+   "dueAt": "2026-03-16T08:00:00",
+   "amount": 149,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Business plan, March 2026",
+     "amount": 149
+    }
+   ]
+  },
+  {
+   "id": "INV-1044",
+   "tenantId": "t4",
+   "number": "OD-1044",
+   "issuedAt": "2026-03-02T08:00:00",
+   "dueAt": "2026-03-16T08:00:00",
+   "amount": 149,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Business plan, March 2026",
+     "amount": 149
+    }
+   ]
+  },
+  {
+   "id": "INV-1045",
+   "tenantId": "t5",
+   "number": "OD-1045",
+   "issuedAt": "2026-03-02T08:00:00",
+   "dueAt": "2026-03-16T08:00:00",
+   "amount": 399,
+   "currency": "EUR",
+   "status": "void",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Enterprise plan, March 2026",
+     "amount": 399
+    }
+   ]
+  },
+  {
+   "id": "INV-1046",
+   "tenantId": "t7",
+   "number": "OD-1046",
+   "issuedAt": "2026-03-02T08:00:00",
+   "dueAt": "2026-03-16T08:00:00",
+   "amount": 149,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Business plan, March 2026",
+     "amount": 149
+    }
+   ]
+  },
+  {
+   "id": "INV-1047",
+   "tenantId": "t8",
+   "number": "OD-1047",
+   "issuedAt": "2026-03-02T08:00:00",
+   "dueAt": "2026-03-16T08:00:00",
+   "amount": 49,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Starter plan, March 2026",
+     "amount": 49
+    }
+   ]
+  },
+  {
+   "id": "INV-1048",
+   "tenantId": "t9",
+   "number": "OD-1048",
+   "issuedAt": "2026-03-02T08:00:00",
+   "dueAt": "2026-03-16T08:00:00",
+   "amount": 49,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Starter plan, March 2026",
+     "amount": 49
+    }
+   ]
+  },
+  {
+   "id": "INV-1049",
+   "tenantId": "t10",
+   "number": "OD-1049",
+   "issuedAt": "2026-03-02T08:00:00",
+   "dueAt": "2026-03-16T08:00:00",
+   "amount": 399,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Enterprise plan, March 2026",
+     "amount": 399
+    }
+   ]
+  },
+  {
+   "id": "INV-1050",
+   "tenantId": "t11",
+   "number": "OD-1050",
+   "issuedAt": "2026-03-02T08:00:00",
+   "dueAt": "2026-03-16T08:00:00",
+   "amount": 49,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Starter plan, March 2026",
+     "amount": 49
+    }
+   ]
+  },
+  {
+   "id": "INV-1051",
+   "tenantId": "t13",
+   "number": "OD-1051",
+   "issuedAt": "2026-03-02T08:00:00",
+   "dueAt": "2026-03-16T08:00:00",
+   "amount": 149,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Business plan, March 2026",
+     "amount": 149
+    }
+   ]
+  },
+  {
+   "id": "INV-1052",
+   "tenantId": "t14",
+   "number": "OD-1052",
+   "issuedAt": "2026-03-02T08:00:00",
+   "dueAt": "2026-03-16T08:00:00",
+   "amount": 49,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Starter plan, March 2026",
+     "amount": 49
+    }
+   ]
+  },
+  {
+   "id": "INV-1053",
+   "tenantId": "t1",
+   "number": "OD-1053",
+   "issuedAt": "2026-04-02T08:00:00",
+   "dueAt": "2026-04-16T08:00:00",
+   "amount": 149,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Business plan, April 2026",
+     "amount": 149
+    }
+   ]
+  },
+  {
+   "id": "INV-1054",
+   "tenantId": "t3",
+   "number": "OD-1054",
+   "issuedAt": "2026-04-02T08:00:00",
+   "dueAt": "2026-04-16T08:00:00",
+   "amount": 149,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Business plan, April 2026",
+     "amount": 149
+    }
+   ]
+  },
+  {
+   "id": "INV-1055",
+   "tenantId": "t4",
+   "number": "OD-1055",
+   "issuedAt": "2026-04-02T08:00:00",
+   "dueAt": "2026-04-16T08:00:00",
+   "amount": 149,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Business plan, April 2026",
+     "amount": 149
+    }
+   ]
+  },
+  {
+   "id": "INV-1056",
+   "tenantId": "t5",
+   "number": "OD-1056",
+   "issuedAt": "2026-04-02T08:00:00",
+   "dueAt": "2026-04-16T08:00:00",
+   "amount": 399,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Enterprise plan, April 2026",
+     "amount": 399
+    }
+   ]
+  },
+  {
+   "id": "INV-1057",
+   "tenantId": "t7",
+   "number": "OD-1057",
+   "issuedAt": "2026-04-02T08:00:00",
+   "dueAt": "2026-04-16T08:00:00",
+   "amount": 149,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Business plan, April 2026",
+     "amount": 149
+    }
+   ]
+  },
+  {
+   "id": "INV-1058",
+   "tenantId": "t8",
+   "number": "OD-1058",
+   "issuedAt": "2026-04-02T08:00:00",
+   "dueAt": "2026-04-16T08:00:00",
+   "amount": 49,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Starter plan, April 2026",
+     "amount": 49
+    }
+   ]
+  },
+  {
+   "id": "INV-1059",
+   "tenantId": "t9",
+   "number": "OD-1059",
+   "issuedAt": "2026-04-02T08:00:00",
+   "dueAt": "2026-04-16T08:00:00",
+   "amount": 149,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Business plan, April 2026",
+     "amount": 149
+    }
+   ]
+  },
+  {
+   "id": "INV-1060",
+   "tenantId": "t10",
+   "number": "OD-1060",
+   "issuedAt": "2026-04-02T08:00:00",
+   "dueAt": "2026-04-16T08:00:00",
+   "amount": 399,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Enterprise plan, April 2026",
+     "amount": 399
+    }
+   ]
+  },
+  {
+   "id": "INV-1061",
+   "tenantId": "t11",
+   "number": "OD-1061",
+   "issuedAt": "2026-04-02T08:00:00",
+   "dueAt": "2026-04-16T08:00:00",
+   "amount": 49,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Starter plan, April 2026",
+     "amount": 49
+    }
+   ]
+  },
+  {
+   "id": "INV-1062",
+   "tenantId": "t13",
+   "number": "OD-1062",
+   "issuedAt": "2026-04-02T08:00:00",
+   "dueAt": "2026-04-16T08:00:00",
+   "amount": 149,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Business plan, April 2026",
+     "amount": 149
+    }
+   ]
+  },
+  {
+   "id": "INV-1063",
+   "tenantId": "t14",
+   "number": "OD-1063",
+   "issuedAt": "2026-04-02T08:00:00",
+   "dueAt": "2026-04-16T08:00:00",
+   "amount": 49,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Starter plan, April 2026",
+     "amount": 49
+    }
+   ]
+  },
+  {
+   "id": "INV-1064",
+   "tenantId": "t1",
+   "number": "OD-1064",
+   "issuedAt": "2026-05-02T08:00:00",
+   "dueAt": "2026-05-16T08:00:00",
+   "amount": 149,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Business plan, May 2026",
+     "amount": 149
+    }
+   ]
+  },
+  {
+   "id": "INV-1065",
+   "tenantId": "t3",
+   "number": "OD-1065",
+   "issuedAt": "2026-05-02T08:00:00",
+   "dueAt": "2026-05-16T08:00:00",
+   "amount": 149,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Business plan, May 2026",
+     "amount": 149
+    }
+   ]
+  },
+  {
+   "id": "INV-1066",
+   "tenantId": "t4",
+   "number": "OD-1066",
+   "issuedAt": "2026-05-02T08:00:00",
+   "dueAt": "2026-05-16T08:00:00",
+   "amount": 149,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Business plan, May 2026",
+     "amount": 149
+    }
+   ]
+  },
+  {
+   "id": "INV-1067",
+   "tenantId": "t5",
+   "number": "OD-1067",
+   "issuedAt": "2026-05-02T08:00:00",
+   "dueAt": "2026-05-16T08:00:00",
+   "amount": 399,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Enterprise plan, May 2026",
+     "amount": 399
+    }
+   ]
+  },
+  {
+   "id": "INV-1068",
+   "tenantId": "t7",
+   "number": "OD-1068",
+   "issuedAt": "2026-05-02T08:00:00",
+   "dueAt": "2026-05-16T08:00:00",
+   "amount": 149,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Business plan, May 2026",
+     "amount": 149
+    }
+   ]
+  },
+  {
+   "id": "INV-1069",
+   "tenantId": "t8",
+   "number": "OD-1069",
+   "issuedAt": "2026-05-02T08:00:00",
+   "dueAt": "2026-05-16T08:00:00",
+   "amount": 49,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Starter plan, May 2026",
+     "amount": 49
+    }
+   ]
+  },
+  {
+   "id": "INV-1070",
+   "tenantId": "t9",
+   "number": "OD-1070",
+   "issuedAt": "2026-05-02T08:00:00",
+   "dueAt": "2026-05-16T08:00:00",
+   "amount": 149,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Business plan, May 2026",
+     "amount": 149
+    }
+   ]
+  },
+  {
+   "id": "INV-1071",
+   "tenantId": "t10",
+   "number": "OD-1071",
+   "issuedAt": "2026-05-02T08:00:00",
+   "dueAt": "2026-05-16T08:00:00",
+   "amount": 399,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Enterprise plan, May 2026",
+     "amount": 399
+    }
+   ]
+  },
+  {
+   "id": "INV-1072",
+   "tenantId": "t11",
+   "number": "OD-1072",
+   "issuedAt": "2026-05-02T08:00:00",
+   "dueAt": "2026-05-16T08:00:00",
+   "amount": 49,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Starter plan, May 2026",
+     "amount": 49
+    }
+   ]
+  },
+  {
+   "id": "INV-1073",
+   "tenantId": "t13",
+   "number": "OD-1073",
+   "issuedAt": "2026-05-02T08:00:00",
+   "dueAt": "2026-05-16T08:00:00",
+   "amount": 149,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Business plan, May 2026",
+     "amount": 149
+    }
+   ]
+  },
+  {
+   "id": "INV-1074",
+   "tenantId": "t14",
+   "number": "OD-1074",
+   "issuedAt": "2026-05-02T08:00:00",
+   "dueAt": "2026-05-16T08:00:00",
+   "amount": 49,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Starter plan, May 2026",
+     "amount": 49
+    }
+   ]
+  },
+  {
+   "id": "INV-1075",
+   "tenantId": "t1",
+   "number": "OD-1075",
+   "issuedAt": "2026-06-02T08:00:00",
+   "dueAt": "2026-06-16T08:00:00",
+   "amount": 149,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Business plan, June 2026",
+     "amount": 149
+    }
+   ]
+  },
+  {
+   "id": "INV-1076",
+   "tenantId": "t3",
+   "number": "OD-1076",
+   "issuedAt": "2026-06-02T08:00:00",
+   "dueAt": "2026-06-16T08:00:00",
+   "amount": 149,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Business plan, June 2026",
+     "amount": 149
+    }
+   ]
+  },
+  {
+   "id": "INV-1077",
+   "tenantId": "t4",
+   "number": "OD-1077",
+   "issuedAt": "2026-06-02T08:00:00",
+   "dueAt": "2026-06-16T08:00:00",
+   "amount": 49,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Starter plan, June 2026",
+     "amount": 49
+    }
+   ]
+  },
+  {
+   "id": "INV-1078",
+   "tenantId": "t5",
+   "number": "OD-1078",
+   "issuedAt": "2026-06-02T08:00:00",
+   "dueAt": "2026-06-16T08:00:00",
+   "amount": 399,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Enterprise plan, June 2026",
+     "amount": 399
+    }
+   ]
+  },
+  {
+   "id": "INV-1079",
+   "tenantId": "t7",
+   "number": "OD-1079",
+   "issuedAt": "2026-06-02T08:00:00",
+   "dueAt": "2026-06-16T08:00:00",
+   "amount": 149,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Business plan, June 2026",
+     "amount": 149
+    }
+   ]
+  },
+  {
+   "id": "INV-1080",
+   "tenantId": "t8",
+   "number": "OD-1080",
+   "issuedAt": "2026-06-02T08:00:00",
+   "dueAt": "2026-06-16T08:00:00",
+   "amount": 49,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Starter plan, June 2026",
+     "amount": 49
+    }
+   ]
+  },
+  {
+   "id": "INV-1081",
+   "tenantId": "t9",
+   "number": "OD-1081",
+   "issuedAt": "2026-06-02T08:00:00",
+   "dueAt": "2026-06-16T08:00:00",
+   "amount": 149,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Business plan, June 2026",
+     "amount": 149
+    }
+   ]
+  },
+  {
+   "id": "INV-1082",
+   "tenantId": "t10",
+   "number": "OD-1082",
+   "issuedAt": "2026-06-02T08:00:00",
+   "dueAt": "2026-06-16T08:00:00",
+   "amount": 399,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Enterprise plan, June 2026",
+     "amount": 399
+    }
+   ]
+  },
+  {
+   "id": "INV-1083",
+   "tenantId": "t11",
+   "number": "OD-1083",
+   "issuedAt": "2026-06-02T08:00:00",
+   "dueAt": "2026-06-16T08:00:00",
+   "amount": 49,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Starter plan, June 2026",
+     "amount": 49
+    }
+   ]
+  },
+  {
+   "id": "INV-1084",
+   "tenantId": "t13",
+   "number": "OD-1084",
+   "issuedAt": "2026-06-02T08:00:00",
+   "dueAt": "2026-06-16T08:00:00",
+   "amount": 149,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Business plan, June 2026",
+     "amount": 149
+    }
+   ]
+  },
+  {
+   "id": "INV-1085",
+   "tenantId": "t14",
+   "number": "OD-1085",
+   "issuedAt": "2026-06-02T08:00:00",
+   "dueAt": "2026-06-16T08:00:00",
+   "amount": 49,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Starter plan, June 2026",
+     "amount": 49
+    }
+   ]
+  },
+  {
+   "id": "INV-1086",
+   "tenantId": "t1",
+   "number": "OD-1086",
+   "issuedAt": "2026-07-02T08:00:00",
+   "dueAt": "2026-07-16T08:00:00",
+   "amount": 149,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Business plan, July 2026",
+     "amount": 149
+    }
+   ]
+  },
+  {
+   "id": "INV-1087",
+   "tenantId": "t3",
+   "number": "OD-1087",
+   "issuedAt": "2026-07-02T08:00:00",
+   "dueAt": "2026-07-16T08:00:00",
+   "amount": 149,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Business plan, July 2026",
+     "amount": 149
+    }
+   ]
+  },
+  {
+   "id": "INV-1088",
+   "tenantId": "t4",
+   "number": "OD-1088",
+   "issuedAt": "2026-07-02T08:00:00",
+   "dueAt": "2026-07-16T08:00:00",
+   "amount": 49,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Starter plan, July 2026",
+     "amount": 49
+    }
+   ]
+  },
+  {
+   "id": "INV-1089",
+   "tenantId": "t5",
+   "number": "OD-1089",
+   "issuedAt": "2026-07-02T08:00:00",
+   "dueAt": "2026-07-16T08:00:00",
+   "amount": 399,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Enterprise plan, July 2026",
+     "amount": 399
+    }
+   ]
+  },
+  {
+   "id": "INV-1090",
+   "tenantId": "t7",
+   "number": "OD-1090",
+   "issuedAt": "2026-07-02T08:00:00",
+   "dueAt": "2026-07-16T08:00:00",
+   "amount": 149,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Business plan, July 2026",
+     "amount": 149
+    }
+   ]
+  },
+  {
+   "id": "INV-1091",
+   "tenantId": "t8",
+   "number": "OD-1091",
+   "issuedAt": "2026-07-02T08:00:00",
+   "dueAt": "2026-07-16T08:00:00",
+   "amount": 49,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Starter plan, July 2026",
+     "amount": 49
+    }
+   ]
+  },
+  {
+   "id": "INV-1092",
+   "tenantId": "t9",
+   "number": "OD-1092",
+   "issuedAt": "2026-07-02T08:00:00",
+   "dueAt": "2026-07-16T08:00:00",
+   "amount": 149,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Business plan, July 2026",
+     "amount": 149
+    }
+   ]
+  },
+  {
+   "id": "INV-1093",
+   "tenantId": "t10",
+   "number": "OD-1093",
+   "issuedAt": "2026-07-02T08:00:00",
+   "dueAt": "2026-07-16T08:00:00",
+   "amount": 399,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Enterprise plan, July 2026",
+     "amount": 399
+    }
+   ]
+  },
+  {
+   "id": "INV-1094",
+   "tenantId": "t11",
+   "number": "OD-1094",
+   "issuedAt": "2026-07-02T08:00:00",
+   "dueAt": "2026-07-16T08:00:00",
+   "amount": 49,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Starter plan, July 2026",
+     "amount": 49
+    }
+   ]
+  },
+  {
+   "id": "INV-1095",
+   "tenantId": "t13",
+   "number": "OD-1095",
+   "issuedAt": "2026-07-02T08:00:00",
+   "dueAt": "2026-07-16T08:00:00",
+   "amount": 149,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Business plan, July 2026",
+     "amount": 149
+    }
+   ]
+  },
+  {
+   "id": "INV-1096",
+   "tenantId": "t14",
+   "number": "OD-1096",
+   "issuedAt": "2026-07-02T08:00:00",
+   "dueAt": "2026-07-16T08:00:00",
+   "amount": 49,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Starter plan, July 2026",
+     "amount": 49
+    }
+   ]
+  },
+  {
+   "id": "INV-1097",
+   "tenantId": "t1",
+   "number": "OD-1097",
+   "issuedAt": "2026-08-02T08:00:00",
+   "dueAt": "2026-08-16T08:00:00",
+   "amount": 149,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Business plan, August 2026",
+     "amount": 149
+    }
+   ]
+  },
+  {
+   "id": "INV-1098",
+   "tenantId": "t3",
+   "number": "OD-1098",
+   "issuedAt": "2026-08-02T08:00:00",
+   "dueAt": "2026-08-16T08:00:00",
+   "amount": 149,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Business plan, August 2026",
+     "amount": 149
+    }
+   ]
+  },
+  {
+   "id": "INV-1099",
+   "tenantId": "t4",
+   "number": "OD-1099",
+   "issuedAt": "2026-08-02T08:00:00",
+   "dueAt": "2026-08-16T08:00:00",
+   "amount": 49,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Starter plan, August 2026",
+     "amount": 49
+    }
+   ]
+  },
+  {
+   "id": "INV-1100",
+   "tenantId": "t5",
+   "number": "OD-1100",
+   "issuedAt": "2026-08-02T08:00:00",
+   "dueAt": "2026-08-16T08:00:00",
+   "amount": 399,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Enterprise plan, August 2026",
+     "amount": 399
+    }
+   ]
+  },
+  {
+   "id": "INV-1101",
+   "tenantId": "t7",
+   "number": "OD-1101",
+   "issuedAt": "2026-08-02T08:00:00",
+   "dueAt": "2026-08-16T08:00:00",
+   "amount": 149,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Business plan, August 2026",
+     "amount": 149
+    }
+   ]
+  },
+  {
+   "id": "INV-1102",
+   "tenantId": "t8",
+   "number": "OD-1102",
+   "issuedAt": "2026-08-02T08:00:00",
+   "dueAt": "2026-08-16T08:00:00",
+   "amount": 49,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Starter plan, August 2026",
+     "amount": 49
+    }
+   ]
+  },
+  {
+   "id": "INV-1103",
+   "tenantId": "t9",
+   "number": "OD-1103",
+   "issuedAt": "2026-08-02T08:00:00",
+   "dueAt": "2026-08-16T08:00:00",
+   "amount": 149,
+   "currency": "EUR",
+   "status": "refunded",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Business plan, August 2026",
+     "amount": 149
+    }
+   ]
+  },
+  {
+   "id": "INV-1104",
+   "tenantId": "t10",
+   "number": "OD-1104",
+   "issuedAt": "2026-08-02T08:00:00",
+   "dueAt": "2026-08-16T08:00:00",
+   "amount": 399,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Enterprise plan, August 2026",
+     "amount": 399
+    }
+   ]
+  },
+  {
+   "id": "INV-1105",
+   "tenantId": "t11",
+   "number": "OD-1105",
+   "issuedAt": "2026-08-02T08:00:00",
+   "dueAt": "2026-08-16T08:00:00",
+   "amount": 49,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Starter plan, August 2026",
+     "amount": 49
+    }
+   ]
+  },
+  {
+   "id": "INV-1106",
+   "tenantId": "t13",
+   "number": "OD-1106",
+   "issuedAt": "2026-08-02T08:00:00",
+   "dueAt": "2026-08-16T08:00:00",
+   "amount": 149,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Business plan, August 2026",
+     "amount": 149
+    }
+   ]
+  },
+  {
+   "id": "INV-1107",
+   "tenantId": "t14",
+   "number": "OD-1107",
+   "issuedAt": "2026-08-02T08:00:00",
+   "dueAt": "2026-08-16T08:00:00",
+   "amount": 49,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Starter plan, August 2026",
+     "amount": 49
+    }
+   ]
+  },
+  {
+   "id": "INV-1108",
+   "tenantId": "t1",
+   "number": "OD-1108",
+   "issuedAt": "2026-09-02T08:00:00",
+   "dueAt": "2026-09-16T08:00:00",
+   "amount": 149,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Business plan, September 2026",
+     "amount": 149
+    }
+   ]
+  },
+  {
+   "id": "INV-1109",
+   "tenantId": "t3",
+   "number": "OD-1109",
+   "issuedAt": "2026-09-02T08:00:00",
+   "dueAt": "2026-09-16T08:00:00",
+   "amount": 149,
+   "currency": "EUR",
+   "status": "failed",
+   "attempts": 3,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Business plan, September 2026",
+     "amount": 149
+    }
+   ]
+  },
+  {
+   "id": "INV-1110",
+   "tenantId": "t4",
+   "number": "OD-1110",
+   "issuedAt": "2026-09-02T08:00:00",
+   "dueAt": "2026-09-16T08:00:00",
+   "amount": 49,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Starter plan, September 2026",
+     "amount": 49
+    }
+   ]
+  },
+  {
+   "id": "INV-1111",
+   "tenantId": "t5",
+   "number": "OD-1111",
+   "issuedAt": "2026-09-02T08:00:00",
+   "dueAt": "2026-09-16T08:00:00",
+   "amount": 399,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Enterprise plan, September 2026",
+     "amount": 399
+    }
+   ]
+  },
+  {
+   "id": "INV-1112",
+   "tenantId": "t7",
+   "number": "OD-1112",
+   "issuedAt": "2026-09-02T08:00:00",
+   "dueAt": "2026-09-16T08:00:00",
+   "amount": 149,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Business plan, September 2026",
+     "amount": 149
+    }
+   ]
+  },
+  {
+   "id": "INV-1113",
+   "tenantId": "t8",
+   "number": "OD-1113",
+   "issuedAt": "2026-09-02T08:00:00",
+   "dueAt": "2026-09-16T08:00:00",
+   "amount": 49,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Starter plan, September 2026",
+     "amount": 49
+    }
+   ]
+  },
+  {
+   "id": "INV-1114",
+   "tenantId": "t9",
+   "number": "OD-1114",
+   "issuedAt": "2026-09-02T08:00:00",
+   "dueAt": "2026-09-16T08:00:00",
+   "amount": 149,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Business plan, September 2026",
+     "amount": 149
+    }
+   ]
+  },
+  {
+   "id": "INV-1115",
+   "tenantId": "t10",
+   "number": "OD-1115",
+   "issuedAt": "2026-09-02T08:00:00",
+   "dueAt": "2026-09-16T08:00:00",
+   "amount": 399,
+   "currency": "EUR",
+   "status": "failed",
+   "attempts": 3,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Enterprise plan, September 2026",
+     "amount": 399
+    }
+   ]
+  },
+  {
+   "id": "INV-1116",
+   "tenantId": "t11",
+   "number": "OD-1116",
+   "issuedAt": "2026-09-02T08:00:00",
+   "dueAt": "2026-09-16T08:00:00",
+   "amount": 49,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Starter plan, September 2026",
+     "amount": 49
+    }
+   ]
+  },
+  {
+   "id": "INV-1117",
+   "tenantId": "t13",
+   "number": "OD-1117",
+   "issuedAt": "2026-09-02T08:00:00",
+   "dueAt": "2026-09-16T08:00:00",
+   "amount": 149,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Business plan, September 2026",
+     "amount": 149
+    }
+   ]
+  },
+  {
+   "id": "INV-1118",
+   "tenantId": "t14",
+   "number": "OD-1118",
+   "issuedAt": "2026-09-02T08:00:00",
+   "dueAt": "2026-09-16T08:00:00",
+   "amount": 49,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Starter plan, September 2026",
+     "amount": 49
+    }
+   ]
+  },
+  {
+   "id": "INV-2010",
+   "tenantId": "t1",
+   "number": "OD-2010",
+   "issuedAt": "2026-10-02T08:00:00",
+   "dueAt": "2026-10-16T08:00:00",
+   "amount": 149,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Business plan, October 2026",
+     "amount": 149
+    }
+   ]
+  },
+  {
+   "id": "INV-2012",
+   "tenantId": "t3",
+   "number": "OD-2012",
+   "issuedAt": "2026-10-02T08:00:00",
+   "dueAt": "2026-10-16T08:00:00",
+   "amount": 149,
+   "currency": "EUR",
+   "status": "failed",
+   "attempts": 2,
+   "nextRetryAt": "2026-10-23T08:00:00",
+   "lines": [
+    {
+     "label": "Business plan, October 2026",
+     "amount": 149
+    }
+   ]
+  },
+  {
+   "id": "INV-2013",
+   "tenantId": "t4",
+   "number": "OD-2013",
+   "issuedAt": "2026-10-02T08:00:00",
+   "dueAt": "2026-10-16T08:00:00",
+   "amount": 49,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Starter plan, October 2026",
+     "amount": 49
+    }
+   ]
+  },
+  {
+   "id": "INV-2014",
+   "tenantId": "t5",
+   "number": "OD-2014",
+   "issuedAt": "2026-10-02T08:00:00",
+   "dueAt": "2026-10-16T08:00:00",
+   "amount": 399,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Enterprise plan, October 2026",
+     "amount": 399
+    }
+   ]
+  },
+  {
+   "id": "INV-2016",
+   "tenantId": "t7",
+   "number": "OD-2016",
+   "issuedAt": "2026-10-02T08:00:00",
+   "dueAt": "2026-10-16T08:00:00",
+   "amount": 149,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Business plan, October 2026",
+     "amount": 149
+    }
+   ]
+  },
+  {
+   "id": "INV-2017",
+   "tenantId": "t8",
+   "number": "OD-2017",
+   "issuedAt": "2026-10-02T08:00:00",
+   "dueAt": "2026-10-16T08:00:00",
+   "amount": 49,
+   "currency": "EUR",
+   "status": "void",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Starter plan, October 2026",
+     "amount": 49
+    }
+   ]
+  },
+  {
+   "id": "INV-2018",
+   "tenantId": "t9",
+   "number": "OD-2018",
+   "issuedAt": "2026-10-02T08:00:00",
+   "dueAt": "2026-10-16T08:00:00",
+   "amount": 149,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Business plan, October 2026",
+     "amount": 149
+    }
+   ]
+  },
+  {
+   "id": "INV-2019",
+   "tenantId": "t10",
+   "number": "OD-2019",
+   "issuedAt": "2026-10-02T08:00:00",
+   "dueAt": "2026-10-16T08:00:00",
+   "amount": 399,
+   "currency": "EUR",
+   "status": "failed",
+   "attempts": 2,
+   "nextRetryAt": "2026-10-23T08:00:00",
+   "lines": [
+    {
+     "label": "Enterprise plan, October 2026",
+     "amount": 399
+    }
+   ]
+  },
+  {
+   "id": "INV-2020",
+   "tenantId": "t11",
+   "number": "OD-2020",
+   "issuedAt": "2026-10-02T08:00:00",
+   "dueAt": "2026-10-16T08:00:00",
+   "amount": 49,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Starter plan, October 2026",
+     "amount": 49
+    }
+   ]
+  },
+  {
+   "id": "INV-2022",
+   "tenantId": "t13",
+   "number": "OD-2022",
+   "issuedAt": "2026-10-02T08:00:00",
+   "dueAt": "2026-10-16T08:00:00",
+   "amount": 149,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Business plan, October 2026",
+     "amount": 149
+    }
+   ]
+  },
+  {
+   "id": "INV-2023",
+   "tenantId": "t14",
+   "number": "OD-2023",
+   "issuedAt": "2026-10-02T08:00:00",
+   "dueAt": "2026-10-16T08:00:00",
+   "amount": 49,
+   "currency": "EUR",
+   "status": "void",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Starter plan, October 2026",
+     "amount": 49
+    }
+   ]
+  },
+  {
+   "id": "INV-2030",
+   "tenantId": "t5",
+   "number": "OD-2030",
+   "issuedAt": "2026-10-18T09:00:00",
+   "dueAt": "2026-11-01T09:00:00",
+   "amount": 120,
+   "currency": "EUR",
+   "status": "open",
+   "attempts": 0,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Extra storage, 50 GB",
+     "amount": 120
+    }
+   ]
+  },
+  {
+   "id": "INV-2031",
+   "tenantId": "t4",
+   "number": "OD-2031",
+   "issuedAt": "2026-10-14T11:30:00",
+   "dueAt": "2026-10-28T11:30:00",
+   "amount": 58,
+   "currency": "EUR",
+   "status": "paid",
+   "attempts": 1,
+   "nextRetryAt": null,
+   "lines": [
+    {
+     "label": "Upgrade to Business, 14 to 31 October 2026 (prorated)",
+     "amount": 58
+    }
+   ]
+  }
+ ]
+}

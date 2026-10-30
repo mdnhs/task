@@ -16,9 +16,11 @@ import {
   useSensor,
   useSensors,
 } from "@dnd-kit/core"
-import type { Announcements, DragEndEvent, DragOverEvent, DragStartEvent, DropAnimation } from "@dnd-kit/core"
+import type { Announcements, DragEndEvent, DragOverEvent, DragStartEvent, DropAnimation, Modifier } from "@dnd-kit/core"
 import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
+
+import { cssZoom, unzoom, unzoomOverlay } from "@/lib/zoom"
 import { motion, useMotionValue, useReducedMotion, useSpring, useTransform, useVelocity } from "motion/react"
 
 import { When } from "@/components/when"
@@ -28,6 +30,8 @@ import type { Candidate, Stage } from "../types"
 const COL = "col:"
 const EASE = "cubic-bezier(0.22, 1, 0.36, 1)"
 // The overlay settles into the card's new slot; the slot fades back in underneath it.
+// The Text size preset zooms <body>; keep the lifted card under the pointer (lib/zoom.ts).
+const zoomOverlay: Modifier = ({ transform, activeNodeRect }) => (activeNodeRect ? unzoomOverlay(transform, activeNodeRect, cssZoom(document.body)) : transform)
 const DROP: DropAnimation = {
   duration: 220,
   easing: EASE,
@@ -85,7 +89,7 @@ function DragCard({ c, calm, onOpen }: { c: Candidate; calm: boolean; onOpen(id:
       ref={setNodeRef}
       className="rec-card rec-card-drag"
       data-dragging={isDragging ? "" : undefined}
-      style={{ transform: CSS.Translate.toString(transform), transition }}
+      style={{ transform: CSS.Translate.toString(transform && { ...transform, x: unzoom(transform.x, cssZoom(document.body)), y: unzoom(transform.y, cssZoom(document.body)) }), transition }}
       onClick={() => onOpen(c.id)}
       {...attributes}
       {...listeners}
@@ -238,7 +242,7 @@ export function Pipeline({
       {board}
       {/* Portalled to <body>: an animated ancestor (page enter transform) would otherwise offset the fixed overlay from the pointer and skew collisions. */}
       {client && createPortal(
-        <DragOverlay dropAnimation={reduce ? null : DROP}>
+        <DragOverlay dropAnimation={reduce ? null : DROP} modifiers={[zoomOverlay]}>
           {active && (reduce ? (
             <div className="rec-card rec-card-overlay">
               <CardBody c={active} />

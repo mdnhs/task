@@ -1,5 +1,9 @@
 import { getData } from "@/lib/data"
+import type { EntitlementsData } from "@/lib/entitlements"
 import type { Invoice, Plan, SubscriptionRecord, Usage } from "./types"
+
+/** Module map and per-plan entitlements (FR-M0-15). */
+export const getEntitlements = async () => getData<EntitlementsData>("billing/entitlements.json")
 
 export const getPlans = async () => getData<Plan[]>("billing/plans.json")
 

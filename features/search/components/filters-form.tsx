@@ -170,9 +170,11 @@ export function FiltersForm({
         <DateRange id="od-sf-date" from={filters.from} to={filters.to} today={today} onChange={onRange} />
       </Field>
       <div className="od-search-frow">
-        <Field label="Department" htmlFor="od-sf-dept">
-          <SearchSelect id="od-sf-dept" value={filters.dept} options={opt(departments)} onChange={(v) => onChange("dept", v)} />
-        </Field>
+        {departments.length > 0 && (
+          <Field label="Department" htmlFor="od-sf-dept">
+            <SearchSelect id="od-sf-dept" value={filters.dept} options={opt(departments)} onChange={(v) => onChange("dept", v)} />
+          </Field>
+        )}
         <Field label="Type" htmlFor="od-sf-type">
           <SearchSelect
             id="od-sf-type"

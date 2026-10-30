@@ -1,5 +1,5 @@
 [
-  {"id":"starter","name":"Starter","priceMonthly":49,"currency":"GBP","trialDays":14,"limits":{"activeUsers":10,"storageGb":10,"messages":1000,"transcriptionMinutes":120},"modules":["dashboard","tasks","reports","attention"]},
-  {"id":"business","name":"Business","priceMonthly":149,"currency":"GBP","trialDays":14,"limits":{"activeUsers":40,"storageGb":50,"messages":5000,"transcriptionMinutes":600},"modules":["dashboard","tasks","reports","attention","staff","recruitment","files","payroll","orders"]},
-  {"id":"enterprise","name":"Enterprise","priceMonthly":399,"currency":"GBP","trialDays":14,"limits":{"activeUsers":150,"storageGb":250,"messages":25000,"transcriptionMinutes":3000},"modules":["dashboard","tasks","reports","attention","staff","recruitment","files","payroll","orders","audit","integrations"]}
+  {"id":"starter","name":"Starter","priceMonthly":49,"currency":"EUR","trialDays":14,"limits":{"activeUsers":10,"storageGb":10,"messages":1000,"transcriptionMinutes":120}},
+  {"id":"business","name":"Business","priceMonthly":149,"currency":"EUR","trialDays":14,"limits":{"activeUsers":40,"storageGb":50,"messages":5000,"transcriptionMinutes":600}},
+  {"id":"enterprise","name":"Enterprise","priceMonthly":399,"currency":"EUR","trialDays":14,"limits":{"activeUsers":150,"storageGb":250,"messages":25000,"transcriptionMinutes":3000}}
 ]
