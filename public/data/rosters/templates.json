@@ -1,0 +1,80 @@
+{
+  "templates": [
+    {
+      "id": "tpl-cop-day",
+      "locationId": "loc-coppers",
+      "name": "Day",
+      "start": "12:00",
+      "end": "18:00",
+      "unpaidBreakMin": 0,
+      "role": "Security Officer",
+      "requires": []
+    },
+    {
+      "id": "tpl-cop-door",
+      "locationId": "loc-coppers",
+      "name": "Door evening",
+      "start": "18:00",
+      "end": "02:00",
+      "unpaidBreakMin": 30,
+      "role": "Security Officer",
+      "requires": [
+        "PSA licence"
+      ]
+    },
+    {
+      "id": "tpl-cop-close",
+      "locationId": "loc-coppers",
+      "name": "Close",
+      "start": "20:00",
+      "end": "03:30",
+      "unpaidBreakMin": 30,
+      "role": "Security Officer",
+      "requires": [
+        "PSA licence"
+      ]
+    },
+    {
+      "id": "tpl-dock-day",
+      "locationId": "loc-docklands",
+      "name": "Day",
+      "start": "07:00",
+      "end": "15:00",
+      "unpaidBreakMin": 30,
+      "role": "Security Officer",
+      "requires": []
+    },
+    {
+      "id": "tpl-dock-night",
+      "locationId": "loc-docklands",
+      "name": "Night",
+      "start": "22:00",
+      "end": "06:00",
+      "unpaidBreakMin": 30,
+      "role": "Security Officer",
+      "requires": [
+        "PSA licence"
+      ]
+    },
+    {
+      "id": "tpl-liff-day",
+      "locationId": "loc-liffey",
+      "name": "Day",
+      "start": "08:00",
+      "end": "16:00",
+      "unpaidBreakMin": 30,
+      "role": "Cleaner",
+      "requires": []
+    },
+    {
+      "id": "tpl-liff-late",
+      "locationId": "loc-liffey",
+      "name": "Late",
+      "start": "14:00",
+      "end": "22:00",
+      "unpaidBreakMin": 30,
+      "role": "Cleaner",
+      "requires": []
+    }
+  ]
+}

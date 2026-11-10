@@ -1,7 +1,9 @@
 import { z } from "zod"
 
+import type { Location, RosterShift, RosterWeek, ShiftTemplate } from "@/lib/rosters"
+import { addDays } from "@/lib/shifts"
 import { COVERAGE } from "./types"
-import type { Coverage, HistoryEntry, Incident, RosterGap, StaffMember } from "./types"
+import type { Coverage, HistoryEntry, Incident, RosterGap, StaffMember, When } from "./types"
 
 // Pure rules shared by the Log incident page and the roster gap page (no React, server-safe).
 
@@ -57,4 +59,41 @@ export const gapCoverNote = (v: GapCoverInput) => (v.assigned ? `${COVERAGE[v.co
 
 export function updateGapCover(g: RosterGap, v: GapCoverInput, at: string, by: string): RosterGap {
   return { ...g, ...v, history: [...g.history, { at, by, action: "Cover updated", note: gapCoverNote(v) }] }
+}
+
+/**
+ * Open shifts of published roster weeks as roster gaps (D12): uncovered, `rosterShiftId` set, linking back to /rosters. Drafts and filled shifts
+ * give none. With `today`, past shifts are dropped and `when` is Today / Tomorrow / Next week; without it every gap reads "next_week".
+ */
+export function gapsFromOpenShifts(shifts: RosterShift[], weeks: RosterWeek[], templates: ShiftTemplate[], locations: Location[], today?: string): RosterGap[] {
+  const published = new Map(weeks.filter((w) => w.status === "published").map((w) => [w.id, w]))
+  const tpl = new Map(templates.map((t) => [t.id, t]))
+  const loc = new Map(locations.map((l) => [l.id, l]))
+  const day = today?.slice(0, 10)
+  const out: RosterGap[] = []
+  for (const s of shifts) {
+    const w = published.get(s.weekId)
+    if (s.personId || !w) continue
+    if (day && s.date < day) continue
+    const place = loc.get(s.locationId)?.name ?? ""
+    const when: When = day && s.date === day ? "today" : day && s.date === addDays(day, 1) ? "tomorrow" : "next_week"
+    out.push({
+      id: `GAP-RS-${s.id}`,
+      when,
+      shiftStart: `${s.date}T${s.start}:00`,
+      time: `${s.start}–${s.end}`,
+      site: place,
+      client: place,
+      role: tpl.get(s.templateId)?.name ? `${s.role} (${tpl.get(s.templateId)!.name})` : s.role,
+      dept: s.role,
+      assigned: "",
+      coverage: "uncovered",
+      owner: "Roster",
+      nextAction: "Open shift: fill it on the roster",
+      history: [{ at: w.publishedAt ?? `${s.date}T00:00:00`, by: "Roster", action: "Open shift in published roster" }],
+      rosterShiftId: s.id,
+      rosterHref: `/rosters?location=${encodeURIComponent(s.locationId)}&week=${w.weekStart}`,
+    })
+  }
+  return out.sort((a, b) => a.shiftStart.localeCompare(b.shiftStart))
 }

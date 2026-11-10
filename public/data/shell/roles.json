@@ -18,8 +18,10 @@
         "orders": "write",
         "settings": "write",
         "audit": "write",
-        "whatsapp": "write"
-      }
+        "whatsapp": "write",
+        "roster": "write"
+      },
+      "rosterLevel": "office"
     },
     {
       "id": "admin",
@@ -39,7 +41,57 @@
         "orders": "read",
         "settings": "write",
         "audit": "write",
-        "whatsapp": "read"
+        "whatsapp": "read",
+        "roster": "write"
+      },
+      "rosterLevel": "office"
+    },
+    {
+      "id": "roster-manager",
+      "label": "Roster Manager",
+      "description": "Plans location rosters across the company and edits published weeks.",
+      "home": "manager",
+      "person": "p-priya",
+      "rosterLevel": "office",
+      "access": {
+        "dashboard": "read",
+        "tasks": "read",
+        "reports": "read",
+        "attention": "read",
+        "staff": "read",
+        "shifts": "read",
+        "recruitment": "read",
+        "files": "read",
+        "payroll": "none",
+        "orders": "read",
+        "settings": "read",
+        "audit": "read",
+        "whatsapp": "read",
+        "roster": "write"
+      }
+    },
+    {
+      "id": "location-supervisor",
+      "label": "Location Supervisor",
+      "description": "Plans and runs the rosters of the locations they are granted.",
+      "home": "manager",
+      "person": "p-ismail",
+      "rosterLevel": "supervisor",
+      "access": {
+        "dashboard": "none",
+        "tasks": "read",
+        "reports": "none",
+        "attention": "none",
+        "staff": "none",
+        "shifts": "none",
+        "recruitment": "none",
+        "files": "none",
+        "payroll": "none",
+        "orders": "none",
+        "settings": "none",
+        "audit": "none",
+        "whatsapp": "none",
+        "roster": "write"
       }
     },
     {
@@ -62,7 +114,8 @@
         "orders": "write",
         "settings": "read",
         "audit": "write",
-        "whatsapp": "write"
+        "whatsapp": "write",
+        "roster": "read"
       }
     },
     {
@@ -83,7 +136,8 @@
         "orders": "write",
         "settings": "read",
         "audit": "read",
-        "whatsapp": "write"
+        "whatsapp": "write",
+        "roster": "read"
       }
     },
     {
@@ -104,7 +158,8 @@
         "orders": "none",
         "settings": "none",
         "audit": "none",
-        "whatsapp": "write"
+        "whatsapp": "write",
+        "roster": "read"
       }
     },
     {
@@ -125,7 +180,8 @@
         "orders": "none",
         "settings": "none",
         "audit": "none",
-        "whatsapp": "none"
+        "whatsapp": "none",
+        "roster": "read"
       }
     },
     {
@@ -146,7 +202,8 @@
         "orders": "none",
         "settings": "none",
         "audit": "none",
-        "whatsapp": "none"
+        "whatsapp": "none",
+        "roster": "read"
       }
     },
     {
@@ -167,7 +224,8 @@
         "orders": "none",
         "settings": "none",
         "audit": "none",
-        "whatsapp": "none"
+        "whatsapp": "none",
+        "roster": "read"
       }
     },
     {
@@ -188,7 +246,8 @@
         "orders": "read",
         "settings": "read",
         "audit": "read",
-        "whatsapp": "read"
+        "whatsapp": "read",
+        "roster": "read"
       }
     },
     {
@@ -210,7 +269,8 @@
         "orders": "none",
         "settings": "none",
         "audit": "none",
-        "whatsapp": "none"
+        "whatsapp": "none",
+        "roster": "none"
       }
     }
   ]

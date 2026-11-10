@@ -47,6 +47,10 @@ export type RosterGap = {
   /** Sensitive (FR-STAFF-03), see Incident. */
   notes?: string
   history: HistoryEntry[]
+  /** Set on a gap derived from an open shift in a published roster week (D12). Cover recorded here does not assign that roster shift. */
+  rosterShiftId?: string
+  /** /rosters link back to that location and week. */
+  rosterHref?: string
 }
 
 export const STAFF_PAGE_SIZE = 10

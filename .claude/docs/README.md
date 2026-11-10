@@ -27,6 +27,7 @@ Feature docs for the later full-UI pages live in `features/<feature>.md`:
 | `features/shift-reports.md` | Shift Reports `/daily-reports` (FR-M1-22..31, CR-01, CR-03): per-member end-of-shift report, inbox, review, missing alerts, export |
 | `features/tasks.md` | Tasks `/tasks` + board, calendar, projects, archive (FR-M1-01..14, FR-M1-40..48, CR-04/05): evidence rules, planning model, routes, assumptions Q6/Q8 |
 | `features/shifts.md` | Shifts `/shifts` (FR-M1-20/21, FR-M0-07): shift model `lib/shifts.ts`, patterns, assignments, reporting on/off, reporting lines; hand-off for the step 2 shift report |
+| `features/rosters.md` | Location Rosters `/rosters` (Module 1A, FR-RS-*, CR-07..09): location access, rule checks, publish/lock/change requests, repeat and templates, open shifts and swaps, staff self-service, overlay into shift reports, privacy, mock limits, deferred items |
 | `features/devices.md` | Devices and platform security (mock): device register and policy, Drive on trusted PCs only, MFA rule and gate, SSO buttons. Deploy guide: `deploy/google-drive-android.md` |
 | `features/platform.md` | Platform console `/platform/**` (SaaS admin, FR-M0-01/02/13/14/15/19): routes, staff roles and permission table, metrics (MRR, NRR cohort rule), health score, store patch contract, privacy rule D8, ⌘K palette, mock limits |
 | `features/whatsapp.md` | WhatsApp inbox `/whatsapp` (SRS §3.17): integration status, voice-note transcripts, link/create task, gates |
@@ -43,9 +44,10 @@ Hex values listed in the per-feature briefs are superseded by the CSS variables 
 ## Must read before any new UI
 - `architecture.md`: feature-based folder structure (`features/<feature>/`), import rules, how to add a feature.
 - `00-design-system/ui-rules.md`: how to skin shadcn components with OpsDesk tokens (popover/dropdown mistake) and where mock data lives (`public/data`).
-- `requirements/SRS.md`: the main spec since 28 Oct 2026, "AI Business OS" by the BA (modules M0–M9, phases, CR-01..06, FR-Mx-nn IDs). Appendix A (engineering) has build status, old-to-new ID mapping and the Phase 1 front-end plan.
+- `requirements/SRS.md`: the main spec since 28 Oct 2026, "AI Business OS" by the BA, v1.3 (modules M0–M9 plus M1A Rostering, M1B Time & Attendance, M1C Payroll; six phases; CR-01..11; FR-Mx-nn, FR-RS, FR-TA, FR-PY IDs). Appendix A (engineering) has build status, old-to-new ID mapping and the Phase 1 front-end plan.
 - `requirements/SRS-v1.2-built.md`: the old OpsDesk SRS v1.2, kept as the record of what was built (route map §5.3, traceability Appendix A, mock status Appendix B). Old IDs in code comments refer to it.
 - `requirements/srs-diff-2026-10-28.md`: full comparison of the two specs and the app.
+- `requirements/srs-diff-2026-11-09.md`: what SRS v1.3 added, and the gaps against the app.
 
 Note: the per-feature `plan.md` files below are historical build plans. The file paths in them (`components/*.tsx`) predate the
 feature-based move. Current locations: dashboard widgets are in `features/dashboard/components/`, and the sidebar, topbar and NavUser are in `features/shell/components/`.

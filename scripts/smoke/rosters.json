@@ -1,0 +1,584 @@
+[
+ {
+  "path": "/rosters",
+  "cookies": {
+   "od-role": "owner"
+  },
+  "expect": [
+   "Location Rosters",
+   "Coppers"
+  ]
+ },
+ {
+  "path": "/rosters",
+  "cookies": {
+   "od-role": "location-supervisor"
+  },
+  "expect": [
+   "Location Rosters",
+   "Coppers"
+  ],
+  "notExpect": [
+   "Access restricted",
+   "Docklands Plaza",
+   "Liffey"
+  ]
+ },
+ {
+  "path": "/rosters",
+  "cookies": {
+   "od-role": "roster-manager"
+  },
+  "expect": [
+   "Location Rosters"
+  ]
+ },
+ {
+  "path": "/rosters",
+  "cookies": {
+   "od-role": "platform"
+  },
+  "expect": [
+   "Access restricted"
+  ]
+ },
+ {
+  "path": "/rosters",
+  "cookies": {
+   "od-tenant": "t2",
+   "od-role": "owner"
+  },
+  "expect": [
+   "Not in your plan"
+  ]
+ },
+ {
+  "path": "/",
+  "cookies": {
+   "od-role": "owner"
+  },
+  "expect": [
+   "href=\"/rosters\""
+  ]
+ },
+ {
+  "path": "/rosters?location=loc-coppers&week=2026-10-19",
+  "cookies": {
+   "od-role": "owner"
+  },
+  "expect": [
+   "Coppers",
+   "Published",
+   "Mon 19 Oct",
+   "Sun 25 Oct",
+   "aria-label=\"Sun 25 Oct\""
+  ]
+ },
+ {
+  "path": "/rosters?location=loc-docklands&week=2026-10-19",
+  "cookies": {
+   "od-role": "location-supervisor"
+  },
+  "expect": [
+   "Access restricted",
+   "Location Rosters"
+  ],
+  "notExpect": [
+   "Docklands Plaza"
+  ]
+ },
+ {
+  "path": "/rosters?location=all&week=2026-10-19",
+  "cookies": {
+   "od-role": "roster-manager"
+  },
+  "expect": [
+   "All locations",
+   "Coppers"
+  ]
+ },
+ {
+  "path": "/rosters?location=loc-coppers&week=2026-10-19&group=person",
+  "cookies": {
+   "od-role": "owner"
+  },
+  "expect": [
+   "By person",
+   "Person"
+  ]
+ },
+ {
+  "path": "/rosters/locations",
+  "cookies": {
+   "od-role": "owner"
+  },
+  "expect": [
+   "Locations",
+   "New location",
+   "Docklands Plaza",
+   "Coppers"
+  ]
+ },
+ {
+  "path": "/rosters/locations",
+  "cookies": {
+   "od-role": "location-supervisor"
+  },
+  "expect": [
+   "Access restricted"
+  ],
+  "notExpect": [
+   "Docklands Plaza",
+   "Liffey",
+   "Sir John"
+  ]
+ },
+ {
+  "path": "/rosters/locations/loc-docklands",
+  "cookies": {
+   "od-role": "location-supervisor"
+  },
+  "expect": [
+   "Access restricted"
+  ],
+  "notExpect": [
+   "Docklands Plaza",
+   "Sir John",
+   "Night"
+  ]
+ },
+ {
+  "path": "/rosters/locations/loc-coppers",
+  "cookies": {
+   "od-role": "owner"
+  },
+  "expect": [
+   "Clock-in zone",
+   "Shift templates",
+   "Staffing targets",
+   "Required skills",
+   "Supervisors",
+   "Swap approval",
+   "Door evening",
+   "In use by shifts"
+  ]
+ },
+ {
+  "path": "/rosters/locations/new",
+  "cookies": {
+   "od-role": "owner"
+  },
+  "expect": [
+   "New location",
+   "Add location"
+  ]
+ },
+ {
+  "path": "/rosters/locations",
+  "cookies": {
+   "od-role": "roster-manager"
+  },
+  "expect": [
+   "Locations",
+   "Docklands Plaza"
+  ],
+  "notExpect": [
+   "Liffey Retail Park",
+   "Naas Road"
+  ]
+ },
+ {
+  "path": "/rosters/locations/loc-liffey",
+  "cookies": {
+   "od-role": "roster-manager"
+  },
+  "expect": [
+   "Access restricted"
+  ],
+  "notExpect": [
+   "Naas Road"
+  ]
+ },
+ {
+  "path": "/rosters",
+  "cookies": {
+   "od-role": "owner"
+  },
+  "expect": [
+   "Manage locations"
+  ]
+ },
+ {
+  "path": "/rosters",
+  "cookies": {
+   "od-role": "location-supervisor"
+  },
+  "expect": [
+   "Location Rosters"
+  ],
+  "notExpect": [
+   "Manage locations"
+  ]
+ },
+ {
+  "path": "/rosters?location=loc-coppers&week=2026-10-26&view=week",
+  "cookies": {
+   "od-role": "location-supervisor"
+  },
+  "expect": [
+   "Publish",
+   "Draft",
+   "Edit shift,",
+   "Add shift on Mon 26 Oct"
+  ]
+ },
+ {
+  "path": "/rosters?location=loc-coppers&week=2026-10-19",
+  "cookies": {
+   "od-role": "location-supervisor"
+  },
+  "expect": [
+   "Published"
+  ],
+  "notExpect": [
+   "Add shift on",
+   "Edit shift,"
+  ]
+ },
+ {
+  "path": "/rosters?location=loc-coppers&week=2026-10-19",
+  "cookies": {
+   "od-role": "owner"
+  },
+  "expect": [
+   "Add shift on"
+  ]
+ },
+ {
+  "path": "/rosters?location=loc-coppers&week=2026-10-19&view=week",
+  "cookies": {
+   "od-role": "location-supervisor"
+  },
+  "expect": [
+   "Request change",
+   "History"
+  ],
+  "notExpect": [
+   "Edit shift,",
+   "Add shift on",
+   "ros-publish",
+   "Change requests"
+  ]
+ },
+ {
+  "path": "/rosters?location=loc-coppers&week=2026-10-26&view=week",
+  "cookies": {
+   "od-role": "location-supervisor"
+  },
+  "expect": [
+   "Publish",
+   "Draft",
+   "Edit shift,",
+   "Add shift on Mon 26 Oct"
+  ]
+ },
+ {
+  "path": "/rosters?location=loc-coppers&week=2026-10-19&view=week",
+  "cookies": {
+   "od-role": "roster-manager"
+  },
+  "expect": [
+   "Change requests",
+   "Private event opens an hour later",
+   "Edit shift,",
+   "History"
+  ],
+  "notExpect": [
+   "Request change,",
+   "ros-publish"
+  ]
+ },
+ {
+  "path": "/rosters?location=loc-coppers&week=2026-10-26",
+  "cookies": {
+   "od-role": "roster-manager"
+  },
+  "expect": [
+   "ros-publish"
+  ]
+ },
+ {
+  "path": "/rosters?location=loc-coppers&week=2026-10-26",
+  "cookies": {
+   "od-role": "roster-manager"
+  },
+  "expect": [
+   "Repeat",
+   "Week templates",
+   "Standard week"
+  ]
+ },
+ {
+  "path": "/rosters?location=loc-coppers&week=2026-10-26",
+  "cookies": {
+   "od-role": "location-supervisor"
+  },
+  "expect": [
+   "Repeat",
+   "Week templates",
+   "Standard week"
+  ],
+  "notExpect": [
+   "Docklands Plaza"
+  ]
+ },
+ {
+  "path": "/rosters?location=loc-coppers&week=2026-10-26",
+  "cookies": {
+   "od-role": "manager"
+  },
+  "expect": [
+   "Location Rosters"
+  ],
+  "notExpect": [
+   "Week templates",
+   "not drafted yet"
+  ]
+ },
+ {
+  "path": "/rosters/mine",
+  "cookies": {
+   "od-role": "employee"
+  },
+  "expect": [
+   "My roster",
+   "Docklands Plaza",
+   "Not available",
+   "Request leave"
+  ],
+  "notExpect": [
+   "Marcus Bell",
+   "Liffey",
+   "Leave to decide",
+   "rs-001",
+   "lv-002",
+   "lv-004"
+  ]
+ },
+ {
+  "path": "/rosters/mine",
+  "cookies": {
+   "od-role": "location-supervisor"
+  },
+  "expect": [
+   "My roster",
+   "Leave to decide",
+   "Haddad"
+  ],
+  "notExpect": [
+   "Access restricted"
+  ]
+ },
+ {
+  "path": "/rosters/mine",
+  "cookies": {
+   "od-role": "owner"
+  },
+  "expect": [
+   "My roster",
+   "Leave to decide",
+   "Marcus Bell",
+   "Haddad"
+  ],
+  "notExpect": [
+   "Access restricted"
+  ]
+ },
+ {
+  "path": "/rosters/mine",
+  "cookies": {
+   "od-role": "platform"
+  },
+  "expect": [
+   "Access restricted"
+  ]
+ },
+ {
+  "path": "/rosters/mine",
+  "cookies": {
+   "od-role": "manager"
+  },
+  "expect": [
+   "My roster",
+   "Open shifts you can take",
+   "Claim"
+  ],
+  "notExpect": [
+   "Access restricted"
+  ]
+ },
+ {
+  "path": "/rosters/mine",
+  "cookies": {
+   "od-role": "employee"
+  },
+  "expect": [
+   "My roster",
+   "Swap"
+  ],
+  "notExpect": [
+   "Access restricted"
+  ]
+ },
+ {
+  "path": "/rosters?location=loc-liffey&week=2026-10-19",
+  "cookies": {
+   "od-role": "owner"
+  },
+  "expect": [
+   "Open shifts and swaps",
+   "Roster gaps",
+   "href=\"/staff-rosters\"",
+   "Approve"
+  ]
+ },
+ {
+  "path": "/rosters?location=loc-coppers&week=2026-10-19",
+  "cookies": {
+   "od-role": "location-supervisor"
+  },
+  "expect": [
+   "Open shifts and swaps"
+  ],
+  "notExpect": [
+   "Docklands Plaza",
+   "Liffey",
+   "Access restricted",
+   "href=\"/staff-rosters\""
+  ]
+ },
+ {
+  "path": "/staff-rosters?tab=gaps",
+  "cookies": {
+   "od-role": "owner"
+  },
+  "expect": [
+   "From roster"
+  ],
+  "notExpect": [
+   "Access restricted"
+  ]
+ },
+ {
+  "path": "/staff-rosters/gaps/GAP-RS-rs-051",
+  "cookies": {
+   "od-role": "owner"
+  },
+  "expect": [
+   "Cover recorded here does not assign the roster shift",
+   "Open roster",
+   "location=loc-liffey"
+  ]
+ },
+ {
+  "path": "/staff-rosters?tab=gaps",
+  "cookies": {
+   "od-role": "location-supervisor"
+  },
+  "expect": [
+   "Access restricted"
+  ],
+  "notExpect": [
+   "Docklands Plaza",
+   "href=\"/staff-rosters/gaps/GAP-"
+  ]
+ },
+ {
+  "path": "/staff-rosters/gaps/GAP-RS-rs-051",
+  "cookies": {
+   "od-role": "location-supervisor"
+  },
+  "notExpect": [
+   "Docklands Plaza",
+   "href=\"/staff-rosters/gaps/GAP-"
+  ],
+  "expect": [
+   "Access restricted"
+  ]
+ },
+ {
+  "path": "/staff-rosters",
+  "cookies": {
+   "od-role": "owner"
+  },
+  "expect": [
+   "Log incident",
+   "href=\"/staff-rosters/incidents/new\""
+  ]
+ },
+ {
+  "path": "/staff-rosters",
+  "cookies": {
+   "od-tenant": "t2",
+   "od-role": "owner"
+  },
+  "expect": [
+   "Not in your plan"
+  ]
+ },
+ {
+  "path": "/daily-reports/p-marcus%3Apat-sec-night%3A2026-10-19",
+  "expect": [],
+  "notExpect": [
+   "Access restricted"
+  ]
+ },
+ {
+  "path": "/",
+  "cookies": {
+   "od-role": "location-supervisor"
+  },
+  "notExpect": [
+   "Application error"
+  ]
+ },
+ {
+  "path": "/staff-rosters",
+  "cookies": {
+   "od-role": "location-supervisor"
+  },
+  "expect": [
+   "Access restricted"
+  ],
+  "notExpect": [
+   "Docklands Plaza",
+   "href=\"/staff-rosters/gaps/GAP-"
+  ]
+ },
+ {
+  "path": "/shifts",
+  "cookies": {
+   "od-role": "location-supervisor"
+  },
+  "expect": [
+   "Access restricted"
+  ],
+  "notExpect": [
+   "Docklands Plaza",
+   "href=\"/staff-rosters/gaps/GAP-"
+  ]
+ },
+ {
+  "path": "/rosters",
+  "cookies": {
+   "od-role": "location-supervisor"
+  },
+  "expect": [
+   "Location Rosters"
+  ],
+  "notExpect": [
+   "href=\"/staff-rosters\"",
+   "href=\"/shifts\""
+  ]
+ }
+]

@@ -1,0 +1,17 @@
+{
+  "requests": [
+    {
+      "id": "cr-001",
+      "weekId": "wk-cop-1019",
+      "shiftId": "rs-001",
+      "by": "p-ismail",
+      "at": "2026-10-16T10:30:00",
+      "patch": { "start": "19:00" },
+      "why": "Private event opens an hour later",
+      "status": "open",
+      "decidedBy": null,
+      "decidedAt": null,
+      "note": null
+    }
+  ]
+}

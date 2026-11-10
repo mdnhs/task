@@ -1,0 +1,13 @@
+{
+  "claims": [
+    {
+      "id": "cl-rs-051-s-bell",
+      "shiftId": "rs-051",
+      "personId": "s-bell",
+      "at": "2026-10-19T16:20:00",
+      "status": "open",
+      "decidedBy": null,
+      "decidedAt": null
+    }
+  ]
+}

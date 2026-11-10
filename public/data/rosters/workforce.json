@@ -1,0 +1,14 @@
+{
+  "extras": [
+    { "id": "p-daniel", "homeLocationId": "loc-docklands", "qualifications": [{ "type": "PSA licence", "expires": "2027-03-31" }] },
+    { "id": "p-ismail", "homeLocationId": "loc-coppers", "qualifications": [{ "type": "PSA licence", "expires": "2026-12-15" }] },
+    { "id": "p-marcus", "homeLocationId": "loc-coppers", "qualifications": [{ "type": "PSA licence", "expires": "2027-06-30" }] },
+    { "id": "p-leo", "homeLocationId": "loc-coppers", "qualifications": [{ "type": "PSA licence", "expires": "2026-11-30" }] },
+    { "id": "s-haddad", "homeLocationId": "loc-coppers", "qualifications": [{ "type": "PSA licence", "expires": "2027-02-28" }] },
+    { "id": "s-silva", "homeLocationId": "loc-docklands", "qualifications": [{ "type": "PSA licence", "expires": "2027-08-31" }] },
+    { "id": "s-kowalski", "homeLocationId": "loc-docklands", "qualifications": [{ "type": "PSA licence", "expires": null }] },
+    { "id": "s-bell", "homeLocationId": "loc-liffey", "qualifications": [{ "type": "PSA licence", "expires": "2027-01-31" }] },
+    { "id": "s-grant", "homeLocationId": "loc-liffey", "qualifications": [], "leftOn": "2026-10-31" },
+    { "id": "p-grace", "homeLocationId": "loc-liffey", "qualifications": [{ "type": "Manual handling", "expires": "2027-05-31" }] }
+  ]
+}

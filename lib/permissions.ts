@@ -14,6 +14,7 @@ const PREFIXES: [string, Module][] = [
   ["/daily-reports", "reports"],
   ["/manager-attention", "attention"],
   ["/staff-rosters", "staff"],
+  ["/rosters", "roster"],
   ["/shifts", "shifts"],
   ["/recruitment", "recruitment"],
   ["/files", "files"],

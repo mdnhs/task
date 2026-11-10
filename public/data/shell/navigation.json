@@ -34,6 +34,20 @@
       "srs": "SRS §3.5, §3.14"
     },
     {
+      "href": "/rosters",
+      "icon": "roster",
+      "label": "Location Rosters",
+      "description": "Weekly rosters by location: who works where, with draft and publish.",
+      "srs": "SRS §5A"
+    },
+    {
+      "href": "/rosters/mine",
+      "icon": "roster",
+      "label": "My roster",
+      "description": "Your published shifts, availability and leave requests.",
+      "srs": "SRS §5A"
+    },
+    {
       "href": "/staff-rosters",
       "icon": "roster",
       "label": "Staff & Rosters",

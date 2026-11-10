@@ -73,6 +73,14 @@
       "dept": "Cleaning"
     },
     {
+      "id": "p-ismail",
+      "name": "Ismail Rahman",
+      "role": "Site Supervisor",
+      "initials": "IR",
+      "avatar": "av5",
+      "dept": "Security"
+    },
+    {
       "id": "p-lilianna",
       "name": "Lilianna Novak",
       "role": "Operations Manager",

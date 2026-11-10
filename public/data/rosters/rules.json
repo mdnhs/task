@@ -1,0 +1,13 @@
+{
+  "avgWeekReferenceWeeks": 17,
+  "severity": {
+    "double_booking": "block",
+    "approved_leave": "block",
+    "unavailable": "warn",
+    "daily_rest": "warn",
+    "weekly_rest": "warn",
+    "avg_48h": "warn",
+    "expired_licence": "warn",
+    "left": "warn"
+  }
+}

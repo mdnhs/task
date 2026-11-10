@@ -1,7 +1,8 @@
 import { headers } from "next/headers"
 
-import { StaffRostersSkeleton, gapGroups, getRosters } from "@/features/staff-rosters"
-import { PageSkeleton } from "@/features/shell"
+import { StaffRostersSkeleton, gapGroups, getDerivedGaps, getRosters } from "@/features/staff-rosters"
+import { PageSkeleton, getUser } from "@/features/shell"
+import { getOrg } from "@/lib/org"
 import { can } from "@/lib/permissions"
 import { canWrite, getSession } from "@/lib/session"
 
@@ -11,7 +12,8 @@ import { canWrite, getSession } from "@/lib/session"
 export default async function Loading() {
   const session = await getSession()
   if (!can(session.role, "staff")) return <PageSkeleton />
-  const [{ incidents, gaps }, h] = await Promise.all([getRosters(false), headers()])
+  const [org, user] = await Promise.all([getOrg(), getUser()])
+  const [{ incidents, gaps }, h] = await Promise.all([getRosters(false, await getDerivedGaps(session, user.name, org.today)), headers()])
   let fromGap = false
   try {
     fromGap = new URL(h.get("referer") ?? "").pathname.startsWith("/staff-rosters/gaps/")

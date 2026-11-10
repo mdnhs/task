@@ -4,6 +4,7 @@
     { "personId": "p-daniel", "teams": ["Security"], "managerId": "p-lilianna" },
     { "personId": "p-grace", "teams": ["Cleaning"], "managerId": "p-lilianna" },
     { "personId": "p-priya", "teams": ["Security"], "managerId": "p-lilianna" },
+    { "personId": "p-ismail", "teams": ["Security"], "managerId": "p-daniel" },
     { "personId": "p-marcus", "teams": ["Security"], "managerId": "p-daniel" },
     { "personId": "p-leo", "teams": ["Security"], "managerId": "p-daniel" },
     { "personId": "p-tomasz", "teams": ["Cleaning"], "managerId": "p-grace" },

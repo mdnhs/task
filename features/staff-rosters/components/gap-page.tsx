@@ -70,6 +70,11 @@ export function GapPage({
         }
       />
       <div className="card sr-page-card">
+        {gap.rosterShiftId && gap.rosterHref && (
+          <p className="sr-from-note">
+            From the roster: an open shift in a published week. <Link href={gap.rosterHref} className="sr-from-link">Open roster</Link>. Cover recorded here does not assign the roster shift.
+          </p>
+        )}
         <GapDetail gap={gap} sensitive={sensitive} today={today} tzLabel={tzLabel} />
       </div>
       {canWrite && <GapDialog gap={gap} open={editing} onOpenChange={setEditing} staff={staff} onSave={save} />}

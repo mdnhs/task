@@ -1,0 +1,136 @@
+{
+  "targets": [
+    {
+      "locationId": "loc-coppers",
+      "templateId": "tpl-cop-door",
+      "weekday": 0,
+      "count": 2
+    },
+    {
+      "locationId": "loc-docklands",
+      "templateId": "tpl-dock-night",
+      "weekday": 0,
+      "count": 1
+    },
+    {
+      "locationId": "loc-coppers",
+      "templateId": "tpl-cop-door",
+      "weekday": 1,
+      "count": 2
+    },
+    {
+      "locationId": "loc-docklands",
+      "templateId": "tpl-dock-night",
+      "weekday": 1,
+      "count": 1
+    },
+    {
+      "locationId": "loc-liffey",
+      "templateId": "tpl-liff-day",
+      "weekday": 1,
+      "count": 1
+    },
+    {
+      "locationId": "loc-coppers",
+      "templateId": "tpl-cop-door",
+      "weekday": 2,
+      "count": 2
+    },
+    {
+      "locationId": "loc-docklands",
+      "templateId": "tpl-dock-night",
+      "weekday": 2,
+      "count": 1
+    },
+    {
+      "locationId": "loc-liffey",
+      "templateId": "tpl-liff-day",
+      "weekday": 2,
+      "count": 1
+    },
+    {
+      "locationId": "loc-coppers",
+      "templateId": "tpl-cop-door",
+      "weekday": 3,
+      "count": 2
+    },
+    {
+      "locationId": "loc-docklands",
+      "templateId": "tpl-dock-night",
+      "weekday": 3,
+      "count": 1
+    },
+    {
+      "locationId": "loc-liffey",
+      "templateId": "tpl-liff-day",
+      "weekday": 3,
+      "count": 1
+    },
+    {
+      "locationId": "loc-coppers",
+      "templateId": "tpl-cop-door",
+      "weekday": 4,
+      "count": 2
+    },
+    {
+      "locationId": "loc-docklands",
+      "templateId": "tpl-dock-night",
+      "weekday": 4,
+      "count": 1
+    },
+    {
+      "locationId": "loc-liffey",
+      "templateId": "tpl-liff-day",
+      "weekday": 4,
+      "count": 1
+    },
+    {
+      "locationId": "loc-coppers",
+      "templateId": "tpl-cop-door",
+      "weekday": 5,
+      "count": 2
+    },
+    {
+      "locationId": "loc-docklands",
+      "templateId": "tpl-dock-night",
+      "weekday": 5,
+      "count": 1
+    },
+    {
+      "locationId": "loc-liffey",
+      "templateId": "tpl-liff-day",
+      "weekday": 5,
+      "count": 1
+    },
+    {
+      "locationId": "loc-coppers",
+      "templateId": "tpl-cop-door",
+      "weekday": 6,
+      "count": 2
+    },
+    {
+      "locationId": "loc-docklands",
+      "templateId": "tpl-dock-night",
+      "weekday": 6,
+      "count": 1
+    },
+    {
+      "locationId": "loc-liffey",
+      "templateId": "tpl-liff-day",
+      "weekday": 6,
+      "count": 1
+    },
+    {
+      "locationId": "loc-coppers",
+      "templateId": "tpl-cop-close",
+      "weekday": 5,
+      "count": 1
+    },
+    {
+      "locationId": "loc-coppers",
+      "templateId": "tpl-cop-close",
+      "weekday": 6,
+      "count": 1
+    }
+  ]
+}

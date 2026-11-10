@@ -1,0 +1,8 @@
+{
+  "leave": [
+    { "id": "lv-001", "personId": "p-marcus", "from": "2026-10-27", "to": "2026-10-28", "kind": "Annual leave", "status": "approved", "decidedBy": "p-grace", "decidedAt": "2026-10-12T09:30:00" },
+    { "id": "lv-002", "personId": "s-bell", "from": "2026-11-02", "to": "2026-11-06", "kind": "Annual leave", "status": "requested", "decidedBy": null, "decidedAt": null },
+    { "id": "lv-003", "personId": "s-haddad", "from": "2026-10-26", "to": "2026-10-28", "kind": "Annual leave", "status": "rejected", "decidedBy": "p-grace", "decidedAt": "2026-10-13T11:00:00" },
+    { "id": "lv-004", "personId": "s-haddad", "from": "2026-11-16", "to": "2026-11-18", "kind": "Sick leave", "status": "requested", "decidedBy": null, "decidedAt": null }
+  ]
+}

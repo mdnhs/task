@@ -1,11 +1,20 @@
 # AI Business OS — Software Requirements Specification
 
-Last updated Oct 28, 2026 · @SRV
+Nov 5, 2026 · @SRV
+
+**Version 1.3, last updated 5 November 2026.** Version 1.3 locks published rosters so only higher-level users can edit them, and adds a Repeat roster button. Version 1.2 added Rostering, Time & Attendance and full Payroll for the first client.
+
+| Version | Date | Changes |
+| --- | --- | --- |
+| 1.3 | 5 Nov 2026 | Module 1A: published rosters are locked for location supervisors; only office roster managers and admins edit them, and supervisors send change requests (FR-RS-35 to 39). Added Repeat roster, auto-repeat and saved roster templates (FR-RS-26 to 29). Updated FR-RS-31, the Location supervisor role, and acceptance criteria. |
+| 1.2 | 4 Nov 2026 | Added Module 1A Rostering by location (with location-scoped supervisors), Module 1B Time & Attendance (clock in and out), and Module 1C Payroll processing, which replaces the old integration-only Module 8. Added first client needs CR-07 to CR-11, a Location supervisor role, Phase 1B in the build order, and new open questions. |
+| 1.1 | 28 Oct 2026 | Added task evidence rules (FR-M1-40 to 49) and the start-of-day briefing with "Play my day" (FR-M1-70 to 81). |
+| 1.0 | 27 Oct 2026 | First issue: Modules 0 to 9, first client needs CR-01 to CR-06. |
 
 > **Main spec since 28 Oct 2026.** Sections 1 to 16 are the business analyst's text (owner: @SRV). Edit them only from the BA's new versions.
 > Appendix A (at the end) is written by engineering: the build status of the app, mapping from the old OpsDesk SRS v1.2, and the Phase 1 front-end plan.
 > The old spec is kept as [`SRS-v1.2-built.md`](SRS-v1.2-built.md). It is the record of what was built. IDs like `FR-TASK-14`, `FR-REP-12`, `OC-05` in code comments refer to it.
-> The full comparison is in [`srs-diff-2026-10-28.md`](srs-diff-2026-10-28.md).
+> The latest comparison (v1.3 against the previous version and the app) is [`srs-diff-2026-11-09.md`](srs-diff-2026-11-09.md); the first one is [`srs-diff-2026-10-28.md`](srs-diff-2026-10-28.md).
 
 ## 1. Introduction
 
@@ -33,6 +42,8 @@ Product owner, solution architect, developers, QA, UI/UX designers, the security
 | NFR-nn | Cross-cutting non-functional requirement | NFR-04 |
 | CR-nn | First client requirement | CR-03 |
 | AC-Mx-nn | Acceptance criterion of module x | AC-M1-02 |
+| FR-RS / FR-TA / FR-PY-nn | Functional requirement of Module 1A Rostering / 1B Time & Attendance / 1C Payroll | FR-RS-30 |
+| AC-RS / AC-TA / AC-PY-nn | Acceptance criterion of Modules 1A / 1B / 1C | AC-TA-02 |
 
 Priority uses MoSCoW: **Must** (release blocker), **Should** (planned for the release), **Could** (if time allows), **Won't** (not this release).
 
@@ -64,9 +75,11 @@ The platform is one modular monolith with a shared foundation; each module is a 
 | Member | Employee | Own tasks, submit shift reports and proof, self-service |
 | HR officer | HR team | Employee records, leave, onboarding (Module 4) |
 | Sales user | Sales team | Leads, deals, customers (Module 5) |
-| Finance user | Finance team | Invoices, expenses, payroll export (Modules 7, 8) |
+| Finance user | Finance team | Invoices, expenses, payroll export (Module 7; payroll is the Payroll officer role) |
 | Client guest | Customer of the tenant | Client portal, approvals on shared deliverables only |
 | Auditor (read-only) | Accountant, DPO | Read reports and audit logs |
+| Location supervisor | Site lead, for example Ismail at Coppers | Draft rosters, leave, attendance and timesheet approval for assigned locations only; cannot edit a published roster, only request changes (Module 1A) |
+| Payroll officer | Office payroll staff | Pay profiles, pay runs, payslips, pay queries (Module 1C) |
 
 Roles are templates; tenant admins can clone and adjust permissions (FR-M0-06).
 
@@ -88,18 +101,19 @@ Roles are templates; tenant admins can clone and adjust permissions (FR-M0-06).
 
 - The first client uses Google Workspace for email and Drive.
 - Each member has a company-allocated PC and an Android phone (company or personal is an open question).
-- An Irish payroll provider with an API will be chosen before Module 8 starts.
+- An Irish payroll provider with an API will be chosen before Module 1C starts.
 
 ## 3. Build order
 
-Build ten modules in five phases, following the blueprint roadmap; a phase starts only after the previous gate passes, and the first client goes live at the end of Phase 1.
+Build twelve modules in six phases, one module at a time; a phase starts only after the previous gate passes. The first client goes live at the end of Phase 1, then gets Rostering, Time & Attendance and Payroll in Phase 1B, in that order.
 
-| Phase | Goal | Modules | Gate before next phase |
+| Phase | Goal | Modules (built in this order) | Gate before next phase |
 | --- | --- | --- | --- |
 | 1. Foundation and MVP | Go live with the first client | M0 Platform foundation, M1 Core workspace, tasks and shift reports | Client signs off CR-01 to CR-06, security review passed |
+| 1B. Workforce operations | First client's new needs, one module at a time | M1A Rostering, then M1B Time and attendance, then M1C Payroll processing | Client signs off CR-07 to CR-11, first pay run reconciled |
 | 2. AI productivity | Beat a plain task manager | M2 AI assistant and voice, M3 Workflow automation engine | AI quality evaluation and DPIA signed off |
 | 3. Connected business | People and customers on shared data | M4 Human resource management, M5 Customer relationship management | Module entitlements proven, cross-module data checks pass |
-| 4. Commercial operations | Money, time and payroll | M6 Projects and resources, M7 Finance, M8 Payroll provider integration | Payroll provider and accountant validation |
+| 4. Commercial operations | Money and client delivery | M6 Projects and resources, M7 Finance and accounting integrations | Accountant validation of finance exports |
 | 5. Insight and expansion | UK and EU readiness | M9 Reporting and business intelligence, country packs, enterprise identity | (none) |
 
 Every module section below has the same parts: purpose, dependencies, functional requirements, data entities, AI features, and acceptance criteria. A module is done when all its Must requirements pass acceptance, it has its own plan entitlement, and it can be switched off without breaking other modules.
@@ -295,6 +309,224 @@ Project, Milestone, Task, TaskDependency, Checklist, Comment, Attachment, Activi
 * AC-M1-09: The Today card appears on the first sign-in of the working day only; after it is dismissed it does not reappear that day, but stays on the home screen.
 * AC-M1-10: "Play my day" reads overdue tasks first; "mark done" on an evidence-required task opens the upload step instead of closing it.
 
+## 5A. Module 1A: Rostering by location
+
+Module 1A plans who works where and when, location by location. Each location can have its own roster supervisor, so a supervisor like Ismail manages only the Coppers roster while the office team manages every other location. It is the first of three workforce modules the first client asked for on 3 November 2026, built only after Module 1 is live.
+
+**Depends on:** Modules 0 and 1 (shift patterns, tasks per shift). **Plan:** Workforce (Rostering). **Leave:** a basic leave and availability flow is included here; Module 4 HRM extends it later.
+
+### 5A.1 First client requirements (added in v1.2)
+
+| ID | Client's words (summary) | Requirement |
+| --- | --- | --- |
+| CR-07 | Roster by location, each day separately, who is working and how many | Selecting a location shows each day separately, with the names, times and number of staff scheduled. |
+| CR-08 | Enter individual start times, which vary by shift | Each rostered shift can have its own start and end time per person, not only the template time. |
+| CR-09 | Ismail manages only the Coppers roster; the office manages all other locations | Roster rights are granted per location; a supervisor sees and edits only their locations. |
+
+### 5A.2 Functional requirements
+
+**Locations and shift set-up**
+
+| ID | Requirement | Priority |
+| --- | --- | --- |
+| FR-RS-01 | Admins shall create locations (sites) with name, address, map pin, clock-in zone radius, opening hours and contact. | Must |
+| FR-RS-02 | Each location shall have shift templates (for example Day, Night, Event) with default start, end, unpaid break and role. | Must |
+| FR-RS-03 | Each location shall have a staffing target per day and shift (for example 4 door staff on Friday night), used to show gaps. | Should |
+| FR-RS-04 | Each location shall list required skills, licences or site inductions; only staff who hold them are suggested. | Should |
+
+**Roster views (CR-07)**
+
+| ID | Requirement | Priority |
+| --- | --- | --- |
+| FR-RS-10 | Choosing a location shall show its roster by day: one column (or card on mobile) per day, listing each person, their start and end time, role, and the day's staff count against the target. | Must |
+| FR-RS-11 | The roster shall also be viewable by person, by role, and across all locations, for a day, week, fortnight or month. | Must |
+| FR-RS-12 | Under- and over-staffed days and shifts shall be highlighted, with the number missing. | Should |
+| FR-RS-13 | Rosters shall print and export to PDF and Excel per location and week. | Should |
+| FR-RS-14 | Users with cost permission shall see estimated labour hours and cost per day and location. | Could |
+
+**Building the roster (CR-08)**
+
+| ID | Requirement | Priority |
+| --- | --- | --- |
+| FR-RS-20 | Supervisors shall add shifts by drag and drop or form, and set an individual start and end time for each person on each shift, overriding the template. | Must |
+| FR-RS-21 | Shifts that cross midnight shall be supported and counted on the day they start. | Must |
+| FR-RS-22 | Supervisors shall copy last week, repeat a rotating pattern, and assign several people at once. | Should |
+| FR-RS-23 | Rosters shall be drafted, then published; staff are notified on publish and on every later change, and confirm they have seen it. | Must |
+| FR-RS-24 | Every change after publishing shall be kept in roster history (who, what, when). | Must |
+| FR-RS-25 | Each rostered shift shall carry its task list from Module 1, so the shift report is pre-filled for that location. | Should |
+| FR-RS-26 | A published week shall have a Repeat roster button that copies the same staff, shifts and individual start and end times to the next week, or to a chosen number of following weeks, in one step. | Must |
+| FR-RS-27 | Before saving a repeat, the system shall re-check every copied shift (approved leave, unavailability, staff who have left, expired licences, rest and 48-hour rules, public holidays). Shifts that fail are left as open shifts and listed for the supervisor, never silently dropped. | Must |
+| FR-RS-28 | Repeated weeks shall be created as drafts and published with one click. A week can be set to auto-repeat: the system creates next week's draft a set number of days ahead (default 7) and notifies the supervisor to review and publish it. | Should |
+| FR-RS-29 | Supervisors shall save a week as a named roster template (for example "Coppers standard week") and apply it to any future week. | Should |
+
+**Location-scoped access (CR-09)**
+
+| ID | Requirement | Priority |
+| --- | --- | --- |
+| FR-RS-30 | Admins shall assign a Location supervisor to one or more locations, for example Ismail to Coppers. | Must |
+| FR-RS-31 | A location supervisor shall view rosters, create and edit draft rosters, publish them, and approve leave and timesheets only for their locations, and see only staff rostered or based there. Published rosters follow FR-RS-35. | Must |
+| FR-RS-32 | Office roster managers shall have access to all locations, or to all except named ones, so ownership of a location is not duplicated by mistake. | Must |
+| FR-RS-33 | A staff member working at several locations shall see one combined roster; each supervisor sees only their location's shifts. | Must |
+| FR-RS-34 | Changes to who manages a location shall be audit-logged. | Must |
+| FR-RS-35 | Once a roster week is published, location supervisors shall not edit it: no adding, removing or moving shifts, and no changing people or times. Only higher-level users (office roster manager, tenant admin, tenant owner) can edit a published roster. Drafts stay fully editable by the supervisor. | Must |
+| FR-RS-36 | A supervisor shall send a change request on a published shift, stating what should change and why. A higher-level user approves or rejects it; an approved change is applied and the affected staff are notified. | Must |
+| FR-RS-37 | Every edit to a published roster shall record who, when, the old and new value, and a required reason; affected staff must confirm the changed shift again. | Must |
+| FR-RS-38 | On a published roster, shift swaps, cover and open-shift claims shall be recommended by the supervisor and approved by a higher-level user, unless a tenant admin delegates swap approval to that supervisor. | Should |
+| FR-RS-39 | The lock shall not block daily attendance work: supervisors still record no-shows, lateness and clock corrections in Module 1B, which do not change the published roster. | Must |
+
+**Staff self-service and rules**
+
+| ID | Requirement | Priority |
+| --- | --- | --- |
+| FR-RS-40 | Staff shall see their roster in the Android app and on the web, and add it to their phone calendar. | Must |
+| FR-RS-41 | Staff shall set their availability and request leave; approved leave and unavailability block rostering. | Must |
+| FR-RS-42 | Supervisors shall post open shifts to qualified staff, who claim them; the supervisor approves. | Should |
+| FR-RS-43 | Staff shall request shift swaps or cover; the supervisor approves, and the rules below are checked. | Should |
+| FR-RS-44 | The system shall warn before publishing when a shift breaks: double booking, approved leave, 11 hours' daily rest, the weekly rest day, the 48-hour average week (Organisation of Working Time Act 1997), or an expired licence. Admins set which rules block and which only warn; an override needs a reason. | Must |
+| FR-RS-45 | Module 2 shall suggest a draft roster from targets, availability, skills and cost. | Could |
+
+### 5A.3 Data entities
+
+Location, LocationZone, ShiftTemplate, StaffingTarget, Roster, RosterShift, ShiftAssignment (with individual start and end), OpenShift, SwapRequest, Availability, LeaveRequest, LocationAccessGrant, Qualification, RuleViolation, RosterTemplate, RepeatRule, RosterChangeRequest.
+
+### 5A.4 Acceptance criteria
+
+- AC-RS-01: Selecting Coppers for a week shows seven days, each listing who is working, their own start and end times, and the staff count.
+- AC-RS-02: Two people on the same Coppers shift can have different start times, and both show correctly on the roster and in the app.
+- AC-RS-03: Ismail, signed in, sees and edits only the Coppers roster; another location's roster returns "no access". An office user sees every location.
+- AC-RS-04: Publishing a roster with a shift that leaves under 11 hours' rest shows a warning naming the person and the shifts.
+- AC-RS-05: After Ismail publishes the Coppers roster, every edit control is disabled for him and the API refuses his edits; he can only send a change request. An office roster manager can edit it, and the change shows in history with a reason.
+- AC-RS-06: Pressing Repeat roster on a published Coppers week creates a draft for next week with the same people and start times. A person on approved leave that week appears as an open shift in the conflict list, not as rostered.
+
+## 5B. Module 1B: Time & Attendance
+
+Module 1B records the hours people actually work, by clock-in and clock-out at the location. It compares them with the roster, and turns them into approved timesheets that feed payroll. It is built after Rostering because each clock event is matched to a rostered shift.
+
+**Depends on:** Modules 0, 1 and 1A. **Plan:** Workforce (Time & Attendance).
+
+### 5B.1 First client requirement (added in v1.2)
+
+| ID | Client's words (summary) | Requirement |
+| --- | --- | --- |
+| CR-10 | Where is clock-in and clock-out for recording working hours? | Staff clock in and out in the app at their location; the hours recorded drive timesheets and payroll. |
+
+### 5B.2 Functional requirements
+
+**Clocking in and out (CR-10)**
+
+| ID | Requirement | Priority |
+| --- | --- | --- |
+| FR-TA-01 | Staff shall clock in and out from the Android app with one tap, showing their rostered shift and location. | Must |
+| FR-TA-02 | The app shall check the phone is inside the location's clock-in zone (geofence) at the moment of clocking only, with no tracking between clock events. Outside the zone, the clock is blocked or flagged for review, as set per location. | Must |
+| FR-TA-03 | A location may use kiosk mode: a shared tablet where staff clock in with a PIN or QR code, with an optional photo at clock-in (with notice to staff). Biometric clocking is off by default, as it is special-category data under GDPR. | Should |
+| FR-TA-04 | Office staff shall clock in from the web on their registered company PC. | Should |
+| FR-TA-05 | Staff shall record breaks (start and end); admins set break rules per location: recorded or auto-deducted. | Must |
+| FR-TA-06 | Clocking shall work offline and sync later; the server time and sync time are stored, and changed device clocks are flagged. | Should |
+
+**Live attendance**
+
+| ID | Requirement | Priority |
+| --- | --- | --- |
+| FR-TA-10 | Each clock event shall be matched to the rostered shift; late arrival, early leaving, no-show and unrostered shifts shall alert the location supervisor in real time. | Must |
+| FR-TA-11 | Supervisors shall see a live "who's on site now" board per location, against the roster. | Must |
+| FR-TA-12 | Admins shall set grace periods and rounding rules per location (for example clock-in up to 5 minutes early counts from the shift start). | Should |
+
+**Timesheets and corrections**
+
+| ID | Requirement | Priority |
+| --- | --- | --- |
+| FR-TA-20 | Staff shall request a correction for a missed or wrong clock event, with a reason; the location supervisor approves or rejects it. The original event is always kept. | Must |
+| FR-TA-21 | The system shall build a timesheet per person and pay period from approved clock events and breaks. | Must |
+| FR-TA-22 | Timesheets shall be approved in two steps: the location supervisor, then the office (payroll). Approved timesheets are locked; later changes need a logged reopen. | Must |
+| FR-TA-23 | Hours shall be classified by pay rule: ordinary, overtime, Sunday, night, public holiday, and paid break. | Must |
+| FR-TA-24 | Absences (sick, unpaid, leave, public holiday) shall be recorded against rostered shifts, including statutory sick leave days used. | Should |
+| FR-TA-25 | Approved timesheets shall be sent to Module 1C Payroll for the pay period. | Must |
+
+**Compliance and reports**
+
+| ID | Requirement | Priority |
+| --- | --- | --- |
+| FR-TA-30 | The system shall report working-time compliance per person: average weekly hours over the reference period, daily and weekly rest, and breaks taken. | Must |
+| FR-TA-31 | Working-time records shall be kept for at least 3 years, as Irish working-time record rules require, then deleted or anonymised. | Must |
+| FR-TA-32 | Reports shall show hours by location, person and role, and rostered against actual hours. | Should |
+
+### 5B.3 Data entities
+
+ClockEvent, BreakEvent, Kiosk, LocationZone, AttendanceException, CorrectionRequest, Timesheet, TimesheetLine, HourType, PayRule, Absence, ComplianceResult.
+
+### 5B.4 Acceptance criteria
+
+- AC-TA-01: A staff member at Coppers clocks in inside the zone; the event shows on the live board within 10 seconds and matches their rostered shift.
+- AC-TA-02: A clock-in 300 m outside the zone is blocked or flagged, as configured.
+- AC-TA-03: A missed clock-out corrected by the supervisor keeps the original record and shows who changed it and why.
+- AC-TA-04: A Sunday night shift splits correctly into Sunday hours and night hours on the timesheet.
+- AC-TA-05: Once the supervisor and the office approve a timesheet, it appears in the payroll run and can no longer be edited.
+
+## 5C. Module 1C: Payroll processing
+
+In Module 1C, payroll runs through the app from start to finish. Approved hours become gross pay with premiums. The office reviews and approves the pay run. Staff get payslips in the app. The legally regulated steps (PAYE, USC, PRSI, pension auto-enrolment and Revenue payroll submissions) run through an integrated, Revenue-compatible Irish payroll engine or provider, so the client gets full payroll without the platform carrying statutory calculation risk in its first version. "Payroll issues" stays as one feature (pay queries), not the whole section.
+
+**Depends on:** Modules 0, 1A and 1B (approved timesheets). Module 4 (employee records) and Module 7 (expenses) feed in when enabled. **Plan:** Payroll add-on.
+
+### 5C.1 First client requirement (added in v1.2)
+
+| ID | Client's words (summary) | Requirement |
+| --- | --- | --- |
+| CR-11 | Will payroll actually be processed through the app, or is it only for payroll issues? | Payroll is prepared, calculated, approved and paid out from the app; payslips are issued in the app; pay queries are one part of it. |
+
+### 5C.2 Functional requirements
+
+**Pay set-up**
+
+| ID | Requirement | Priority |
+| --- | --- | --- |
+| FR-PY-01 | Payroll users shall keep each employee's pay profile: pay type (hourly or salaried), rates by role or location, effective dates, PPSN, tax and PRSI details, bank account (IBAN), and pension scheme. Sensitive fields are masked and limited to payroll roles. | Must |
+| FR-PY-02 | Admins shall define pay rules: overtime thresholds and multipliers, Sunday premium, night rate, public holiday pay, paid breaks, and allowances. | Must |
+| FR-PY-03 | Admins shall set pay frequencies (weekly, fortnightly, monthly) and pay calendars. | Must |
+| FR-PY-04 | The system shall accrue annual leave from hours worked (for example 8% of hours worked, capped at 4 working weeks) and track public holiday entitlements. | Should |
+
+**Pay run**
+
+| ID | Requirement | Priority |
+| --- | --- | --- |
+| FR-PY-10 | A pay run shall gather approved timesheets, salaries, absences, leave, approved expenses and one-off payments or deductions for the period. | Must |
+| FR-PY-11 | The system shall calculate gross pay per employee from hours, rates and pay rules, and show each line's working. | Must |
+| FR-PY-12 | Statutory deductions (PAYE, USC, PRSI, pension auto-enrolment) and net pay shall come from the integrated Irish payroll engine or provider, which also files the Revenue payroll submission. | Must |
+| FR-PY-13 | Before approval, the system shall show exceptions: missing timesheets, unapproved hours, large changes from last period, missing bank or tax details. | Must |
+| FR-PY-14 | Pay runs shall move through draft, review, approved, submitted and paid; approval needs a payroll role, and an approved run is locked. | Must |
+| FR-PY-15 | Corrections after payment shall be made in the next run or an off-cycle run, never by editing a paid run. | Must |
+
+**Outputs**
+
+| ID | Requirement | Priority |
+| --- | --- | --- |
+| FR-PY-20 | Staff shall see and download payslips in the app and on the web. | Must |
+| FR-PY-21 | The system shall produce a SEPA bank payment file for net pay. | Should |
+| FR-PY-22 | The system shall export a payroll journal to the accounting product (Module 7 or a direct export). | Should |
+| FR-PY-23 | Reports shall cover payroll cost by location, role and period, overtime and premiums paid, and holiday liability. | Should |
+| FR-PY-24 | Staff shall raise pay queries ("payroll issues") linked to a payslip line; payroll staff answer and track them to close. | Must |
+
+**Control**
+
+| ID | Requirement | Priority |
+| --- | --- | --- |
+| FR-PY-30 | Every change to pay data, rules and runs shall be audit-logged with old and new value. | Must |
+| FR-PY-31 | Location supervisors shall see hours for their location but not pay rates or pay, unless granted. | Must |
+| FR-PY-32 | The integration layer shall be per country, so UK or other EU payroll can be added later after specialist validation. | Should |
+| FR-PY-33 | Native statutory calculation inside the platform shall only be built after legal and payroll specialist validation and testing against Revenue specifications. | Won't (this release) |
+
+### 5C.3 Data entities
+
+EmployeePayProfile, PayRule, PayCalendar, PayRun, PayRunLine, Allowance, Deduction, LeaveAccrual, Payslip, PaymentFile, PayrollJournal, PayQuery, ProviderConnection.
+
+### 5C.4 Acceptance criteria
+
+- AC-PY-01: A fortnight of approved Coppers timesheets with Sunday and overtime hours produces gross pay that matches a hand calculation from the pay rules.
+- AC-PY-02: Net pay and deductions returned by the payroll provider's test environment match the provider's own payslips.
+- AC-PY-03: A pay run cannot be approved while it has exceptions marked as blocking.
+- AC-PY-04: Staff see their payslip in the app on pay day, and a pay query raised from it reaches the payroll team.
+- AC-PY-05: Ismail can approve Coppers hours but cannot see anyone's pay rate.
+
 ## 6. Module 2: AI Business Assistant and voice
 
 Module 2 turns the AI features into one platform-wide assistant that answers from the user's own authorised data, speaks and listens, and never takes a consequential action without the user's confirmation. Each later module adds its own skills to this assistant.
@@ -381,7 +613,7 @@ Module 4 manages the employee lifecycle from hire to exit, and reuses Module 1 s
 | FR-M4-07 | Managers shall run performance reviews and track development goals. | Should |
 | FR-M4-08 | HR shall record training, skills and certifications with expiry dates and reminders. | Should |
 | FR-M4-09 | HR shall store employee documents and collect policy acknowledgements with time stamps. | Must |
-| FR-M4-10 | Employees shall use a self-service portal (web and Android) for profile, leave, payslips (Module 8) and documents. | Must |
+| FR-M4-10 | Employees shall use a self-service portal (web and Android) for profile, leave, payslips (Module 1C) and documents. | Must |
 | FR-M4-11 | HR shall have workforce reports: headcount, turnover, absence, leave liability. | Should |
 | FR-M4-12 | Sensitive fields (health, bank details, PPSN) shall be visible only to explicitly permitted roles and shall be masked by default. | Must |
 | FR-M4-13 | Retention rules shall delete or anonymise ex-employee data after the tenant's configured period. | Must |
@@ -489,33 +721,9 @@ Invoice, InvoiceLine, CreditNote, TaxRate, Payment, Expense, Receipt, PurchaseRe
 - AC-M7-02: An approved expense appears in the accounting product after the next sync, with its receipt.
 - AC-M7-03: An issued invoice cannot be edited; only a credit note can change it.
 
-## 12. Module 8: Payroll and compensation (provider integration)
+## 12. Module 8: Payroll (moved to Module 1C)
 
-Module 8 manages pay data and approvals, and hands the statutory calculation and Revenue reporting to a certified Irish payroll provider. The platform must never present itself as calculating Irish PAYE, PRSI, USC or pension deductions in v1.
-
-**Depends on:** Modules 0, 3, 4 (employees, leave), 1 (timesheets), 7 (expenses). **Plan:** Payroll add-on.
-
-### 12.1 Functional requirements
-
-| ID | Requirement | Priority |
-| --- | --- | --- |
-| FR-M8-01 | Payroll users shall keep salary, allowances, deductions and overtime rules per employee, with effective dates. | Must |
-| FR-M8-02 | The system shall define pay periods and gather each period's inputs: hours, overtime, leave, approved expenses, one-off payments. | Must |
-| FR-M8-03 | Inputs shall go through a review and approval step before they are sent. | Must |
-| FR-M8-04 | Approved inputs shall be sent to the payroll provider by API (or file where no API exists); results (gross, deductions, net) come back. | Must |
-| FR-M8-05 | Employees shall see payslips returned by the provider in self-service. | Must |
-| FR-M8-06 | The system shall reconcile what was sent with what came back and flag differences. | Should |
-| FR-M8-07 | Every payroll change shall be audit-logged, and payroll data visible only to payroll roles. | Must |
-| FR-M8-08 | The integration shall be designed per country, so a UK or other EU provider can be added later after specialist validation. | Should |
-
-### 12.2 Data entities
-
-PayElement, EmployeePayProfile, PayPeriod, PayrollRun, PayrollInput, PayrollResult, Payslip, ProviderConnection, Reconciliation.
-
-### 12.3 Acceptance criteria
-
-- AC-M8-01: A pay period cannot be sent until approved, and a sent period cannot be edited.
-- AC-M8-02: A test run with the provider's sandbox returns payslips that match the provider's own output.
+Since version 1.2, payroll is specified and built as Module 1C (section 5C), right after Rostering and Time & Attendance, because the first client needs it. Module number 8 is kept free so that requirement IDs in other sections stay stable.
 
 ## 13. Module 9: Reporting and business intelligence
 
@@ -572,7 +780,7 @@ These apply to every module from Module 0 onward; a module cannot pass its gate 
 
 ## 15. First client traceability matrix
 
-All six first-client needs are covered inside Modules 0 and 1, so the client can go live at the end of Phase 1 without waiting for later modules.
+CR-01 to CR-06 are covered inside Modules 0 and 1, so the client can go live at the end of Phase 1. CR-07 to CR-11 (added 4 November 2026) are covered by Modules 1A, 1B and 1C in Phase 1B, built one after another.
 
 | Client need | Functional requirements | Acceptance criteria |
 | --- | --- | --- |
@@ -582,6 +790,11 @@ All six first-client needs are covered inside Modules 0 and 1, so the client can
 | CR-04 Check, add, remove tasks and timelines | FR-M1-10, 11, 12, 13, 14 | AC-M1-04 |
 | CR-05 Proven progress after submission | FR-M1-40 to FR-M1-49 | AC-M1-05 |
 | CR-06 All services on Android except official Drive | FR-M1-52, 53, 54, 55; NFR-11 | AC-M1-06, AC-M1-07 |
+| CR-07 Roster by location, per day, who and how many | FR-RS-10, 11, 12, 13 | AC-RS-01 |
+| CR-08 Individual start times per shift | FR-RS-20, 21 | AC-RS-02 |
+| CR-09 Location-only supervisor (Ismail for Coppers) | FR-RS-30 to FR-RS-34; FR-PY-31 | AC-RS-03, AC-PY-05 |
+| CR-10 Clock-in and clock-out for working hours | FR-TA-01 to FR-TA-25 | AC-TA-01 to AC-TA-05 |
+| CR-11 Full payroll through the app | FR-PY-01 to FR-PY-32 | AC-PY-01 to AC-PY-04 |
 
 ## 16. Open questions
 
@@ -598,6 +811,15 @@ These need an answer from SRV or the first client before Module 1 design is fixe
 - [ ] Q9: How many users, teams and shifts does the first client have, and do they work nights or across midnight?
 - [ ] Q10: Should the first client's Drive files be linked into tasks, or only used alongside the platform on the PC? Assumed: linked.
 - [ ] Q11: Which Irish payroll provider and accounting product should Modules 7 and 8 integrate with first?
+
+Added in v1.2 for Modules 1A to 1C:
+
+- [ ] Q12 (CR-07): Which locations does the client have besides Coppers, and does each have a set number of staff per day or shift?
+- [ ] Q13 (CR-09): Are there other location supervisors besides Ismail at Coppers? Should supervisors also approve leave and timesheets, or only the roster? Assumed: roster, swaps, leave and timesheets for their own location.
+- [ ] Q14 (CR-10): Will staff clock in on their own phones, a shared tablet at the site, or both? Are staff told about the location check at clock-in? Assumed: own phones with a zone check, kiosk optional.
+- [ ] Q15 (CR-11): Which payroll software or bureau does the client use today for Revenue submissions, and should we integrate with it or replace it? Assumed: integrate with a Revenue-compatible provider.
+- [ ] Q16 (CR-11): What are the pay rules: hourly rates by location or role, overtime thresholds, Sunday and night premiums, pay frequency?
+- [ ] Q17: Do any staff need licence checks before they are rostered, for example PSA licences for security staff?
 
 ## Appendix A. Engineering notes: build status (not BA text)
 
@@ -626,10 +848,10 @@ Status on 28 Oct 2026. "Built" means a front-end mock: JSON seed data in `public
 | Dashboard, Manager attention | M1 (FR-M1-62, FR-M1-79) | The deadline card follows the shift model (`lib/report-deadline.ts`): members see their next report due, managers each team's due / missing reports (fix wave 29 Oct 2026) |
 | Notifications (in-app, delivery log, reminders) | M0 (FR-M0-11) | The bell also shows task change notices to the member (FR-M1-12, `lib/task-notices.ts`). Add Android push and quiet hours; WhatsApp channel not in this SRS |
 | AI assistant panel | M2 (Phase 2 add-on) | |
-| Staff & Rosters (`/staff-rosters`) | M1 shifts (FR-M1-20), M4 attendance (FR-M4-06) | Incident and cover-gap model not in this SRS. Product owner: keep it (28 Oct 2026) |
+| Staff & Rosters (`/staff-rosters`) | M1 shifts (FR-M1-20), M4 attendance (FR-M4-06), partly M1A (FR-RS-12, 43) | Incident and cover-gap model not in this SRS. Product owner: keep it (28 Oct 2026). The M1A roster has to connect to it |
 | Shifts (`/shifts`) | M1 (FR-M1-20, FR-M1-21, FR-M1-22 hook), M0 (FR-M0-07) | Phase 1 step 1. Departments act as teams (A.5); Q5, Q7, Q9 built on the assumptions |
 | Recruitment (`/recruitment`), employee files | M4 (Phase 3) | |
-| Payroll issues (`/payroll-issues`) | M8 (Phase 4) | M8 is pay inputs to a provider, not an issue log |
+| Payroll issues (`/payroll-issues`) | M1C (Phase 1B), close to FR-PY-24 | Pay queries are one feature of Module 1C; not linked to a payslip line yet (no payslips built) |
 | Orders & Stock (`/orders-stock`), client files, WhatsApp (`/whatsapp`) | Not in this SRS | Product owner: keep (28 Oct 2026). Ask the BA to add them to the SRS. May be switched by plan entitlement (FR-M0-15) |
 | Task voice instructions (change request, product owner 30 Oct 2026): record up to 2 minutes on New task, play on the task and in "Play my day" | M1 tasks (next to FR-M1-01, FR-M1-73); not in this SRS | Built (mock) 30 Oct 2026: `components/voice-note.tsx`, `lib/task-voice.ts`, `features/tasks.md` → Voice instructions. No transcription or AI (that stays FR-M2-07). Recording is a `blob:` URL in this tab only. Backend: tenant storage, access as the task, retention (delete with the task's archive purge). Ask the BA to add an FR |
 
@@ -669,3 +891,47 @@ Product owner decision (28 Oct 2026): WhatsApp, Orders & Stock, client files and
 - Departments in the app map to teams (FR-M0-07) until the team model is built.
 - Currency, locale, time zone and deadline stay tenant data, never code (FR-M0-20).
 - Billing stays behind the provider-agnostic billing module with Stripe first (FR-M0-14).
+
+### A.6 SRS v1.3: Phase 1B status (9 Nov 2026)
+
+Module 1A is built as a front-end mock (status in A.7). Modules 1B and 1C are not built, apart from the small overlaps listed in [`srs-diff-2026-11-09.md`](srs-diff-2026-11-09.md). `billing/entitlements.json` now has `M1A` (rostering, in Business and Enterprise) and maps `payroll` to `M1C` (renamed from `M8`); it still needs an entitlement for M1B when that module is built. Ismail and Coppers are examples in the BA's text: seed data only, never code.
+
+To raise with the BA (from the v1.3 comparison): §2.4 and Q11 still describe the old Module 8; FR-M8-06 (reconcile sent and returned payroll) has no FR-PY equivalent although the Phase 1B gate needs a reconciled pay run; leave sits in both FR-RS-41 and FR-M4-05.
+
+### A.7 Module 1A Rostering: build status (10 Nov 2026)
+
+Built as a front-end mock (details: [`../features/rosters.md`](../features/rosters.md)). Decisions D1..D13 are in `../superpowers/specs/2026-11-09-module-1a-rostering-design.md`; the owner asked for a plan without questions, so they are open to the BA.
+
+| FR-RS group | Status |
+| --- | --- |
+| Locations and access (FR-RS-01..04, 30..32, 34) | Built: `/rosters/locations`, supervisor grants, Roster Manager `except` limits, location-scoped payloads |
+| Weekly view and staffing (FR-RS-10..12, 33; CR-07, 08) | Built: day board, person grid, count against target |
+| Rules (FR-RS-20..21, 44) | Built: eight configurable rules, 17-week 48h reference, override with reason |
+| Repeat and templates (FR-RS-22, 26..29) | Built, except the rotating pattern |
+| Publish, lock, change requests, history (FR-RS-23, 24, 35..37) | Built |
+| Open shifts and swaps (FR-RS-38, 42, 43) | Built |
+| Staff self-service (FR-RS-40, 41), `.ics` | Built |
+| Shift reports and cover (FR-RS-25) | Built: published roster shifts overlay the shift state; open shifts show as derived gaps |
+| Lock does not block daily attendance work (FR-RS-39) | Nothing in Module 1A blocks it; the work itself (no-shows, lateness, clock corrections) belongs to Module 1B, not built (see A.8, decision 4) |
+| FR-RS-13 (PDF/Excel), FR-RS-14 (labour cost), FR-RS-22 rotating pattern, FR-RS-45 | Deferred |
+
+Entitlements: `M1A` in Business and Enterprise; `M8` renamed `M1C`. Modules 1B and 1C are still not built.
+
+To raise with the BA, in addition to the three items in A.6:
+- FR-RS-39: read as Module 1B work, not as incidents in Staff & Rosters (decision 4 in A.8). The Location Supervisor still has no access to Staff & Rosters, Shifts, Dashboard or WhatsApp, because those modules are not location-aware yet.
+- "Office roster manager" is used in the SRS but not defined in §2.2; built as a new Roster Manager role.
+- FR-RS-42/43 (approval of swaps) against FR-RS-38: built so the supervisor approves on a draft week, an office role on a published week unless the location delegates.
+- No unpublish exists in the SRS; after publishing a supervisor can only send a change request.
+
+### A.8 Decisions taken for the BA (10 Nov 2026, pending the BA's confirmation)
+
+The owner asked engineering to act as the BA for the open items from A.6 and A.7. These are decisions, not edits to sections 1-16. Each one gives the wording the BA can adopt.
+
+1. **Payroll is no longer "integration only" (§2.4, Q11).** Module 1C runs the pay run in the app; only the statutory calculations stay with a certified provider. Proposed §2.4 wording: "Payroll is run in the app (Module 1C); statutory calculations stay with a certified provider." Proposed Q11 wording: "Which Irish payroll provider and accounting product should Modules 7 and 1C integrate with first?"
+2. **Reconciliation gets an FR-PY requirement.** FR-M8-06 has no successor, and the Phase 1B gate says "first pay run reconciled". Proposed new requirement, next free number in 5C: "FR-PY-34 After a pay run is sent to the provider, the system shall compare what was sent with what came back (per employee: gross, net, deductions) and list every difference for a payroll officer to resolve before the run is closed. Must." Acceptance: a run with one mismatched line cannot be closed until the line is resolved or accepted with a reason.
+3. **One owner for the leave record.** When Module 1A is enabled it owns the leave record (FR-RS-41): rostering blocks on approved leave, and Module 4 (FR-M4-05) reads and shows the same record and its balances. When only Module 4 is enabled, Module 4 owns it. Approval follows D8: the supervisor of the person's home location, else an office role. One request is never entered twice.
+4. **FR-RS-39 is Module 1B work.** The requirement says the lock must not block daily attendance work: no-shows, lateness and clock corrections, which live in Module 1B and "do not change the published roster". Module 1A meets it by not locking anything outside the roster. The build had read it as "a supervisor logs an incident in Staff & Rosters", which is a different feature and not a requirement. When Module 1B is built, the Location Supervisor gets a narrow attendance right for their own locations only; no staff write and no access to FR-STAFF-03 sensitive fields.
+5. **Office roster manager is defined.** Proposed §2.2 row: "Roster Manager: builds and edits rosters, including published weeks with a reason, for all locations or all except those the company excludes; approves open shifts and swaps on published weeks; cannot manage billing or staff pay."
+6. **Swaps and unpublish.** Swaps and open shifts are approved by the supervisor on a draft week and by an office role on a published week, unless the location delegates to the supervisor (FR-RS-42/43 with FR-RS-38). There is no unpublish; after publishing, a supervisor sends a change request (FR-RS-35/36).
+
+What engineering did with them: the app is built to 3, 5 and 6; 1, 2 and 4 are text for the BA and need no code now.

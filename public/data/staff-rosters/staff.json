@@ -44,6 +44,7 @@
     },
     {
       "id": "s-daniel",
+      "personId": "p-daniel",
       "name": "Daniel Okafor",
       "role": "Security Supervisor",
       "dept": "Security",
@@ -79,6 +80,7 @@
     },
     {
       "id": "s-grace",
+      "personId": "p-grace",
       "name": "Grace Mensah",
       "role": "Cleaning Team Lead",
       "dept": "Cleaning",

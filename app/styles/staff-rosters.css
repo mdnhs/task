@@ -59,3 +59,8 @@
 @media (max-width:640px){.sr-main .sk-line:has(> .sk-sum2){height:38px !important}}
 /* Forms (ui-rules 32): a FilterSeg field keeps its natural width; its label row shakes like a Field's control when invalid */
 .sr-seg .seg.od-seg{align-self:flex-start}
+.sr-from{font-weight:500;color:var(--ink-2)}
+.sr-from-note{margin:0 0 12px;font-size:13px;line-height:19px;color:var(--ink-2)}
+.sr-from-link{color:var(--brand-deep);text-decoration:none;font-weight:600}
+:root[data-theme="dark"] .sr-from-link{color:var(--brand-3)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .sr-from-link{color:var(--brand-3)}}

@@ -1,0 +1,194 @@
+/* Location Rosters (Module 1A, FR-RS-10/11/12/33) */
+.ros-sub{display:inline-flex;flex-wrap:wrap;align-items:center;gap:4px 12px}
+.ros-sum{font-weight:700;color:var(--ink-2)}
+.ros-sum[data-short]{color:var(--bad)}
+.ros-card .od-filters{margin-bottom:16px}
+.ros-card[data-pending]{opacity:.7;transition:opacity var(--dur-fast) var(--ease)}
+
+/* Range navigation: prev / label / next pill */
+.ros-nav{display:inline-flex;align-items:center;gap:2px;height:40px;padding:0 4px;border-radius:var(--r-pill);background:var(--mute-bg);flex:none}
+.ros-nav-btn{width:32px;height:32px;border-radius:50%;display:grid;place-items:center;color:var(--ink-2);cursor:pointer;transition:background var(--dur-fast) var(--ease),color var(--dur-fast) var(--ease)}
+.ros-nav-btn svg{width:17px;height:17px}
+.ros-nav-btn:hover{background:var(--card);color:var(--ink)}
+.ros-nav-label{min-width:116px;height:32px;padding:0 10px;border-radius:var(--r-pill);font-size:13px;font-weight:600;color:var(--ink);cursor:pointer;white-space:nowrap}
+.ros-nav-label:hover{background:var(--card)}
+:is(.ros-nav-btn,.ros-nav-label):focus-visible{outline:2px solid var(--brand);outline-offset:1px}
+
+/* One block per location */
+.ros-block + .ros-block{margin-top:24px}
+.ros-block-head{display:flex;align-items:center;flex-wrap:wrap;gap:8px 12px;margin-bottom:12px}
+.ros-block-head h2{margin:0;font-size:16px;line-height:24px}
+.ros-block-head .ros-sum{font-size:13px}
+
+/* Day board: seven columns, one card per day at 640px and under */
+.ros-board{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:10px}
+.ros-board[data-view="day"]{grid-template-columns:minmax(0,1fr)}
+.ros-cell{min-width:0}
+.ros-day{height:100%;display:flex;flex-direction:column;gap:8px;padding:12px;border-radius:var(--r-lg);background:var(--mute-bg)}
+.ros-day[data-today]{background:color-mix(in srgb,var(--brand-soft) 70%,var(--mute-bg))}
+.ros-day-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.ros-day-name{font-size:12.5px;font-weight:700;line-height:18px;color:var(--ink-2)}
+.ros-day[data-today] .ros-day-name{color:var(--brand)}
+.ros-count{font-size:13px;font-weight:700;line-height:18px;color:var(--ink)}
+.ros-target{color:var(--ink-3)}
+.ros-day[data-short] .ros-count{color:var(--bad)}
+.ros-gap{font-weight:700}
+.ros-gap[data-kind="short"]{color:var(--bad)}
+.ros-gap[data-kind="over"]{color:var(--info)}
+.ros-shifts{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.ros-shift{display:flex;flex-direction:column;gap:1px;min-width:0}
+.ros-who{font-size:13px;font-weight:600;line-height:18px;color:var(--ink);overflow-wrap:anywhere}
+.ros-who:empty{display:none}
+.ros-time{font-size:12px;line-height:16px;color:var(--ink-2);white-space:nowrap}
+.ros-role{font-size:11.5px;line-height:15px;color:var(--ink-3)}
+.ros-next{font-weight:700;color:var(--info)}
+.ros-shift[data-open] .ros-who{color:var(--warn)}
+.ros-none{font-size:12px;line-height:16px;color:var(--ink-3)}
+.ros-empty{margin:0;padding:24px 0;text-align:center;font-size:13px;color:var(--ink-3)}
+
+/* Person grid */
+.ros-grid{table-layout:fixed}
+.ros-grid th:first-child{width:170px}
+.ros-grid th.ros-today{color:var(--brand)}
+.ros-grid td{vertical-align:top}
+.ros-grid td.ros-today{background:color-mix(in srgb,var(--brand-soft) 45%,transparent)}
+.ros-person .tt{overflow-wrap:anywhere}
+.ros-group td{padding:14px 12px 6px;font-size:12.5px;font-weight:700;color:var(--ink-2)}
+.ros-grid .ros-none{display:inline-block;padding:6px 0}
+
+@media (max-width:640px){
+  .ros-board{grid-template-columns:minmax(0,1fr)}
+  .ros-cell{grid-column-start:auto !important}
+  .ros-nav{flex:1 1 auto;justify-content:space-between}
+}
+@media (max-width:720px){
+  .ros-grid{min-width:0 !important;table-layout:auto}
+  .ros-grid th:first-child{width:auto}
+  .ros-grid td{vertical-align:middle}
+  .ros-grid td.ros-today{background:none}
+  .ros-grid td.ros-today::before{color:var(--brand)}
+  .ros-grid .ros-shifts{align-items:flex-end}
+  .ros-grid .ros-shift{align-items:flex-end;text-align:right}
+  .ros-grid .ros-none{padding:0}
+  .ros-group{background:none !important;padding:0 !important;margin-bottom:4px !important}
+  .ros-group td{padding:8px 4px 0}
+}
+
+/* Locations admin (FR-RS-01..04, 30) */
+.rl-list{display:flex;flex-direction:column;gap:4px;padding:12px}
+.rl-row{display:grid;grid-template-columns:40px minmax(0,1.4fr) auto minmax(0,1fr) 20px;align-items:center;gap:16px;padding:12px;border-radius:var(--r-lg);color:var(--ink);text-decoration:none;transition:color var(--dur-fast) var(--ease)}
+.rl-row:hover .rl-main b{color:var(--brand-deep)}
+:root[data-theme="dark"] .rl-row:hover .rl-main b{color:var(--brand-3)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .rl-row:hover .rl-main b{color:var(--brand-3)}}
+.rl-row:focus-visible{outline:2px solid var(--brand);outline-offset:1px}
+.rl-ico{width:40px;height:40px;border-radius:var(--r-md);display:grid;place-items:center;background:var(--brand-soft);color:var(--brand-deep)}
+.rl-ico svg{width:18px;height:18px}
+.rl-main{display:flex;flex-direction:column;min-width:0}
+.rl-main b{font-size:14px;line-height:20px;transition:color var(--dur-fast) var(--ease)}
+.rl-main span{font-size:13px;line-height:18px;color:var(--ink-3)}
+.rl-meta{font-size:13px;color:var(--ink-2);white-space:nowrap}
+.rl-sups{font-size:13px;color:var(--ink-2);overflow-wrap:anywhere}
+.rl-go{width:18px;height:18px;color:var(--ink-3)}
+@media (max-width:760px){.rl-row{grid-template-columns:40px minmax(0,1fr) 20px}.rl-meta,.rl-sups{grid-column:2}}
+.rl-empty{margin:0;font-size:13px;line-height:18px;color:var(--ink-3)}
+.rl-tpl{display:flex;flex-direction:column;gap:12px;padding:14px;border-radius:var(--r-lg);background:var(--mute-bg)}
+.rl-tpl-foot{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.rl-tpl-foot .fs-act{margin-left:0}
+.rl-tpl-foot .fs-act:disabled{opacity:.45;cursor:not-allowed}
+.rl-tpl-foot .fs-act.bad:not(:disabled):hover{color:var(--bad)}
+.rl-note{font-size:12.5px;line-height:18px;color:var(--ink-3)}
+.rl-err{margin:0;font-size:13px;line-height:18px;color:var(--bad)}
+.rl-targets{display:flex;flex-direction:column;gap:6px}
+.rl-days{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px}
+.rl-day{display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:600;color:var(--ink-3);text-align:center}
+.rl-day input{text-align:center;padding-inline:4px}
+
+/* Editing shifts (FR-RS-20/21/22) */
+.ros-add{flex:none;width:24px;height:24px;margin:-3px -4px -3px 0;border-radius:50%;display:grid;place-items:center;color:var(--ink-2);cursor:pointer;transition:background var(--dur-fast) var(--ease),color var(--dur-fast) var(--ease)}
+.ros-add svg{width:15px;height:15px}
+.ros-add:hover{background:var(--card);color:var(--brand-deep)}
+.ros-add:focus-visible,.ros-shift-btn:focus-visible{outline:2px solid var(--brand);outline-offset:1px}
+.ros-day-head .ros-count{margin-left:auto}
+.ros-day-head .ros-count + .ros-add{margin-left:8px}
+.ros-shift[draggable="true"]{cursor:grab}
+.ros-shift[draggable="true"]:active{cursor:grabbing}
+.ros-shift-btn{display:flex;flex-direction:column;gap:1px;min-width:0;width:100%;padding:0;border:0;background:none;font:inherit;text-align:left;color:inherit;cursor:inherit}
+.ros-shift-btn:hover .ros-who{color:var(--brand-deep)}
+.ros-shift[data-open] .ros-shift-btn:hover .ros-who{color:var(--warn)}
+.ros-day[data-over]{background:var(--brand-soft)}
+.ros-dialog{width:min(760px,calc(calc(100vw / var(--text-scale,1)) - 24px))}
+.ros-dialog .od-form-cols{gap:16px 32px}
+.ros-dialog .od-form-foot .ros-remove{margin-right:auto;color:var(--bad);border-color:var(--bad)}
+.ros-dialog .od-form-foot .ros-remove svg{width:15px;height:15px}
+
+/* Publish, change requests, history (FR-RS-23/35/36/37) */
+.ros-publish{margin-left:auto}
+.ros-req-btn{align-self:flex-start;margin-top:2px;padding:0;border:0;background:none;font:inherit;font-size:12px;font-weight:600;color:var(--ink-3);cursor:pointer;transition:color var(--dur-fast) var(--ease)}
+.ros-req-btn:hover{color:var(--brand-deep)}
+.ros-req-btn:focus-visible{outline:2px solid var(--brand);outline-offset:1px}
+.ros-viol{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.ros-viol-row{display:flex;gap:8px;align-items:flex-start;font-size:14px;line-height:20px;color:var(--ink-2)}
+.ros-viol-row svg{flex:none;width:16px;height:16px;margin-top:2px}
+.ros-viol-row[data-kind="block"] svg{color:var(--bad)}
+.ros-viol-row[data-kind="warn"] svg{color:var(--warn)}
+.ros-viol-row b{color:var(--ink)}
+.ros-viol-more{font-size:13px;color:var(--ink-3)}
+.ros-panel{margin-top:16px}
+.ros-panel-head{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+.ros-panel-head h2{margin:0;font-size:16px;line-height:24px}
+.ros-req-list,.ros-hist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:14px}
+.ros-req{display:grid;grid-template-columns:minmax(0,1fr) minmax(160px,260px) auto;gap:12px;align-items:center}
+.ros-req-main,.ros-hist-row{display:flex;flex-direction:column;gap:1px;min-width:0}
+.ros-req-act{display:flex;gap:8px}
+.ros-more{margin-top:14px}
+@media (max-width:640px){
+  .ros-req{grid-template-columns:minmax(0,1fr)}
+}
+
+/* Repeat, templates, banner (FR-RS-22/26..29) */
+.ros-repeat{margin-left:auto}
+.ros-repeat + .ros-publish{margin-left:0}
+.ros-banner{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px;padding:10px 14px;border-radius:var(--r-lg);background:var(--mute-bg);font-size:13px;line-height:20px;color:var(--ink-2)}
+.ros-banner .btn{margin-left:auto}
+.ros-switch-row{display:flex;align-items:center;gap:10px;font-size:14px;line-height:20px;color:var(--ink-2);cursor:pointer}
+.ros-panel-x{margin-left:auto}
+.ros-panel-head .ros-sum + .ros-panel-x{margin-left:auto}
+.ros-conf-link{display:inline;margin:0;font-size:inherit}
+.ros-tpl-save{display:flex;align-items:flex-end;gap:12px;margin-bottom:14px}
+.ros-tpl-save > :first-child{flex:1 1 auto;min-width:0}
+.ros-tpl-row{display:flex;align-items:center;justify-content:space-between;gap:12px}
+@media (max-width:720px){.ros-tpl-save{flex-direction:column;align-items:stretch}}
+
+/* My roster (Task 9, FR-RS-23/33/40/41) */
+.mr-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.mr-shift{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr) auto;align-items:center;gap:12px;padding:12px 14px;border-radius:var(--r-lg);background:var(--mute-bg)}
+.mr-when,.mr-where{display:flex;flex-direction:column;min-width:0}
+.mr-when b{font-size:14px;line-height:20px}
+.mr-when span,.mr-where span{font-size:13px;line-height:18px;color:var(--ink-2)}
+.mr-act{display:flex;align-items:center;gap:8px;justify-content:flex-end}
+.mr-btn{height:34px;padding:0 12px;font-size:13px}
+.mr-btn svg{width:15px;height:15px}
+.mr-ics{width:34px;height:34px;border:0;border-radius:50%;background:none;display:grid;place-items:center;color:var(--ink-2);cursor:pointer;transition:color var(--dur-fast) var(--ease)}
+.mr-ics svg{width:17px;height:17px}
+.mr-ics:hover{color:var(--brand-deep)}
+.mr-ics:focus-visible{outline:2px solid var(--brand);outline-offset:1px}
+.mr-form{display:flex;flex-direction:column;gap:14px}
+.mr-add{align-self:flex-start}
+.mr-chips{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.mr-chip{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 14px;border-radius:var(--r-md);background:var(--mute-bg);font-size:13.5px;line-height:20px}
+.mr-chip .fs-act{margin-left:0}
+.mr-decide{display:inline-flex;gap:6px;flex:none}
+@media (max-width:640px){
+  .mr-shift{grid-template-columns:minmax(0,1fr) auto}
+  .mr-where{grid-column:1}
+  .mr-act{grid-column:2;grid-row:1 / span 2;flex-wrap:wrap}
+  .mr-chip{flex-wrap:wrap}
+}
+
+/* Open shifts and swaps (Task 10, FR-RS-38/42/43) */
+.ros-os{display:flex;flex-direction:column;gap:8px;padding:12px 14px;border-radius:var(--r-lg);background:var(--mute-bg)}
+.ros-os-claim{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.ros-os-i{width:14px;height:14px;margin-right:6px;vertical-align:-2px;color:var(--ink-3)}
+.ros-os-gap{margin-left:auto;text-decoration:none}
+.ros-os-gap:hover{color:var(--brand-deep)}
+.mr-note{font-size:12px;line-height:16px;color:var(--ink-3)}

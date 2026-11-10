@@ -1,0 +1,9 @@
+{
+  "grants": [
+    { "locationId": "loc-coppers", "personId": "p-ismail" },
+    { "locationId": "loc-docklands", "personId": "p-daniel" }
+  ],
+  "limits": [
+    { "personId": "p-priya", "except": ["loc-liffey"] }
+  ]
+}

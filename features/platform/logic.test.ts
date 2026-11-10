@@ -171,11 +171,11 @@ describe("other tenant 360 actions", () => {
   })
   it("overrideModule grants an add-on outside the plan, revokes one in it, and clears", () => {
     const o = { at: AT, by: "Aoife Brennan", reason: WHY }
-    const g = overrideModule(tenant(), "M8", "grant", false, o)
-    expect(g.moduleOverrides).toEqual([{ module: "M8", mode: "grant", reason: WHY, at: AT, by: "Aoife Brennan" }])
-    expect(() => overrideModule(tenant(), "M8", "grant", true, o)).toThrow()
-    expect(() => overrideModule(tenant(), "M8", "revoke", false, o)).toThrow()
-    expect(overrideModule(g, "M8", null, false, o).moduleOverrides).toBeUndefined()
+    const g = overrideModule(tenant(), "M1C", "grant", false, o)
+    expect(g.moduleOverrides).toEqual([{ module: "M1C", mode: "grant", reason: WHY, at: AT, by: "Aoife Brennan" }])
+    expect(() => overrideModule(tenant(), "M1C", "grant", true, o)).toThrow()
+    expect(() => overrideModule(tenant(), "M1C", "revoke", false, o)).toThrow()
+    expect(overrideModule(g, "M1C", null, false, o).moduleOverrides).toBeUndefined()
   })
   it("overrideModule refuses to revoke a core module (fix round 1)", () => {
     const o = { at: AT, by: "Aoife Brennan", reason: WHY, core: ["M0"] }

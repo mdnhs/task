@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import { createIncident, gapHref, incidentSchema, nextIncidentId, rostersHref, rostersTab, updateGapCover } from "./logic"
+import { createIncident, gapsFromOpenShifts, gapHref, incidentSchema, nextIncidentId, rostersHref, rostersTab, updateGapCover } from "./logic"
 import type { Incident, RosterGap, StaffMember } from "./types"
 
 const staff: StaffMember[] = [{ id: "s1", name: "Ana Silva", role: "Cleaner", dept: "Cleaning" }]
@@ -48,5 +48,20 @@ describe("updateGapCover", () => {
     expect(out).toMatchObject({ coverage: "partial", assigned: "Ana Silva", nextAction: "Find a second" })
     expect(out.history).toEqual([{ at: h.at, by: h.by, action: "Cover updated", note: "Partly covered, Ana Silva" }])
     expect(updateGapCover(g, { coverage: "uncovered", assigned: "", nextAction: "Call" }, h.at, h.by).history[0].note).toBe("Uncovered")
+  })
+})
+
+describe("gapsFromOpenShifts", () => {
+  const loc = [{ id: "loc-a", name: "Coppers", address: "", pin: { lat: 0, lng: 0 }, zoneRadiusM: 1, openingHours: "", contact: "", swapApprovalDelegated: false }]
+  const tpl = [{ id: "t1", locationId: "loc-a", name: "Door", start: "18:00", end: "02:00", unpaidBreakMin: 0, role: "Security Officer", requires: [] }]
+  const wk = (id: string, status: "draft" | "published") => ({ id, locationId: "loc-a", weekStart: "2026-10-19", status, publishedAt: null, publishedBy: null, autoRepeatDays: null })
+  const sh = (id: string, weekId: string, personId: string | null, date = "2026-10-21") => ({ id, weekId, locationId: "loc-a", date, personId, templateId: "t1", role: "Security Officer", start: "18:00", end: "02:00", unpaidBreakMin: 0, confirmedAt: null })
+  it("derives uncovered gaps from open shifts in published weeks only", () => {
+    const g = gapsFromOpenShifts([sh("a", "w1", null), sh("b", "w1", "p-x"), sh("c", "w2", null)], [wk("w1", "published"), wk("w2", "draft")], tpl, loc, "2026-10-20")
+    expect(g).toHaveLength(1)
+    expect(g[0]).toMatchObject({ rosterShiftId: "a", coverage: "uncovered", when: "tomorrow", shiftStart: "2026-10-21T18:00:00", site: "Coppers", rosterHref: "/rosters?location=loc-a&week=2026-10-19" })
+  })
+  it("drops past shifts when today is given", () => {
+    expect(gapsFromOpenShifts([sh("a", "w1", null, "2026-10-19")], [wk("w1", "published")], tpl, loc, "2026-10-20")).toHaveLength(0)
   })
 })

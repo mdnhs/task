@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation"
 
-import { GapPage, getRosters } from "@/features/staff-rosters"
+import { GapPage, getDerivedGaps, getRosters } from "@/features/staff-rosters"
 import { AccessRestricted, getUser } from "@/features/shell"
 import { getOrg } from "@/lib/org"
 import { can } from "@/lib/permissions"
@@ -22,7 +22,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
   if (!can(session.role, "staff")) return <AccessRestricted moduleLabel="Staff & Rosters" />
   const gid = decode(id)
   const sensitive = can(session.role, "staff", "write")
-  const { gaps, staff } = await getRosters(sensitive)
+  const { gaps, staff } = await getRosters(sensitive, await getDerivedGaps(session, user.name, org.today))
   if (!gaps.some((g) => g.id === gid)) notFound()
   return (
     <GapPage

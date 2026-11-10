@@ -8,7 +8,7 @@ export type Status = { tone: Tone; label: string }
 export type Dept = "all" | "Security" | "Cleaning"
 
 // Session / tenancy (see lib/permissions.ts, lib/session.ts)
-export type Module = "dashboard" | "tasks" | "reports" | "attention" | "staff" | "shifts" | "recruitment" | "files" | "payroll" | "orders" | "settings" | "audit" | "whatsapp"
+export type Module = "dashboard" | "tasks" | "reports" | "attention" | "staff" | "shifts" | "recruitment" | "files" | "payroll" | "orders" | "settings" | "audit" | "whatsapp" | "roster"
 export type Access = "none" | "read" | "write"
 export type Role = {
   id: string
@@ -21,6 +21,8 @@ export type Role = {
   person?: string
   /** "team": a manager-home role that only sees the reports of the people below `person` in the reporting lines. */
   reportScope?: "team"
+  /** Location rosters (D4): "office" sees all locations and edits published weeks; "supervisor" only granted locations, draft only. */
+  rosterLevel?: "office" | "supervisor"
 }
 export type Tenant = {
   id: string

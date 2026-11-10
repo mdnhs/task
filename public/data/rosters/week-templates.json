@@ -1,0 +1,279 @@
+{
+  "weekTemplates": [
+    {
+      "id": "wt-cop-standard",
+      "name": "Standard week",
+      "locationId": "loc-coppers",
+      "shifts": [
+        {
+          "day": 0,
+          "personId": "s-haddad",
+          "templateId": "tpl-cop-door",
+          "role": "Security Officer",
+          "start": "18:00",
+          "end": "02:00",
+          "unpaidBreakMin": 30
+        },
+        {
+          "day": 0,
+          "personId": "s-kowalski",
+          "templateId": "tpl-cop-door",
+          "role": "Security Officer",
+          "start": "18:00",
+          "end": "02:00",
+          "unpaidBreakMin": 30
+        },
+        {
+          "day": 1,
+          "personId": "s-haddad",
+          "templateId": "tpl-cop-door",
+          "role": "Security Officer",
+          "start": "18:00",
+          "end": "02:00",
+          "unpaidBreakMin": 30
+        },
+        {
+          "day": 1,
+          "personId": "s-kowalski",
+          "templateId": "tpl-cop-door",
+          "role": "Security Officer",
+          "start": "18:00",
+          "end": "02:00",
+          "unpaidBreakMin": 30
+        },
+        {
+          "day": 2,
+          "personId": "s-haddad",
+          "templateId": "tpl-cop-door",
+          "role": "Security Officer",
+          "start": "18:00",
+          "end": "02:00",
+          "unpaidBreakMin": 30
+        },
+        {
+          "day": 2,
+          "personId": "s-kowalski",
+          "templateId": "tpl-cop-door",
+          "role": "Security Officer",
+          "start": "19:00",
+          "end": "02:00",
+          "unpaidBreakMin": 30
+        },
+        {
+          "day": 3,
+          "personId": "s-haddad",
+          "templateId": "tpl-cop-door",
+          "role": "Security Officer",
+          "start": "18:00",
+          "end": "02:00",
+          "unpaidBreakMin": 30
+        },
+        {
+          "day": 3,
+          "personId": "s-kowalski",
+          "templateId": "tpl-cop-door",
+          "role": "Security Officer",
+          "start": "18:00",
+          "end": "02:00",
+          "unpaidBreakMin": 30
+        },
+        {
+          "day": 4,
+          "personId": "s-haddad",
+          "templateId": "tpl-cop-door",
+          "role": "Security Officer",
+          "start": "18:00",
+          "end": "02:00",
+          "unpaidBreakMin": 30
+        },
+        {
+          "day": 4,
+          "personId": "s-kowalski",
+          "templateId": "tpl-cop-door",
+          "role": "Security Officer",
+          "start": "18:00",
+          "end": "02:00",
+          "unpaidBreakMin": 30
+        },
+        {
+          "day": 4,
+          "personId": "s-bell",
+          "templateId": "tpl-cop-close",
+          "role": "Security Officer",
+          "start": "20:00",
+          "end": "03:30",
+          "unpaidBreakMin": 30
+        },
+        {
+          "day": 5,
+          "personId": "s-haddad",
+          "templateId": "tpl-cop-door",
+          "role": "Security Officer",
+          "start": "18:00",
+          "end": "02:00",
+          "unpaidBreakMin": 30
+        },
+        {
+          "day": 5,
+          "personId": "s-kowalski",
+          "templateId": "tpl-cop-door",
+          "role": "Security Officer",
+          "start": "18:00",
+          "end": "02:00",
+          "unpaidBreakMin": 30
+        },
+        {
+          "day": 5,
+          "personId": null,
+          "templateId": "tpl-cop-close",
+          "role": "Security Officer",
+          "start": "20:00",
+          "end": "03:30",
+          "unpaidBreakMin": 30
+        },
+        {
+          "day": 5,
+          "personId": "s-bell",
+          "templateId": "tpl-cop-day",
+          "role": "Security Officer",
+          "start": "12:00",
+          "end": "18:00",
+          "unpaidBreakMin": 0
+        },
+        {
+          "day": 6,
+          "personId": "s-haddad",
+          "templateId": "tpl-cop-door",
+          "role": "Security Officer",
+          "start": "18:00",
+          "end": "02:00",
+          "unpaidBreakMin": 30
+        },
+        {
+          "day": 6,
+          "personId": "s-kowalski",
+          "templateId": "tpl-cop-door",
+          "role": "Security Officer",
+          "start": "18:00",
+          "end": "02:00",
+          "unpaidBreakMin": 30
+        }
+      ]
+    },
+    {
+      "id": "wt-dock-standard",
+      "name": "Standard week",
+      "locationId": "loc-docklands",
+      "shifts": [
+        {
+          "day": 0,
+          "personId": "p-daniel",
+          "templateId": "tpl-dock-night",
+          "role": "Security Officer",
+          "start": "22:00",
+          "end": "06:00",
+          "unpaidBreakMin": 30
+        },
+        {
+          "day": 0,
+          "personId": "s-silva",
+          "templateId": "tpl-dock-day",
+          "role": "Security Officer",
+          "start": "07:00",
+          "end": "15:00",
+          "unpaidBreakMin": 30
+        },
+        {
+          "day": 1,
+          "personId": "s-silva",
+          "templateId": "tpl-dock-night",
+          "role": "Security Officer",
+          "start": "22:00",
+          "end": "06:00",
+          "unpaidBreakMin": 30
+        },
+        {
+          "day": 1,
+          "personId": "s-silva",
+          "templateId": "tpl-dock-day",
+          "role": "Security Officer",
+          "start": "07:00",
+          "end": "15:00",
+          "unpaidBreakMin": 30
+        },
+        {
+          "day": 2,
+          "personId": "p-daniel",
+          "templateId": "tpl-dock-night",
+          "role": "Security Officer",
+          "start": "22:00",
+          "end": "06:00",
+          "unpaidBreakMin": 30
+        },
+        {
+          "day": 2,
+          "personId": "s-silva",
+          "templateId": "tpl-dock-day",
+          "role": "Security Officer",
+          "start": "07:00",
+          "end": "15:00",
+          "unpaidBreakMin": 30
+        },
+        {
+          "day": 3,
+          "personId": "s-silva",
+          "templateId": "tpl-dock-night",
+          "role": "Security Officer",
+          "start": "22:00",
+          "end": "06:00",
+          "unpaidBreakMin": 30
+        },
+        {
+          "day": 3,
+          "personId": "s-silva",
+          "templateId": "tpl-dock-day",
+          "role": "Security Officer",
+          "start": "07:00",
+          "end": "15:00",
+          "unpaidBreakMin": 30
+        },
+        {
+          "day": 4,
+          "personId": "p-daniel",
+          "templateId": "tpl-dock-night",
+          "role": "Security Officer",
+          "start": "22:00",
+          "end": "06:00",
+          "unpaidBreakMin": 30
+        },
+        {
+          "day": 4,
+          "personId": "s-silva",
+          "templateId": "tpl-dock-day",
+          "role": "Security Officer",
+          "start": "07:00",
+          "end": "15:00",
+          "unpaidBreakMin": 30
+        },
+        {
+          "day": 5,
+          "personId": "s-silva",
+          "templateId": "tpl-dock-night",
+          "role": "Security Officer",
+          "start": "22:00",
+          "end": "06:00",
+          "unpaidBreakMin": 30
+        },
+        {
+          "day": 6,
+          "personId": "p-daniel",
+          "templateId": "tpl-dock-night",
+          "role": "Security Officer",
+          "start": "22:00",
+          "end": "06:00",
+          "unpaidBreakMin": 30
+        }
+      ]
+    }
+  ]
+}

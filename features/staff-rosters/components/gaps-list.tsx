@@ -29,7 +29,7 @@ export function GapsList({ rows, page, tzLabel }: { rows: RosterGap[]; page: num
                   <motion.li key={g.id} layout="position" {...listItem} transition={layoutTransition}>
                     <Link href={gapHref(g.id)} className="sr-row">
                       <span className="sr-main">
-                        <span className="sr-title">{g.site} · {g.role}</span>
+                        <span className="sr-title">{g.site} · {g.role}{g.rosterShiftId && <span className="sr-from"> · From roster</span>}</span>
                         <span className="sr-sum">
                           <When iso={g.shiftStart} today="" tzLabel="" mode="date" /> {g.time} {tzLabel} · {g.client}
                         </span>

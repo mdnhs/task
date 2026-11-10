@@ -1,0 +1,40 @@
+{
+  "weeks": [
+    {
+      "id": "wk-cop-1019",
+      "locationId": "loc-coppers",
+      "weekStart": "2026-10-19",
+      "status": "published",
+      "publishedAt": "2026-10-12T16:00:00",
+      "publishedBy": "p-priya",
+      "autoRepeatDays": null
+    },
+    {
+      "id": "wk-cop-1026",
+      "locationId": "loc-coppers",
+      "weekStart": "2026-10-26",
+      "status": "draft",
+      "publishedAt": null,
+      "publishedBy": null,
+      "autoRepeatDays": null
+    },
+    {
+      "id": "wk-dock-1019",
+      "locationId": "loc-docklands",
+      "weekStart": "2026-10-19",
+      "status": "published",
+      "publishedAt": "2026-10-12T16:30:00",
+      "publishedBy": "p-priya",
+      "autoRepeatDays": 7
+    },
+    {
+      "id": "wk-liff-1019",
+      "locationId": "loc-liffey",
+      "weekStart": "2026-10-19",
+      "status": "published",
+      "publishedAt": "2026-10-13T10:00:00",
+      "publishedBy": "p-priya",
+      "autoRepeatDays": null
+    }
+  ]
+}
