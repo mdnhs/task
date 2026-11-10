@@ -1,5 +1,6 @@
 "use client"
 
+import { ActionButton } from "@/components/action-button"
 import { useState } from "react"
 
 import { Field } from "@/components/field"
@@ -86,7 +87,7 @@ export function RepeatDialog({ source, locationName, weeks, nameOf, onRepeat, on
             )}
             <div className="od-form-foot">
               <DialogClose render={<button type="button" className="btn btn-outline" />}>Cancel</DialogClose>
-              <button type="submit" className="btn btn-primary" disabled={published > 0 || (drafts > 0 && !replace)}>Repeat</button>
+              <ActionButton type="submit" className="btn btn-primary" disabled={published > 0 || (drafts > 0 && !replace)}>Repeat</ActionButton>
             </div>
           </form>
         )}

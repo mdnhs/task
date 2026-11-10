@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button"
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel"
 import { DeptContext } from "@/hooks/use-dept"
 import type { Dept } from "@/lib/types"
+import { StretchIndicator } from "@/components/stretch-indicator"
 import { layoutTransition } from "@/lib/motion"
 import { cn } from "@/lib/utils"
 
@@ -46,13 +47,6 @@ function Nav({ items, active, onNavigate, label }: { items: NavItemData[]; activ
           aria-label={n.badge ? `${n.label}, ${n.badge.text}` : undefined}
           onClick={onNavigate}
         >
-          {/* Shared indicators (bar + background): on route change they slide from the old item to the new one, across both nav groups */}
-          {isActive(n.href) && (
-            <>
-              <motion.span layoutId="nav-active-bg" className="nav-bg" transition={layoutTransition} />
-              <motion.span layoutId="nav-active" className="nav-ind" transition={layoutTransition} />
-            </>
-          )}
           <Icon name={n.icon} />
           <span className="lbl">{n.label}</span>
           {n.badge && (
@@ -182,6 +176,9 @@ export function AppShell({
           {platform ? <Logo href="/platform" onNavigate={() => setOpen(false)} /> : <Logo tenantId={session.tenant.id} onNavigate={() => setOpen(false)} />}
 
           <div className="sidebar-scroll">
+            {/* Shared indicators (background + bar): on route change they stretch from the old item to the new one, across both nav groups */}
+            <StretchIndicator active={active ?? null} axis="y" selector="a.active" className="nav-bg stretch-ind" />
+            <StretchIndicator active={active ?? null} axis="y" fit={false} inset={[8, 8]} selector="a.active" className="nav-ind stretch-ind" />
             {grouped ? (
               sections(navigation.menu).map((g) => (
                 <div key={g.section ?? ""}>

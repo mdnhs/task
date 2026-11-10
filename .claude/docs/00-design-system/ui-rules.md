@@ -92,7 +92,7 @@ No GSAP. CSS covers most cases. The `motion` library (`motion/react`) is used on
 13. **Pick the tool by job.**
     - **CSS:** hover, focus, open/close, page enter, skeleton → content.
     - **`motion`:** these four only:
-      - A shared indicator that moves between items: `layoutId`. Two examples in `AppShell`:
+      - A shared indicator that moves between items. Since the reel redesign it is `<StretchIndicator>` (`components/stretch-indicator.tsx`), not `layoutId`: one pill, first child of the container, whose leading edge leaves first and trailing edge catches up (`STRETCH` in `lib/motion.ts`). Used by `FilterSeg`, the settings/account tab lists, the tenant 360 tabs and the sidebar. Until it has measured, CSS paints the active item itself (no `data-st` on the container). The department pill (`DeptSeg`, `DeptRow`), the search results pill and the WhatsApp conversation bar still use `layoutId`. Two examples in `AppShell`:
         - the sidebar active bar, `<motion.span layoutId="nav-active" className="nav-ind">`
         - the department filter pill, `seg-active` / `.seg-ind`. On phones (≤640px) `DeptSeg` is hidden and `DeptRow`
           (`features/shell/components/dept-row.tsx`) takes over: a full-width, scroll-snapped pill row under the search,
@@ -158,6 +158,7 @@ No GSAP. CSS covers most cases. The `motion` library (`motion/react`) is used on
     Typing is shown as quiet grey dots. Voice progress is a clipped overlay layer, never a width change.
 26. **Department switch:** a filtered figure never jumps. `CountUp` counts up once, then hands the value to `RollNumber`, so later changes roll per digit
     (down when the value fell; `numDir` in `lib/motion.ts`). `RollNumber` keys digit slots from the right. Stat data may carry `byDept` overrides.
+    `CountUp` counts plain numbers and also numbers with a prefix, suffix and grouping (`€12,400`, `94%`, `£12.50`, `4.2k`): `lib/count-format.ts` keeps the affixes, thousands separator and decimal places while it counts, and `numDir` reads the number inside them. Only the English shape (`,` groups, `.` decimals) is read; a bare decimal (`1.6`) counts only with `decimals`; anything else renders unchanged.
     Recharts series stay mounted and ease to new data (`animationDuration` = `DUR.count` after the entrance). Short non-table card lists (daily-report rows, notifications) may use `AnimatePresence` + `listItem`; tables and paged lists stay static (rule 22).
 27. **Popups grow from their trigger.**
     - Menus, selects, popovers, tooltips: one CSS rule in `opsdesk.css` keyed on their `data-slot`. Scale .96→1 + fade from base-ui's `--transform-origin`
@@ -190,6 +191,15 @@ No GSAP. CSS covers most cases. The `motion` library (`motion/react`) is used on
     - Small fixed choices (≤4 options: priority, type, yes/no modes) are a `FilterSeg` or `.rp-day` chips, not a select. Picking several people is `PeoplePicker` (select + removable chips), never a wall of chips.
     - Rarely used or advanced fields go in a `FormFold` opened by a `FoldToggle` in the section heading (label names what's inside); an error inside opens it.
     - Hints only when they prevent a mistake, one short line. Validation, error messages, `Field` and the foot (Cancel + primary) stay as they are.
+
+33. **Cascades (the reel pass).** A short same-level group enters in order, not all at once:
+    - Page blocks: `.canvas > *` already enter 40ms apart (rule 12 tokens).
+    - `.od-cascade` on a container makes its direct children fade up 40ms apart after the page blocks (capped at 8 steps; `opsdesk.css`). Use it on tile strips, card rows, short stacks.
+    - Card groups cascade without opting in (selector list in `opsdesk.css`): `.stats` strips, `.grid-2` page rows, `.kb-cols` and `.rec-board` columns, `.ros-board` days, `.pf-ov-grid`. Cards inside a Kanban column do not, because a dropped card remounts and would flash. Uses `backwards` fill, never `both`, so a dragged card keeps its inline transform.
+    - Form sections (`.fs-sec`) on a page cascade by position; a two-column form runs both columns side by side.
+    - Nothing inside `.od-slide`, a dialog or a sheet cascades (they already move as one), and tables and paged lists never cascade (rule 22).
+    - Chart bars rise from their base one after another (`.rc-rise` with `--i` per bar, in `opsdesk.css`); fill bars (`.progress i`) inside a list fill row by row (the Nth list item waits N steps). A Recharts bar chart that uses `rc-rise` sets its own `animationDuration` to 1ms until its entrance is done and keeps `isAnimationActive` on, because switching it would remount the bars and replay the rise.
+    - Only opacity and transform; reduced motion drops it through the global rule.
 
 ## Data
 Mock API lives in `public/data/<feature>/<name>.json`. Each feature's `features/<feature>/api.ts` reads it with `getData()`

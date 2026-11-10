@@ -3,12 +3,11 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { motion } from "motion/react"
 
 import { Icon } from "@/components/icons"
 import { useSlideDir } from "@/components/data-pagination"
 import { PageHead } from "@/components/page-head"
-import { layoutTransition } from "@/lib/motion"
+import { StretchIndicator } from "@/components/stretch-indicator"
 import { ACCOUNT_TABS, isTab } from "../types"
 import type { AccountTabId } from "../types"
 
@@ -35,6 +34,7 @@ export function AccountLayout({ tab: initial, panels }: { tab: AccountTabId; pan
       <PageHead title="Account" subtitle="Your own profile, sign-in security and notification preferences" />
       <div className="set-layout">
         <nav className="set-tabs" aria-label="Account sections">
+          <StretchIndicator active={tab} axis="auto" className="set-tab-bg stretch-ind" />
           {ACCOUNT_TABS.map((t) => (
             <Link
               key={t.id}
@@ -50,8 +50,7 @@ export function AccountLayout({ tab: initial, panels }: { tab: AccountTabId; pan
                 window.history.pushState(null, "", `/account/${t.id}`)
               }}
             >
-              {t.id === tab && <motion.span layoutId="acc-tab-bg" className="set-tab-bg" transition={layoutTransition} />}
-              <Icon name={t.icon} />
+                            <Icon name={t.icon} />
               <span>{t.label}</span>
             </Link>
           ))}

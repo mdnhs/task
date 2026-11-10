@@ -1,5 +1,7 @@
 "use client"
 
+import { AnimatePresence, motion } from "motion/react"
+import { listItem } from "@/lib/motion"
 import { useState } from "react"
 import { Check, X } from "lucide-react"
 
@@ -27,10 +29,11 @@ export function RequestsPanel({ requests, shiftOf, nameOf, onDecide }: {
         <span className="ros-sum num">{open.length} open</span>
       </div>
       <ul className="ros-req-list">
+        <AnimatePresence initial={false}>
         {open.map((r) => {
           const s = shiftOf(r.shiftId)
           return (
-            <li key={r.id} className="ros-req">
+            <motion.li key={r.id} className="ros-req" {...listItem}>
               <div className="ros-req-main">
                 <span className="ros-who">{nameOf(r.by)} · {s ? `${nameOf(s.personId)}, ${formatDate(s.date)} ${s.start}–${s.end}` : "Shift removed"}</span>
                 <span className="ros-time num">
@@ -43,9 +46,10 @@ export function RequestsPanel({ requests, shiftOf, nameOf, onDecide }: {
                 <button type="button" className="btn btn-outline" onClick={() => onDecide(r.id, false, notes[r.id] ?? null)}><X aria-hidden="true" />Reject</button>
                 <button type="button" className="btn btn-primary" disabled={!s} onClick={() => onDecide(r.id, true, notes[r.id] ?? null)}><Check aria-hidden="true" />Approve</button>
               </div>
-            </li>
+            </motion.li>
           )
         })}
+        </AnimatePresence>
       </ul>
     </section>
   )

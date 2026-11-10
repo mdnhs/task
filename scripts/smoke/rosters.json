@@ -353,8 +353,8 @@
   "expect": [
    "My roster",
    "Docklands Plaza",
-   "Not available",
-   "Request leave"
+   "Time off",
+   "To confirm"
   ],
   "notExpect": [
    "Marcus Bell",
@@ -372,7 +372,7 @@
   },
   "expect": [
    "My roster",
-   "Leave to decide",
+   "Time off",
    "Haddad"
   ],
   "notExpect": [
@@ -386,7 +386,7 @@
   },
   "expect": [
    "My roster",
-   "Leave to decide",
+   "Time off",
    "Marcus Bell",
    "Haddad"
   ],
@@ -411,7 +411,7 @@
   "expect": [
    "My roster",
    "Open shifts you can take",
-   "Claim"
+   "To confirm"
   ],
   "notExpect": [
    "Access restricted"
@@ -424,7 +424,7 @@
   },
   "expect": [
    "My roster",
-   "Swap"
+   "Next shift"
   ],
   "notExpect": [
    "Access restricted"

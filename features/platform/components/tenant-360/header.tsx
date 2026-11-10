@@ -3,13 +3,12 @@
 import { useState } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
-import { motion } from "motion/react"
 
 import { CopyId } from "@/components/copy-id"
 import { Icon } from "@/components/icons"
 import { StatusPill } from "@/components/status-pill"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { layoutTransition } from "@/lib/motion"
+import { StretchIndicator } from "@/components/stretch-indicator"
 import { canRetry } from "../../billing"
 import { TENANT_TABS, tenantPath, type T360Head } from "../../tenant-360"
 import { TENANT_STATUS } from "../../types"
@@ -111,10 +110,10 @@ export function Tenant360Header({ head, ctx, tabs }: { head: T360Head; ctx: T360
 
       {/* Route segs (rule 30): each tab is its own URL; the pill slides between them. */}
       <nav className="seg od-seg pf-360-tabs" aria-label={`${t.name} sections`}>
+        <StretchIndicator active={active} className="seg-ind stretch-ind" />
         {TENANT_TABS.filter((x) => tabs.includes(x.id)).map((x) => (
           <Link key={x.id} href={tenantPath(t.id, x.id)} aria-current={x.id === active ? "page" : undefined} scroll={false}>
-            {x.id === active && <motion.span layoutId="pf-360-tab" className="seg-ind" transition={layoutTransition} />}
-            <span className="seg-lbl">{x.label}</span>
+                        <span className="seg-lbl">{x.label}</span>
           </Link>
         ))}
       </nav>

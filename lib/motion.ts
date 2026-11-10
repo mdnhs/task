@@ -1,3 +1,5 @@
+import { countNumber } from "./count-format"
+
 // JS mirror of the CSS motion tokens in app/opsdesk.css (:root --dur-*, --ease). Seconds, for the `motion` library.
 // Keep both in sync. Rules: .claude/docs/00-design-system/ui-rules.md → Motion.
 export const DUR = { fast: 0.15, base: 0.22, slow: 0.32, count: 0.6 }
@@ -11,6 +13,8 @@ export const listItem = {
   exit: { opacity: 0, transition: { duration: DUR.fast, ease: EASE } },
 }
 export const layoutTransition = { duration: DUR.base, ease: EASE }
+// Stretching indicator (components/stretch-indicator.tsx): the edge facing the travel direction leaves first, the other follows `lag` later.
+export const STRETCH = { lead: 0.2, trail: 0.34, lag: 0.04 }
 
 // ---- Wave A: action feedback, cascades, grow-from-trigger ----
 // Gap between rows in a short top→bottom cascade (e.g. "Mark all read" clearing the unread dots).
@@ -20,8 +24,8 @@ export const ACTION = { done: 0.7 }
 
 // Direction a changed number rolls: "down" when it decreased, "up" otherwise (also for non-numeric values).
 export function numDir(prev: string, next: string): "up" | "down" {
-  const a = parseFloat(prev)
-  const b = parseFloat(next)
+  const a = countNumber(prev) ?? parseFloat(prev)
+  const b = countNumber(next) ?? parseFloat(next)
   return Number.isFinite(a) && Number.isFinite(b) && b < a ? "down" : "up"
 }
 

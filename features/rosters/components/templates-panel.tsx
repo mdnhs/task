@@ -1,5 +1,6 @@
 "use client"
 
+import { ActionButton } from "@/components/action-button"
 import { useState } from "react"
 import { Save } from "lucide-react"
 
@@ -87,7 +88,7 @@ export function ApplyTemplateDialog({ template, locations, firstMonday, taken, o
           </Field>
           <div className="od-form-foot">
             <DialogClose render={<button type="button" className="btn btn-outline" />}>Cancel</DialogClose>
-            <button type="submit" className="btn btn-primary" disabled={!loc || !picked}>Apply</button>
+            <ActionButton type="submit" className="btn btn-primary" disabled={!loc || !picked}>Apply</ActionButton>
           </div>
         </form>
       </DialogContent>

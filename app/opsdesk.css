@@ -77,10 +77,12 @@ a{color:inherit;text-decoration:none}
 .nav{display:flex;flex-direction:column;gap:2px}
 .nav a{position:relative;isolation:isolate;display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:calc(12px * var(--radius-scale,1));color:var(--ink-2);font-weight:500;transition:color .15s}
 .nav a:hover,.nav a.active{color:var(--brand)}
-/* Active background and bar are real elements (<motion.span layoutId="nav-active-bg" / "nav-active">) so they slide between items on route change.
-   The background sits under the item's content (z-index:-1 inside the link's isolated stacking context). */
-.nav-bg{position:absolute;inset:0;z-index:-1;border-radius:inherit;background:var(--card)}
-.nav-ind{position:absolute;left:-18px;top:8px;bottom:8px;width:5px;border-radius:0 calc(6px * var(--radius-scale,1)) calc(6px * var(--radius-scale,1)) 0;background:var(--brand)}
+/* Active background and bar are two <StretchIndicator>s at the top of .sidebar-scroll (they stretch between items, across both nav groups).
+   They come first in the DOM, so every link (position:relative) paints above them. Left edge of the scroll box = the bar's x. */
+.sidebar-scroll{position:relative}
+.nav-bg{border-radius:calc(12px * var(--radius-scale,1));background:var(--card)}
+.nav-ind{left:0;width:5px;border-radius:0 calc(6px * var(--radius-scale,1)) calc(6px * var(--radius-scale,1)) 0;background:var(--brand)}
+.sidebar-scroll:not([data-st]) .nav a.active{background:var(--card)}
 .nav .badge{margin-left:auto;background:var(--brand);color:var(--on-brand);font-size:11px;font-weight:700;padding:2px 8px;border-radius:calc(8px * var(--radius-scale,1))}
 .nav .badge.alert{background:var(--bad)}
 .nav .lock{margin-left:auto;color:var(--ink-3)}
@@ -107,11 +109,15 @@ a{color:inherit;text-decoration:none}
 .search input::placeholder{color:var(--placeholder)}
 ::placeholder{color:var(--placeholder);opacity:1}
 .search .ico{width:18px;height:18px}
-.seg{display:flex;background:var(--card);border-radius:var(--r-pill);padding:4px;gap:2px}
+.seg{position:relative;display:flex;background:var(--card);border-radius:var(--r-pill);padding:4px;gap:2px}
 .seg button{display:inline-flex;align-items:center;height:42px;padding:0 14px;border-radius:var(--r-pill);font-size:13px;font-weight:600;color:var(--ink-2)}
 .seg button{position:relative;transition:color var(--dur) var(--ease)}
 .seg button[aria-pressed="true"]{color:var(--on-brand)}
-/* Active pill is one shared element (<motion.span layoutId="seg-active">) that slides between buttons */
+/* Active pill is one <StretchIndicator> child of the container (components/stretch-indicator.tsx): it stretches towards the new item.
+   Before it has measured (server render) the container has no data-st, so the active item paints itself and the pill stays hidden. */
+.stretch-ind{pointer-events:none}
+:not([data-st])>.stretch-ind{visibility:hidden}
+.seg:not([data-st]) :is(button[aria-pressed="true"],a[aria-current="page"]){background:var(--brand)}
 .seg-ind{position:absolute;inset:0;border-radius:var(--r-pill);background:var(--brand)}
 .seg-lbl{position:relative}
 .top-actions{margin-left:auto;display:flex;align-items:center;gap:12px}
@@ -217,6 +223,14 @@ a{color:inherit;text-decoration:none}
 .progress{height:6px;background:var(--mute-bg);border-radius:calc(6px * var(--radius-scale,1));overflow:hidden;margin-top:6px;width:110px}
 .progress i{display:block;height:100%;background:var(--warn);border-radius:calc(6px * var(--radius-scale,1));transform-origin:left;animation:od-fill .8s var(--ease) .2s both}
 @keyframes od-fill{from{transform:scaleX(0)}}
+/* Bars that rise (SVG chart bars): from the base, one after another by --i (set per bar). */
+@keyframes rc-rise{from{transform:scaleY(0)}}
+.rc-rise{transform-box:fill-box;transform-origin:50% 100%;animation:rc-rise var(--dur-slow) var(--ease) backwards;animation-delay:calc(80ms + 40ms * min(var(--i,0), 12))}
+/* A list of fill bars (plan mix, usage) fills row by row: the bar inside the Nth list item waits N steps. */
+:is(ul,ol)>li:nth-child(2) .progress i{animation-delay:.28s}
+:is(ul,ol)>li:nth-child(3) .progress i{animation-delay:.36s}
+:is(ul,ol)>li:nth-child(4) .progress i{animation-delay:.44s}
+:is(ul,ol)>li:nth-child(n+5) .progress i{animation-delay:.52s}
 /* Scroll reveal (components/reveal-observer.tsx): a bar that starts off screen waits at 0 and fills when it
    scrolls into view. Removing the hold re-applies the animation, so it runs from the start at that moment. */
 @media (prefers-reduced-motion:no-preference){
@@ -298,7 +312,6 @@ td.due{white-space:nowrap}
   .app.collapsed .logo{padding:0;justify-content:center}
   .app.collapsed .lbl,.app.collapsed .nav-label,.app.collapsed .nav .badge,.app.collapsed .nav .lock,.app.collapsed .app-card{display:none}
   .app.collapsed .nav a{justify-content:center;padding:11px 0}
-  .app.collapsed .nav-ind{left:-10px}
   /* Icon-only rail: no active background; the side bar and brand-coloured icon mark the active item. */
   .app.collapsed .nav-bg{display:none}
 }
@@ -619,6 +632,24 @@ body{padding:0;background:#fff}
 .canvas>:nth-child(3){animation-delay:80ms}
 .canvas>:nth-child(4){animation-delay:120ms}
 .canvas>:nth-child(n+5){animation-delay:160ms}
+/* Cascade utility (reel pass, phase 2): the direct children of `.od-cascade` fade up one after another, 40ms apart (capped at 8 steps),
+   after the page enter has started. Use it on a row of cards, a tile strip, a stack of sections: any short, same-level group.
+   Nothing inside a slide panel (.od-slide), dialog or sheet cascades, because those already move as one. */
+:is(.od-cascade,.stats,.grid-2,.kb-cols,.rec-board,.ros-board,.pf-ov-grid)>*{animation:od-enter var(--dur-slow) var(--ease) backwards;animation-delay:calc(60ms + 40ms * min(var(--i,0), 8))}
+:is(.od-cascade,.stats,.grid-2,.kb-cols,.rec-board,.ros-board,.pf-ov-grid)>:nth-child(1){--i:0}
+:is(.od-cascade,.stats,.grid-2,.kb-cols,.rec-board,.ros-board,.pf-ov-grid)>:nth-child(2){--i:1}
+:is(.od-cascade,.stats,.grid-2,.kb-cols,.rec-board,.ros-board,.pf-ov-grid)>:nth-child(3){--i:2}
+:is(.od-cascade,.stats,.grid-2,.kb-cols,.rec-board,.ros-board,.pf-ov-grid)>:nth-child(4){--i:3}
+:is(.od-cascade,.stats,.grid-2,.kb-cols,.rec-board,.ros-board,.pf-ov-grid)>:nth-child(5){--i:4}
+:is(.od-cascade,.stats,.grid-2,.kb-cols,.rec-board,.ros-board,.pf-ov-grid)>:nth-child(6){--i:5}
+:is(.od-cascade,.stats,.grid-2,.kb-cols,.rec-board,.ros-board,.pf-ov-grid)>:nth-child(7){--i:6}
+:is(.od-cascade,.stats,.grid-2,.kb-cols,.rec-board,.ros-board,.pf-ov-grid)>:nth-child(n+8){--i:7}
+/* Phase 3: the card groups cascade without being opted in: stat strips, two-column page rows, Kanban and recruitment columns, the roster day board, the platform overview.
+   `backwards` (not `both`) so nothing is held after the cascade: a card dragged later keeps its own inline transform. Cards inside a Kanban column do not cascade, because a dropped card remounts in its new column and would flash. */
+/* Form sections: each section of a page form fades up in order (a two-column form runs both columns side by side). */
+.canvas .fs-sec{animation:od-enter var(--dur-slow) var(--ease) both;animation-delay:calc(80ms + 50ms * var(--i,0))}
+.canvas .fs-sec:nth-of-type(2){--i:1}.canvas .fs-sec:nth-of-type(3){--i:2}.canvas .fs-sec:nth-of-type(4){--i:3}.canvas .fs-sec:nth-of-type(n+5){--i:4}
+.od-slide .fs-sec,[data-slot="dialog-content"] .fs-sec,.od-sheet .fs-sec{animation:none}
 /* Popups: OpsDesk timing instead of shadcn's 100ms */
 .od-menu,.ai-panel,[data-slot="dialog-content"]{animation-duration:var(--dur);transition-duration:var(--dur-slow);transition-timing-function:var(--ease)}
 /* Menus, selects, popovers, tooltips (base-ui): open out of their trigger. base-ui sets --transform-origin to the anchor

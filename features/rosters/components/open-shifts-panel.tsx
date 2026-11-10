@@ -1,5 +1,7 @@
 "use client"
 
+import { AnimatePresence, motion } from "motion/react"
+import { listItem } from "@/lib/motion"
 import Link from "next/link"
 import { ArrowRightLeft, Check, HandHelping, X } from "lucide-react"
 
@@ -32,10 +34,11 @@ export function OpenShiftsPanel({ gapsLink, open, claims, swaps, shiftOf, nameOf
         {gapsLink && <Link href="/staff-rosters" className="ros-req-btn ros-os-gap">Roster gaps</Link>}
       </div>
       <ul className="ros-req-list">
+        <AnimatePresence initial={false}>
         {open.map((s) => {
           const mine = claims.filter((c) => c.shiftId === s.id && c.status === "open")
           return (
-            <li key={s.id} className="ros-os" data-id={s.id}>
+            <motion.li key={s.id} className="ros-os" data-id={s.id} {...listItem}>
               <div className="ros-req-main">
                 <span className="ros-who"><HandHelping aria-hidden="true" className="ros-os-i" />{when(s)} · {s.role}</span>
                 <span className="ros-role">{placeOf(s.locationId)}{mine.length === 0 ? " · nobody has offered yet" : ""}</span>
@@ -53,14 +56,14 @@ export function OpenShiftsPanel({ gapsLink, open, claims, swaps, shiftOf, nameOf
                   )}
                 </div>
               ))}
-            </li>
+            </motion.li>
           )
         })}
         {waiting.map((r) => {
           const s = shiftOf(r.shiftId)!
           const t = r.toShiftId ? shiftOf(r.toShiftId) : undefined
           return (
-            <li key={r.id} className="ros-os" data-id={r.id}>
+            <motion.li key={r.id} className="ros-os" data-id={r.id} {...listItem}>
               <div className="ros-req-main">
                 <span className="ros-who"><ArrowRightLeft aria-hidden="true" className="ros-os-i" />{nameOf(r.fromPersonId)} to {nameOf(r.toPersonId)}</span>
                 <span className="ros-time num">{when(s)}{t ? ` for ${when(t)}` : ""}</span>
@@ -74,9 +77,10 @@ export function OpenShiftsPanel({ gapsLink, open, claims, swaps, shiftOf, nameOf
               ) : (
                 <span className="ros-role">A higher-level user approves</span>
               )}
-            </li>
+            </motion.li>
           )
         })}
+        </AnimatePresence>
       </ul>
     </section>
   )

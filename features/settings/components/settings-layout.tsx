@@ -3,12 +3,11 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { motion } from "motion/react"
 
 import { Icon } from "@/components/icons"
 import { useSlideDir } from "@/components/data-pagination"
 import { PageHead } from "@/components/page-head"
-import { layoutTransition } from "@/lib/motion"
+import { StretchIndicator } from "@/components/stretch-indicator"
 import { SETTINGS_TABS, isTab } from "../types"
 import type { SettingsTabId } from "../types"
 
@@ -45,6 +44,7 @@ export function SettingsLayout({
       <PageHead title="Settings" subtitle={readOnly ? "Workspace settings. You have read-only access." : "Workspace settings: organisation, people, notifications, billing and privacy"} />
       <div className="set-layout">
         <nav className="set-tabs" aria-label="Settings sections">
+          <StretchIndicator active={tab} axis="auto" className="set-tab-bg stretch-ind" />
           {SETTINGS_TABS.map((t) => (
             <Link
               key={t.id}
@@ -60,8 +60,7 @@ export function SettingsLayout({
                 window.history.pushState(null, "", `/settings/${t.id}`)
               }}
             >
-              {t.id === tab && <motion.span layoutId="set-tab-bg" className="set-tab-bg" transition={layoutTransition} />}
-              <Icon name={t.icon} />
+                            <Icon name={t.icon} />
               <span>{t.label}</span>
             </Link>
           ))}

@@ -192,3 +192,75 @@
 .ros-os-gap{margin-left:auto;text-decoration:none}
 .ros-os-gap:hover{color:var(--brand-deep)}
 .mr-note{font-size:12px;line-height:16px;color:var(--ink-3)}
+
+/* My calendar (FR-RS-40): month grid of the person's shifts and leave */
+.mc-nav{display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+.mc-btn{height:36px;min-width:36px;padding:0 12px;display:inline-grid;place-items:center;border:0;border-radius:var(--r-pill);background:var(--mute-bg);color:var(--ink-2);font:inherit;font-size:13px;font-weight:700;cursor:pointer;transition:color var(--dur-fast) var(--ease)}
+.mc-btn svg{width:16px;height:16px}
+.mc-btn:hover{color:var(--brand-deep)}
+.mc-btn:focus-visible,.mc-day:focus-visible,.mc-chip:focus-visible,.mc-more:focus-visible{outline:2px solid var(--brand);outline-offset:1px}
+.mc-title{margin:0 0 0 6px;font-size:18px;font-weight:700;line-height:26px}
+.mc-count{margin-left:auto;font-size:13px;line-height:18px;color:var(--ink-3)}
+.mc-grid{display:flex;flex-direction:column;gap:6px}
+.mc-row{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px}
+.mc-dow div{padding:0 8px;font-size:11.5px;font-weight:700;letter-spacing:.02em;line-height:16px;color:var(--ink-3)}
+.mc-dow div:nth-child(n+6){color:var(--ink-2)}
+/* Days off stay quiet; days with a shift or leave carry a tint so the month reads at a glance. */
+.mc-cell{--mc-pad:8px;--mc-in:6px;position:relative;min-width:0;min-height:88px;padding:var(--mc-pad);display:flex;flex-direction:column;align-items:stretch;gap:var(--mc-pad);border-radius:var(--r-lg);background:color-mix(in srgb,var(--mute-bg) 55%,transparent)}
+.mc-cell:nth-child(n+6){background:color-mix(in srgb,var(--mute-bg) 80%,transparent)}
+.mc-cell[data-out]{opacity:.45}
+.mc-cell:has(.mc-chip),.mc-cell[data-leave]{cursor:pointer}
+.mc-cell:has(.mc-chip){background:var(--brand-soft)}
+.mc-cell[data-leave]{background:var(--info-bg)}
+.mc-cell[data-picked]{outline:2px solid var(--brand);outline-offset:-2px}
+.mc-day{align-self:flex-start;min-width:24px;height:24px;padding:0 var(--mc-in);margin:-2px 0 -4px;border:0;border-radius:var(--r-pill);background:none;font:inherit;font-size:12.5px;font-weight:700;line-height:24px;color:var(--ink-2);cursor:pointer;transition:color var(--dur-fast) var(--ease)}
+.mc-day:hover{color:var(--brand-deep)}
+.mc-cell[data-today] .mc-day{background:var(--brand);color:var(--on-brand);text-align:center}
+.mc-chip{display:flex;flex-direction:column;align-items:flex-start;flex:1 1 auto;justify-content:center;width:100%;min-width:0;padding:var(--mc-in);border:0;border-radius:var(--r-md);background:var(--card);font:inherit;text-align:left;cursor:pointer;transition:color var(--dur-fast) var(--ease)}
+.mc-chip b{max-width:100%;font-size:12px;line-height:16px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:color var(--dur-fast) var(--ease)}
+.mc-chip i{font-style:normal;color:var(--ink-3)}
+.mc-chip small{max-width:100%;font-size:11px;line-height:15px;color:var(--ink-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mc-chip:hover b{color:var(--brand-deep)}
+.mc-more{align-self:flex-start;padding:0 var(--mc-in);border:0;background:none;font:inherit;font-size:11.5px;font-weight:700;color:var(--ink-2);cursor:pointer;transition:color var(--dur-fast) var(--ease)}
+.mc-more:hover{color:var(--brand-deep)}
+.mc-leave{padding:0 var(--mc-in);font-size:11.5px;font-weight:700;line-height:18px;color:var(--info)}
+.mc-dots{display:none}
+.mc-legend{list-style:none;margin:12px 0 0;padding:0;display:flex;gap:16px;flex-wrap:wrap;font-size:12px;line-height:16px;color:var(--ink-3)}
+.mc-legend li{display:inline-flex;align-items:center;gap:6px}
+.mc-legend i{width:12px;height:12px;border-radius:var(--r-pill);background:var(--mute-bg)}
+.mc-legend i[data-k="shift"]{background:var(--brand-soft)}
+.mc-legend i[data-k="leave"]{background:var(--info-bg)}
+.mc-legend i[data-k="today"]{background:var(--brand)}
+.mc-detail{margin-top:14px;display:flex;flex-direction:column;gap:10px}
+.mc-detail-day{font-size:15px;line-height:22px}
+.mc-detail-leave{margin:0;font-size:13px;line-height:18px;color:var(--info)}
+/* The day dialog: wider than the default, and each shift row stacks (the title already says the date). */
+.od-dialog.mc-dlg{width:min(520px,calc(calc(100vw / var(--text-scale,1)) - 24px))}
+.mc-dlg .mr-shift{grid-template-columns:minmax(0,1fr) auto}
+.mc-dlg .mr-when b{display:none}
+.mc-dlg .mr-when span{font-size:14px;line-height:20px;color:var(--ink)}
+.mc-dlg .mr-where{grid-column:1}
+.mc-dlg .mr-act{grid-column:2;grid-row:1 / span 2;flex-wrap:wrap}
+@media (max-width:640px){
+  .mc-row{gap:4px}
+  .mc-cell{--mc-pad:4px;min-height:56px;align-items:center;gap:2px}
+  .mc-day{align-self:center}
+  .mc-chip,.mc-more,.mc-leave{display:none}
+  .mc-dots{display:grid;place-items:center;min-width:20px;height:20px;padding:0 6px;border-radius:var(--r-pill);background:var(--brand);color:var(--on-brand);font-size:11px;font-weight:700;line-height:20px}
+  .mc-dots[data-leave]{background:var(--info)}
+  .mc-count{margin-left:0;width:100%}
+}
+
+/* My roster: summary tiles and section tabs */
+.mr-sum{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:14px}
+.mr-tile{display:flex;flex-direction:column;align-items:flex-start;gap:3px;min-width:0;padding:14px 16px;border-radius:var(--r-lg);background:var(--card)}
+.mr-tile b{font-size:18px;line-height:26px}
+.mr-tile-k{font-size:12px;font-weight:700;line-height:16px;color:var(--ink-3)}
+.mr-tile .mr-btn{margin-top:6px}
+.mr-tabs{margin-bottom:14px}
+.mr-tabs .seg.od-seg{background:var(--card);width:fit-content}
+@media (max-width:760px){.mr-sum{grid-template-columns:minmax(0,1fr)}}
+
+/* A card that arrives after first paint (added or moved here) fades in once; reduced motion drops it. */
+.ros-shift[data-new]{animation:od-enter var(--dur) var(--ease) both}
+@media (prefers-reduced-motion:reduce){.ros-shift[data-new]{animation:none}}

@@ -1,5 +1,6 @@
 "use client"
 
+import { ActionButton } from "@/components/action-button"
 import { useState } from "react"
 import { CalendarClock, Trash2, Users } from "lucide-react"
 
@@ -140,7 +141,7 @@ export function ShiftDialog({ shift, date, templates, members, dates, onSave, on
               </button>
             )}
             <DialogClose render={<button type="button" className="btn btn-outline" />}>Cancel</DialogClose>
-            <button type="submit" className="btn btn-primary">{shift ? "Save changes" : "Add shift"}</button>
+            <ActionButton type="submit" className="btn btn-primary">{shift ? "Save changes" : "Add shift"}</ActionButton>
           </div>
         </form>
       </DialogContent>

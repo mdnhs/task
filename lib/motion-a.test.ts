@@ -32,3 +32,13 @@ describe("growInset", () => {
     expect(r).toEqual({ top: 0, right: 0, bottom: 0, left: 0, radius: 200 })
   })
 })
+
+describe("numDir with formatted values", () => {
+  it("reads the number inside currency and grouping", async () => {
+    const { numDir } = await import("./motion")
+    expect(numDir("€12,400", "€9,800")).toBe("down")
+    expect(numDir("€9,800", "€12,400")).toBe("up")
+    expect(numDir("94%", "88%")).toBe("down")
+    expect(numDir("—", "5")).toBe("up")
+  })
+})

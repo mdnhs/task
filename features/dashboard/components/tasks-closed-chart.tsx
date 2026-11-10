@@ -31,7 +31,8 @@ function PillBar({ x = 0, y = 0, width = 0, height = 0, fill, index = 0 }: Shape
   const top = y + height - h
   return (
     <g style={{ cursor: "pointer" }}>
-      <rect data-bar={index} x={left} y={top} width={w} height={h} rx={Math.min(w, h) / 2} fill={fill} />
+      {/* Entrance: each bar rises from its base, left to right (CSS, `rc-rise`); later data changes are eased by Recharts. */}
+      <rect data-bar={index} className="rc-rise" style={{ "--i": index } as React.CSSProperties} x={left} y={top} width={w} height={h} rx={Math.min(w, h) / 2} fill={fill} />
     </g>
   )
 }
@@ -148,7 +149,9 @@ export function TasksClosedChart({ data }: { data: TasksClosedData }) {
               dataKey="n"
               shape={(p: ShapeProps) => <PillBar {...p} />}
               isAnimationActive={!reduce}
-              animationDuration={ready ? UPDATE_MS : ENTER_MS}
+              // Entrance: Recharts snaps to the final heights (1ms) and the CSS rise animates each bar; after that it eases data changes.
+              // The prop stays on throughout: toggling it would remount the bars and replay the rise.
+              animationDuration={ready ? UPDATE_MS : 1}
               animationEasing="ease-out"
               onMouseEnter={(_, i) => setActive(i)}
               onMouseLeave={() => setActive(last)}

@@ -1,12 +1,10 @@
 "use client"
 
-import { useId } from "react"
-import { motion } from "motion/react"
 
 import { useField } from "@/components/field"
 import { Icon } from "@/components/icons"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { layoutTransition } from "@/lib/motion"
+import { StretchIndicator } from "@/components/stretch-indicator"
 
 type Option<V extends string> = { value: V; label: string }
 
@@ -69,12 +67,11 @@ export function FilterSeg<V extends string>({
   options: { value: V; label: React.ReactNode }[]
   onChange(v: V): void
 }) {
-  const id = useId()
   return (
     <div className="seg od-seg" role="group" aria-label={label}>
+      <StretchIndicator active={value} className="seg-ind stretch-ind" />
       {options.map((o) => (
         <button key={o.value} type="button" aria-pressed={value === o.value} onClick={() => onChange(o.value)}>
-          {value === o.value && <motion.span layoutId={`seg-${id}`} className="seg-ind" transition={layoutTransition} />}
           <span className="seg-lbl">{o.label}</span>
         </button>
       ))}

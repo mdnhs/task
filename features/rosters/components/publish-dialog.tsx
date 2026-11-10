@@ -1,5 +1,6 @@
 "use client"
 
+import { ActionButton } from "@/components/action-button"
 import { useState } from "react"
 import { AlertTriangle, TriangleAlert } from "lucide-react"
 
@@ -85,7 +86,7 @@ export function PublishDialog({ title, violations, nameOf, canOverride, checking
           )}
           <div className="od-form-foot">
             <DialogClose render={<button type="button" className="btn btn-outline" />}>Cancel</DialogClose>
-            <button type="submit" className="btn btn-primary" disabled={stopped || checking}>{blocks.length ? "Publish anyway" : "Publish"}</button>
+            <ActionButton type="submit" className="btn btn-primary" disabled={stopped || checking}>{blocks.length ? "Publish anyway" : "Publish"}</ActionButton>
           </div>
         </form>
       </DialogContent>

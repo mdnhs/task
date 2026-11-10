@@ -1,5 +1,6 @@
 "use client"
 
+import { ActionButton } from "@/components/action-button"
 import { useState } from "react"
 import { Plane } from "lucide-react"
 import { toast } from "sonner"
@@ -51,7 +52,7 @@ export function LeaveForm({ me, today, scopeKey, data, queue }: { me: string; to
             ))}
           </div>
         </div>
-        <button type="submit" className="btn btn-primary mr-add">Request leave</button>
+        <ActionButton type="submit" className="btn btn-primary mr-add">Request leave</ActionButton>
       </form>
     </FormSection>
   )

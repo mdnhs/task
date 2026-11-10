@@ -75,7 +75,7 @@ export function TasksSkeleton({ canCreate = true, staff = false, rows = 8, proje
                     {labels[i]?.due ? <span className="sk-ghost"><When iso={labels[i].due!} today={today} tzLabel={tzLabel} />{labels[i].late ? " · late" : ""}</span> : <Sk w={90} h={12} lh={18.8} />}
                   </td>
                   <td data-label="Status">
-                    {/* Real pill + evidence tag markup with the real labels as ghost text: they flow on one line exactly like the loaded cell. */}
+                    {/* Real pill + evidence tag markup with the real labels as ghost text: the tag sits under the pill exactly like the loaded cell. */}
                     {labels[i] ? <><span className="st sk-ghost">{labels[i].status}</span>{labels[i].ev && <div className="ev-tag sk-ghost">{labels[i].ev}</div>}</> : <Sk w={84} h={29.4} r={8} />}
                   </td>
                 </tr>

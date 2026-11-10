@@ -1,5 +1,6 @@
 "use client"
 
+import { ActionButton } from "@/components/action-button"
 import { useState } from "react"
 
 import { Field } from "@/components/field"
@@ -35,7 +36,7 @@ export function ReasonDialog({ title, description, confirmLabel, onConfirm, onCl
           </Field>
           <div className="od-form-foot">
             <DialogClose render={<button type="button" className="btn btn-outline" />}>Cancel</DialogClose>
-            <button type="submit" className="btn btn-primary">{confirmLabel}</button>
+            <ActionButton type="submit" className="btn btn-primary">{confirmLabel}</ActionButton>
           </div>
         </form>
       </DialogContent>

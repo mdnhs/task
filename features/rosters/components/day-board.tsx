@@ -3,7 +3,9 @@
 import { useState } from "react"
 import { Plus } from "lucide-react"
 
+import { RollNumber } from "@/components/roll-number"
 import { formatDate } from "@/lib/dates"
+import { numDir } from "@/lib/motion"
 import type { RosterViewKind, ViewBlock, ViewDay, ViewShift } from "../view"
 
 // By location (FR-RS-10): one card per day, laid out as the seven-day columns (a single column at 640px and under). A card shows the
@@ -47,10 +49,17 @@ function Lines({ s, place }: { s: ViewShift; place?: boolean }) {
   )
 }
 
-export function ShiftLine({ s, place, onEdit, onRequest, onDragStart }: { s: ViewShift; place?: boolean; onEdit?(): void; onRequest?(): void; onDragStart?(): void }) {
+/** The day's count: a change after mount rolls per digit (down when it fell), never on first paint (ui-rules.md rule 26). */
+function RollCount({ value }: { value: number }) {
+  const [seen, setSeen] = useState({ value, dir: "up" as "up" | "down" })
+  if (seen.value !== value) setSeen({ value, dir: numDir(String(seen.value), String(value)) })
+  return <RollNumber value={String(value)} dir={seen.dir} />
+}
+
+export function ShiftLine({ s, place, fresh, onEdit, onRequest, onDragStart }: { s: ViewShift; place?: boolean; fresh?: boolean; onEdit?(): void; onRequest?(): void; onDragStart?(): void }) {
   if (!onEdit && onRequest) {
     return (
-      <li className="ros-shift" data-open={s.open || undefined}>
+      <li className="ros-shift" data-open={s.open || undefined} data-new={fresh || undefined}>
         <Lines s={s} place={place} />
         <button type="button" className="ros-req-btn" onClick={onRequest} aria-label={`Request change, ${s.person}, ${s.start} to ${s.end}`}>Request change</button>
       </li>
@@ -58,7 +67,7 @@ export function ShiftLine({ s, place, onEdit, onRequest, onDragStart }: { s: Vie
   }
   if (!onEdit) {
     return (
-      <li className="ros-shift" data-open={s.open || undefined}>
+      <li className="ros-shift" data-open={s.open || undefined} data-new={fresh || undefined}>
         <Lines s={s} place={place} />
       </li>
     )
@@ -67,7 +76,7 @@ export function ShiftLine({ s, place, onEdit, onRequest, onDragStart }: { s: Vie
   return (
     <li
       className="ros-shift"
-      data-open={s.open || undefined}
+      data-open={s.open || undefined} data-new={fresh || undefined}
       draggable
       onDragStartCapture={(e: React.DragEvent) => {
         e.dataTransfer.setData("text/plain", s.id)
@@ -87,6 +96,14 @@ function Day({ day, today, locationId, editor, dragId, setDragId }: { day: ViewD
   const canEdit = !!editor && day.hasRoster && editor.editable(locationId, day.date)
   const canAsk = !canEdit && !!editor && day.hasRoster && editor.canRequest(locationId, day.date)
   const [over, setOver] = useState(false)
+  // Cards that arrive after the first paint (added, or moved here from another day) fade in once; the first paint is covered by the page enter.
+  const key = day.shifts.map((x) => x.id).join("|")
+  const [known, setKnown] = useState({ key, ids: new Set(day.shifts.map((x) => x.id)), fresh: new Set<string>() })
+  if (known.key !== key) {
+    const ids = new Set(day.shifts.map((x) => x.id))
+    setKnown({ key, ids, fresh: new Set([...ids].filter((id) => !known.ids.has(id))) })
+  }
+  const fresh = known.fresh
   const dragged = dragId && editor ? editor.shiftInfo(dragId) : undefined
   const droppable = canEdit && !!dragged && dragged.locationId === locationId && dragged.date !== day.date
   return (
@@ -114,7 +131,7 @@ function Day({ day, today, locationId, editor, dragId, setDragId }: { day: ViewD
         <span className="ros-day-name">{formatDate(day.date)}</span>
         {day.hasRoster && (
           <span className="ros-count num">
-            {day.count}
+            <RollCount value={day.count} />
             {day.target > 0 && <span className="ros-target">/{day.target}</span>}
             {day.short > 0 && <b className="ros-gap" data-kind="short"> −{day.short}<span className="sr-only"> short</span></b>}
             {day.over > 0 && <b className="ros-gap" data-kind="over"> +{day.over}<span className="sr-only"> over</span></b>}
@@ -129,7 +146,7 @@ function Day({ day, today, locationId, editor, dragId, setDragId }: { day: ViewD
       {day.shifts.length > 0 ? (
         <ul className="ros-shifts" onDragEnd={() => { setDragId(null); setOver(false) }}>
           {day.shifts.map((s) => (
-            <ShiftLine key={s.id} s={s} onEdit={canEdit ? () => editor?.onEdit(s.id) : undefined} onRequest={canAsk ? () => editor?.onRequest(s.id) : undefined} onDragStart={() => setDragId(s.id)} />
+            <ShiftLine key={s.id} s={s} fresh={fresh.has(s.id)} onEdit={canEdit ? () => editor?.onEdit(s.id) : undefined} onRequest={canAsk ? () => editor?.onRequest(s.id) : undefined} onDragStart={() => setDragId(s.id)} />
           ))}
         </ul>
       ) : (

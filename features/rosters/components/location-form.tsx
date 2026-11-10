@@ -1,5 +1,6 @@
 "use client"
 
+import { ActionButton } from "@/components/action-button"
 import { useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
@@ -239,9 +240,9 @@ function LocationFormBody({ data, location, scopeKey, me, today }: { data: Locat
       </div>
       <div className="od-form-foot">
         <Link href="/rosters/locations" className="btn btn-outline">Cancel</Link>
-        <button type="submit" className="btn btn-primary" disabled={done}>
+        <ActionButton type="submit" className="btn btn-primary" disabled={done}>
           {location ? "Save location" : "Add location"}
-        </button>
+        </ActionButton>
       </div>
     </form>
   )

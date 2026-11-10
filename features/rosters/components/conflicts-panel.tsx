@@ -1,5 +1,7 @@
 "use client"
 
+import { AnimatePresence, motion } from "motion/react"
+import { listItem } from "@/lib/motion"
 import { Info, TriangleAlert, X } from "lucide-react"
 
 import { formatDate } from "@/lib/dates"
@@ -25,18 +27,20 @@ export function ConflictsPanel({ conflicts, shiftOf, nameOf, onOpen, onDismiss }
         <button type="button" className="ros-nav-btn ros-panel-x" aria-label="Dismiss conflicts" onClick={onDismiss}><X aria-hidden="true" /></button>
       </div>
       <ul className="ros-viol">
+        <AnimatePresence initial={false}>
         {conflicts.map((c) => {
           const s = shiftOf(c.shiftId)
           return (
-            <li key={`${c.shiftId}-${c.reason}`} className="ros-viol-row" data-kind={c.open ? "block" : "warn"}>
+            <motion.li key={`${c.shiftId}-${c.reason}`} className="ros-viol-row" data-kind={c.open ? "block" : "warn"} {...listItem}>
               {c.open ? <TriangleAlert aria-hidden="true" /> : <Info aria-hidden="true" />}
               <span>
                 <b>{nameOf(c.personId)}</b> {c.message}
                 {s && <> · <button type="button" className="ros-req-btn ros-conf-link num" onClick={() => onOpen(c.shiftId)}>{formatDate(s.date)} {s.start}–{s.end}{c.open ? ", open shift" : ""}</button></>}
               </span>
-            </li>
+            </motion.li>
           )
         })}
+        </AnimatePresence>
       </ul>
     </section>
   )

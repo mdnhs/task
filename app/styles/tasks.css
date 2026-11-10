@@ -155,7 +155,7 @@
 .ev-earlier summary{cursor:pointer;font-size:13px;font-weight:600;color:var(--ink-2);line-height:20px;transition:color var(--dur-fast) var(--ease)}
 .ev-earlier summary:hover{color:var(--ink)}
 .ev-step-list{margin-top:0}
-.ev-tag{display:inline-block;margin-top:4px;font-size:11.5px;font-weight:700;line-height:16px;color:var(--ink-3)}
+.ev-tag{display:block;width:fit-content;margin-top:4px;font-size:11.5px;font-weight:700;line-height:16px;color:var(--ink-3)}
 .ev-tag.ok{color:var(--ok)}.ev-tag.bad{color:var(--bad)}.ev-tag.warn{color:var(--warn)}.ev-tag.info{color:var(--info)}
 .sig-pad{width:100%;aspect-ratio:8/3;border-radius:var(--r-md);background:var(--mute-bg);color:var(--ink);touch-action:none;cursor:crosshair}
 

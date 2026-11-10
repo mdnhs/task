@@ -1,5 +1,6 @@
 "use client"
 
+import { ActionButton } from "@/components/action-button"
 import { useState } from "react"
 
 import { Field } from "@/components/field"
@@ -63,7 +64,7 @@ export function ChangeRequestDialog({ shift, template, members, onSend, onClose 
           </Field>
           <div className="od-form-foot">
             <DialogClose render={<button type="button" className="btn btn-outline" />}>Cancel</DialogClose>
-            <button type="submit" className="btn btn-primary">Send request</button>
+            <ActionButton type="submit" className="btn btn-primary">Send request</ActionButton>
           </div>
         </form>
       </DialogContent>
