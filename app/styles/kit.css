@@ -3,12 +3,26 @@
 
 /* ---------- Filter bar ---------- */
 .od-filters{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-.od-filter-search{flex:1 1 220px;max-width:320px;display:flex;align-items:center;gap:10px;background:var(--mute-bg);border-radius:var(--r-pill);padding:10px 14px;color:var(--ink-3);transition:box-shadow var(--dur-fast) var(--ease)}
-.od-filter-search:focus-within{box-shadow:0 0 0 2px var(--brand)}
-.od-filter-search input{flex:1;min-width:0;background:transparent;border:0;outline:none;font:inherit;font-size:13.5px;color:var(--ink)}
-.od-filter-search input::placeholder{color:var(--placeholder)}
-.od-filter-search .ico{width:18px;height:18px}
-.od-filters [data-slot="select-trigger"].od-filter-select{height:auto;min-width:140px;padding:10px 14px;border:0;border-radius:var(--r-pill);background:var(--mute-bg);color:var(--ink);font-size:13.5px;font-weight:600;box-shadow:none}
+/* Every filter-bar control is var(--ctl-h) (48px) tall, same as .od-field controls: search, select, seg, date, week nav. */
+/* FilterSearch (components/filter-bar.tsx): closed = a 48px brand circle; open = a grey bar (220 to 320px) that flips in on rotateX,
+   with the circle at its right end turned over to an X. */
+.od-filter-search{position:relative;flex:none;width:var(--ctl-h);height:var(--ctl-h);perspective:700px}
+.od-filter-search[data-open]{flex:1 1 220px;width:auto;max-width:320px}
+.ofs-bar{position:absolute;inset:0;display:flex;align-items:center;padding:0 calc(var(--ctl-h) + 8px) 0 20px;background:var(--mute-bg);border-radius:var(--r-pill);cursor:text;backface-visibility:hidden;transition:box-shadow var(--dur-fast) var(--ease)}
+.ofs-bar:focus-within{box-shadow:0 0 0 2px var(--brand)}
+.ofs-bar input{flex:1;min-width:0;background:transparent;border:0;outline:none;font:inherit;font-size:13.5px;color:var(--ink)}
+.ofs-bar input::placeholder{color:var(--placeholder)}
+/* The round X clears the query, so drop the browser's own clear button. */
+.ofs-bar input::-webkit-search-cancel-button,.ofs-bar input::-webkit-search-decoration{-webkit-appearance:none;appearance:none;display:none}
+.ofs-btn{position:absolute;top:0;left:0;width:var(--ctl-h);height:var(--ctl-h);border-radius:50%;background:transparent;color:var(--on-brand);cursor:pointer;perspective:300px}
+.od-filter-search:not([data-shut]) .ofs-btn{left:auto;right:0}
+.ofs-btn:hover .ofs-face{background:var(--brand-deep)}
+.ofs-btn:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+.ofs-flip{position:absolute;inset:0;transform-style:preserve-3d}
+.ofs-face{position:absolute;inset:0;display:grid;place-items:center;border-radius:50%;background:var(--brand);backface-visibility:hidden;transition:background var(--dur-fast) var(--ease)}
+.ofs-face-back{transform:rotateY(180deg)}
+.ofs-face .ico,.ofs-face svg{width:18px;height:18px}
+.od-filters [data-slot="select-trigger"].od-filter-select{height:var(--ctl-h);min-width:140px;padding:0 14px;border:0;border-radius:var(--r-pill);background:var(--mute-bg);color:var(--ink);font-size:13.5px;font-weight:600;box-shadow:none}
 .od-filters [data-slot="select-trigger"].od-filter-select:focus-visible{box-shadow:0 0 0 2px var(--brand);outline:none}
 /* The topbar hides .seg on phones; a filter pill group must stay visible and scroll instead */
 /* In-page tabs: one look everywhere, a grey track inside cards and panels with the green sliding pill (FilterSeg). */
@@ -20,7 +34,7 @@
 .od-filters .seg.od-seg{display:flex;background:var(--mute-bg);max-width:100%;overflow-x:auto;scrollbar-width:none}
 .od-filters .seg.od-seg::-webkit-scrollbar{display:none}
 .od-filters .seg.od-seg button{white-space:nowrap}
-@media (max-width:640px){.od-filter-search{max-width:none;flex-basis:100%}}
+@media (max-width:640px){.od-filter-search[data-open]{max-width:none;flex-basis:100%}}
 
 /* ---------- Select popup (shared by every shadcn Select given .od-menu) ---------- */
 .od-menu[data-slot="select-content"]{animation-duration:var(--dur);animation-fill-mode:both}
@@ -37,7 +51,7 @@
 .od-dialog [data-slot="alert-dialog-description"]{margin:6px 0 0;font-size:14px;line-height:1.5;color:var(--ink-2)}
 .od-dialog [data-slot="alert-dialog-header"]{display:block;text-align:left}
 .od-dialog [data-slot="alert-dialog-footer"]{display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap;margin:0;padding:0;background:transparent;border:0}
-.od-dialog .btn{justify-content:center;padding:11px 20px;cursor:pointer;border:1.6px solid transparent}
+.od-dialog .btn{justify-content:center;padding:0 20px;cursor:pointer;border:1.6px solid transparent}
 .od-dialog .btn-outline{border-color:var(--brand)}
 .btn-danger{background:var(--bad);color:#fff}
 .btn-danger:hover{filter:brightness(.92)}
@@ -65,7 +79,7 @@
 .od-field{display:flex;flex-direction:column;gap:6px;min-width:0}
 .od-field>label{font-size:12.5px;font-weight:700;color:var(--ink-2)}
 .od-req{color:var(--bad)}
-.od-field :is(input,select,textarea,[data-slot="select-trigger"],[data-slot="input"],[data-slot="textarea"]){width:100%;min-height:44px;background:var(--mute-bg);color:var(--ink);border:0;border-radius:var(--r-md);padding:11px 14px;font:inherit;font-size:14px;box-shadow:none;outline:none;transition:box-shadow var(--dur-fast) var(--ease)}
+.od-field :is(input,select,textarea,[data-slot="select-trigger"],[data-slot="input"],[data-slot="textarea"]){width:100%;min-height:var(--ctl-h);background:var(--mute-bg);color:var(--ink);border:0;border-radius:var(--r-md);padding:11px 14px;font:inherit;font-size:14px;box-shadow:none;outline:none;transition:box-shadow var(--dur-fast) var(--ease)}
 /* Beats the 44px control rule above (.od-field :is(...,[data-slot]) is two classes deep). */
 .od-field textarea[data-slot="textarea"],.od-field textarea{min-height:76px;resize:vertical}
 .od-field :is(input,select,textarea,[data-slot="select-trigger"]):focus-visible{box-shadow:0 0 0 2px var(--brand);outline:none}
@@ -150,13 +164,15 @@
 
 /* ---------- Date picker (Calendar in a Popover) ---------- */
 .od-datepick-wrap{display:flex;gap:8px;min-width:0}
-.od-datepick{flex:1;min-width:0;display:flex;align-items:center;gap:10px;min-height:44px;padding:11px 14px;border:0;border-radius:var(--r-md);background:var(--mute-bg);color:var(--ink);font:inherit;font-size:14px;text-align:left;cursor:pointer;transition:box-shadow var(--dur-fast) var(--ease)}
+.od-datepick{flex:1;min-width:0;display:flex;align-items:center;gap:10px;min-height:var(--ctl-h);padding:11px 14px;border:0;border-radius:var(--r-md);background:var(--mute-bg);color:var(--ink);font:inherit;font-size:14px;text-align:left;cursor:pointer;transition:box-shadow var(--dur-fast) var(--ease)}
 .od-datepick svg{width:18px;height:18px;flex:none;color:var(--ink-3)}
 .od-datepick-ph{color:var(--ink-3)}
 .od-datepick:focus-visible,.od-datepick[data-popup-open]{box-shadow:0 0 0 2px var(--brand);outline:none}
 .od-field[data-invalid] .od-datepick{box-shadow:0 0 0 2px var(--bad)}
 .od-field[data-invalid] .seg.od-seg,.od-field[data-invalid] .er-types{box-shadow:0 0 0 2px var(--bad);border-radius:var(--r-pill)}
 .od-field[data-invalid] .er-types{border-radius:var(--r-md);padding:4px}
+/* In a column .od-field, flex:1 would grow the trigger to a taller neighbour field's height; keep it at --ctl-h. */
+.od-field > .od-datepick{flex:none}
 .od-datepick-wrap .od-timepick{flex:none;width:auto;min-width:132px}
 .od-timepick:disabled{opacity:.5;cursor:not-allowed}
 
@@ -200,7 +216,7 @@
 .od-form-col{display:flex;flex-direction:column;gap:16px;min-width:0}
 @media (max-width:1100px){.od-form-cols{grid-template-columns:minmax(0,1fr)}}
 .od-form-foot{display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap}
-.od-form-foot .btn{justify-content:center;padding:11px 20px;cursor:pointer;border:1.6px solid transparent}
+.od-form-foot .btn{justify-content:center;padding:0 20px;cursor:pointer;border:1.6px solid transparent}
 .od-form-foot .btn-outline{border-color:var(--brand)}
 .od-form-dialog [data-slot="switch"]{align-self:flex-start;width:40px;height:24px;min-height:0;padding:0}
 .od-form-dialog [data-slot="switch-thumb"]{width:18px;height:18px}
@@ -223,13 +239,13 @@
 .od-choice:has([data-disabled]):not([data-checked]){background:var(--mute-bg);color:var(--ink-3)}
 .od-choice:has([data-disabled]):not([data-checked]) [data-slot="radio-group-item"]{opacity:.6}
 
-/* ---------- Pager (components/data-pagination.tsx): borderless 36px circles, active = brand, hover = text colour only ---------- */
+/* ---------- Pager (components/data-pagination.tsx): borderless 48px (--ctl-h) circles, active = brand, hover = text colour only ---------- */
 .od-pager{display:flex;align-items:center;justify-content:space-between;gap:12px 16px;margin-top:16px}
 .od-pager-sum{margin:0;font-size:13px;font-weight:500;color:var(--ink-2)}
 .od-pager .od-pager-nav{width:auto;margin:0;justify-content:flex-end}
 .od-pager [data-slot="pagination-content"]{gap:4px}
-.od-pager [data-slot="pagination-ellipsis"]{width:36px;height:36px;color:var(--ink-3)}
-.od-pager [data-slot="button"]{box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;gap:4px;min-width:36px;height:36px;padding:0;border:0;border-radius:var(--r-pill);background:transparent;box-shadow:none;color:var(--ink-2);font:inherit;font-size:13px;font-weight:600;font-variant-numeric:tabular-nums;cursor:pointer;transition:color var(--dur-fast) var(--ease)}
+.od-pager [data-slot="pagination-ellipsis"]{width:var(--ctl-h);height:var(--ctl-h);color:var(--ink-3)}
+.od-pager [data-slot="button"]{box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;gap:4px;min-width:var(--ctl-h);height:var(--ctl-h);padding:0;border:0;border-radius:var(--r-pill);background:transparent;box-shadow:none;color:var(--ink-2);font:inherit;font-size:13px;font-weight:600;font-variant-numeric:tabular-nums;cursor:pointer;transition:color var(--dur-fast) var(--ease)}
 .od-pager [data-slot="button"] svg{width:16px;height:16px;flex:none}
 .od-pager [data-slot="button"]:not(:disabled,[aria-current]):hover{background:transparent;color:var(--brand-deep)}
 :root[data-theme="dark"] .od-pager [data-slot="button"]:not(:disabled,[aria-current]):hover{color:var(--brand-3)}
@@ -248,12 +264,12 @@
 }
 .od-pager > .sk-line{width:auto}
 .od-pager-sk-list{display:flex;align-items:center;gap:4px;margin:0;padding:0;list-style:none}
-@media (max-width:640px){.od-pager-sk-step{width:36px!important}.od-pager-sk-list{gap:2px}.od-pager > .sk-line{justify-content:center}}
+@media (max-width:640px){.od-pager-sk-step{width:48px!important}.od-pager-sk-list{gap:2px}.od-pager > .sk-line{justify-content:center}}
 
 /* ---------- Colour picker ---------- */
 .cp{display:block;min-width:0}
 .cp-control{display:block}
-.cp-trigger{display:flex;align-items:center;gap:10px;width:100%;min-height:44px;background:var(--mute-bg);color:var(--ink);border:0;border-radius:var(--r-md);padding:8px 14px;font:inherit;font-size:14px;text-align:left;cursor:pointer;outline:none;transition:box-shadow var(--dur-fast) var(--ease)}
+.cp-trigger{display:flex;align-items:center;gap:10px;width:100%;min-height:var(--ctl-h);background:var(--mute-bg);color:var(--ink);border:0;border-radius:var(--r-md);padding:8px 14px;font:inherit;font-size:14px;text-align:left;cursor:pointer;outline:none;transition:box-shadow var(--dur-fast) var(--ease)}
 .cp-trigger:focus-visible,.cp-trigger[data-state="open"]{box-shadow:0 0 0 2px var(--brand)}
 .cp-trigger[data-invalid]{box-shadow:0 0 0 2px var(--bad)}
 .cp-trigger[data-disabled]{cursor:not-allowed}
@@ -377,7 +393,7 @@
 .btn.sk-ghost-btn{color:transparent !important;pointer-events:none;background:color-mix(in srgb,var(--ink) 8%,transparent);border-color:transparent}
 .sk-ghost-btn .pf-count{border-color:transparent}
 
-/* Voice instructions (components/voice-note.tsx): recorder + player. Same language as the WhatsApp voice note (.wa-voice). */
+/* Voice instructions (components/voice-note.tsx): recorder + player. */
 .vn-player{display:flex;align-items:center;gap:10px;min-width:0}
 .vn-play{width:36px;height:36px;flex:none;border-radius:50%;display:grid;place-items:center;background:var(--brand);color:var(--on-brand);transition:background var(--dur-fast) var(--ease)}
 .vn-play:hover{background:var(--brand-deep)}
@@ -403,15 +419,15 @@
 .vn-tile-tx{display:flex;flex-direction:column;gap:1px;min-width:0}
 .vn-tile-tx b{font-size:14px;font-weight:600;line-height:20px}
 .vn-tile-tx small{font-size:12px;line-height:17px;color:var(--ink-3)}
-.vn-mic,.vn-stop{display:inline-flex;align-items:center;gap:8px;min-height:40px;padding:8px 16px;border-radius:var(--r-pill);font-size:13.5px;font-weight:600;cursor:pointer;transition:background var(--dur-fast) var(--ease),color var(--dur-fast) var(--ease)}
+.vn-mic,.vn-stop{display:inline-flex;align-items:center;gap:8px;min-height:var(--ctl-h);padding:0 16px;border-radius:var(--r-pill);font-size:13.5px;font-weight:600;cursor:pointer;transition:background var(--dur-fast) var(--ease),color var(--dur-fast) var(--ease)}
 .vn-mic{background:var(--card);color:var(--brand-deep)}
 .vn-mic:hover{background:var(--brand-soft)}
 .vn-mic:disabled{cursor:default;color:var(--ink-3);background:var(--card)}
 .vn-mic svg,.vn-stop svg{width:16px;height:16px;flex:none}
-.vn-stop{background:var(--bad-bg);color:var(--bad);margin-left:auto;min-height:40px}
+.vn-stop{background:var(--bad-bg);color:var(--bad);margin-left:auto;min-height:var(--ctl-h)}
 .vn-stop svg{fill:currentColor}
 .vn-hint{margin:0;font-size:12.5px;line-height:18px;color:var(--ink-2)}
-.vn-rec{display:flex;align-items:center;flex-wrap:wrap;gap:8px 10px;min-height:40px}
+.vn-rec{display:flex;align-items:center;flex-wrap:wrap;gap:8px 10px;min-height:var(--ctl-h)}
 .vn-dot{width:10px;height:10px;border-radius:50%;background:var(--bad);flex:none;animation:vn-pulse 1.2s var(--ease) infinite}
 @keyframes vn-pulse{50%{opacity:.35}}
 .vn-rec-t{font-size:13.5px;font-weight:700;color:var(--ink)}

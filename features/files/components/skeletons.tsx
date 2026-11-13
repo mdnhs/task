@@ -40,7 +40,7 @@ export function FilesSkeleton({
       </section>
       <div className="card files-card">
         <div className="files-tabs">
-          <Sk w={332} h={50} r="pill" />
+          <Sk w={332} h={48} r="pill" />
         </div>
         {/* the real tab bodies are each wrapped in a <div hidden> */}
         {tab === "client" ? (
@@ -50,9 +50,9 @@ export function FilesSkeleton({
         ) : (
           <div>
             <div className="od-filters">
-              <Sk h={40} r="pill" className="sk-fsearch" />
-              <Sk w={140} h={40} r="pill" />
-              <Sk w={140} h={40} r="pill" />
+              <Sk w={140} h={48} r="pill" />
+              <Sk w={140} h={48} r="pill" />
+              <Sk h={48} r="pill" className="sk-fsearch" />
             </div>
             <div className="table-wrap">
               <table className="rtable files-table">
@@ -117,8 +117,8 @@ function ClientBodySkeleton({ rows }: { rows: number }) {
   return (
     <>
       <div className="od-filters">
-        <Sk h={40} r="pill" className="sk-fsearch" />
-        <Sk w={140} h={40} r="pill" />
+        <Sk w={140} h={48} r="pill" />
+        <Sk h={48} r="pill" className="sk-fsearch" />
       </div>
       <div className="table-wrap">
         <table className="rtable files-table files-clients">

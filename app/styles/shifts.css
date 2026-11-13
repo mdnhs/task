@@ -2,7 +2,7 @@
 .sh-card .od-filters{margin-bottom:16px}
 
 /* Week navigation in the filter bar: prev / label / next pill */
-.sh-weeknav{display:inline-flex;align-items:center;gap:2px;height:40px;padding:0 4px;border-radius:var(--r-pill);background:var(--mute-bg);flex:none}
+.sh-weeknav{display:inline-flex;align-items:center;gap:2px;height:var(--ctl-h);padding:0 4px;border-radius:var(--r-pill);background:var(--mute-bg);flex:none}
 .sh-nav-btn{width:32px;height:32px;border-radius:50%;display:grid;place-items:center;color:var(--ink-2);cursor:pointer;transition:background var(--dur-fast) var(--ease),color var(--dur-fast) var(--ease)}
 .sh-nav-btn svg{width:17px;height:17px}
 .sh-nav-btn:hover{background:var(--card);color:var(--ink)}
@@ -64,7 +64,7 @@ td.sh-act{text-align:right;white-space:nowrap}
 /* Pattern dialog: day toggles */
 .sh-days-label{font-size:12.5px;font-weight:700;color:var(--ink-2)}
 .sh-days{display:flex;flex-wrap:wrap;gap:6px}
-.sh-day-btn{min-width:48px;height:38px;padding:0 10px;border-radius:var(--r-pill);background:var(--mute-bg);font-size:13px;font-weight:600;color:var(--ink-2);cursor:pointer;transition:background var(--dur-fast) var(--ease),color var(--dur-fast) var(--ease)}
+.sh-day-btn{min-width:48px;height:var(--ctl-h);padding:0 10px;border-radius:var(--r-pill);background:var(--mute-bg);font-size:13px;font-weight:600;color:var(--ink-2);cursor:pointer;transition:background var(--dur-fast) var(--ease),color var(--dur-fast) var(--ease)}
 .sh-day-btn:hover{color:var(--ink)}
 .sh-day-btn[aria-pressed="true"]{background:var(--brand);color:var(--on-brand)}
 .sh-day-btn:focus-visible{outline:2px solid var(--brand);outline-offset:2px}

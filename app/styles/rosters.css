@@ -6,7 +6,7 @@
 .ros-card[data-pending]{opacity:.7;transition:opacity var(--dur-fast) var(--ease)}
 
 /* Range navigation: prev / label / next pill */
-.ros-nav{display:inline-flex;align-items:center;gap:2px;height:40px;padding:0 4px;border-radius:var(--r-pill);background:var(--mute-bg);flex:none}
+.ros-nav{display:inline-flex;align-items:center;gap:2px;height:var(--ctl-h);padding:0 4px;border-radius:var(--r-pill);background:var(--mute-bg);flex:none}
 .ros-nav-btn{width:32px;height:32px;border-radius:50%;display:grid;place-items:center;color:var(--ink-2);cursor:pointer;transition:background var(--dur-fast) var(--ease),color var(--dur-fast) var(--ease)}
 .ros-nav-btn svg{width:17px;height:17px}
 .ros-nav-btn:hover{background:var(--card);color:var(--ink)}
@@ -140,6 +140,9 @@
 .ros-req{display:grid;grid-template-columns:minmax(0,1fr) minmax(160px,260px) auto;gap:12px;align-items:center}
 .ros-req-main,.ros-hist-row{display:flex;flex-direction:column;gap:1px;min-width:0}
 .ros-req-act{display:flex;gap:8px}
+/* Note field: same height as the Reject/Approve buttons beside it, OpsDesk field look (not the 32px shadcn default). */
+.ros-req-note{height:var(--ctl-h);background:var(--mute-bg);border:0;border-radius:var(--r-md);padding:11px 14px;font-size:14px;box-shadow:none}
+.ros-req-note:focus-visible{box-shadow:0 0 0 2px var(--brand);border:0}
 .ros-more{margin-top:14px}
 @media (max-width:640px){
   .ros-req{grid-template-columns:minmax(0,1fr)}
@@ -166,7 +169,7 @@
 .mr-when b{font-size:14px;line-height:20px}
 .mr-when span,.mr-where span{font-size:13px;line-height:18px;color:var(--ink-2)}
 .mr-act{display:flex;align-items:center;gap:8px;justify-content:flex-end}
-.mr-btn{height:34px;padding:0 12px;font-size:13px}
+.mr-btn{height:var(--ctl-h);padding:0 12px;font-size:13px}
 .mr-btn svg{width:15px;height:15px}
 .mr-ics{width:34px;height:34px;border:0;border-radius:50%;background:none;display:grid;place-items:center;color:var(--ink-2);cursor:pointer;transition:color var(--dur-fast) var(--ease)}
 .mr-ics svg{width:17px;height:17px}
@@ -195,7 +198,7 @@
 
 /* My calendar (FR-RS-40): month grid of the person's shifts and leave */
 .mc-nav{display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap}
-.mc-btn{height:36px;min-width:36px;padding:0 12px;display:inline-grid;place-items:center;border:0;border-radius:var(--r-pill);background:var(--mute-bg);color:var(--ink-2);font:inherit;font-size:13px;font-weight:700;cursor:pointer;transition:color var(--dur-fast) var(--ease)}
+.mc-btn{height:var(--ctl-h);min-width:var(--ctl-h);padding:0 12px;display:inline-grid;place-items:center;border:0;border-radius:var(--r-pill);background:var(--mute-bg);color:var(--ink-2);font:inherit;font-size:13px;font-weight:700;cursor:pointer;transition:color var(--dur-fast) var(--ease)}
 .mc-btn svg{width:16px;height:16px}
 .mc-btn:hover{color:var(--brand-deep)}
 .mc-btn:focus-visible,.mc-day:focus-visible,.mc-chip:focus-visible,.mc-more:focus-visible{outline:2px solid var(--brand);outline-offset:1px}

@@ -151,9 +151,9 @@ export function RecruitmentView({
       <div className="card rec-card-wrap">
         <FilterBar>
           <FilterSeg label="View" value={view} options={VIEWS} onChange={(v) => { setView(v); setPage(1) }} />
-          <FilterSearch value={q} onChange={(v) => { setQ(v); setPage(1) }} placeholder="Search candidates" />
           <FilterSelect label="Owner" value={owner} options={[{ value: "all", label: "All owners" }, ...owners.map((o) => ({ value: o, label: o }))]} onChange={(v) => { setOwner(v); setPage(1) }} />
           {view === "list" && <FilterSelect label="Stage" value={stage} options={STAGES} onChange={(v) => { setStage(v); setPage(1) }} />}
+          <FilterSearch value={q} onChange={(v) => { setQ(v); setPage(1) }} placeholder="Search candidates" />
         </FilterBar>
         {rows.length === 0 ? (
           <EmptyState

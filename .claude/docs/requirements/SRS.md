@@ -852,7 +852,7 @@ Status on 28 Oct 2026. "Built" means a front-end mock: JSON seed data in `public
 | Shifts (`/shifts`) | M1 (FR-M1-20, FR-M1-21, FR-M1-22 hook), M0 (FR-M0-07) | Phase 1 step 1. Departments act as teams (A.5); Q5, Q7, Q9 built on the assumptions |
 | Recruitment (`/recruitment`), employee files | M4 (Phase 3) | |
 | Payroll issues (`/payroll-issues`) | M1C (Phase 1B), close to FR-PY-24 | Pay queries are one feature of Module 1C; not linked to a payslip line yet (no payslips built) |
-| Orders & Stock (`/orders-stock`), client files, WhatsApp (`/whatsapp`) | Not in this SRS | Product owner: keep (28 Oct 2026). Ask the BA to add them to the SRS. May be switched by plan entitlement (FR-M0-15) |
+| Orders & Stock (`/orders-stock`), client files | Not in this SRS | Product owner: keep (28 Oct 2026). The WhatsApp inbox (`/whatsapp`) was removed on 12 Nov 2026 at the product owner's request; WhatsApp stays only as a notification channel and integration in Settings. Ask the BA to add them to the SRS. May be switched by plan entitlement (FR-M0-15) |
 | Task voice instructions (change request, product owner 30 Oct 2026): record up to 2 minutes on New task, play on the task and in "Play my day" | M1 tasks (next to FR-M1-01, FR-M1-73); not in this SRS | Built (mock) 30 Oct 2026: `components/voice-note.tsx`, `lib/task-voice.ts`, `features/tasks.md` → Voice instructions. No transcription or AI (that stays FR-M2-07). Recording is a `blob:` URL in this tab only. Backend: tenant storage, access as the task, retention (delete with the task's archive purge). Ask the BA to add an FR |
 
 Rule: later-phase pages are hidden by plan entitlement, not deleted.

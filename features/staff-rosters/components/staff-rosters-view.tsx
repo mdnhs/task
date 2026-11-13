@@ -185,7 +185,6 @@ export function StaffRostersView({
               window.history.replaceState(null, "", rostersHref(v))
             }}
           />
-          <FilterSearch value={q} onChange={filter(setQ)} placeholder={tab === "attendance" ? "Search incidents" : "Search roster gaps"} />
           {tab === "attendance" ? (
             <>
               <FilterSelect label="Type" value={type} options={TYPE_OPTIONS} onChange={filter(setType)} />
@@ -194,6 +193,7 @@ export function StaffRostersView({
           ) : (
             <FilterSelect label="Coverage" value={coverage} options={COVERAGE_OPTIONS} onChange={filter(setCoverage)} />
           )}
+          <FilterSearch value={q} onChange={filter(setQ)} placeholder={tab === "attendance" ? "Search incidents" : "Search roster gaps"} />
         </FilterBar>
         {pager.total > 0 ? (
           <>

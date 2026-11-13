@@ -157,7 +157,6 @@ export function TasksView({
       <TaskViewTabs active="list" />
       <div className="card tasks-card">
         <FilterBar>
-          <FilterSearch value={filters.q} onChange={(v) => set("q", v)} placeholder="Search tasks" />
           <FilterSelect label="Status" value={filters.status} options={onlyAssignee ? STATUSES : [...STATUSES.slice(0, 3), REVIEW_STATUS, ...STATUSES.slice(3)]} onChange={(v) => set("status", v)} />
           <FilterSelect label="Priority" value={filters.priority} options={PRIORITIES} onChange={(v) => set("priority", v)} />
           <FilterSelect label="Repeat" value={filters.repeat} options={REPEAT} onChange={(v) => set("repeat", v)} />
@@ -173,6 +172,7 @@ export function TasksView({
             />
           )}
           <FilterSeg label="Due" value={filters.due} options={DUE} onChange={(v) => set("due", v)} />
+          <FilterSearch value={filters.q} onChange={(v) => set("q", v)} placeholder="Search tasks" />
         </FilterBar>
         {rows.length > 0 ? (
           <>

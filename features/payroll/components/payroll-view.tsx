@@ -156,9 +156,9 @@ export function PayrollView({
       </section>
       <div className="card pay-card">
         <FilterBar>
-          <FilterSearch value={q} onChange={(v) => { setQ(v); setPage(1) }} placeholder="Search issues" />
           <FilterSelect label="Status" value={status} options={STATUSES} onChange={(v) => { setStatus(v); setPage(1) }} />
           <FilterSelect label="Type" value={type} options={TYPES} onChange={(v) => { setType(v); setPage(1) }} />
+          <FilterSearch value={q} onChange={(v) => { setQ(v); setPage(1) }} placeholder="Search issues" />
         </FilterBar>
         {rows.length > 0 ? (
           <>

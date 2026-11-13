@@ -7,8 +7,7 @@
     { "id": "M4", "label": "People and files", "description": "Recruitment and employee and client files." },
     { "id": "M1C", "label": "Payroll", "description": "Payroll issues." },
     { "id": "rosters", "label": "Staff and rosters", "description": "Staff records, attendance incidents, rosters and cover." },
-    { "id": "orders-stock", "label": "Orders and stock", "description": "Stock requests, supplier orders and approvals." },
-    { "id": "whatsapp", "label": "WhatsApp", "description": "Staff and client WhatsApp messages and voice notes." }
+    { "id": "orders-stock", "label": "Orders and stock", "description": "Stock requests, supplier orders and approvals." }
   ],
   "modules": {
     "dashboard": "M0",
@@ -23,15 +22,14 @@
     "payroll": "M1C",
     "roster": "M1A",
     "staff": "rosters",
-    "orders": "orders-stock",
-    "whatsapp": "whatsapp"
+    "orders": "orders-stock"
   },
   "assistant": "M2",
   "defaultPlan": "starter",
   "core": ["M0"],
   "plans": {
-    "starter": ["M0", "M1", "whatsapp"],
-    "business": ["M0", "M1", "M1A", "M2", "M4", "M1C", "rosters", "orders-stock", "whatsapp"],
-    "enterprise": ["M0", "M1", "M1A", "M2", "M4", "M1C", "rosters", "orders-stock", "whatsapp"]
+    "starter": ["M0", "M1"],
+    "business": ["M0", "M1", "M1A", "M2", "M4", "M1C", "rosters", "orders-stock"],
+    "enterprise": ["M0", "M1", "M1A", "M2", "M4", "M1C", "rosters", "orders-stock"]
   }
 }

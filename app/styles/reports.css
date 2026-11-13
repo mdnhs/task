@@ -12,7 +12,7 @@
 .rf-btn.btn-outline{border-color:var(--brand)}
 .rf-summary{display:flex;flex-direction:column;gap:2px;padding:14px 18px;border-radius:var(--r-md);background:var(--bad-bg);color:var(--bad);font-size:13px;line-height:20px;outline:none}
 .rf-summary strong{font-size:14px}
-.rf-add{align-self:flex-start;display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:var(--r-pill);font-size:13px;font-weight:600;color:var(--brand-deep);background:var(--brand-soft);cursor:pointer;transition:background var(--dur-fast) var(--ease)}
+.rf-add{align-self:flex-start;display:inline-flex;align-items:center;gap:6px;min-height:var(--ctl-h);padding:0 14px;border-radius:var(--r-pill);font-size:13px;font-weight:600;color:var(--brand-deep);background:var(--brand-soft);cursor:pointer;transition:background var(--dur-fast) var(--ease)}
 .rf-add:hover{background:var(--mute-bg)}
 .rf-add .ico{width:16px;height:16px}
 :root[data-theme="dark"] .rf-add{color:var(--brand-3)}
@@ -95,7 +95,7 @@
 .sr-items-edit th:nth-child(2),.sr-status{width:170px}
 .sr-items-edit th:nth-child(3){width:120px}
 .sr-status .od-filter-select{width:100%}
-.sr-in{width:100%;min-height:40px;background:var(--mute-bg);color:var(--ink);border:0;border-radius:var(--r-md);padding:9px 12px;font:inherit;font-size:13.5px;outline:none;transition:box-shadow var(--dur-fast) var(--ease)}
+.sr-in{width:100%;min-height:var(--ctl-h);background:var(--mute-bg);color:var(--ink);border:0;border-radius:var(--r-md);padding:9px 12px;font:inherit;font-size:13.5px;outline:none;transition:box-shadow var(--dur-fast) var(--ease)}
 .sr-in::placeholder{color:var(--placeholder)}
 .sr-in:focus-visible{box-shadow:0 0 0 2px var(--brand)}
 .sr-in[aria-invalid="true"]{box-shadow:0 0 0 2px var(--bad)}

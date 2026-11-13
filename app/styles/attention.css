@@ -34,7 +34,7 @@
 .att-carry{font-size:12px;font-weight:600;color:var(--ink-3)}
 .att-carry-old{color:var(--bad)}
 .att-actions{display:flex;gap:8px;margin-top:2px}
-.att-actions .btn{padding:7px 14px;font-size:13px;cursor:pointer;justify-content:center}
+.att-actions .btn{padding:0 14px;font-size:13px;cursor:pointer;justify-content:center}
 /* Decision dialog */
 /* Decision dialog outcome (ui-rules 32): a FilterSeg field keeps its natural width */
 .att-seg .seg.od-seg{align-self:flex-start}

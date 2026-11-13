@@ -1,4 +1,4 @@
-// Hand-off for tasks created or changed outside /tasks (WhatsApp FR-WA-02, end-of-shift report FR-M1-26). Features can't import each other, so the creating
+// Hand-off for tasks created or changed outside /tasks (end-of-shift report FR-M1-26). Features can't import each other, so the creating
 // feature pushes here and the tasks store merges these in when a tasks screen mounts (features/tasks/store.ts).
 // Module state like lib/store.ts: survives client navigation, resets on reload.
 export type IncomingTask = {
@@ -16,7 +16,7 @@ export type IncomingTask = {
   creator: string
   /** YYYY-MM-DDTHH:mm:ss, tenant time. */
   at: string
-  /** Where it came from, for the timeline, e.g. "WhatsApp". */
+  /** Where it came from, for the timeline, e.g. "Shift report". */
   source: string
 }
 

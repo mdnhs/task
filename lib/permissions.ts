@@ -20,7 +20,6 @@ const PREFIXES: [string, Module][] = [
   ["/files", "files"],
   ["/payroll-issues", "payroll"],
   ["/orders-stock", "orders"],
-  ["/whatsapp", "whatsapp"],
   ["/settings", "settings"],
   ["/audit-log", "audit"],
 ]

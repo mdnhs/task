@@ -170,7 +170,6 @@ export function DataRequestsView({ data, view, q = "", today, operator }: Props)
           />
         </FilterBar>
         <FilterBar>
-          <FilterSearch value={filters.q} onChange={(q) => { setFilters((f) => ({ ...f, q })); setSorting(false); setPage(1) }} placeholder="Search request, requester or tenant" />
           <span className="pf-sort-m">
             <FilterSelect
               label="Sort by"
@@ -182,6 +181,7 @@ export function DataRequestsView({ data, view, q = "", today, operator }: Props)
               }}
             />
           </span>
+          <FilterSearch value={filters.q} onChange={(q) => { setFilters((f) => ({ ...f, q })); setSorting(false); setPage(1) }} placeholder="Search request, requester or tenant" />
         </FilterBar>
         {rows.length > 0 ? (
           <>

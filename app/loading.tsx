@@ -7,14 +7,14 @@ import { getSession } from "@/lib/session"
 
 // First load: the (app) layout is still fetching nav/user, so show the whole shell as a skeleton.
 // Departments come from the local nav JSON so the topbar filter skeleton matches the tenant's real pills.
-// The topbar icons follow the same rules as the layout: the assistant needs its plan module, the WhatsApp shortcut
-// follows the role- and plan-filtered nav. Under /platform (platform role) it is the console shell instead (D1, D2).
+// The topbar icons follow the same rules as the layout: the assistant needs its plan module.
+// Under /platform (platform role) it is the console shell instead (D1, D2).
 export default async function Loading() {
   const [navigation, session, path] = await Promise.all([getNavigation(), getSession(), requestPath()])
   if (session.role.platform && (path === "/platform" || path.startsWith("/platform/"))) {
     const [nav, op, env] = await Promise.all([getPlatformNav(), getOperator(), getPlatformEnv()])
     return (
-      <AppShellSkeleton departments={false} assistant={false} whatsapp={false} platform={{ menu: filterForStaff(nav.menu, op), env }}>
+      <AppShellSkeleton departments={false} assistant={false} platform={{ menu: filterForStaff(nav.menu, op), env }}>
         <PageSkeleton />
       </AppShellSkeleton>
     )
@@ -24,7 +24,6 @@ export default async function Loading() {
     <AppShellSkeleton
       departments={navigation.departments}
       assistant={hasProductModule(session.entitlements, session.entitlements.assistant)}
-      whatsapp={menu.some((n) => n.href === "/whatsapp")}
     >
       <PageSkeleton />
     </AppShellSkeleton>

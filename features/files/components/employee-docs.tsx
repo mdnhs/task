@@ -106,9 +106,9 @@ export function EmployeeDocs({
   return (
     <>
       <FilterBar>
-        <FilterSearch value={q} onChange={(v) => update(setQ, v)} placeholder="Search documents" />
         <FilterSelect label="Status" value={status} options={STATUSES} onChange={(v) => update(setStatus, v)} />
         <FilterSelect label="Type" value={type} options={[{ value: "all", label: "All types" }, ...types.map((t) => ({ value: t, label: t }))]} onChange={(v) => update(setType, v)} />
+        <FilterSearch value={q} onChange={(v) => update(setQ, v)} placeholder="Search documents" />
       </FilterBar>
       {rows.length > 0 ? (
         <>

@@ -117,8 +117,8 @@ export function OrdersView({
       <OrdersStats stats={stats} money={money} />
       <div className="card ord-card">
         <FilterBar>
-          <FilterSearch value={q} onChange={(v) => { setQ(v); setPage(1) }} placeholder="Search orders" />
           <FilterSeg label="View" value={tab} options={TABS} onChange={(v) => { setTab(v); setPage(1) }} />
+          <FilterSearch value={q} onChange={(v) => { setQ(v); setPage(1) }} placeholder="Search orders" />
         </FilterBar>
         {rows.length > 0 ? (
           <>

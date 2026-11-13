@@ -32,7 +32,7 @@ const CardHead = ({ title, sub, button, wrap }: { title: number; sub: number; bu
       <Sk w={sub} h={11} lh={17} style={{ marginTop: 2 }} />
       {wrap && <Sk w={sub / 2} h={11} lh={17.8} className="sk-wrap" />}
     </div>
-    {button ? <Sk w={button} h={36.8} r={12} /> : null}
+    {button ? <Sk w={button} h={48} r={12} /> : null}
   </div>
 )
 
@@ -40,7 +40,7 @@ const CardHead = ({ title, sub, button, wrap }: { title: number; sub: number; bu
 const FieldSk = ({ label = 90, hint }: { label?: number; hint?: number }) => (
   <div className="od-field">
     <Sk w={label} h={11} lh={18.1} />
-    <Sk h={44} r={14} />
+    <Sk h={48} r={14} />
     {hint ? <Sk w={hint} h={10} lh={17.4} style={{ marginTop: 6 }} /> : null}
   </div>
 )
@@ -60,7 +60,7 @@ function Profile() {
         <div className="od-row2"><FieldSk label={90} /><FieldSk label={40} hint={150} /></div>
         <div className="od-row2"><FieldSk label={36} /><FieldSk label={80} /></div>
         <div className="od-row2"><FieldSk label={64} /></div>
-        <div className="od-form-foot"><Sk w={140} h={44.3} r={14} /></div>
+        <div className="od-form-foot"><Sk w={140} h={48} r={14} /></div>
       </div>
     </section>
   )
@@ -102,7 +102,7 @@ function Security({ counts }: { counts: AccountCounts }) {
                     </span>
                     <span className="tm sk-ghost">{x.location} · {whenText(x.lastActive, counts.security!.today, counts.security!.tzLabel)}</span>
                   </div>
-                  {!x.current && <Sk w={81} h={36.8} r={12} className="sk-btn" />}
+                  {!x.current && <Sk w={81} h={48} r={12} className="sk-btn" />}
                 </li>
               ))
             : Array.from({ length: counts.sessions }, (_, i) => (
@@ -127,7 +127,7 @@ function Security({ counts }: { counts: AccountCounts }) {
                   </>
                 )}
               </div>
-              {i > 0 && <Sk w={81} h={36.8} r={12} />}
+              {i > 0 && <Sk w={81} h={48} r={12} />}
             </li>
           ))}
         </ul>
@@ -198,7 +198,7 @@ function Notifications({ counts }: { counts: AccountCounts }) {
           {/* "Remind me" label + FilterSeg (4 lead times) */}
           <div className="od-field">
             <Sk w={70} h={11} lh={18.1} />
-            <Sk w={243} h={50} r="pill" style={{ maxWidth: "100%" }} />
+            <Sk w={243} h={48} r="pill" style={{ maxWidth: "100%" }} />
           </div>
         </div>
       </section>

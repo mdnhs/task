@@ -19,15 +19,15 @@ export function AuditSkeleton({ rows = 60 }: { rows?: number }) {
           </span>
         </p>
         <div className="od-filters">
-          <Sk h={40} r="pill" className="sk-fsearch" />
           {[140, 140, 140].map((w, i) => (
             <span key={i} style={{ display: "contents" }}>
-              <Sk w={w} h={40} r="pill" />
+              <Sk w={w} h={48} r="pill" />
             </span>
           ))}
           {/* From / To date pickers: 44px controls, browser-measured widths at 1440 */}
-          <Sk w={90} h={44} r={14} />
-          <Sk w={71} h={44} r={14} />
+          <Sk w={90} h={48} r={14} />
+          <Sk w={71} h={48} r={14} />
+          <Sk h={48} r="pill" className="sk-fsearch" />
         </div>
         <div className="table-wrap">
           <table className="rtable au-table">

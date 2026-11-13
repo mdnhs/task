@@ -35,9 +35,9 @@ export function ShiftsSkeleton({ data, today: todayIso, tz, tzLabel, canWrite }:
       </div>
       <div className="card sh-card">
         <div className="od-filters">
-          <Sk w={229} h={50} r="pill" />
-          <Sk h={40} r="pill" className="sk-fsearch" />
-          <Sk w={192} h={40} r="pill" className="sk-sh-nav" />
+          <Sk w={229} h={48} r="pill" />
+          <Sk w={192} h={48} r="pill" className="sk-sh-nav" />
+          <Sk h={48} r="pill" className="sk-fsearch" />
         </div>
         {rows.length > 0 ? (
           <>

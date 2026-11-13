@@ -299,7 +299,7 @@ button.pf-arrow:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
 .pf-360-more[data-popup-open]{background:var(--brand-soft)}
 /* Route segs (rule 30): links styled as the seg buttons; on the grey page the track is --card. */
 .seg.od-seg.pf-360-tabs{display:flex;align-self:flex-start;background:var(--card)}
-.pf-360-tabs a{position:relative;display:inline-flex;align-items:center;height:42px;padding:0 16px;border-radius:var(--r-pill);font-size:13px;font-weight:600;color:var(--ink-2);text-decoration:none;white-space:nowrap;transition:color var(--dur) var(--ease)}
+.pf-360-tabs a{position:relative;display:inline-flex;align-items:center;height:calc(var(--ctl-h) - 8px);padding:0 16px;border-radius:var(--r-pill);font-size:13px;font-weight:600;color:var(--ink-2);text-decoration:none;white-space:nowrap;transition:color var(--dur) var(--ease)}
 .pf-360-tabs a:hover{color:var(--ink)}
 .pf-360-tabs a[aria-current="page"]{color:var(--on-brand)}
 .pf-360-tabs a:focus-visible{outline:2px solid var(--brand);outline-offset:-2px}
@@ -341,7 +341,7 @@ button.pf-arrow:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
 /* Internal notes */
 .pf-note-form{display:flex;flex-direction:column;align-items:flex-end;gap:10px;margin-bottom:16px}
 .pf-note-form textarea{width:100%}
-.pf-note-form .btn{cursor:pointer;padding:10px 18px}
+.pf-note-form .btn{cursor:pointer;padding:0 18px}
 .pf-notes{list-style:none;margin:0;padding:0}
 .pf-notes li{padding:12px 0;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:2px}
 .pf-notes li:first-child{border-top:0;padding-top:0}

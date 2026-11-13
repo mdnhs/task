@@ -13,7 +13,7 @@ const CardHead = ({ title, sub, button, pill }: { title: number; sub: number; bu
       <Sk w={title} h={16} lh={pill ? 24 : 28} />
       <Sk w={sub} h={10} lh={pill ? 20.9 : 18} style={{ marginTop: 2 }} />
     </div>
-    {button && <Sk w={112} h={46} r={14} />}
+    {button && <Sk w={112} h={48} r={14} />}
     {pill && <Sk w={84} h={29.4} r={8} />}
   </div>
 )
@@ -42,7 +42,7 @@ export function ReportsSkeleton({ own = false, prompts = 0, mine = true, rows = 
                 ) : (
                   <div className="sr-prompt-main"><Sk w={170} h={13} lh={20} /><Sk w="80%" h={11} lh={20} /></div>
                 )}
-                <Sk w={140} h={46.3} r={14} className="sr-prompt-btn" />
+                <Sk w={140} h={48} r={14} className="sr-prompt-btn" />
               </li>
             ))}
           </ul>
@@ -82,7 +82,7 @@ export function ReportsSkeleton({ own = false, prompts = 0, mine = true, rows = 
               </>
             )}
           </div>
-          <Sk w={160} h={46.3} r={14} className="sr-mine-btn" />
+          <Sk w={160} h={48} r={14} className="sr-mine-btn" />
         </section>
       ) : (
         <section className="card sr-mine">
@@ -94,14 +94,14 @@ export function ReportsSkeleton({ own = false, prompts = 0, mine = true, rows = 
         <CardHead title={own ? 100 : 120} sub={200} button />
         {!own && (
           // status tab seg (All + five states with counts): 42px buttons + 4px padding
-          <div className="sr-counts"><Sk w={568} h={50} r="pill" style={{ maxWidth: "100%" }} /></div>
+          <div className="sr-counts"><Sk w={568} h={48} r="pill" style={{ maxWidth: "100%" }} /></div>
         )}
         <div className="od-filters">
-          <div className="rep-date"><Sk w="100%" h={44} r={14} /></div>
-          <div className="rep-date"><Sk w="100%" h={44} r={14} /></div>
-          {!own && teams > 1 && <Sk w={140} h={40} r="pill" />}
-          {!own && <Sk w={140} h={40} r="pill" />}
-          <Sk w={140} h={40} r="pill" />
+          <div className="rep-date"><Sk w="100%" h={48} r={14} /></div>
+          <div className="rep-date"><Sk w="100%" h={48} r={14} /></div>
+          {!own && teams > 1 && <Sk w={140} h={48} r="pill" />}
+          {!own && <Sk w={140} h={48} r="pill" />}
+          <Sk w={140} h={48} r="pill" />
         </div>
         {rows === 0 ? (
           <div className="od-empty">
@@ -222,9 +222,9 @@ export function ReportPageSkeleton({ edit = false, review = false, items = 5 }: 
                     <td data-label="Task"><Sk w={170} h={12} lh={18.84} /><Sk w={120} h={10} lh={15.94} /></td>
                     {edit ? (
                       <>
-                        <td data-label="Status" className="sr-status"><Sk w={140} h={40} r="pill" /></td>
-                        <td data-label="Time (min)"><Sk w="100%" h={40} r={12} /></td>
-                        <td data-label="Note"><Sk w="100%" h={40} r={12} /></td>
+                        <td data-label="Status" className="sr-status"><Sk w={140} h={48} r="pill" /></td>
+                        <td data-label="Time (min)"><Sk w="100%" h={48} r={12} /></td>
+                        <td data-label="Note"><Sk w="100%" h={48} r={12} /></td>
                       </>
                     ) : (
                       <>
@@ -261,7 +261,7 @@ export function ReportPageSkeleton({ edit = false, review = false, items = 5 }: 
                 {[120, 100].map((w, i) => (
                   <section key={i} className="fs-sec">
                     <SecHead w={w} note />
-                    <div className="sr-set"><Sk w={150} h={34.8} r="pill" /></div>
+                    <div className="sr-set"><Sk w={150} h={48} r="pill" /></div>
                   </section>
                 ))}
               </div>

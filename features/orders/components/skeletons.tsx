@@ -22,9 +22,9 @@ export function OrdersSkeleton({ canWrite = true, rows = 4 }: { canWrite?: boole
       </section>
       <div className="card ord-card">
         <div className="od-filters">
-          <Sk h={40} r="pill" className="sk-fsearch" />
-          {/* tab seg with count badges: 42px buttons + 4px padding */}
-          <Sk w={307} h={50} r="pill" />
+          {/* tab seg with count badges: 40px buttons + 4px padding */}
+          <Sk w={307} h={48} r="pill" />
+          <Sk h={48} r="pill" className="sk-fsearch" />
         </div>
         <div className="table-wrap">
           <table className="rtable ord-table">

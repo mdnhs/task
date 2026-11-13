@@ -1,5 +1,7 @@
 /* OpsDesk – ported 1:1 from task_light.html / task_dark.html */
 :root{
+  /* One height for every in-page button, input, select, date field and seg/tab track (topbar keeps its own 50px system). */
+  --ctl-h:48px;
   color-scheme:light;
   /* Calm palette with the classic OpsDesk green (#1a8a3a) as the brand: warm off-white surfaces, softer ink, muted status colours. */
   --page:#e8ebe6;
@@ -110,7 +112,7 @@ a{color:inherit;text-decoration:none}
 ::placeholder{color:var(--placeholder);opacity:1}
 .search .ico{width:18px;height:18px}
 .seg{position:relative;display:flex;background:var(--card);border-radius:var(--r-pill);padding:4px;gap:2px}
-.seg button{display:inline-flex;align-items:center;height:42px;padding:0 14px;border-radius:var(--r-pill);font-size:13px;font-weight:600;color:var(--ink-2)}
+.seg button{display:inline-flex;align-items:center;height:calc(var(--ctl-h) - 8px);padding:0 14px;border-radius:var(--r-pill);font-size:13px;font-weight:600;color:var(--ink-2)}
 .seg button{position:relative;transition:color var(--dur) var(--ease)}
 .seg button[aria-pressed="true"]{color:var(--on-brand)}
 /* Active pill is one <StretchIndicator> child of the container (components/stretch-indicator.tsx): it stretches towards the new item.
@@ -142,7 +144,7 @@ a{color:inherit;text-decoration:none}
 .head h1{margin:0;font-size:36px;font-weight:700;letter-spacing:-.025em;line-height:1.1}
 .head p{margin:8px 0 0;color:var(--ink-2)}
 .head-actions{display:flex;gap:12px;flex-wrap:wrap}
-.btn{display:inline-flex;align-items:center;gap:8px;padding:13px 22px;border-radius:calc(14px * var(--radius-scale,1));font-weight:600;font-size:14px;transition:transform var(--dur-fast) var(--ease),background-color var(--dur-fast) var(--ease)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:var(--ctl-h);padding:0 22px;border-radius:calc(14px * var(--radius-scale,1));font-weight:600;font-size:14px;transition:transform var(--dur-fast) var(--ease),background-color var(--dur-fast) var(--ease)}
 /* Press: a small scale-down (ui-rules → Motion, action buttons). Disabled buttons don't press and show not-allowed. */
 .btn:active:not(:disabled,[aria-disabled="true"],[data-phase]){transform:scale(.97)}
 .btn:disabled{cursor:not-allowed}
@@ -176,7 +178,7 @@ a{color:inherit;text-decoration:none}
 .card-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:calc(16px * var(--space-scale,1));flex-wrap:wrap}
 .card-head h2{margin:0;font-size:19px;font-weight:700;letter-spacing:-.01em}
 .card-head .sub{font-size:12px;color:var(--ink-3);margin-top:2px}
-.pill-btn{display:inline-flex;align-items:center;gap:6px;border:1.5px solid var(--brand-deep);color:var(--brand-deep);border-radius:var(--r-pill);padding:8px 16px;font-size:13px;font-weight:600}
+.pill-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:var(--ctl-h);border:1.5px solid var(--brand-deep);color:var(--brand-deep);border-radius:var(--r-pill);padding:0 16px;font-size:13px;font-weight:600}
 :root[data-theme="dark"] .pill-btn{border-color:var(--brand-3);color:var(--brand-3)}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .pill-btn{border-color:var(--brand-3);color:var(--brand-3)}}
 .pill-btn:hover{background:var(--brand-soft)}
@@ -334,7 +336,7 @@ td.due{white-space:nowrap}
   .canvas{padding:calc(16px * var(--space-scale,1));gap:calc(14px * var(--space-scale,1))}
   .head h1{font-size:28px}
   .head-actions{width:100%}
-  .head-actions .btn{flex:1;min-width:max-content;justify-content:center;padding:12px;white-space:nowrap}
+  .head-actions .btn{flex:1;min-width:max-content;justify-content:center;padding:0 12px;white-space:nowrap}
   .stats{gap:calc(10px * var(--space-scale,1))}
   .stat{padding:calc(16px * var(--space-scale,1));min-height:140px}
   .stat .value{font-size:36px}
@@ -702,7 +704,7 @@ body{padding:0;background:#fff}
 .sk-search{flex:1 1 200px;max-width:280px}
 /* Same box as .seg + .seg button; labels stay invisible and only set the width */
 .sk-seg{display:flex;gap:2px;padding:4px;width:auto;height:auto;border-radius:var(--r-pill)}
-.sk-seg > span{display:inline-flex;align-items:center;height:42px;padding:0 14px;font-size:13px;font-weight:600;white-space:nowrap;visibility:hidden}
+.sk-seg > span{display:inline-flex;align-items:center;height:calc(var(--ctl-h) - 8px);padding:0 14px;font-size:13px;font-weight:600;white-space:nowrap;visibility:hidden}
 .sk-seg-carousel{flex:0 1 360px;min-width:0}
 /* NavUser trigger: fixed .who width, so these are exact (chevron hides ≤1080px, .who ≤640px) */
 .sk-user{width:244px}
@@ -726,8 +728,8 @@ body{padding:0;background:#fff}
 .legend .sk-line,.gauge-legend .sk-line,.head-actions .sk-line,.pf-meter-top .sk-line,.pj-card .card-head > .sk-line{width:auto}
 /* Stat value: 46px line, 36px at ≤640 (.stat .value font-size) */
 @media (max-width:640px){.sk-line:has(> .sk-val){height:36px !important}.sk-val{height:30px !important}}
-/* FilterSearch: same flex box as .od-filter-search (grows from 220px, caps at 320px; full row at ≤640) */
-.sk-fsearch{flex:1 1 220px;max-width:320px}
+/* FilterSearch starts closed: a 48px round icon (.od-filter-search without [data-open]) */
+.sk-fsearch{flex:none;width:var(--ctl-h)}
 /* PageHeadSkeleton: h1 line 40px (31px at ≤640, 28px font), buttons drop 2px and share the row at ≤640 like .head-actions .btn,
    and a description that wraps on phones gets its second line only there (.sk-wrap; .sk-wrap-md = wraps at ≤900) */
 .sk-h1{height:40px}
@@ -736,7 +738,6 @@ body{padding:0;background:#fff}
 .sk-line:has(> .sk-wrap-xl){display:none}
 @media (min-width:1241px){.sk-line:has(> .sk-wrap-xl){display:flex}}
 @media (max-width:640px){
-  .sk-fsearch{max-width:none;flex-basis:100%}
   .sk-h1{height:31px;--sk-h1:26px}
   .head-actions{--sk-btn-d:2px}
   .head-actions .sk-btn{flex:1;min-width:0}

@@ -64,7 +64,7 @@
 /* Invite rows: the email on its own line, then role, department and Remove; on phones Remove gets its own line too. */
 .auth-list>li.auth-invite{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;align-items:end;gap:10px 12px}
 .auth-invite>.od-field:first-child{grid-column:1/-1}
-.auth-rm{padding:11px 16px;min-height:44px;justify-content:center}
+.auth-rm{padding:0 16px;justify-content:center}
 .auth-add{align-self:flex-start}
 
 /* Report template matrix */
@@ -90,7 +90,7 @@
 
 /* Single sign-on buttons (mock) and the divider before the email form */
 .auth-sso{display:flex;flex-direction:column;gap:10px}
-.auth-sso .btn{justify-content:center;width:100%;min-height:48px;gap:10px;cursor:pointer}
+.auth-sso .btn{justify-content:center;width:100%;gap:10px;cursor:pointer}
 .auth-sso .btn:disabled{opacity:.55;cursor:not-allowed}
 .auth-sso-mark{width:20px;height:20px;border-radius:calc(6px * var(--radius-scale,1));display:grid;place-items:center;background:var(--shell);font-size:12px;font-weight:800}
 .auth-or{margin:0;display:flex;align-items:center;gap:12px;font-size:12.5px;line-height:20px;color:var(--ink-3)}

@@ -178,7 +178,6 @@ export function ShiftsView({
       <div className="card sh-card">
         <FilterBar>
           <FilterSeg label="View" value={tab} options={TABS} onChange={(v) => { setTab(v); resetPage() }} />
-          <FilterSearch value={q} onChange={(v) => { setQ(v); resetPage() }} placeholder={tab === "patterns" ? "Search patterns" : "Search people"} />
           {tab === "week" && (
             <div className="sh-weeknav" role="group" aria-label="Week">
               <button type="button" className="sh-nav-btn" aria-label="Previous week" onClick={() => setOffset((o) => o - 1)}>
@@ -192,6 +191,7 @@ export function ShiftsView({
               </button>
             </div>
           )}
+          <FilterSearch value={q} onChange={(v) => { setQ(v); resetPage() }} placeholder={tab === "patterns" ? "Search patterns" : "Search people"} />
         </FilterBar>
         {tab === "people" && visibleTeams.length > 0 && (
           <TeamDefaults teams={visibleTeams} defaults={state.reporting.teamDefaults} canWrite={canWrite && scope === "all"} onChange={teamDefault} />

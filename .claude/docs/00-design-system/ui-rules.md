@@ -102,6 +102,10 @@ No GSAP. CSS covers most cases. The `motion` library (`motion/react`) is used on
         - Old and new digits share one grid cell, not `popLayout`, so there is no jitter.
         - Use `dir="down"` for decreasing counters.
       - Progress bars (`.progress i`) fill from 0 with the CSS `od-fill` keyframe (scaleX, so no layout cost). New bars get this for free.
+      - In-page search (`FilterSearch`, `components/filter-bar.tsx`) is the "flipping search" from the product owner's reference reel (12 Nov 2026).
+        Closed: a 48px brand circle with a search icon. Click: the grey bar flips open on `rotateX` (90 to 0) while the circle glides to its right end
+        (`layout="position"`) and turns over on `rotateY` to an X. X (or Escape) clears and flips it back; blur while empty closes it too. The box
+        keeps its open width until the bar has flipped shut. `DUR.slow` + `EASE`. Skeleton `.sk-fsearch` is the closed 48px circle.
 20. **Scroll reveal: anything that animates once must not play off screen.**
     - A progress bar (or any "fill/count" animation) that starts outside the viewport waits at its start state, then plays when it is scrolled into view (once).
     - How it works:

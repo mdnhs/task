@@ -12,7 +12,7 @@ const NAV_WIDTHS = { menu: [92, 60, 110, 140, 120, 100, 170, 120, 116], general:
 // Mirrors DeptSeg. Up to SEG_MAX pills: one block sized by the real labels, set invisible, so the width matches
 // exactly for any tenant. Beyond that: the carousel's fixed-basis block.
 function DeptSegSkeleton({ departments }: { departments: NavigationData["departments"] }) {
-  if (departments.length > SEG_MAX) return <Sk h={50} r="pill" className="sk-on-panel sk-seg-carousel" />
+  if (departments.length > SEG_MAX) return <Sk h={48} r="pill" className="sk-on-panel sk-seg-carousel" />
   return (
     <span aria-hidden="true" className="sk sk-on-panel sk-seg">
       {departments.map((d) => (
@@ -24,7 +24,7 @@ function DeptSegSkeleton({ departments }: { departments: NavigationData["departm
 
 // Phones: the full-width pill row under the search (DeptRow). Hidden above 640px by CSS.
 function DeptRowSkeleton() {
-  return <Sk h={52} r="pill" className="sk-on-panel sk-dept-row" />
+  return <Sk h={48} r="pill" className="sk-on-panel sk-dept-row" />
 }
 
 function NavSkeleton({ widths }: { widths: number[] }) {
@@ -69,15 +69,13 @@ function GroupedNavSkeleton({ items }: { items: NavItemData[] }) {
 export function AppShellSkeleton({
   departments,
   assistant = true,
-  whatsapp = true,
   platform,
   children,
 }: {
   // `false` = no department filter (the platform console), so neither the desktop pills nor the phone row render.
   departments: NavigationData["departments"] | false
-  /** Topbar icons shown by the real shell: the AI assistant (plan module) and the WhatsApp shortcut (role + plan). */
+  /** Topbar icons shown by the real shell: the AI assistant (plan module). */
   assistant?: boolean
-  whatsapp?: boolean
   /** The platform console variant (AppShell variant="platform"): its filtered menu and environment pill; no promo card. */
   platform?: { menu: NavItemData[]; env?: { label: string; live: boolean } }
   children: React.ReactNode
@@ -116,7 +114,6 @@ export function AppShellSkeleton({
               {platform && <PlatformContext env={platform.env} />}
               <div className="top-actions">
                 {assistant && <Sk w={50} h={50} r="circle" className="sk-on-panel" />}
-                {whatsapp && <Sk w={50} h={50} r="circle" className="sk-on-panel" />}
                 <Sk w={50} h={50} r="circle" className="sk-on-panel" />
                 <Sk w={null} h={50} r="pill" className="sk-on-panel sk-user" />
               </div>

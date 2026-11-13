@@ -30,7 +30,7 @@ export function AttentionSkeleton({ items = 4, outstanding = 10, closed = 0, can
       <section className="card att-card">
         <CardHead title={170} sub={130} />
         <div className="od-filters">
-          <Sk w={201} h={50} r="pill" />
+          <Sk w={201} h={48} r="pill" />
         </div>
         <ul className="att-list">
           {Array.from({ length: items }, (_, i) => (
@@ -58,8 +58,8 @@ export function AttentionSkeleton({ items = 4, outstanding = 10, closed = 0, can
                 <Sk w={90} h={12} lh={19} />
                 {canWrite && i < outstanding - closed && (
                   <span className="att-actions">
-                    <Sk w={77} h={35} r={14} />
-                    <Sk w={66} h={35} r={14} />
+                    <Sk w={77} h={48} r={14} />
+                    <Sk w={66} h={48} r={14} />
                   </span>
                 )}
               </div>

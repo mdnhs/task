@@ -5,8 +5,8 @@ import { Mic, Pause, Play, RotateCcw, Square, Trash2 } from "lucide-react"
 
 import { VOICE_MAX_SEC, atVoiceLimit, clampVoiceSec, formatClock, pickVoiceMime, voiceTotal } from "@/lib/task-voice"
 
-// Voice instructions (lib/task-voice.ts): a recorder for forms and a player for real audio. Same visual language as the WhatsApp
-// voice note (round brand play button, quiet track), own classes (.vn-* in app/styles/kit.css) so WhatsApp stays untouched.
+// Voice instructions (lib/task-voice.ts): a recorder for forms and a player for real audio. Round brand play button,
+// quiet track; classes are .vn-* in app/styles/kit.css.
 
 /** What the recorder hands the form: a `blob:` URL owned by this tab, its length and container type. */
 export type VoiceDraft = { url: string; durationSec: number; mime: string }

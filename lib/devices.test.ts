@@ -19,7 +19,7 @@ describe("canUse", () => {
   })
   it("is open without a policy and for features with allow any", () => {
     expect(canUse("drive", phone, [])).toBe(true)
-    expect(canUse("whatsapp", phone, policy)).toBe(true)
+    expect(canUse("payroll", phone, policy)).toBe(true)
     expect(canUse("drive", phone, [{ feature: "drive", allow: "any" }])).toBe(true)
   })
   it("blocks everywhere with allow none", () => {

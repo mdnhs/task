@@ -23,9 +23,9 @@ export function RecruitmentSkeleton({ canWrite = true, counts }: { canWrite?: bo
       </section>
       <div className="card rec-card-wrap">
         <div className="od-filters">
-          <Sk w={138} h={50} r="pill" />
-          <Sk h={40} r="pill" className="sk-fsearch" />
-          <Sk w={140} h={40} r="pill" />
+          <Sk w={138} h={48} r="pill" />
+          <Sk w={140} h={48} r="pill" />
+          <Sk h={48} r="pill" className="sk-fsearch" />
         </div>
         <div className="rec-board">
           {STAGE_ORDER.map((s, i) => {

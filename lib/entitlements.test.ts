@@ -13,7 +13,7 @@ const data: EntitlementsData = {
   defaultPlan: "small",
   plans: { small: ["M0", "M1"], big: ["M0", "M1", "M8", "M2"] },
 }
-const role = { id: "owner", label: "Owner", description: "", home: "manager", access: { dashboard: "write", tasks: "write", reports: "write", attention: "write", staff: "write", shifts: "write", recruitment: "write", files: "write", payroll: "write", orders: "write", settings: "write", audit: "write", whatsapp: "write" } } as Role
+const role = { id: "owner", label: "Owner", description: "", home: "manager", access: { dashboard: "write", tasks: "write", reports: "write", attention: "write", staff: "write", shifts: "write", recruitment: "write", files: "write", payroll: "write", orders: "write", settings: "write", audit: "write", roster: "write" } } as Role
 
 describe("entitlements", () => {
   const small = resolveEntitlements(data, "small")
@@ -28,7 +28,6 @@ describe("entitlements", () => {
     expect(hasModule(small, "shifts")).toBe(true)
     expect(hasModule(small, "payroll")).toBe(false)
     expect(hasModule(big, "payroll")).toBe(true)
-    expect(hasModule(small, "whatsapp")).toBe(true)
   })
   it("hasProductModule covers the assistant", () => {
     expect(hasProductModule(small, small.assistant)).toBe(false)

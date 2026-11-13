@@ -105,7 +105,7 @@ export function BillingSkeleton({
               </div>
               <Sk w={130} h={26} lh={40.6} />
               <ul className="bill-limits">{[110, 100, 90, 150, 70].map((w, j) => <li key={j}><Sk w={w} h={11} lh={18.8} /></li>)}</ul>
-              {canManage && i !== currentIndex && <Sk h={48.3} r={14} />}
+              {canManage && i !== currentIndex && <Sk h={48} r={14} />}
             </li>
           ))}
         </ul>
@@ -127,7 +127,7 @@ export function BillingSkeleton({
                       <td data-label="Date" className="num">{inv ? <time className="od-when sk-ghost">{dateText(inv.date, locale)}</time> : <Sk w={80} h={12} />}</td>
                       <td data-label="Amount" className="num">{inv ? <span className="sk-ghost">{moneyText(inv.amount, inv.currency, locale)}</span> : <Sk w={64} h={12} />}</td>
                       <td data-label="Status"><Sk w={64} h={29.4} r={8} /></td>
-                      <td data-label="Download"><Sk w={100} h={36.8} r={12} /></td>
+                      <td data-label="Download"><Sk w={100} h={48} r={12} /></td>
                     </tr>
                   )
                 })}

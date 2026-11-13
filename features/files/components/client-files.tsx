@@ -71,8 +71,8 @@ export function ClientFiles({
   return (
     <>
       <FilterBar>
-        <FilterSearch value={q} onChange={(v) => { setQ(v); setPage(1) }} placeholder="Search clients" />
         <FilterSelect label="Status" value={status} options={STATUSES} onChange={(v) => { setStatus(v); setPage(1) }} />
+        <FilterSearch value={q} onChange={(v) => { setQ(v); setPage(1) }} placeholder="Search clients" />
       </FilterBar>
       {rows.length > 0 ? (
         <>

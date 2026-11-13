@@ -68,7 +68,6 @@ export function BoardFilters({ q, project, assignee, set, people, projects, only
 }) {
   return (
     <FilterBar>
-      <FilterSearch value={q} onChange={(v) => set("q", v)} placeholder="Search tasks" />
       {projects.length > 0 && (
         <FilterSelect label="Project" value={project} options={[{ value: "all", label: "All projects" }, ...projects.map((p) => ({ value: p.id, label: p.name }))]} onChange={(v) => set("project", v)} />
       )}
@@ -76,6 +75,7 @@ export function BoardFilters({ q, project, assignee, set, people, projects, only
         <FilterSelect label="Assignee" value={assignee} options={[{ value: "all", label: "All assignees" }, ...people.map((p) => ({ value: p.id, label: p.name }))]} onChange={(v) => set("assignee", v)} />
       )}
       {children}
+      <FilterSearch value={q} onChange={(v) => set("q", v)} placeholder="Search tasks" />
     </FilterBar>
   )
 }

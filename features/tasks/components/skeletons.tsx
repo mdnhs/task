@@ -13,17 +13,17 @@ export function TasksSkeleton({ canCreate = true, staff = false, rows = 8, proje
       <TabsSkeleton />
       <div className="card tasks-card">
         <div className="od-filters">
-          <Sk h={40} r="pill" className="sk-fsearch" />
-          <Sk w={140} h={39.6} r="pill" />
-          <Sk w={140} h={39.6} r="pill" />
-          <Sk w={140} h={39.6} r="pill" />
-          {projects && <Sk w={140} h={39.6} r="pill" />}
+          <Sk w={140} h={48} r="pill" />
+          <Sk w={140} h={48} r="pill" />
+          <Sk w={140} h={48} r="pill" />
+          {projects && <Sk w={140} h={48} r="pill" />}
           {!staff && (
             <>
-              <Sk w={140} h={39.6} r="pill" />
+              <Sk w={140} h={48} r="pill" />
             </>
           )}
-          <Sk w={331} h={50} r="pill" />
+          <Sk w={331} h={48} r="pill" />
+          <Sk h={48} r="pill" className="sk-fsearch" />
         </div>
         <div className="table-wrap">
           <table className="rtable tasks-table">
@@ -135,7 +135,7 @@ export function TaskDetailSkeleton({ canEdit = true, reviewer = false }: { canEd
             {canEdit && (
               <>
                 <Sk w="100%" h={90} r={14} />
-                <div className="ev-add"><Sk w={104} h={46} r={14} /><Sk w={104} h={46} r={14} /></div>
+                <div className="ev-add"><Sk w={104} h={48} r={14} /><Sk w={104} h={48} r={14} /></div>
               </>
             )}
             <ul className="ev-list">
@@ -157,7 +157,7 @@ export function TaskDetailSkeleton({ canEdit = true, reviewer = false }: { canEd
               <div className="td-form">
                 <Sk w={60} h={12} lh={18} />
                 <Sk w="100%" h={96} r={14} />
-                <div className="td-form-foot"><Sk w={112} h={46} r={14} /></div>
+                <div className="td-form-foot"><Sk w={112} h={48} r={14} /></div>
               </div>
             )}
           </section>
@@ -165,12 +165,12 @@ export function TaskDetailSkeleton({ canEdit = true, reviewer = false }: { canEd
         <div className="td-col">
           <section className="card td-actions">
             <Line w={70} h={14} lh={24} />
-            {canEdit && <div className="td-btns" style={{ marginTop: 12 }}><Sk w={150} h={46} r={14} /><Sk w={120} h={46} r={14} /></div>}
+            {canEdit && <div className="td-btns" style={{ marginTop: 12 }}><Sk w={150} h={48} r={14} /><Sk w={120} h={48} r={14} /></div>}
             {!canEdit && <div style={{ marginTop: 12 }}><Line w={200} h={11} lh={20} /></div>}
             {/* Manager tools (Reschedule, Reassign, Remove) or the member's "Propose new dates" (task-actions.tsx) */}
             {canEdit && (
               <div className="td-deadline">
-                {reviewer ? <div className="td-btns"><Sk w={120} h={46} r={14} /><Sk w={106} h={46} r={14} /><Sk w={98} h={46} r={14} /></div> : <Sk w={170} h={46} r={14} />}
+                {reviewer ? <div className="td-btns"><Sk w={120} h={48} r={14} /><Sk w={106} h={48} r={14} /><Sk w={98} h={48} r={14} /></div> : <Sk w={170} h={48} r={14} />}
               </div>
             )}
           </section>
@@ -202,14 +202,14 @@ export function TabsSkeleton() {
   )
 }
 
-/** Board filter bar (task-board.tsx BoardFilters): search, project, assignee (not for staff), plus extra controls. */
+/** Board filter bar (task-board.tsx BoardFilters): project, assignee (not for staff), extra controls, then search last. */
 function BoardFiltersSkeleton({ staff, projects = true, seg }: { staff: boolean; projects?: boolean; seg?: number }) {
   return (
     <div className="od-filters">
-      <Sk h={40} r="pill" className="sk-fsearch" />
-      {projects && <Sk w={140} h={40} r="pill" />}
-      {!staff && <Sk w={140} h={40} r="pill" />}
-      {seg && <Sk w={seg} h={50} r="pill" />}
+      {projects && <Sk w={140} h={48} r="pill" />}
+      {!staff && <Sk w={140} h={48} r="pill" />}
+      {seg && <Sk w={seg} h={48} r="pill" />}
+      <Sk h={48} r="pill" className="sk-fsearch" />
     </div>
   )
 }
@@ -244,7 +244,7 @@ export function TaskBoardSkeleton({ staff = false, counts = [3, 3, 2, 2, 2, 3], 
                         {k?.chip && <span className="kb-chip num sk-ghost">{k.chip}</span>}
                         {k?.ev && <span className="ev-tag sk-ghost">{k.ev}</span>}
                       </div>
-                      {(k ? k.move : movable) && <Sk w="100%" h={34} r="pill" />}
+                      {(k ? k.move : movable) && <Sk w="100%" h={48} r="pill" />}
                     </li>
                   ))}
                 </ul>
@@ -268,7 +268,7 @@ export function TaskCalendarSkeleton({ staff = false, projects = true, weeks }: 
       <TabsSkeleton />
       <div className="card tasks-card">
         <BoardFiltersSkeleton staff={staff} projects={projects} seg={170} />
-        <div className="cal-nav"><Sk w={52} h={38} r="pill" /><Sk w={74} h={38} r="pill" /><Sk w={52} h={38} r="pill" /><span className="cal-title"><Sk w={130} h={14} lh={24} /></span></div>
+        <div className="cal-nav"><Sk w={52} h={48} r="pill" /><Sk w={74} h={48} r="pill" /><Sk w={52} h={48} r="pill" /><span className="cal-title"><Sk w={130} h={14} lh={24} /></span></div>
         <div className="cal-month">
           <div className="cal-row cal-dow">{Array.from({ length: 7 }, (_, i) => <div key={i}><Sk w={26} h={10} lh={16} /></div>)}</div>
           {grid.map((week, w) => (

@@ -124,9 +124,9 @@ export function UsersPanel({ users, invites, roles, departments, today, tzLabel,
           </p>
         )}
         <FilterBar>
-          <FilterSearch value={q} onChange={reset(setQ)} placeholder="Search name or email" />
           <FilterSelect label="Role" value={role} onChange={reset(setRole)} options={[{ value: "all", label: "All roles" }, ...roles.map((r) => ({ value: r.id, label: r.label }))]} />
           <FilterSelect label="Status" value={status} onChange={reset(setStatus)} options={[{ value: "all", label: "All statuses" }, { value: "active", label: "Active" }, { value: "deactivated", label: "Deactivated" }]} />
+          <FilterSearch value={q} onChange={reset(setQ)} placeholder="Search name or email" />
         </FilterBar>
         {paged.rows.length > 0 ? (
           <div className="table-wrap">

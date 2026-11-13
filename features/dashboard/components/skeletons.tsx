@@ -22,7 +22,7 @@ function CardHead({ sub = true, action, title = 190, subW = 240 }: { sub?: boole
         <Sk w={title} h={18} lh={28} />
         {sub && <Sk w={subW} h={11} lh={17} style={{ marginTop: 2 }} />}
       </div>
-      {action && <Sk w={action} h={37} r="pill" />}
+      {action && <Sk w={action} h={48} r="pill" />}
     </div>
   )
 }
@@ -66,8 +66,8 @@ export function TodayCardSkeleton({ mode, tiles, team, data }: TodaySk) {
           <div className="today-head">
             {data ? <div className="sub"><span className="sk-ghost">{todaySub(data.day)}</span></div> : <Sk w={120} h={11} lh={17} />}
             <div className="today-actions">
-              <Sk w={151.3} h={36.6} r="pill" />
-              <Sk w={107.9} h={36.6} r="pill" />
+              <Sk w={151.3} h={48} r="pill" />
+              <Sk w={107.9} h={48} r="pill" />
             </div>
           </div>
           <ul className="today-tiles" data-n={labels?.length ?? tiles}>
@@ -205,7 +205,7 @@ export function ReportDeadlineSkeleton({ data, canRemind }: { data?: ReportDeadl
           <span className="st sk-ghost">{r.status.label}</span>
         </div>
       ))}
-      {(data.kind === "member" || (canRemind && data.missing > 0)) && <Sk w="100%" h={46.3} r={14} style={{ marginTop: 12 }} />}
+      {(data.kind === "member" || (canRemind && data.missing > 0)) && <Sk w="100%" h={48} r={14} style={{ marginTop: 12 }} />}
     </div>
   )
 }

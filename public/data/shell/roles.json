@@ -18,7 +18,6 @@
         "orders": "write",
         "settings": "write",
         "audit": "write",
-        "whatsapp": "write",
         "roster": "write"
       },
       "rosterLevel": "office"
@@ -41,7 +40,6 @@
         "orders": "read",
         "settings": "write",
         "audit": "write",
-        "whatsapp": "read",
         "roster": "write"
       },
       "rosterLevel": "office"
@@ -66,7 +64,6 @@
         "orders": "read",
         "settings": "read",
         "audit": "read",
-        "whatsapp": "read",
         "roster": "write"
       }
     },
@@ -90,7 +87,6 @@
         "orders": "none",
         "settings": "none",
         "audit": "none",
-        "whatsapp": "none",
         "roster": "write"
       }
     },
@@ -114,7 +110,6 @@
         "orders": "write",
         "settings": "read",
         "audit": "write",
-        "whatsapp": "write",
         "roster": "read"
       }
     },
@@ -136,7 +131,6 @@
         "orders": "write",
         "settings": "read",
         "audit": "read",
-        "whatsapp": "write",
         "roster": "read"
       }
     },
@@ -158,7 +152,6 @@
         "orders": "none",
         "settings": "none",
         "audit": "none",
-        "whatsapp": "write",
         "roster": "read"
       }
     },
@@ -180,7 +173,6 @@
         "orders": "none",
         "settings": "none",
         "audit": "none",
-        "whatsapp": "none",
         "roster": "read"
       }
     },
@@ -202,7 +194,6 @@
         "orders": "none",
         "settings": "none",
         "audit": "none",
-        "whatsapp": "none",
         "roster": "read"
       }
     },
@@ -224,7 +215,6 @@
         "orders": "none",
         "settings": "none",
         "audit": "none",
-        "whatsapp": "none",
         "roster": "read"
       }
     },
@@ -246,7 +236,6 @@
         "orders": "read",
         "settings": "read",
         "audit": "read",
-        "whatsapp": "read",
         "roster": "read"
       }
     },
@@ -269,7 +258,6 @@
         "orders": "none",
         "settings": "none",
         "audit": "none",
-        "whatsapp": "none",
         "roster": "none"
       }
     }

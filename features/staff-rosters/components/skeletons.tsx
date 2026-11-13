@@ -63,10 +63,10 @@ export function StaffRostersSkeleton({
         ) : (
           <>
             <div className="od-filters">
-              <Sk w={232} h={50} r="pill" />
-              <Sk h={40} r="pill" className="sk-fsearch" />
-              <Sk w={140} h={40} r="pill" />
-              <Sk w={140} h={40} r="pill" />
+              <Sk w={232} h={48} r="pill" />
+              <Sk w={140} h={48} r="pill" />
+              <Sk w={140} h={48} r="pill" />
+              <Sk h={48} r="pill" className="sk-fsearch" />
             </div>
             <div className="table-wrap">
               <table className="rtable sr-table">
@@ -133,9 +133,9 @@ function GapsBodySkeleton({
   return (
     <>
       <div className="od-filters">
-        <Sk w={232} h={50} r="pill" />
-        <Sk h={40} r="pill" className="sk-fsearch" />
-        <Sk w={140} h={40} r="pill" />
+        <Sk w={232} h={48} r="pill" />
+        <Sk w={140} h={48} r="pill" />
+        <Sk h={48} r="pill" className="sk-fsearch" />
       </div>
       <div className="sr-groups">
         {groups.map((n, g) => (

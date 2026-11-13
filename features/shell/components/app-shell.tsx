@@ -222,19 +222,6 @@ export function AppShell({
             {platform && <PlatformContext env={env} />}
             <div className="top-actions">
               {assistant}
-              {/* The nav is already filtered by role and plan, so the shortcut follows it. */}
-              {navigation.menu.some((n) => n.href === "/whatsapp") && (
-                <Button
-                  variant="ghost"
-                  size="icon-lg"
-                  className="icon-btn"
-                  aria-label="WhatsApp inbox"
-                  nativeButton={false}
-                  render={<Link href="/whatsapp" />}
-                >
-                  <Icon name="mail" />
-                </Button>
-              )}
               <NotificationsPanel items={notifications} today={today} tzLabel={tzLabel} scope={bellScope ?? `${session.tenant.id}:${session.role.id}`} notify={notify} />
               <NavUser user={user} session={session} variant={variant} />
             </div>

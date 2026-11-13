@@ -179,7 +179,7 @@
 .set-appear-row{display:grid;grid-template-columns:96px minmax(0,1fr);align-items:center;gap:12px;margin:0;padding:0;border:0;min-width:0}
 .set-appear-row legend{float:left;font-size:13px;color:var(--ink-2);padding:0}
 .set-appear-opts{display:flex;gap:8px;flex-wrap:wrap}
-.set-opt{display:inline-flex;align-items:center;padding:8px 14px;border-radius:var(--r-pill);background:var(--mute-bg);font-size:13px;font-weight:600;color:var(--ink-2);cursor:pointer;transition:background var(--dur-fast) var(--ease),color var(--dur-fast) var(--ease)}
+.set-opt{display:inline-flex;align-items:center;min-height:var(--ctl-h);padding:0 14px;border-radius:var(--r-pill);background:var(--mute-bg);font-size:13px;font-weight:600;color:var(--ink-2);cursor:pointer;transition:background var(--dur-fast) var(--ease),color var(--dur-fast) var(--ease)}
 .set-opt:hover{color:var(--ink)}
 .set-opt:has(:checked){background:var(--brand-soft);color:var(--brand-deep)}
 :root[data-theme="dark"] .set-opt:has(:checked){color:var(--brand-3)}
@@ -189,7 +189,7 @@
 .set-appear-row:disabled .set-opt:hover{color:var(--ink-2)}
 @media (max-width:640px){.set-appear-row{grid-template-columns:minmax(0,1fr)}}
 /* Forms (ui-rules.md rule 32): chip choices inside settings cards; long labels may wrap on phones */
-.set-card .rp-day{height:auto;min-height:36px;padding-block:8px;line-height:20px;text-align:left}
+.set-card .rp-day{height:auto;min-height:var(--ctl-h);padding-block:8px;line-height:20px;text-align:left}
 .set-card .rp-day:disabled{cursor:not-allowed}
 .set-card .rp-day:disabled:not([aria-pressed="true"]):hover{color:var(--ink-2)}
 .set-card .rp-day:disabled:not([aria-pressed="true"]){opacity:.6}

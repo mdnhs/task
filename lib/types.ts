@@ -8,7 +8,7 @@ export type Status = { tone: Tone; label: string }
 export type Dept = "all" | "Security" | "Cleaning"
 
 // Session / tenancy (see lib/permissions.ts, lib/session.ts)
-export type Module = "dashboard" | "tasks" | "reports" | "attention" | "staff" | "shifts" | "recruitment" | "files" | "payroll" | "orders" | "settings" | "audit" | "whatsapp" | "roster"
+export type Module = "dashboard" | "tasks" | "reports" | "attention" | "staff" | "shifts" | "recruitment" | "files" | "payroll" | "orders" | "settings" | "audit" | "roster"
 export type Access = "none" | "read" | "write"
 export type Role = {
   id: string

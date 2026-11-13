@@ -100,8 +100,8 @@ export function SupportView({ data, operator, today, tz, tzLabel, requestFor }: 
       />
       <div className="card pf-card">
         <FilterBar>
-          <FilterSearch value={q} onChange={(v) => { setQ(v); setPage(1) }} placeholder="Search requests" />
           <FilterSelect label="Status" value={status} options={STATUS_OPTIONS} onChange={(v) => { setStatus(v); setPage(1) }} />
+          <FilterSearch value={q} onChange={(v) => { setQ(v); setPage(1) }} placeholder="Search requests" />
         </FilterBar>
         {rows.length > 0 ? (
           <>

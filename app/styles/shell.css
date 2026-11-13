@@ -73,10 +73,10 @@
   .dept-row{order:4;flex:1 1 100%;min-width:0;display:flex;gap:2px;padding:4px;background:var(--card);border-radius:var(--r-pill);
     overflow-x:auto;overscroll-behavior-x:contain;scroll-snap-type:x mandatory;scrollbar-width:none;-webkit-overflow-scrolling:touch}
   .dept-row::-webkit-scrollbar{display:none}
-  .dept-row button{position:relative;flex:none;display:inline-flex;align-items:center;height:44px;min-width:44px;justify-content:center;padding:0 18px;border-radius:var(--r-pill);
+  .dept-row button{position:relative;flex:none;display:inline-flex;align-items:center;height:calc(var(--ctl-h) - 8px);min-width:44px;justify-content:center;padding:0 18px;border-radius:var(--r-pill);
     font-size:13px;font-weight:600;white-space:nowrap;color:var(--ink-2);scroll-snap-align:center;transition:color var(--dur) var(--ease)}
   .dept-row button[aria-pressed="true"]{color:var(--on-brand)}
-  .sk-dept-row{display:block;order:4;flex:1 1 100%;width:100%;height:52px}
+  .sk-dept-row{display:block;order:4;flex:1 1 100%;width:100%;height:var(--ctl-h)}
 }
 
 /* ---------- Sidebar badges in the icon-collapsed rail: same counts, pinned to the icon's top-right corner ---------- */

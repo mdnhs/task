@@ -102,7 +102,7 @@ const ghost = (text: React.ReactNode) => <span className="sk-ghost">{text}</span
 const PlanFieldSk = ({ label, req = true }: { label?: string; req?: boolean }) => (
   <div className="od-field">
     {label ? <label>{ghost(label)}{req && <span className="od-req" aria-hidden="true"> *</span>}</label> : <Sk w={130} h={11} lh={18.1} />}
-    <Sk h={44} r={14} />
+    <Sk h={48} r={14} />
   </div>
 )
 
@@ -236,8 +236,8 @@ export function SupportSkeleton({ requests = [], audit = [], tenants = [], today
       <PageHeadSkeleton actions={1} wrap />
       <div className="card pf-card">
         <div className="od-filters">
-          <Sk h={40} r="pill" className="sk-fsearch" />
-          <Sk w={140} h={40} r="pill" />
+          <Sk w={140} h={48} r="pill" />
+          <Sk h={48} r="pill" className="sk-fsearch" />
         </div>
         <div className="table-wrap">
           <table className="rtable pf-table pf-support">

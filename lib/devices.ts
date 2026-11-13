@@ -3,7 +3,7 @@
 
 export type DeviceType = "pc" | "android" | "browser"
 export type DeviceOwner = "company" | "personal"
-export type DeviceFeature = "drive" | "whatsapp" | "payroll"
+export type DeviceFeature = "drive" | "payroll"
 export type DeviceAllow = "trusted-company-pc" | "any" | "none"
 
 export type Device = {
@@ -28,7 +28,6 @@ export const DEVICE_OWNERS: { value: DeviceOwner; label: string }[] = [
 ]
 export const DEVICE_FEATURES: { value: DeviceFeature; label: string }[] = [
   { value: "drive", label: "Google Drive" },
-  { value: "whatsapp", label: "WhatsApp" },
   { value: "payroll", label: "Payroll" },
 ]
 export const DEVICE_ALLOWS: { value: DeviceAllow; label: string }[] = [

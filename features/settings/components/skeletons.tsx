@@ -89,7 +89,7 @@ const CardHead = ({
       {typeof title === "string" ? <h2>{g(title)}</h2> : <Sk w={title} h={18} lh={28} />}
       {typeof sub === "string" ? <div className="sub">{g(sub)}</div> : <Sk w={sub} h={11} lh={17} style={{ marginTop: 2 }} />}
     </div>
-    {button ? <Sk w={button} h={46.3} r={14} /> : null}
+    {button ? <Sk w={button} h={48} r={14} /> : null}
     {extra}
   </div>
 )
@@ -111,7 +111,7 @@ const FieldSk = ({
     ) : (
       <Sk w={label} h={11} lh={18.1} />
     )}
-    <Sk h={44} r={14} />
+    <Sk h={48} r={14} />
     {typeof hint === "string" ? (
       <div className="od-field-msg"><p className="od-field-hint">{g(hint)}</p></div>
     ) : hint ? (
@@ -123,7 +123,7 @@ const FieldSk = ({
 // Form submit button: 44.3px (shadcn Button size lg in .od-form-foot).
 const Foot = ({ w = 135 }: { w?: number }) => (
   <div className="od-form-foot">
-    <Sk w={w} h={44.3} r={14} />
+    <Sk w={w} h={48} r={14} />
   </div>
 )
 
@@ -243,9 +243,9 @@ function Users({
       <section className="card set-card">
         <CardHead title={70} sub={190} button={canWrite ? 160 : 0} />
         <div className="od-filters">
-          <Sk h={40} r="pill" className="sk-fsearch" />
-          <Sk w={140} h={40} r="pill" />
-          <Sk w={140} h={40} r="pill" />
+          <Sk w={140} h={48} r="pill" />
+          <Sk w={140} h={48} r="pill" />
+          <Sk h={48} r="pill" className="sk-fsearch" />
         </div>
         <div className="table-wrap">
           <table className="rtable set-table">
@@ -329,7 +329,7 @@ function Roles({ canWrite, matrix }: { canWrite: boolean; matrix?: MatrixData })
                 {roles.map((r) => (
                   <td key={r.id} data-label={r.label}>
                     {canWrite && r.id !== "owner" ? (
-                      <div className="od-filters set-access"><Sk w={96} h={34.8} r="pill" /></div>
+                      <div className="od-filters set-access"><Sk w={96} h={48} r="pill" /></div>
                     ) : (
                       <span className="set-level sk-ghost">{LEVEL[r.access[m.id]]}</span>
                     )}
@@ -354,7 +354,7 @@ function Template({ depts, seed }: { depts: number; seed?: TemplateData }) {
       <CardHead
         title="Report template"
         sub={current ? `${list.filter((x) => x.enabled).length} of ${list.length} sections enabled for ${current.dept}` : "No departments"}
-        extra={depts > 1 && <Sk w={174} h={50} r="pill" className="sk-seg-hide" />}
+        extra={depts > 1 && <Sk w={174} h={48} r="pill" className="sk-seg-hide" />}
       />
       <ul className="set-list">
         {list.map((sec, i) => (
@@ -413,7 +413,7 @@ function Notifications({ canWrite, data, deadline, tzLabel, today, log }: { canW
           ))}
           {canWrite && spare.length > 0 && (
             <div className="od-filters set-add-interval">
-              <Sk w={140} h={39.6} r="pill" />
+              <Sk w={140} h={48} r="pill" />
             </div>
           )}
         </div>
@@ -421,7 +421,7 @@ function Notifications({ canWrite, data, deadline, tzLabel, today, log }: { canW
           {g(next ? `Next reminder: ${formatTime(next.reminder.atIso)} ${tzLabel}${next.tomorrow ? " tomorrow" : ""} (${next.reminder.channels.map(chLabel).join(", ")})` : "No reminders will be sent.")}
         </p>
         <div className="od-filters set-clock">
-          <Sk w={200} h={40} r="pill" />
+          <Sk w={200} h={48} r="pill" />
           <span className="tm">{g("Try the schedule: moves the mock clock, nothing is sent.")}</span>
         </div>
       </section>
@@ -460,8 +460,8 @@ function Notifications({ canWrite, data, deadline, tzLabel, today, log }: { canW
       <section className="card set-card">
         <CardHead title="Delivery log" sub="Every notification, channel by channel, with its delivery status" />
         <div className="od-filters">
-          <Sk w={140} h={40} r="pill" />
-          <Sk w={140} h={40} r="pill" />
+          <Sk w={140} h={48} r="pill" />
+          <Sk w={140} h={48} r="pill" />
         </div>
         <div className="table-wrap">
           <table className="rtable set-table">
@@ -543,7 +543,7 @@ function DevicePolicies({ canWrite, policies }: { canWrite: boolean; policies: D
               <span>{g(describePolicy({ feature: f.value, allow: allowFor(f.value, policies) }))}</span>
             </div>
             {/* FilterSeg: Trusted PCs / Any device / Nowhere (browser-measured 297 wide) */}
-            {canWrite && <div className="od-filters"><Sk w={297} h={50} r="pill" style={{ maxWidth: "100%" }} /></div>}
+            {canWrite && <div className="od-filters"><Sk w={297} h={48} r="pill" style={{ maxWidth: "100%" }} /></div>}
           </li>
         ))}
       </ul>
@@ -556,7 +556,7 @@ const MFA_SEG_W = 292
 function MfaPolicySk({ canWrite, policy, roleLabels }: { canWrite: boolean; policy: MfaPolicy; roleLabels: Record<string, string> }) {
   return (
     <section className="card set-card">
-      <CardHead title="Two-step verification" sub={describeMfaPolicy(policy, roleLabels)} extra={canWrite ? <div className="od-filters"><Sk w={MFA_SEG_W} h={50} r="pill" style={{ maxWidth: "100%" }} /></div> : null} />
+      <CardHead title="Two-step verification" sub={describeMfaPolicy(policy, roleLabels)} extra={canWrite ? <div className="od-filters"><Sk w={MFA_SEG_W} h={48} r="pill" style={{ maxWidth: "100%" }} /></div> : null} />
       {policy.mode === "roles" && (
         <div className="dev-roles">
           {Object.entries(roleLabels).map(([id, text]) => (
@@ -626,7 +626,7 @@ function Branding({
           <SecSk title="Colour">
             <div className="od-field">
               <Sk w={90} h={11} lh={18.1} />
-              <Sk h={44} r={14} />
+              <Sk h={48} r={14} />
             </div>
           </SecSk>
           <SecSk title="Appearance">
@@ -634,7 +634,7 @@ function Branding({
               {APPEAR_PILLS.map((ws, i) => (
                 <div key={i} className="set-appear-row">
                   <Sk w={LEGEND_W[i]} h={11} lh={18.8} />
-                  <div className="set-appear-opts">{ws.map((w, j) => <Sk key={j} w={w} h={34.8} r="pill" />)}</div>
+                  <div className="set-appear-opts">{ws.map((w, j) => <Sk key={j} w={w} h={48} r="pill" />)}</div>
                 </div>
               ))}
             </div>

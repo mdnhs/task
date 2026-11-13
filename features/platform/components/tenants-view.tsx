@@ -185,7 +185,6 @@ export function TenantsView({ data, view, today, operator }: { data: TenantsData
           />
         </FilterBar>
         <FilterBar>
-          <FilterSearch value={filters.q} onChange={(v) => set("q", v)} placeholder="Search name, slug or ID" />
           <FilterSelect label="Plan" value={filters.plan} options={[{ value: "all", label: "All plans" }, ...data.plans.map((p) => ({ value: p.id, label: p.name }))]} onChange={(v) => set("plan", v)} />
           <FilterSelect label="Status" value={filters.status} options={STATUS_OPTIONS} onChange={(v) => set("status", v)} />
           <span className="pf-sort-m">
@@ -199,6 +198,7 @@ export function TenantsView({ data, view, today, operator }: { data: TenantsData
               }}
             />
           </span>
+          <FilterSearch value={filters.q} onChange={(v) => set("q", v)} placeholder="Search name, slug or ID" />
         </FilterBar>
         {rows.length > 0 ? (
           <>

@@ -17,7 +17,7 @@ function Head() {
 const FieldSk = ({ hint = false }: { hint?: boolean }) => (
   <div className="od-field">
     <Sk w={96} h={12} lh={18.1} />
-    <Sk h={44} r={12} />
+    <Sk h={48} r={12} />
     {hint && <div className="od-field-msg"><Sk w={220} h={10} lh={17.4} /></div>}
   </div>
 )
@@ -103,11 +103,11 @@ export function OnboardingSkeleton({ departments = 2 }: { departments?: number }
             {Array.from({ length: departments }, (_, i) => (
               <li key={i}>
                 <FieldSk />
-                <Sk w={92} h={44.3} r={14} />
+                <Sk w={92} h={48} r={14} />
               </li>
             ))}
           </ul>
-          <Sk w={170} h={48.3} r={14} />
+          <Sk w={170} h={48} r={14} />
         </section>
         <div className="auth-actions"><ButtonSk w={140} h={46.3} /></div>
       </div>

@@ -30,7 +30,6 @@ Feature docs for the later full-UI pages live in `features/<feature>.md`:
 | `features/rosters.md` | Location Rosters `/rosters` (Module 1A, FR-RS-*, CR-07..09): location access, rule checks, publish/lock/change requests, repeat and templates, open shifts and swaps, staff self-service, overlay into shift reports, privacy, mock limits, deferred items |
 | `features/devices.md` | Devices and platform security (mock): device register and policy, Drive on trusted PCs only, MFA rule and gate, SSO buttons. Deploy guide: `deploy/google-drive-android.md` |
 | `features/platform.md` | Platform console `/platform/**` (SaaS admin, FR-M0-01/02/13/14/15/19): routes, staff roles and permission table, metrics (MRR, NRR cohort rule), health score, store patch contract, privacy rule D8, ⌘K palette, mock limits |
-| `features/whatsapp.md` | WhatsApp inbox `/whatsapp` (SRS §3.17): integration status, voice-note transcripts, link/create task, gates |
 | `search/brief.md` | Global topbar search (FR-AUD-01): one-surface clip-path panel, lazy role-filtered index, shortcuts |
 
 Layout grid (desktop, content area): 4 stat cards row → [chart 2/3 | deadline 1/3] → [attention 2/3 | progress 1/3] → [team tasks 2/3 | coverage 1/3].

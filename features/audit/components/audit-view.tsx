@@ -95,12 +95,12 @@ export function AuditView({
           </span>
         </p>
         <FilterBar>
-          <FilterSearch value={filters.q} onChange={(v) => set("q", v)} placeholder="Search events" />
           <FilterSelect label="Actor" value={filters.actor} options={actors} onChange={(v) => set("actor", v)} />
           <FilterSelect label="Action" value={filters.action} options={actions} onChange={(v) => set("action", v)} />
           <FilterSelect label="Record type" value={filters.recordType} options={types} onChange={(v) => set("recordType", v)} />
           <DatePicker value={filters.from} onChange={(v) => set("from", v)} today={today} label="From date" placeholder="From" />
           <DatePicker value={filters.to} onChange={(v) => set("to", v)} today={today} min={filters.from || undefined} label="To date" placeholder="To" />
+          <FilterSearch value={filters.q} onChange={(v) => set("q", v)} placeholder="Search events" />
         </FilterBar>
         {rows.length === 0 ? (
           <EmptyState icon="history" title="No events match" text="Try a different actor, action or date range." />
