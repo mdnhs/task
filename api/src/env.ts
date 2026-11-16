@@ -24,6 +24,12 @@ const schema = z.object({
   DATA_REGION: z.enum(["eu-west-1", "eu-central-1"]),
   GOOGLE_CLIENT_ID: optional,
   GOOGLE_CLIENT_SECRET: optional,
+  // Tenant Google Drive integration (T2.4): its OWN OAuth client, separate from the sign-in client above. Required only
+  // when the integration is used (start answers 503 integration_not_configured otherwise); empty = unset.
+  GOOGLE_INTEGRATION_CLIENT_ID: optional,
+  GOOGLE_INTEGRATION_CLIENT_SECRET: optional,
+  // Exact redirect URI registered at Google; defaults to `${APP_URL}/v1/integrations/google/callback`.
+  GOOGLE_INTEGRATION_REDIRECT_URI: optional,
   MICROSOFT_CLIENT_ID: optional,
   MICROSOFT_CLIENT_SECRET: optional,
   SECRETS_KEY: secretsKey,

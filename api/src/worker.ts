@@ -3,6 +3,7 @@ import { relayOnce } from "./core/events"
 import { makeBullQueue, startWorker } from "./core/queue/bull-queue"
 import { registerJob } from "./core/queue/queue"
 import { registerFiles } from "./modules/files"
+import { registerIntegrations } from "./modules/integrations"
 import { registerNotifications } from "./modules/notifications"
 import { parseEnv, type Env } from "./env"
 import { makeDeps } from "./server"
@@ -12,6 +13,7 @@ export async function startWorkerProcess(env: Env = parseEnv(process.env)) {
   const deps = makeDeps(env)
   registerNotifications() // notification.send job + member.joined subscriber
   registerFiles() // file.scan + file.delete-object jobs
+  registerIntegrations() // integration.refresh job (token refresh is otherwise lazy, see getAccessToken)
   registerJob("events.relay", async (_data, d) => {
     await relayOnce(d)
   })

@@ -68,6 +68,8 @@ const SPECS: Record<string, Spec> = {
   "POST /v1/files/{id}/complete": { actor: "owner", expect: "file_not_found" },
   "GET /v1/files/{id}/download": { actor: "owner", expect: "file_not_found" },
   "DELETE /v1/files/{id}": { actor: "owner", expect: "file_not_found" },
+  // the tenant's google connection (control: DELETE -> 204)
+  "DELETE /v1/integrations/{id}": { actor: "owner", expect: "integration_not_found" },
 }
 
 let t: ReturnType<typeof testApp>
@@ -94,7 +96,7 @@ const substitute = (path: string, params: Record<string, string>) => path.replac
 
 async function hashes(tenantId: string): Promise<Record<string, string>> {
   const out: Record<string, string> = {}
-  for (const tbl of ["roles", "memberships", "teams", "team_members", "reporting_lines", "devices", "device_policies", "invites", "audit_events", "tenant_settings", "notifications", "notification_preferences", "push_tokens", "notification_deliveries", "files"]) {
+  for (const tbl of ["roles", "memberships", "teams", "team_members", "reporting_lines", "devices", "device_policies", "invites", "audit_events", "tenant_settings", "notifications", "notification_preferences", "push_tokens", "notification_deliveries", "files", "integration_connections", "oauth_states", "public_holidays"]) {
     const [r] = await ownerTenantQuery(tenantId, `select count(*)::text || ':' || coalesce(md5(string_agg(to_jsonb(x)::text, ',' order by to_jsonb(x)::text)), '') as h from ${tbl} x`)
     out[tbl] = String(r.h)
   }

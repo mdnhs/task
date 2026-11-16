@@ -8,6 +8,7 @@ import { fakePush, type FakePush } from "../src/core/push/fake-push"
 import { fakeScanner } from "../src/core/scan/fake-scanner"
 import { makeStorage } from "../src/modules/platform-storage"
 import { fakeQueue, type FakeQueue } from "../src/core/queue/fake-queue"
+import { fakeOAuth, type FakeOAuth } from "../src/core/oauth/fake-oauth"
 import { fakeClock, fakeMailer, type FakeClock, type FakeMailer } from "./fakes"
 
 export { fakeClock, fakeMailer }
@@ -38,7 +39,7 @@ export const testEnv: Deps["env"] = {
 // Lets helpers (factories.ts) find an app's fake mailer from the app alone.
 export const mailerOf = new WeakMap<object, FakeMailer>()
 
-export function testApp(over: Partial<Deps> = {}): { app: AppType; deps: Deps; mailer: FakeMailer; clock: FakeClock; queue: FakeQueue; push: FakePush } {
+export function testApp(over: Partial<Deps> = {}): { app: AppType; deps: Deps; mailer: FakeMailer; clock: FakeClock; queue: FakeQueue; push: FakePush; oauth: FakeOAuth } {
   const clock = fakeClock()
   const env = over.env ?? testEnv
   // Real (lazy-connecting) Testcontainers db when global setup provided one; inert fake otherwise.
@@ -48,12 +49,13 @@ export function testApp(over: Partial<Deps> = {}): { app: AppType; deps: Deps; m
   const mailer = (over.mailer ?? fakeMailer()) as FakeMailer // the one actually used
   const queue = (over.queue ?? fakeQueue()) as FakeQueue
   const push = (over.push ?? fakePush()) as FakePush
+  const oauth = (over.oauth ?? fakeOAuth()) as FakeOAuth
   const storage = over.storage ?? makeStorage({ env, db })
   const scanner = over.scanner ?? fakeScanner() // auto: flags EICAR, everything else clean
-  const deps: Deps = { env, db, clock: usedClock, mailer, logger, queue, push, storage, scanner, auth: over.auth ?? buildAuth({ env, db, clock: usedClock, mailer, logger }) }
+  const deps: Deps = { env, db, clock: usedClock, mailer, logger, queue, push, storage, scanner, oauth, auth: over.auth ?? buildAuth({ env, db, clock: usedClock, mailer, logger }) }
   const app = createApp(deps)
   mailerOf.set(app, mailer)
-  return { app, deps, mailer, clock: usedClock as FakeClock, queue, push }
+  return { app, deps, mailer, clock: usedClock as FakeClock, queue, push, oauth }
 }
 
 export function call(
@@ -73,11 +75,17 @@ export function call(
   return Promise.resolve(app.request(path, { method, headers, body }))
 }
 
+/**
+ * Browser-redirect callbacks: authenticated by session only (no X-Tenant exists on a redirect); the tenant comes from the
+ * single-use state, and forced MFA is enforced there (integrations.test.ts covers it). Not "tenant routes" for the MFA sweep.
+ */
+const CALLBACKS = new Set(["/v1/integrations/google/callback"])
+
 /** GET routes from the OpenAPI document that have no path params, minus /v1/me* and the spec itself (R6). */
 export function tenantGetRoutes(app: AppType): string[] {
   const doc = app.getOpenAPI31Document({ openapi: "3.1.0", info: { title: "t", version: "1" } })
   return Object.entries(doc.paths ?? {})
-    .filter(([path, item]) => "get" in (item ?? {}) && !path.includes("{") && !path.startsWith("/v1/me") && path !== "/v1/openapi.json")
+    .filter(([path, item]) => "get" in (item ?? {}) && !path.includes("{") && !path.startsWith("/v1/me") && path !== "/v1/openapi.json" && !CALLBACKS.has(path))
     .map(([path]) => path)
     .sort()
 }

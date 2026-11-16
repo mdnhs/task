@@ -21,7 +21,7 @@ import { notify, withTenantAfterCommit } from "../src/modules/notifications"
 export type Fixture = { kind: "id" | "static"; value: string }
 export type TenantFixtures = Record<string, Record<string, Fixture>>
 
-type Resource = "role" | "member" | "team" | "device" | "feature" | "notification" | "pushToken" | "file"
+type Resource = "role" | "member" | "team" | "device" | "feature" | "notification" | "pushToken" | "file" | "integration"
 
 /** path template -> param -> which resource that param names on that route. */
 export const ROUTE_PARAMS: Record<string, Record<string, Resource>> = {
@@ -40,6 +40,7 @@ export const ROUTE_PARAMS: Record<string, Record<string, Resource>> = {
   "/v1/files/{id}": { id: "file" },
   "/v1/files/{id}/complete": { id: "file" },
   "/v1/files/{id}/download": { id: "file" },
+  "/v1/integrations/{id}": { id: "integration" },
 }
 
 export type Actor = { userId: string; cookie: string; slug: string }
@@ -79,7 +80,15 @@ export async function fixtureIds(t: { app: AppType; deps: Deps }, tenant: { id: 
   const fileRes = await call(t.app, "POST", "/v1/files/uploads", { cookie: owner.cookie, tenant: tenant.slug, body: { name: `File ${uniq}.pdf`, mime: "application/pdf", sizeBytes: 1024 } })
   if (fileRes.status !== 201) throw new Error(`fixture file intent failed: ${fileRes.status}`)
   const file = (await fileRes.json()) as { fileId: string }
-  const resources = { file: file.fileId, role: await roleIdOf(t.deps, tenant.id, "employee"), member: staff.userId, team: team.id, device: device.id, notification: String(notif.id), pushToken: ((await tokRes.json()) as { id: string }).id }
+  // the tenant's (single) google connection, reset to `connected` by every call; the ciphertext is junk on purpose (never opened by the walked route)
+  const [integ] = await ownerTenantQuery(
+    tenant.id,
+    `insert into integration_connections (tenant_id, provider, status, scopes, account_email, token_ciphertext, connected_by, connected_at)
+     values ($1::uuid, 'google', 'connected', array['openid'], $3, 'v2:junk', $2, now())
+     on conflict (tenant_id, provider) do update set status = 'connected', token_ciphertext = 'v2:junk', account_email = $3 returning id`,
+    [tenant.id, owner.userId, `drive-${uniq}@example.com`],
+  )
+  const resources = { integration: String(integ.id), file: file.fileId, role: await roleIdOf(t.deps, tenant.id, "employee"), member: staff.userId, team: team.id, device: device.id, notification: String(notif.id), pushToken: ((await tokRes.json()) as { id: string }).id }
   const fixtures: TenantFixtures = {}
   for (const [path, params] of Object.entries(ROUTE_PARAMS)) {
     fixtures[path] = {}
@@ -87,5 +96,5 @@ export async function fixtureIds(t: { app: AppType; deps: Deps }, tenant: { id: 
       fixtures[path][param] = res === "feature" ? { kind: "static", value: "drive" } : { kind: "id", value: resources[res] }
     }
   }
-  return { fixtures, resources, marks: [tenant.id, tenant.slug, team.id, device.id, file.fileId, `File ${uniq}.pdf`, staff.userId, owner.userId, `Team ${uniq}`, `Device ${uniq}`] }
+  return { fixtures, resources, marks: [tenant.id, tenant.slug, String(integ.id), `drive-${uniq}@example.com`, team.id, device.id, file.fileId, `File ${uniq}.pdf`, staff.userId, owner.userId, `Team ${uniq}`, `Device ${uniq}`] }
 }

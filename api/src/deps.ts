@@ -4,6 +4,7 @@ import type { PushSender } from "./core/push/push"
 import type { MalwareScanner } from "./core/scan/scanner"
 import type { Storage } from "./core/storage/storage"
 import type { Queue } from "./core/queue/queue"
+import type { OAuthClient } from "./core/oauth/oauth"
 import type { Env } from "./env"
 import type { Auth } from "./modules/auth/auth"
 
@@ -16,4 +17,4 @@ export type Mailer = {
   invalidate?(): void
 }
 export type { Auth }
-export type Deps = { env: Env; db: Db; auth: Auth; clock: Clock; mailer: Mailer; logger: Logger; queue: Queue; push: PushSender; storage: Storage; scanner: MalwareScanner }
+export type Deps = { env: Env; db: Db; auth: Auth; clock: Clock; mailer: Mailer; logger: Logger; queue: Queue; push: PushSender; storage: Storage; scanner: MalwareScanner; oauth: OAuthClient }
