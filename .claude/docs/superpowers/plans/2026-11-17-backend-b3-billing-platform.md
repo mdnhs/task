@@ -91,7 +91,7 @@ type BillingEvent =
 
 **Files:** Create `db/schema/platform.ts` + migration: `platform_staff(user_id pk → user.id, role, status 'active'|'suspended', added_by, added_at)`, `platform_audit_events(id, seq bigint unique, at, actor_id, action, entity, entity_id, target_tenant_id null, before jsonb, after jsonb, prev_hash, hash)` (app_user SELECT+INSERT only); `core/middleware/platform.ts`; `modules/platform-staff/*`; `modules/platform-audit/*`; `modules/platform-email/routes.ts`; `scripts/create-platform-owner.ts`. Modify `modules/platform-email/service.ts`: remove `InMemoryAuditSink` from `index.ts` exports (move to test helpers), write settings + platform audit in one transaction.
 
-**Interfaces:** Produces `requirePlatformStaff`, `recordPlatformAudit`, `verifyPlatformChain`; routes `GET/POST/PATCH /v1/platform/staff` (owner), `GET /v1/platform/audit` + `/export` (owner, viewer read), `GET/PUT /v1/platform/settings/email`, `POST /v1/platform/settings/email/test` (owner).
+**Interfaces:** Produces `requirePlatformStaff`, `recordPlatformAudit`, `verifyPlatformChain`; routes `GET/POST/PATCH /v1/platform/staff` (owner), `GET /v1/platform/audit` + `/export` (owner, viewer read), `GET/PUT /v1/platform/settings/email`, `POST /v1/platform/settings/email/test` (owner), `GET/PUT /v1/platform/settings/storage`, `POST /v1/platform/settings/storage/test` (owner; R2 account id, bucket, access key id, secret — service from B2 T2.3, user decision 2026-11-17).
 
 - [ ] **Step 1: Failing tests**
 
