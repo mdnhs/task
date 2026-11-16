@@ -2,28 +2,23 @@ import { and, eq } from "drizzle-orm"
 import { z } from "zod"
 import { sanitizeMailError } from "../../core/mail/sanitize"
 import { buildKeyring, isCurrent, open, seal, type Keyring, type KeyringEnv } from "../../core/crypto/secret-box"
+import { emailHmac } from "../../core/crypto/audit-hmac"
 import { AppError } from "../../core/errors"
 import type { Db } from "../../db/client"
 import { platformEmailSettings as t } from "../../db/schema"
 import type { Deps } from "../../deps"
+import { recordPlatformAudit, type PlatformTx } from "../platform-audit"
 
 export type EmailSettings =
   | { configured: false }
   | { configured: true; provider: "resend"; fromAddress: string; fromName: string; keyLast4: string; updatedAt: Date; updatedBy: string | null }
 
 /** Secrets-free snapshot used in audit entries. */
-export type EmailSettingsSnapshot = { configured: boolean; keyLast4?: string; fromAddress?: string; fromName?: string }
+export type EmailSettingsSnapshot = { configured: boolean; keyLast4?: string; fromAddressHmac?: string; fromDomain?: string; fromName?: string }
 /** Secrets-free snapshot of any platform settings (email, storage); never put secrets in it. */
 export type AuditSnapshot = { configured: boolean; [k: string]: unknown }
-export type PlatformAuditEntry = { action: string; actorId: string; before: AuditSnapshot; after: AuditSnapshot; at: Date }
-// TODO(B3): replace with the real platform audit table once platform staff auth exists.
-export interface PlatformAuditSink { record(entry: PlatformAuditEntry): Promise<void> }
-export class InMemoryAuditSink implements PlatformAuditSink {
-  entries: PlatformAuditEntry[] = []
-  async record(entry: PlatformAuditEntry): Promise<void> { this.entries.push(entry) }
-}
 
-export type EmailSettingsDeps = Pick<Deps, "env" | "clock" | "mailer"> & { audit: PlatformAuditSink }
+export type EmailSettingsDeps = Pick<Deps, "env" | "clock" | "mailer">
 
 /** AAD binding the stored Resend key to its column; a ciphertext copied elsewhere will not open. */
 export const EMAIL_KEY_AAD = "platform.email.api_key"
@@ -32,10 +27,13 @@ export function secretsKeyring(env: KeyringEnv): Keyring {
   return buildKeyring(env)
 }
 
-const snapshot = (s: EmailSettings): EmailSettingsSnapshot =>
-  s.configured ? { configured: true, keyLast4: s.keyLast4, fromAddress: s.fromAddress, fromName: s.fromName } : { configured: false }
+/** Audit snapshot: never the key, never the raw sender address (an HMAC of it plus its domain, so a change is visible). */
+const snapshot = (env: KeyringEnv, s: EmailSettings): EmailSettingsSnapshot =>
+  s.configured
+    ? { configured: true, keyLast4: s.keyLast4, fromAddressHmac: emailHmac(env, "platform", s.fromAddress), fromDomain: s.fromAddress.split("@").pop(), fromName: s.fromName }
+    : { configured: false }
 
-export async function getEmailSettings(db: Db): Promise<EmailSettings> {
+export async function getEmailSettings(db: Db | PlatformTx): Promise<EmailSettings> {
   const [r] = await db.select().from(t).where(eq(t.id, 1))
   if (!r) return { configured: false }
   return { configured: true, provider: "resend", fromAddress: r.fromAddress, fromName: r.fromName, keyLast4: r.apiKeyLast4, updatedAt: r.updatedAt, updatedBy: r.updatedBy }
@@ -60,21 +58,22 @@ export async function setEmailSettings(
     throw bad("invalid_api_key", "Invalid API key")
   }
 
-  const before = await getEmailSettings(db)
-  if (!before.configured && !apiKey) throw bad("api_key_required", "API key required")
-
   const ring = secretsKeyring(deps.env)
   const now = deps.clock.now()
-  const values = { fromAddress, fromName, updatedBy: actorId, updatedAt: now }
-  if (apiKey) {
-    const keyValues = { ...values, apiKeyCiphertext: seal(apiKey, ring, EMAIL_KEY_AAD), apiKeyLast4: apiKey.slice(-4) }
-    await db.insert(t).values({ id: 1, ...keyValues }).onConflictDoUpdate({ target: t.id, set: keyValues })
-  } else {
-    await db.update(t).set(values).where(eq(t.id, 1))
-  }
-
-  const after = await getEmailSettings(db)
-  await deps.audit.record({ action: "platform.email_settings.updated", actorId, before: snapshot(before), after: snapshot(after), at: now })
+  // Settings write + platform audit entry in ONE transaction: neither exists without the other.
+  await db.transaction(async (tx) => {
+    const before = await getEmailSettings(tx)
+    if (!before.configured && !apiKey) throw bad("api_key_required", "API key required")
+    const values = { fromAddress, fromName, updatedBy: actorId, updatedAt: now }
+    if (apiKey) {
+      const keyValues = { ...values, apiKeyCiphertext: seal(apiKey, ring, EMAIL_KEY_AAD), apiKeyLast4: apiKey.slice(-4) }
+      await tx.insert(t).values({ id: 1, ...keyValues }).onConflictDoUpdate({ target: t.id, set: keyValues })
+    } else {
+      await tx.update(t).set(values).where(eq(t.id, 1))
+    }
+    const after = await getEmailSettings(tx)
+    await recordPlatformAudit(tx, { action: "platform.email_settings.updated", entity: "platform_email_settings", entityId: "1", actorId, before: snapshot(deps.env, before), after: snapshot(deps.env, after) }, now)
+  })
   deps.mailer.invalidate?.()
 }
 

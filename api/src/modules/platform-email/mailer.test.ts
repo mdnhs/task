@@ -13,7 +13,7 @@ vi.mock("resend", () => ({
   },
 }))
 
-import { InMemoryAuditSink, makeMailer, setEmailSettings } from "./index"
+import { makeMailer, setEmailSettings } from "./index"
 
 const SECRETS_KEY = randomBytes(32).toString("base64")
 const msg = { to: "u@x.ie", subject: "Hi", text: "body" }
@@ -26,7 +26,7 @@ test("DB settings win over env bootstrap, and setEmailSettings invalidates the c
   await mailer.send(msg) // env bootstrap only so far
   expect(h.ctor).toHaveBeenLastCalledWith("re_env_key_000000000000")
   expect(h.send).toHaveBeenLastCalledWith(expect.objectContaining({ from: "Env <env@x.ie>" }))
-  await setEmailSettings(testDb(), { env, clock: { now: () => new Date() }, mailer, audit: new InMemoryAuditSink() },
+  await setEmailSettings(testDb(), { env, clock: { now: () => new Date() }, mailer },
     { apiKey: "re_db_key_0000000000000", fromAddress: "db@x.ie", fromName: "Db" }, "admin")
   await mailer.send(msg)
   expect(h.ctor).toHaveBeenLastCalledWith("re_db_key_0000000000000")

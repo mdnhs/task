@@ -11,3 +11,4 @@ export {
   type StorageSettings,
   type StorageSettingsDeps,
 } from "./service"
+export { storageSettingsRoutes } from "./routes"

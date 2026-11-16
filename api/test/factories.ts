@@ -154,3 +154,31 @@ export function roleIdOf(deps: Deps, tenantId: string, key: string): Promise<str
     return r.id
   })
 }
+
+// ---- platform staff (B3 T3.1) ----
+import type { PlatformRole } from "../src/core/context"
+import { platformStaff } from "../src/db/schema"
+
+/** A verified password user; with `totp` also enrolled in TOTP. `staleCookie` is a session from BEFORE enrolment (mfa_passed false). */
+export async function makeUser(deps: Deps, over: { email?: string; totp?: boolean; verified?: boolean } = {}) {
+  const email = over.email ?? `p-${uniq()}@x.ie`
+  const password = "Passw0rd!long"
+  const created = await deps.auth.api.signUpEmail({ body: { email, password, name: "Platform Person" } })
+  await deps.db.update(user).set({ emailVerified: true }).where(eq(user.id, created.user.id)) // sign-in (TOTP enrolment) needs it
+  if (!over.totp) {
+    if (over.verified === false) await deps.db.update(user).set({ emailVerified: false }).where(eq(user.id, created.user.id))
+    return { userId: created.user.id, email, password }
+  }
+  const login = await deps.auth.api.signInEmail({ body: { email, password }, returnHeaders: true })
+  const staleCookie = cookieOf(login.headers)
+  const enrolled = await enrollTotp(deps, email, password)
+  if (over.verified === false) await deps.db.update(user).set({ emailVerified: false }).where(eq(user.id, created.user.id))
+  return { userId: created.user.id, email, password, totpSecret: enrolled.secret, cookie: enrolled.cookie, staleCookie }
+}
+
+/** A platform staff person: TOTP enrolled (cookie = MFA-passed session, staleCookie = not passed) unless `totp: false`. */
+export async function makeStaff(deps: Deps, role: PlatformRole, over: { email?: string; totp?: boolean; status?: "active" | "suspended" } = {}) {
+  const u = await makeUser(deps, { email: over.email, totp: over.totp ?? true })
+  await deps.db.insert(platformStaff).values({ userId: u.userId, role, status: over.status ?? "active", addedBy: "test", addedAt: deps.clock.now() })
+  return u
+}

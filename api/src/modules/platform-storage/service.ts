@@ -7,13 +7,14 @@ import type { Db } from "../../db/client"
 import { platformStorageSettings as t } from "../../db/schema"
 import type { Deps } from "../../deps"
 import type { Env } from "../../env"
-import type { AuditSnapshot, PlatformAuditSink } from "../platform-email"
+import { recordPlatformAudit, type PlatformTx } from "../platform-audit"
+import type { AuditSnapshot } from "../platform-email/service"
 
 export type StorageSettings =
   | { configured: false }
   | { configured: true; provider: "r2"; accountId: string; bucket: string; accessKeyId: string; secretLast4: string; updatedAt: Date; updatedBy: string | null }
 
-export type StorageSettingsDeps = Pick<Deps, "env" | "clock"> & { storage: Pick<Storage, "invalidate">; audit: PlatformAuditSink }
+export type StorageSettingsDeps = Pick<Deps, "env" | "clock"> & { storage: Pick<Storage, "invalidate"> }
 
 /** AAD binding the stored R2 secret to its column; a ciphertext copied elsewhere will not open. */
 export const STORAGE_SECRET_AAD = "platform.storage.r2.secret_access_key"
@@ -22,9 +23,9 @@ export const STORAGE_SECRET_AAD = "platform.storage.r2.secret_access_key"
 export const r2Endpoint = (accountId: string) => `https://${accountId}.r2.cloudflarestorage.com`
 
 const snapshot = (s: StorageSettings): AuditSnapshot =>
-  s.configured ? { configured: true, accountId: s.accountId, bucket: s.bucket, accessKeyId: s.accessKeyId, secretLast4: s.secretLast4 } : { configured: false }
+  s.configured ? { configured: true, accountId: s.accountId, bucket: s.bucket, accessKeyIdLast4: s.accessKeyId.slice(-4), secretLast4: s.secretLast4 } : { configured: false }
 
-export async function getStorageSettings(db: Db): Promise<StorageSettings> {
+export async function getStorageSettings(db: Db | PlatformTx): Promise<StorageSettings> {
   const [r] = await db.select().from(t).where(eq(t.id, 1))
   if (!r) return { configured: false }
   return { configured: true, provider: "r2", accountId: r.accountId, bucket: r.bucket, accessKeyId: r.accessKeyId, secretLast4: r.secretLast4, updatedAt: r.updatedAt, updatedBy: r.updatedBy }
@@ -47,19 +48,21 @@ export async function setStorageSettings(
   if (!/^[A-Za-z0-9]{16,128}$/.test(accessKeyId)) throw bad("invalid_access_key_id", "Invalid access key id")
   if (secret !== undefined && !/^[A-Za-z0-9+/=_-]{32,128}$/.test(secret)) throw bad("invalid_secret_access_key", "Invalid secret access key")
 
-  const before = await getStorageSettings(db)
-  if (!before.configured && !secret) throw bad("secret_required", "Secret access key required")
-
   const now = deps.clock.now()
-  const values = { accountId, bucket, accessKeyId, updatedBy: actorId, updatedAt: now }
-  if (secret) {
-    const v = { ...values, secretAccessKeyCiphertext: seal(secret, buildKeyring(deps.env), STORAGE_SECRET_AAD), secretLast4: secret.slice(-4) }
-    await db.insert(t).values({ id: 1, ...v }).onConflictDoUpdate({ target: t.id, set: v })
-  } else {
-    await db.update(t).set(values).where(eq(t.id, 1))
-  }
-  const after = await getStorageSettings(db)
-  await deps.audit.record({ action: "platform.storage_settings.updated", actorId, before: snapshot(before), after: snapshot(after), at: now })
+  // Settings write + platform audit entry in ONE transaction: neither exists without the other.
+  await db.transaction(async (tx) => {
+    const before = await getStorageSettings(tx)
+    if (!before.configured && !secret) throw bad("secret_required", "Secret access key required")
+    const values = { accountId, bucket, accessKeyId, updatedBy: actorId, updatedAt: now }
+    if (secret) {
+      const v = { ...values, secretAccessKeyCiphertext: seal(secret, buildKeyring(deps.env), STORAGE_SECRET_AAD), secretLast4: secret.slice(-4) }
+      await tx.insert(t).values({ id: 1, ...v }).onConflictDoUpdate({ target: t.id, set: v })
+    } else {
+      await tx.update(t).set(values).where(eq(t.id, 1))
+    }
+    const after = await getStorageSettings(tx)
+    await recordPlatformAudit(tx, { action: "platform.storage_settings.updated", entity: "platform_storage_settings", entityId: "1", actorId, before: snapshot(before), after: snapshot(after) }, now)
+  })
   deps.storage.invalidate?.()
 }
 

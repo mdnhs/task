@@ -124,8 +124,16 @@ beforeAll(async () => {
 }, 120_000)
 
 type Op = { method: string; path: string; key: string; op: Json; params: string[] }
+/**
+ * Ruling C4: /v1/platform/* is NOT walked. Platform routes are not tenant-scoped (no X-Tenant, no tenant record id in the
+ * path: `{userId}` is a platform staff user id). They are covered by platform.test.ts instead: every one answers 404
+ * not_found to a non-staff caller (no existence oracle), role/MFA gates, and audit entries in the platform chain.
+ * The route-registration test below still includes them (they must be in the OpenAPI doc).
+ */
+const PLATFORM = (path: string) => path.startsWith("/v1/platform/")
 const operations = (): Op[] =>
   Object.entries(doc.paths).flatMap(([path, item]) => {
+    if (PLATFORM(path)) return []
     const params = [...path.matchAll(/\{(\w+)\}/g)].map((m) => m[1])
     if (params.length === 0) return []
     return METHODS.filter((m) => item[m]).map((m) => ({ method: m.toUpperCase(), path, key: `${m.toUpperCase()} ${path}`, op: item[m], params }))
@@ -252,6 +260,10 @@ describe("every /v1 route is registered through OpenAPI (no hidden routes)", () 
     const documented = new Set<string>()
     for (const [path, item] of Object.entries(doc.paths)) for (const m of METHODS) if (item[m]) documented.add(`${m.toUpperCase()} ${path}`)
     expect(registered.size).toBeGreaterThan(20)
+    for (const k of ["GET /v1/platform/staff", "POST /v1/platform/staff", "PATCH /v1/platform/staff/{userId}", "GET /v1/platform/audit", "GET /v1/platform/audit/export", "GET /v1/platform/settings/email", "PUT /v1/platform/settings/email", "POST /v1/platform/settings/email/test", "GET /v1/platform/settings/storage", "PUT /v1/platform/settings/storage", "POST /v1/platform/settings/storage/test"]) {
+      expect(registered.has(k), `${k} registered`).toBe(true)
+      expect(documented.has(k), `${k} in OpenAPI`).toBe(true)
+    }
     expect([...registered].filter((k) => !documented.has(k)).sort()).toEqual([])
     expect([...documented].filter((k) => !registered.has(k)).sort()).toEqual([])
   })

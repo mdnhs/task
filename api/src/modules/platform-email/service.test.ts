@@ -3,7 +3,8 @@ import { beforeEach, expect, test, vi } from "vitest"
 import { ownerQuery } from "../../../test/db"
 import { resetDb, testApp } from "../../../test/harness"
 import { loadMailConfig } from "./service"
-import { getEmailSettings, InMemoryAuditSink, sendTestEmail, setEmailSettings } from "./index"
+import { getEmailSettings, sendTestEmail, setEmailSettings } from "./index"
+import { platformAuditEntries } from "../../../test/platform-audit"
 import { testDb } from "../../../test/db"
 
 const KEY = "re_test_key_aaaaaaaaaaaa1234"
@@ -12,10 +13,9 @@ beforeEach(resetDb)
 
 function ctx() {
   const t = testApp({ env: { ...testApp().deps.env, SECRETS_KEY: b64 } })
-  const audit = new InMemoryAuditSink()
   const invalidate = vi.fn()
-  const deps = { env: t.deps.env, clock: t.clock, mailer: Object.assign(t.mailer, { invalidate }), audit }
-  return { ...t, deps, audit, invalidate, db: testDb() }
+  const deps = { env: t.deps.env, clock: t.clock, mailer: Object.assign(t.mailer, { invalidate }) }
+  return { ...t, deps, invalidate, db: testDb() }
 }
 const input = { apiKey: KEY, fromAddress: "no-reply@x.ie", fromName: "OpsDesk" }
 
@@ -52,16 +52,18 @@ test("setEmailSettings rejects invalid fromAddress and malformed key", async () 
   expect(await ownerQuery("select id from platform_email_settings")).toEqual([])
 })
 test("setEmailSettings writes an audit entry without the key", async () => {
-  const { db, deps, audit } = ctx()
+  const { db, deps } = ctx()
   await setEmailSettings(db, deps, input, "admin-1")
   await setEmailSettings(db, deps, { apiKey: "re_other_key_bbbbbbbbbb9999", fromAddress: "no-reply@x.ie", fromName: "OpsDesk" }, "admin-1")
-  expect(audit.entries).toHaveLength(2)
-  expect(audit.entries[0]).toMatchObject({ action: "platform.email_settings.updated", actorId: "admin-1", before: { configured: false }, after: { configured: true, keyLast4: "1234" } })
-  expect(audit.entries[1]).toMatchObject({ before: { keyLast4: "1234" }, after: { keyLast4: "9999" } })
-  const dump = JSON.stringify(audit.entries)
+  const entries = await platformAuditEntries()
+  expect(entries).toHaveLength(2)
+  expect(entries[0]).toMatchObject({ action: "platform.email_settings.updated", actorId: "admin-1", before: { configured: false }, after: { configured: true, keyLast4: "1234" } })
+  expect(entries[1]).toMatchObject({ before: { keyLast4: "1234" }, after: { keyLast4: "9999" } })
+  const dump = JSON.stringify(entries)
   expect(dump).not.toContain("re_test_key")
   expect(dump).not.toContain("re_other_key")
   expect(dump).not.toContain("ciphertext")
+  expect(dump).not.toContain("no-reply@x.ie") // the raw sender address is stored as an HMAC + domain only
 })
 test("app_user cannot delete the settings row", async () => {
   const { db, deps } = ctx()
@@ -71,7 +73,7 @@ test("app_user cannot delete the settings row", async () => {
 test("setEmailSettings needs SECRETS_KEY", async () => {
   const t = testApp()
   const env = { ...t.deps.env, SECRETS_KEY: undefined }
-  await expect(setEmailSettings(testDb(), { env, clock: t.clock, mailer: t.mailer, audit: new InMemoryAuditSink() }, input, "u")).rejects.toThrow(/SECRETS_KEY/)
+  await expect(setEmailSettings(testDb(), { env, clock: t.clock, mailer: t.mailer }, input, "u")).rejects.toThrow(/SECRETS_KEY/)
 })
 test("sendTestEmail sends a fixed message through the mailer", async () => {
   const { deps, mailer } = ctx()
@@ -88,7 +90,7 @@ test("sendTestEmail returns sanitized error when the SDK rejects", async () => {
 })
 
 test("getEmailSettings path lazily re-seals a v1 ciphertext to v2 on first load, without audit or updated_at change", async () => {
-  const { db, deps, audit } = ctx()
+  const { db, deps } = ctx()
   await setEmailSettings(db, deps, input, "u")
   // Rewrite the row as a legacy v1 value (no AAD, single key).
   const key = Buffer.from(b64, "base64")
@@ -98,12 +100,12 @@ test("getEmailSettings path lazily re-seals a v1 ciphertext to v2 on first load,
   const v1 = ["v1", iv.toString("base64"), c.getAuthTag().toString("base64"), ct.toString("base64")].join(":")
   await ownerQuery("update platform_email_settings set api_key_ciphertext = $1", [v1])
   const [b4] = await ownerQuery("select updated_at from platform_email_settings")
-  const auditBefore = audit.entries.length
+  const auditBefore = (await platformAuditEntries()).length
 
   expect((await loadMailConfig(db, deps.env))?.apiKey).toBe(KEY)
   const [row] = await ownerQuery("select api_key_ciphertext, updated_at from platform_email_settings")
   expect(row.api_key_ciphertext).toMatch(/^v2:k1:/)
   expect(row.updated_at).toEqual(b4.updated_at)
-  expect(audit.entries.length).toBe(auditBefore)
+  expect((await platformAuditEntries()).length).toBe(auditBefore)
   expect((await loadMailConfig(db, deps.env))?.apiKey).toBe(KEY)
 })

@@ -4,7 +4,7 @@ import { ownerQuery, ownerTenantQuery, testDb } from "../../../test/db"
 import { call, resetDb, testApp, testEnv } from "../../../test/harness"
 import { makeMember, makeTenant, signIn } from "../../../test/factories"
 import { buildKeyring, open } from "../../core/crypto/secret-box"
-import { InMemoryAuditSink } from "../platform-email"
+import { platformAuditEntries } from "../../../test/platform-audit"
 import { getStorageSettings, makeStorage, setStorageSettings, STORAGE_SECRET_AAD, testStorage } from "."
 
 beforeEach(resetDb)
@@ -19,8 +19,7 @@ function ctx(env: Partial<typeof testEnv> = {}) {
   const db = testDb()
   const storage = makeStorage({ env: e, db })
   const t = testApp({ env: e, storage })
-  const audit = new InMemoryAuditSink()
-  return { ...t, env: e, db, storage, audit, sdeps: { env: e, clock: t.clock, storage, audit } }
+  return { ...t, env: e, db, storage, sdeps: { env: e, clock: t.clock, storage } }
 }
 
 test("getStorageSettings never exposes the secret; the stored secret is sealed with the purpose AAD", async () => {
@@ -57,11 +56,12 @@ test("first save requires the secret; omitting it later keeps the old one; valid
 })
 
 test("the audit entry never contains the secret", async () => {
-  const { db, sdeps, audit } = ctx()
+  const { db, sdeps } = ctx()
   await setStorageSettings(db, sdeps, input, "admin-1")
-  expect(audit.entries).toHaveLength(1)
-  expect(audit.entries[0]).toMatchObject({ action: "platform.storage_settings.updated", actorId: "admin-1" })
-  const text = JSON.stringify(audit.entries)
+  const entries = await platformAuditEntries()
+  expect(entries).toHaveLength(1)
+  expect(entries[0]).toMatchObject({ action: "platform.storage_settings.updated", actorId: "admin-1" })
+  const text = JSON.stringify(entries)
   expect(text).not.toContain(SECRET)
   expect(text).not.toContain("secret_access_key")
 })

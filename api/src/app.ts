@@ -14,6 +14,10 @@ import { notificationRoutes } from "./modules/notifications"
 import { integrationRoutes } from "./modules/integrations"
 import { searchRoutes } from "./modules/search"
 import { settingsRoutes } from "./modules/settings"
+import { emailSettingsRoutes } from "./modules/platform-email"
+import { storageSettingsRoutes } from "./modules/platform-storage"
+import { platformAuditRoutes } from "./modules/platform-audit"
+import { platformStaffRoutes } from "./modules/platform-staff"
 import { rbacRoutes } from "./modules/rbac"
 import { authRoutes } from "./modules/auth/routes"
 import { inviteRoutes } from "./modules/invites"
@@ -66,6 +70,10 @@ export function createApp(deps: Deps) {
   app.route("/", integrationRoutes)
   app.route("/", searchRoutes)
   app.route("/", gdprRoutes)
+  app.route("/", platformStaffRoutes)
+  app.route("/", platformAuditRoutes)
+  app.route("/", emailSettingsRoutes)
+  app.route("/", storageSettingsRoutes)
   if (deps.env.NODE_ENV === "test") app.route("/", probeRoutes) // test-only; never registered elsewhere, not in the OpenAPI doc
 
   app.doc31("/v1/openapi.json", { openapi: "3.1.0", info: { title: "OpsDesk API", version: "1" } })
