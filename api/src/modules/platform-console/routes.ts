@@ -86,7 +86,7 @@ const modulesRoute = createRoute({
 })
 const metricsRoute = createRoute({
   method: "get", path: "/v1/platform/metrics", middleware: [requirePlatformStaff("owner", "billing", "viewer")] as const,
-  responses: { 200: { description: "MRR/ARR per currency in minor units (active + past_due subscriptions), trials, past_due, churn (moved to canceled in the last 30 days)", content: { "application/json": { schema: MetricsDto } } } },
+  responses: { 200: { description: "MRR/ARR per currency in minor units (ACTIVE subscriptions only, ruling C11), trials, past_due (reported as its own count, not in MRR), churn (moved to canceled in the last 30 days)", content: { "application/json": { schema: MetricsDto } } } },
 })
 const dsrRoute = createRoute({
   method: "get", path: "/v1/platform/data-requests", middleware: [requirePlatformStaff("owner", "support", "billing", "viewer")] as const, request: { query: z.object(Paging) },

@@ -121,6 +121,9 @@ export const inviteRoutes = newRouter()
     const now = deps.clock.now()
 
     const slug = await withTenant(deps.db, tenantId, async (tx) => {
+      // Ruling C14: a suspended (or unknown) tenant accepts nobody; same 404 as a bad token, before any lock or write.
+      const [tn] = await tx.select({ status: tenants.status }).from(tenants).where(eq(tenants.id, tenantId))
+      if (tn?.status !== "active") throw NotFound("invite_not_found")
       const [inv] = await tx.select().from(invites).where(eq(invites.tokenHash, sha256(token))).for("update") // serialises double accepts
       if (!inv) throw NotFound("invite_not_found")
       if (inv.email !== me.email.toLowerCase()) throw Forbidden("invite_email_mismatch")

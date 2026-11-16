@@ -120,12 +120,12 @@ export async function revokeSupportGrantAsStaff(deps: Deps, grantId: string, sta
 }
 
 /**
- * Tenant revoke (tenant owner; the route checks the role). In the platform chain the actor is the tenant member's user id
- * (the entry's targetTenantId says which tenant). Another tenant's grant id is 404 grant_not_found (RLS + tenant filter).
+ * Tenant revoke (tenant owner; the route checks the role). In the platform chain the actor is `tenant:<member user id>`
+ * (see the actor catalogue in platform-audit/record.ts; the tenant chain keeps the raw id). Another tenant's grant id is 404 grant_not_found (RLS + tenant filter).
  */
 export async function revokeSupportGrantAsTenant(deps: Deps, tenantId: string, memberUserId: string, grantId: string): Promise<GrantView> {
   if (!UUID.test(grantId)) throw GrantNotFound()
-  return revokeIn(deps, tenantId, grantId.toLowerCase(), () => {}, { tenantActor: memberUserId, platformActor: memberUserId })
+  return revokeIn(deps, tenantId, grantId.toLowerCase(), () => {}, { tenantActor: memberUserId, platformActor: `tenant:${memberUserId}` })
 }
 
 /** The tenant's grants, newest first (at most 200), with the staff member's display name. */

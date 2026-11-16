@@ -1,7 +1,7 @@
 import { beforeEach, expect, test } from "vitest"
 import { ownerQuery, ownerTenantQuery } from "../../../test/db"
 import { call, resetDb, testApp, testEnv } from "../../../test/harness"
-import { makeMember, makeStaff, makeTenant, signIn } from "../../../test/factories"
+import { makeMember, makeStaff, makeTenant, roleIdOf, signIn, signUp } from "../../../test/factories"
 import { platformAuditEntries } from "../../../test/platform-audit"
 import { buildKeyring, open } from "../../core/crypto/secret-box"
 import { resetSubscribers } from "../../core/events"
@@ -64,9 +64,9 @@ const billingNotes = (w: W) => ownerTenantQuery(w.tenant.id, "select user_id, ti
 
 test("checkout requires owner; admin gets 403 forbidden; success/cancel URLs are APP_URL-based", async () => {
   const w = await world()
-  expect(await code(await req(w, w.ac, "POST", "/v1/billing/checkout", { planId: "business", seats: 5 }))).toBe("forbidden")
-  expect((await req(w, w.ec, "POST", "/v1/billing/checkout", { planId: "business", seats: 5 })).status).toBe(403)
-  const r = await owner(w, "POST", "/v1/billing/checkout", { planId: "business", seats: 5 })
+  expect(await code(await req(w, w.ac, "POST", "/v1/billing/checkout", { planId: "business" }))).toBe("forbidden")
+  expect((await req(w, w.ec, "POST", "/v1/billing/checkout", { planId: "business" })).status).toBe(403)
+  const r = await owner(w, "POST", "/v1/billing/checkout", { planId: "business" })
   expect(r.status).toBe(200)
   expect(((await r.json()) as Json).url).toMatch(/^https:\/\/billing\.fake\/checkout\//)
   expect(w.billing.last("createCheckout")).toMatchObject({
@@ -77,27 +77,31 @@ test("checkout requires owner; admin gets 403 forbidden; success/cancel URLs are
   expect(w.billing.last("ensureCustomer")).toMatchObject({ tenantId: w.tenant.id, email: w.owner.email })
   expect(await ownerQuery("select provider, customer_id from billing_customers")).toEqual([{ provider: "fake", customer_id: `cus_fake_${w.tenant.id.slice(0, 8)}` }])
   expect((await subRow(w)).provider_customer_id).toBe(`cus_fake_${w.tenant.id.slice(0, 8)}`)
-  await owner(w, "POST", "/v1/billing/checkout", { planId: "business", seats: 5 })
+  await owner(w, "POST", "/v1/billing/checkout", { planId: "business" })
   expect(w.billing.calls.filter((c) => c.method === "ensureCustomer")).toHaveLength(1)
 })
 
-test("checkout validation: seats >= active members, known + purchasable plan, one subscription per tenant", async () => {
+test("checkout validation: known + purchasable plan, one subscription per tenant", async () => {
   const w = await world()
-  expect(await code(await owner(w, "POST", "/v1/billing/checkout", { planId: "business", seats: 2 }))).toBe("seats_below_members") // 3 active members
-  expect((await owner(w, "POST", "/v1/billing/checkout", { planId: "business", seats: 2 })).status).toBe(422)
-  expect(await code(await owner(w, "POST", "/v1/billing/checkout", { planId: "nope", seats: 5 }))).toBe("unknown_plan")
+  expect(await code(await owner(w, "POST", "/v1/billing/checkout", { planId: "nope" }))).toBe("unknown_plan")
   await ownerQuery("update platform_billing_settings set price_map = '{}'")
-  expect(await code(await owner(w, "POST", "/v1/billing/checkout", { planId: "business", seats: 5 }))).toBe("plan_not_purchasable")
-  expect((await owner(w, "POST", "/v1/billing/checkout", { planId: "business", seats: 0 })).status).toBe(400)
+  expect(await code(await owner(w, "POST", "/v1/billing/checkout", { planId: "business" }))).toBe("plan_not_purchasable")
+  expect((await owner(w, "POST", "/v1/billing/checkout", {})).status).toBe(400)
   await ownerQuery("update platform_billing_settings set price_map = $1", [JSON.stringify(PRICES)])
   await link(w)
-  expect(await code(await owner(w, "POST", "/v1/billing/checkout", { planId: "business", seats: 5 }))).toBe("already_subscribed")
+  expect(await code(await owner(w, "POST", "/v1/billing/checkout", { planId: "business" }))).toBe("already_subscribed")
   expect(w.billing.calls.filter((c) => c.method === "createCheckout")).toHaveLength(0)
+})
+
+test("M4: checkout takes only planId; a stray seats field is ignored (zod strips unknown keys, as on other routes)", async () => {
+  const w = await world()
+  expect((await owner(w, "POST", "/v1/billing/checkout", { planId: "business", seats: 2 })).status).toBe(200) // previously 422 seats_below_members (3 members)
+  expect(w.billing.calls.filter((c) => c.method === "createCheckout")).toHaveLength(1)
 })
 
 test("a running trial carries into checkout as trialDays", async () => {
   const w = await world({ planId: "starter", status: "trialing", seats: 10, trialEndsAt: at(5) })
-  await owner(w, "POST", "/v1/billing/checkout", { planId: "business", seats: 5 })
+  await owner(w, "POST", "/v1/billing/checkout", { planId: "business" })
   expect(w.billing.last("createCheckout")).toMatchObject({ trialDays: 5 })
 })
 
@@ -281,13 +285,40 @@ test("subscription.updated changes plan -> entitlements invalidated immediately 
   const r = await wh(w, subEvent({ priceId: PRICES.business, seats: 1, createdAt: at(1) }))
   expect(r.status).toBe(200)
   expect((await owner(w, "GET", "/v1/_probe/m1a")).status).toBe(200) // same clock instant: no 60 s wait
-  expect(await subRow(w)).toMatchObject({ plan_id: "business", seats: 10, status: "active", provider_subscription_id: "sub_A" }) // the webhook quantity (1) never overwrites the local seat cap
+  expect(await subRow(w)).toMatchObject({ plan_id: "business", seats: 40, status: "active", provider_subscription_id: "sub_A" }) // plan change resets the cap to the new plan limit (C12); the webhook quantity (1) is never used
   const audit = await ownerTenantQuery(w.tenant.id, "select actor_id, before, after from audit_events where action = 'subscription.changed'")
   expect(audit).toHaveLength(1)
   expect(audit[0]).toMatchObject({ actor_id: "system:billing" })
   expect((audit[0].before as Json).planId).toBe("starter")
   expect((audit[0].after as Json).planId).toBe("business")
   expect(await ownerTenantQuery(w.tenant.id, "select 1 from domain_events where type = 'billing.subscription_changed'")).toHaveLength(1)
+})
+
+test("I1: upgrade starter -> business sets seats 40 and the 11th member can then accept an invite", async () => {
+  const w = await world({ planId: "starter", seats: 10 })
+  await link(w)
+  for (let i = 0; i < 7; i++) await makeMember(w.deps, w.tenant.id, "employee") // owner + admin + employee + 7 = 10 = starter cap
+  await wh(w, subEvent({ priceId: PRICES.business, createdAt: at(1) }))
+  expect(await subRow(w)).toMatchObject({ plan_id: "business", seats: 40 })
+  const role = await roleIdOf(w.deps, w.tenant.id, "employee")
+  const inv = await owner(w, "POST", "/v1/invites", { email: "eleven@x.ie", roleId: role })
+  expect(inv.status).toBe(201)
+  const token = w.mailer.last().text.match(/\/invite\?token=([\w-]+)/)![1]
+  await signUp(w.app, "eleven@x.ie", "Passw0rd!long", "Eleven")
+  const { cookie } = await signIn(w.app, "eleven@x.ie", "Passw0rd!long")
+  expect((await call(w.app, "POST", "/v1/invites/accept", { cookie, body: { token } })).status).toBe(200)
+})
+
+test("I1: downgrade enterprise -> starter sets seats 10; same plan keeps a lowered local cap; unknown price leaves plan and seats alone", async () => {
+  const w = await world({ planId: "enterprise", seats: 150 })
+  await link(w)
+  await wh(w, subEvent({ priceId: PRICES.starter, createdAt: at(1) }))
+  expect(await subRow(w)).toMatchObject({ plan_id: "starter", seats: 10 })
+  await ownerTenantQuery(w.tenant.id, "update subscriptions set seats = 6")
+  await wh(w, subEvent({ priceId: PRICES.starter, createdAt: at(2) }))
+  expect(await subRow(w)).toMatchObject({ plan_id: "starter", seats: 6 }) // unchanged plan: local cap kept
+  await wh(w, subEvent({ priceId: "price_mystery", createdAt: at(3) }))
+  expect(await subRow(w)).toMatchObject({ plan_id: "starter", seats: 6 })
 })
 
 test("unknown event types are recorded as ignored and return 200; unknown customer too", async () => {
@@ -419,7 +450,7 @@ test("unconfigured: billing writes and the webhook answer 503 billing_not_config
   const o = await makeMember(t.deps, tenant.id, "owner")
   const { cookie } = await signIn(t.app, o.email, o.password)
   await setBillingSettings(t.deps.db, { ...t.deps, billing: { id: "fake", invalidate() {} } as never }, { secretKey: SECRET, webhookSecret: WHSEC, priceMap: PRICES }, "pa")
-  const co = await call(t.app, "POST", "/v1/billing/checkout", { cookie, tenant: tenant.slug, body: { planId: "business", seats: 1 } })
+  const co = await call(t.app, "POST", "/v1/billing/checkout", { cookie, tenant: tenant.slug, body: { planId: "business" } })
   expect([co.status, await code(co)]).toEqual([503, "billing_not_configured"])
   const hook = await t.app.request("/webhooks/billing/stripe", { method: "POST", headers: { "stripe-signature": "t=1,v1=x" }, body: "{}" })
   expect([hook.status, await code(hook)]).toEqual([503, "billing_not_configured"])
@@ -475,25 +506,25 @@ test("I1: a same-second invoice tie (failed then paid) is settled by the provide
 test("I2: a second checkout while the provider reports a live subscription is 409 subscription_exists (no session created)", async () => {
   const w = await world()
   w.billing.active.set(`cus_fake_${w.tenant.id.slice(0, 8)}`, [{ id: "sub_live", status: "active" }])
-  const r = await owner(w, "POST", "/v1/billing/checkout", { planId: "business", seats: 5 })
+  const r = await owner(w, "POST", "/v1/billing/checkout", { planId: "business" })
   expect([r.status, await code(r)]).toEqual([409, "subscription_exists"])
   expect(w.billing.calls.filter((c) => c.method === "createCheckout")).toHaveLength(0)
 })
 
 test("I2: a second checkout expires the previous open session and remembers the new one", async () => {
   const w = await world()
-  const first = (await (await owner(w, "POST", "/v1/billing/checkout", { planId: "business", seats: 5 })).json()) as Json
+  const first = (await (await owner(w, "POST", "/v1/billing/checkout", { planId: "business" })).json()) as Json
   void first
   const s1 = (await subRow(w)).checkout_session_id as string
   expect(s1).toMatch(/^cs_fake_/)
   expect(w.billing.calls.filter((c) => c.method === "expireCheckoutSession")).toHaveLength(0)
-  expect((await owner(w, "POST", "/v1/billing/checkout", { planId: "business", seats: 5 })).status).toBe(200)
+  expect((await owner(w, "POST", "/v1/billing/checkout", { planId: "business" })).status).toBe(200)
   expect(w.billing.last("expireCheckoutSession")).toEqual({ sessionId: s1 })
   const s2 = (await subRow(w)).checkout_session_id as string
   expect(s2).not.toBe(s1)
   // an expire that fails (session already completed/expired) never blocks a new checkout
   w.billing.failNext("expireCheckoutSession")
-  expect((await owner(w, "POST", "/v1/billing/checkout", { planId: "business", seats: 5 })).status).toBe(200)
+  expect((await owner(w, "POST", "/v1/billing/checkout", { planId: "business" })).status).toBe(200)
 })
 
 test("I2: a webhook for subscription Y while X is live leaves the row on X (ignored.foreign_subscription, 200); after X is canceled Y is adopted", async () => {

@@ -24,6 +24,8 @@ export const REQUEST_TIMEOUT_MS = 10_000
 export const MAX_RESPONSE_BYTES = 64 * 1024
 /** A claimed delivery is leased this long (next_attempt_at is pushed out); a crashed worker's delivery is taken over after it. */
 export const LEASE_MS = 2 * 60_000
+/** Ruling C14: a delivery claimed while its tenant is not active stays pending and is looked at again after this long. */
+export const SUSPENDED_DEFER_MS = 3_600_000
 const SWEEP_STALE_MS = 2 * 60_000
 /** Wait before retry n (after attempt n failed): ~1 min, 5 min, 15 min, 1 h, 2 h, 4 h, 8 h, each with +-20% jitter (total <= ~18.5 h < 24 h). */
 const BASE_DELAYS_MS = [60_000, 300_000, 900_000, 3_600_000, 7_200_000, 14_400_000, 28_800_000]
@@ -54,6 +56,9 @@ export function registerWebhooks(): void {
     subscribe("*", FANOUT_SUBSCRIBER, async (e, { tx, deps, enqueue }) => {
       const type = e.type
       if (!isWebhookEvent(type)) return
+      // Ruling C14: a suspended tenant's events are not sent (no delivery rows are created, so nothing is replayed on reactivation).
+      const [tn] = await tx.select({ status: tenants.status }).from(tenants).where(eq(tenants.id, e.tenantId))
+      if (tn?.status !== "active") return
       const endpoints = await tx
         .select({ id: webhookEndpoints.id })
         .from(webhookEndpoints)
@@ -106,6 +111,12 @@ export async function deliverWebhook(data: unknown, deps: Deps): Promise<void> {
     const [row] = await tx.select().from(webhookDeliveries).where(eq(webhookDeliveries.id, deliveryId)).for("update")
     const now = deps.clock.now()
     if (!row || row.status !== "pending" || row.nextAttemptAt > now) return { kind: "done" }
+    // Ruling C14: tenant not active -> nothing is sent; the delivery stays pending, is pushed out, and costs no attempt (no failing_since either).
+    const [tn] = await tx.select({ status: tenants.status }).from(tenants).where(eq(tenants.id, tenantId))
+    if (tn?.status !== "active") {
+      await tx.update(webhookDeliveries).set({ nextAttemptAt: new Date(now.getTime() + SUSPENDED_DEFER_MS) }).where(eq(webhookDeliveries.id, deliveryId))
+      return { kind: "done" }
+    }
     const [ep] = await tx.select().from(webhookEndpoints).where(eq(webhookEndpoints.id, row.endpointId))
     if (!ep || ep.deletedAt !== null || !ep.active) {
       await tx.update(webhookDeliveries).set({ status: "failed", lastError: "endpoint_inactive" }).where(eq(webhookDeliveries.id, deliveryId))
@@ -205,7 +216,7 @@ async function noteFailure(tx: Parameters<Parameters<typeof withTenant>[2]>[0], 
  */
 export async function sweepWebhooks(_data: unknown, deps: Deps): Promise<void> {
   const cutoff = new Date(deps.clock.now().getTime() - SWEEP_STALE_MS)
-  const ids = await deps.db.select({ id: tenants.id }).from(tenants) // `tenants` has no RLS
+  const ids = await deps.db.select({ id: tenants.id }).from(tenants).where(eq(tenants.status, "active")) // `tenants` has no RLS; suspended tenants are skipped (C14)
   for (const { id: tenantId } of ids) {
     try {
       const due = await withTenant(deps.db, tenantId, (tx) =>

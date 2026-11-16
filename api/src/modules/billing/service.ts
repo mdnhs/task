@@ -60,19 +60,13 @@ async function ensureCustomer(deps: Deps, tenantId: string, tenantName: string, 
   return customerId
 }
 
-async function assertSeats(deps: Deps, tenantId: string, seats: number): Promise<void> {
-  const used = await withTenant(deps.db, tenantId, (tx) => seatsUsed(tx, tenantId))
-  if (seats < used) throw unprocessable("seats_below_members")
-}
-
 const LIVE = new Set(["trialing", "active", "past_due", "unpaid", "paused", "incomplete"])
 
-export async function startCheckout(deps: Deps, tenant: { id: string; name: string }, actor: Actor, input: { planId: string; seats: number }): Promise<{ url: string }> {
+export async function startCheckout(deps: Deps, tenant: { id: string; name: string }, actor: Actor, input: { planId: string }): Promise<{ url: string }> {
   const [plan] = await deps.db.select().from(plans).where(eq(plans.id, input.planId))
   if (!plan || !plan.active) throw unprocessable("unknown_plan")
   const priceId = await resolvePriceId(deps.db, deps.billing.id, plan)
   if (!priceId) throw unprocessable("plan_not_purchasable")
-  await assertSeats(deps, tenant.id, input.seats)
   const sub = await loadSub(deps, tenant.id)
   // One subscription per tenant: a tenant that already pays changes plan or card in the portal, never by a second checkout.
   if (sub.providerSubscriptionId && LIVE.has(sub.status) && sub.status !== "incomplete") throw Conflict("already_subscribed")

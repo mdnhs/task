@@ -212,6 +212,8 @@ describe("grant path in requireTenant", () => {
     // audited in both chains
     expect(await actions(w.tenant.id, "support.revoked")).toMatchObject([{ actor_id: w.owner.userId, entity_id: g.id }])
     expect((await platAudit()).map((r) => r.action)).toEqual(["platform.support.granted", "platform.support.revoked"])
+    // I3: the platform chain tags a tenant owner's revoke `tenant:<id>` (never confusable with a staff id); the tenant chain keeps the raw id
+    expect((await platAudit()).find((r) => r.action === "platform.support.revoked")).toMatchObject({ actor_id: `tenant:${w.owner.userId}` })
     expect(await verifyChain(w.deps.db, w.tenant.id)).toMatchObject({ ok: true })
     expect(await verifyPlatformChain(w.deps.db)).toMatchObject({ ok: true })
     // a new grant is possible after revocation
@@ -300,6 +302,19 @@ describe("rulings", () => {
     expect(me.member.roleKey).toBe("employee")
     expect((await w.asStaff("POST", "/v1/me/push-tokens", w.support, w.tenant.slug, { token: "fcm-member-path-xxxxxxxx", platform: "android" })).status).toBe(201)
     expect((await tenantAudit(w.tenant.id)).filter((a) => String(a.action).startsWith("support.") && a.action !== "support.granted")).toEqual([])
+  })
+
+  test("M1: a non-MFA session with an expired grant gets 401 mfa_challenge and NO access_denied audit row", async () => {
+    const w = await world()
+    expect((await w.grant(w.support)).status).toBe(201)
+    w.clock.advance({ hours: 3 }) // grant (2 h) expired
+    const stale = await w.asStaff("GET", "/v1/roles", { cookie: w.support.staleCookie })
+    expect(stale.status).toBe(401)
+    expect(await code(stale)).toBe("mfa_challenge")
+    expect(await actions(w.tenant.id, "support.access_denied")).toEqual([])
+    // the MFA-passed session of the same staff member does get the audited denial
+    expect((await w.asStaff("GET", "/v1/roles")).status).toBe(404)
+    expect((await actions(w.tenant.id, "support.access_denied")).map((r) => r.after.reason)).toEqual(["expired"])
   })
 
   test("ruling 1: the grant path needs active owner/support staff and an MFA-passed session", async () => {

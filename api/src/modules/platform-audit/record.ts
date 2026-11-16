@@ -6,6 +6,13 @@ import { GENESIS, PLATFORM_AUDIT_LOCK, PLATFORM_LOCK_NS, platformEntryHash } fro
 /** A transaction on the app_user connection. Platform tables have no RLS, so no tenant context is needed. */
 export type PlatformTx = TenantTx
 
+/**
+ * Actor catalogue for platform_audit_events.actor_id (one namespace, three shapes):
+ *  - `<userId>`        a platform staff member (raw user id)
+ *  - `tenant:<userId>` a tenant member acting on their own tenant through a tenant route (e.g. an owner revoking a support grant)
+ *  - `system:<name>`   an automated actor (e.g. `system:billing`)
+ * The tenant chain is separate and keeps its own raw ids (`platform:<staffId>` there marks staff acting inside a tenant).
+ */
 export type PlatformAuditInput = {
   action: string
   entity: string

@@ -58,7 +58,7 @@ const getInvoices = createRoute({
 })
 const checkout = createRoute({
   method: "post", path: "/v1/billing/checkout", middleware: [requireTenant, ownerOnly] as const,
-  request: { body: { required: true, content: { "application/json": { schema: z.object({ planId: z.string().min(1).max(64), seats: z.number().int().min(1).max(100000) }).openapi({ example: { planId: "business", seats: 25 } }) } } } },
+  request: { body: { required: true, content: { "application/json": { schema: z.object({ planId: z.string().min(1).max(64) }).openapi({ example: { planId: "business" } }) } } } },
   responses: { 200: json(UrlDto, "Hosted checkout URL (success/cancel return to APP_URL/settings/billing)") },
 })
 const portal = createRoute({ method: "post", path: "/v1/billing/portal", middleware: [requireTenant, ownerOnly] as const, responses: { 200: json(UrlDto, "Hosted billing portal URL") } })

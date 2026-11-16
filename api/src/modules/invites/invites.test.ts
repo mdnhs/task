@@ -222,3 +222,18 @@ test("two different invites for the same user accepted at once: one 200, the oth
   expect(((await bad.json()) as Json).code).toBe("already_member")
   expect((await ownerTenantQuery(w.tenant.id, "select 1 from memberships m join \"user\" u on u.id=m.user_id where u.email='new@x.ie'")).length).toBe(1)
 })
+
+test("M5: accepting an invite of a suspended tenant is 404 invite_not_found and writes nothing; works again after reactivation", async () => {
+  const w = await world()
+  await invite(w)
+  const token = tokenFrom(w.mailer.last())
+  const cookie = await newcomer(w)
+  await ownerQuery("update tenants set status = 'suspended' where id = $1", [w.tenant.id])
+  const r = await call(w.app, "POST", "/v1/invites/accept", { cookie, body: { token } })
+  expect(r.status).toBe(404)
+  expect(((await r.json()) as Json).code).toBe("invite_not_found")
+  expect((await ownerTenantQuery(w.tenant.id, "select accepted_at from invites"))[0].accepted_at).toBeNull()
+  expect(await ownerTenantQuery(w.tenant.id, "select 1 from memberships where user_id in (select id from \"user\" where email = 'new@x.ie')")).toEqual([])
+  await ownerQuery("update tenants set status = 'active' where id = $1", [w.tenant.id])
+  expect((await call(w.app, "POST", "/v1/invites/accept", { cookie, body: { token } })).status).toBe(200)
+})

@@ -23,18 +23,41 @@ const BILLING_PREFIX = "/v1/billing" // reserved for T3.3: always open so a bloc
 const DATA_EXPORT = "/v1/me/data-export" // NFR-18: data export on exit stays open
 const DATA_REQUESTS = "/v1/data-requests"
 
-/** Whether a (blocked) tenant may still call this non-GET route: billing, data export and DSR handling. */
+const ONE_ID = "[^/]+"
+const REVOKE_DELETES = [
+  new RegExp(`^/v1/api-keys/${ONE_ID}$`),
+  new RegExp(`^/v1/webhooks/${ONE_ID}$`),
+  new RegExp(`^/v1/settings/support-grants/${ONE_ID}$`),
+]
+/** PATCH routes that are exempt ONLY when the body is exactly the disabling field (decided here from a cloned body, so the handler is untouched). */
+const DISABLE_PATCHES: { path: RegExp; field: string; value: boolean }[] = [
+  { path: new RegExp(`^/v1/webhooks/${ONE_ID}$`), field: "active", value: false }, // pause an endpoint
+  { path: new RegExp(`^/v1/devices/${ONE_ID}$`), field: "trusted", value: false }, // device revoke = withdraw trust
+]
+
+/**
+ * Whether a (blocked) tenant may still call this non-GET route: billing, data export, DSR handling, and (ruling C13) the
+ * security duties that must never need payment: revoking api keys / webhooks / support grants and pausing a webhook or
+ * un-trusting a device. Matched on the request path against fixed templates (one id segment), like the other exemptions.
+ * (Members have no deactivate/remove route in this API; role changes are ordinary writes.)
+ */
 async function exemptWhenBlocked(c: Context<AppEnv>): Promise<boolean> {
   const p = c.req.path
   if (p === BILLING_PREFIX || p.startsWith(`${BILLING_PREFIX}/`)) return true
   if (p === DATA_EXPORT || p.startsWith(`${DATA_EXPORT}/`)) return true
-  if (p === DATA_REQUESTS) {
-    // Opening an export request stays possible; erase/correct/restrict are ordinary writes.
-    const body = (await c.req.raw.clone().json().catch(() => null)) as { kind?: unknown } | null
-    return body?.kind === "export"
+  // Opening ANY data request (export, erase, correct, restrict) stays possible: the GDPR clock does not wait for payment (C8, C13).
+  if (p === DATA_REQUESTS) return true
+  // Working an EXISTING request (complete / reject / retry) must not be blocked by billing either.
+  if (p.startsWith(`${DATA_REQUESTS}/`)) return true
+  if (c.req.method === "DELETE" && REVOKE_DELETES.some((r) => r.test(p))) return true
+  if (c.req.method === "PATCH") {
+    const rule = DISABLE_PATCHES.find((r) => r.path.test(p))
+    if (!rule) return false
+    const body = (await c.req.raw.clone().json().catch(() => null)) as Record<string, unknown> | null
+    const keys = body && typeof body === "object" ? Object.keys(body) : []
+    return keys.length === 1 && keys[0] === rule.field && body![rule.field] === rule.value
   }
-  // Working an EXISTING request (complete / reject / retry) must not be blocked by billing: the GDPR clock keeps running.
-  return p.startsWith(`${DATA_REQUESTS}/`)
+  return false
 }
 
 /**

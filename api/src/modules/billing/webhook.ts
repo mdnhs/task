@@ -48,7 +48,10 @@ type SubOutcome = "applied" | "stale" | "foreign"
  */
 async function applySubscription(tx: TenantTx, deps: Deps, tenantId: string, ev: SubEvent, now: Date, snap?: SubscriptionSnapshot): Promise<SubOutcome> {
   let outcome: SubOutcome = "applied"
-  const planId = await planForPrice(tx, deps.billing.id, snap?.priceId ?? ev.priceId)
+  const priceId = snap?.priceId ?? ev.priceId
+  const planId = await planForPrice(tx, deps.billing.id, priceId)
+  // Unknown price: the plan stays as it is (never guess); safe code + the price id only.
+  if (!planId) deps.logger.warn({ code: "unknown_price", priceId }, "billing event for an unknown price: plan unchanged")
   await changeSubscriptionTx(
     tx, tenantId, BILLING_ACTOR,
     (before) => {
@@ -65,8 +68,9 @@ async function applySubscription(tx: TenantTx, deps: Deps, tenantId: string, ev:
       return {
         status: keepTrial ? "trialing" : cur.status,
         ...(planId ? { planId } : {}),
-        // seats: the LOCAL cap is kept (ruling C10): Stripe's quantity is always 1 and never overwrites it.
-        ...(before.seats < 1 ? { seats: planFacts(planId ?? before.planId).limits.activeUsers ?? 1 } : {}),
+        // seats (rulings C10/C12): Stripe's quantity is always 1 and never overwrites the LOCAL cap, but a plan CHANGE (upgrade or
+        // downgrade) resets the cap to the new plan's activeUsers limit. Same plan: the local cap is kept.
+        ...(planId && planId !== before.planId ? { seats: planFacts(planId).limits.activeUsers ?? 1 } : before.seats < 1 ? { seats: planFacts(before.planId).limits.activeUsers ?? 1 } : {}),
         ...(keepTrial ? {} : { trialEndsAt: cur.trialEnd }),
         currentPeriodEnd: cur.currentPeriodEnd,
         cancelAtPeriodEnd: cur.cancelAtPeriodEnd,

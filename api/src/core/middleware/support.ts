@@ -87,9 +87,10 @@ async function audit(c: Context<AppEnv>, tenantId: string, action: string, entit
  * The grant path (rulings 1-7). Called by requireTenant ONLY when the caller has no active membership of the tenant.
  * Every failure before the grant is found is the same 404 a non-member gets (no oracle). In order:
  *  1. active platform staff with role owner|support, else 404;
- *  2. a grant for THIS tenant and THIS staff with starts_at <= now < expires_at and revoked_at null, read fresh (no cache),
+ *  2. 2FA enrolled and passed by THIS session (the platform rule, always): 401 mfa_enrolment_required / mfa_challenge,
+ *     BEFORE the grant is looked at, so an un-MFA'd session can neither probe grants nor cause an audit row;
+ *  3. a grant for THIS tenant and THIS staff with starts_at <= now < expires_at and revoked_at null, read fresh (no cache),
  *     else 404; when the latest grant for the pair is expired or revoked, `support.access_denied` is audited (reason);
- *  3. 2FA enrolled and passed by THIS session (the platform rule, always): 401 mfa_enrolment_required / mfa_challenge;
  *  4. any method but GET/HEAD: 403 support_read_only (audited support.write_denied), before any handler;
  *  5. a deny-listed route: 403 support_forbidden_route (audited support.route_denied);
  *  6. `support.access` audited in its own transaction (fail closed), then the synthetic member/role are set.
@@ -104,6 +105,10 @@ export async function enterSupportPath(c: Context<AppEnv>, tenant: TenantRow): P
   const staffId = session.userId
   const [staff] = await deps.db.select({ role: platformStaff.role, status: platformStaff.status }).from(platformStaff).where(eq(platformStaff.userId, staffId))
   if (!staff || staff.status !== "active" || !(SUPPORT_STAFF_ROLES as readonly string[]).includes(staff.role)) throw NotFound()
+
+  // 2FA first (M1): a session that has not passed MFA learns nothing about grants and writes no audit row (not even access_denied).
+  if (!user.twoFactorEnabled) throw Unauthorized("mfa_enrolment_required")
+  if (!session.mfaPassed) throw Unauthorized("mfa_challenge")
 
   const now = deps.clock.now()
   const method = c.req.method.toUpperCase()
@@ -121,9 +126,6 @@ export async function enterSupportPath(c: Context<AppEnv>, tenant: TenantRow): P
     if (latest) await audit(c, tenant.id, "support.access_denied", latest.id, staffId, { grantId: latest.id, reason: latest.revokedAt ? "revoked" : "expired", method, path })
     throw NotFound()
   }
-
-  if (!user.twoFactorEnabled) throw Unauthorized("mfa_enrolment_required")
-  if (!session.mfaPassed) throw Unauthorized("mfa_challenge")
 
   const grantId = active.id
   if (!READ_METHODS.has(method)) {

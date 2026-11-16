@@ -275,6 +275,27 @@ test("member.joined event notifies the tenant's owners", async () => {
   expect(await q(w.tenant.id, "select 1 from notifications")).toHaveLength(2)
 })
 
+test("M2: billing.subscription_changed notifies owners only when the status becomes past_due / canceled / unpaid / paused", async () => {
+  const w = await world()
+  const owner2 = await makeMember(w.deps, w.tenant.id, "owner")
+  const emit = async (from: string, to: string, planTo = "business") => {
+    await withTenant(w.deps.db, w.tenant.id, (tx) => publish(tx, { tenantId: w.tenant.id, type: "billing.subscription_changed", payload: { from: { planId: "business", status: from }, to: { planId: planTo, status: to } }, actorId: "system:billing" }, w.deps.clock.now()))
+    await relayOnce(w.deps)
+  }
+  const notes = () => q<{ user_id: string; title: string; kind: string }>(w.tenant.id, "select user_id, title, kind from notifications")
+  await emit("trialing", "active") // recovery / activation: silent
+  await emit("active", "active", "enterprise") // plan-only change: silent
+  expect(await notes()).toEqual([])
+  await emit("active", "past_due")
+  let rows = await notes()
+  expect(rows.map((r) => r.user_id).sort()).toEqual([w.owner.userId, owner2.userId].sort())
+  expect(rows.every((r) => r.kind === "billing" && r.title === "Subscription past due")).toBe(true)
+  await emit("past_due", "canceled")
+  rows = await notes()
+  expect(rows.filter((r) => r.title === "Subscription canceled")).toHaveLength(2)
+  expect(rows).toHaveLength(4) // staff members get nothing
+})
+
 // ---------------------------------------------------------------- fix wave: stuck deliveries
 
 test("a running job never dedupes its own re-hold: job ids carry a per-enqueue nonce, no ':'", async () => {

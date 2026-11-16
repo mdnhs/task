@@ -173,7 +173,7 @@ test("expired trial: 7-day grace allows writes (reported by /v1/entitlements), t
   const ex = await post(b, "/v1/data-requests", { subjectUserId: b.owner.userId, kind: "export", reason: "Subject access request received by email" })
   expect(ex.status).toBe(201)
   expect(await code(await post(b, "/v1/me/data-export"))).toBe("request_open") // reached the handler (409), not 402
-  expect(await code(await post(b, "/v1/data-requests", { subjectUserId: b.owner.userId, kind: "erase", reason: "Subject asked for erasure by email" }))).toBe("billing_required")
+  expect((await post(b, "/v1/data-requests", { subjectUserId: b.owner.userId, kind: "erase", reason: "Subject asked for erasure by email" })).status).not.toBe(402) // C13: opening ANY data request stays open
   expect((await call(b.app, "POST", "/api/auth/sign-out", { cookie: b.cookie, headers: { origin: "http://localhost:3000" } })).status).toBe(200)
   // paying lifts the block (in-process change)
   const p = await world({ planId: "starter", status: "trialing", seats: 10, trialEndsAt: new Date(now.getTime() - 8 * DAY) })

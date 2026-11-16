@@ -4,8 +4,9 @@ import { call, resetDb, testApp } from "../../../test/harness"
 import { eq } from "drizzle-orm"
 import { ownerQuery, ownerTenantQuery } from "../../../test/db"
 import { memberships } from "../../db/schema"
-import { withTenant } from "../../db/tenant-tx"
+import { withTenant, type TenantTx } from "../../db/tenant-tx"
 import { makeMember, makeTenant, roleIdOf, signIn } from "../../../test/factories"
+import { changeMemberRole, cloneRole, updateRole } from "./service"
 import { requireTenant } from "../../core/middleware/tenant"
 import { requirePermission } from "../../core/middleware/permission"
 import { redactFields } from "./index"
@@ -277,6 +278,25 @@ describe("actor re-check inside the mutation tx (R25)", () => {
     expect(((await r.json()) as Json).code).toBe("forbidden")
     const row = (await ownerTenantQuery(w.tenant.id, "select r.key from memberships m join roles r on r.id=m.role_id where m.user_id=$1", [emp.userId]))[0]
     expect(row.key).toBe("employee")
+  })
+})
+
+describe("M6: services refuse an apikey actor (defence in depth behind the deny-list)", () => {
+  test("clone, edit and assign each answer 403 api_key_forbidden_route before touching anything", async () => {
+    const w = await world()
+    const actor = { userId: `apikey:${w.owner.userId}` }
+    const adminRole = await w.roleId("admin")
+    const employeeRole = await w.roleId("employee")
+    const run = (f: (tx: TenantTx) => Promise<unknown>) => withTenant(w.deps.db, w.tenant.id, f)
+    const now = w.clock.now()
+    for (const f of [
+      (tx: TenantTx) => cloneRole(tx, w.tenant.id, actor, adminRole, "Copy", now),
+      (tx: TenantTx) => updateRole(tx, w.tenant.id, actor, adminRole, { label: "x" }, now),
+      (tx: TenantTx) => changeMemberRole(tx, w.tenant.id, actor, w.admin.userId, employeeRole, now),
+    ]) {
+      await expect(run(f)).rejects.toMatchObject({ status: 403, code: "api_key_forbidden_route" })
+    }
+    expect(await ownerTenantQuery(w.tenant.id, "select 1 from audit_events where action like 'role.%'")).toEqual([])
   })
 })
 

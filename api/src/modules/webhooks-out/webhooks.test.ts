@@ -3,7 +3,7 @@ import { Writable } from "node:stream"
 import pino from "pino"
 import { sql } from "drizzle-orm"
 import { afterEach, beforeEach, describe, expect, test } from "vitest"
-import { ownerTenantQuery } from "../../../test/db"
+import { ownerQuery, ownerTenantQuery } from "../../../test/db"
 import { makeMember, makeTenant, roleIdOf, signIn } from "../../../test/factories"
 import { call, resetDb, testApp } from "../../../test/harness"
 import { buildKeyring, open } from "../../core/crypto/secret-box"
@@ -432,6 +432,40 @@ describe("delivery", () => {
     await expect(
       ownerTenantQuery(w.tenant.id, "insert into webhook_deliveries (tenant_id, endpoint_id, event_id, event_type, payload, next_attempt_at) values ($1, $2, $3, 'team.created', '{}', now())", [w.tenant.id, d.endpoint_id, d.event_id]),
     ).rejects.toMatchObject({ code: "23505" })
+  })
+
+  test("I4: a suspended tenant's event creates no delivery; a pending delivery is deferred (no attempt) while suspended and sent after reactivation", async () => {
+    const w = await world()
+    await w.mint()
+    // (a) fan-out while suspended: nothing is created
+    await ownerQuery("update tenants set status = 'suspended' where id = $1", [w.tenant.id])
+    await w.emitTeam("while suspended")
+    await w.relay()
+    expect(await w.deliveries()).toEqual([])
+    expect(w.queue.jobs).toEqual([])
+    // (b) a delivery that was pending when the tenant got suspended
+    await ownerQuery("update tenants set status = 'active' where id = $1", [w.tenant.id])
+    await w.emitTeam("before suspension")
+    await w.relay()
+    expect(w.queue.jobs).toHaveLength(1)
+    await ownerQuery("update tenants set status = 'suspended' where id = $1", [w.tenant.id])
+    await w.runNext() // the claim sees a suspended tenant
+    expect(w.net.sent).toEqual([])
+    const [d] = await w.deliveries()
+    expect(d).toMatchObject({ status: "pending", attempts: 0 })
+    expect((d.next_attempt_at as Date).getTime()).toBe(w.clock.now().getTime() + 3_600_000)
+    expect((await ownerTenantQuery(w.tenant.id, "select failing_since from webhook_endpoints"))[0].failing_since).toBeNull()
+    // sweeps skip suspended tenants
+    w.clock.advance({ hours: 2 })
+    await runJob(SWEEP_JOB, {}, w.deps)
+    expect(w.queue.jobs).toEqual([])
+    // reactivated: the next sweep re-enqueues it and it is delivered
+    await ownerQuery("update tenants set status = 'active' where id = $1", [w.tenant.id])
+    await runJob(SWEEP_JOB, {}, w.deps)
+    expect(w.queue.jobs).toHaveLength(1)
+    await w.runNext()
+    expect(w.net.sent).toHaveLength(1)
+    expect((await w.deliveries())[0]).toMatchObject({ status: "delivered", attempts: 1 })
   })
 
   test("the sweep re-enqueues a delivery whose job was lost", async () => {

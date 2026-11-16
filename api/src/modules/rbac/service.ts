@@ -79,7 +79,13 @@ export async function listRoles(tx: TenantTx, tenantId: string): Promise<RoleRow
 
 const slug = (label: string) => label.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40) || "role"
 
+/** Defence in depth behind the api-key deny-list: role administration is for human members only (an api-key actor id is `apikey:<id>`). */
+function humanActorOnly(actor: Actor): void {
+  if (actor.userId.startsWith(API_KEY_ACTOR_PREFIX)) throw Forbidden("api_key_forbidden_route")
+}
+
 export async function cloneRole(tx: TenantTx, tenantId: string, actor: Actor, sourceId: string, label: string, now: Date): Promise<RoleRow> {
+  humanActorOnly(actor)
   await lockRbac(tx, tenantId)
   await lockActor(tx, tenantId, actor.userId, "settings", "write")
   const src = await roleIn(tx, tenantId, sourceId)
@@ -109,6 +115,7 @@ export async function updateRole(
   tx: TenantTx, tenantId: string, actor: Actor, id: string,
   patch: { label?: string; access?: Record<string, string>; fieldRules?: Record<string, string[]> }, now: Date,
 ): Promise<RoleRow> {
+  humanActorOnly(actor)
   await lockRbac(tx, tenantId)
   const me = await lockActor(tx, tenantId, actor.userId, "settings", "write")
   const [cur] = await tx.select().from(roles).where(and(eq(roles.id, id), eq(roles.tenantId, tenantId))).for("update")
@@ -130,6 +137,7 @@ export async function updateRole(
 export async function changeMemberRole(
   tx: TenantTx, tenantId: string, actor: Actor, userId: string, roleId: string, now: Date,
 ): Promise<{ userId: string; roleId: string; roleKey: string }> {
+  humanActorOnly(actor)
   await lockRbac(tx, tenantId)
   const me = await lockActor(tx, tenantId, actor.userId, "settings", "write")
   const target = await roleIn(tx, tenantId, roleId)
