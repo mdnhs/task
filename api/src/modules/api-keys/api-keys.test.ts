@@ -222,6 +222,47 @@ describe("use: tenant binding, permissions, gates", () => {
     expect((await w.withKey(k.key, "GET", "/v1/_probe/ak/tasks/read")).status).toBe(403)
   })
 
+  test("I1: a key sees only what its creator would in /v1/people (team-scoped manager template, and a clone of it); admin sees all", async () => {
+    const w = await world()
+    const admin = await w.who("admin")
+    await w.who("employee") // somebody else in the tenant
+    const k = await w.mint(admin, ["reports:read"])
+    const viaKey = async () => ((await (await w.withKey(k.key, "GET", "/v1/people")).json()) as Json[]).map((p) => p.email).sort()
+    const viaCreator = async () => ((await (await call(w.app, "GET", "/v1/people", { cookie: admin.cookie, tenant: "acme" })).json()) as Json[]).map((p) => p.email).sort()
+    expect((await viaKey()).length).toBeGreaterThanOrEqual(3) // admin: all
+    expect(await viaKey()).toEqual(await viaCreator())
+    // demoted to manager: template scope "team" (nobody reports to the creator): the key must not widen to "all"
+    const mgr = await roleIdOf(w.deps, w.tenant.id, "manager")
+    await ownerTenantQuery(w.tenant.id, "update memberships set role_id = $1 where user_id = $2", [mgr, admin.userId])
+    const asCreator = await viaCreator()
+    expect(asCreator).not.toContain(w.owner.email)
+    expect(await viaKey()).toEqual(asCreator)
+    expect(await viaKey()).not.toContain(w.owner.email)
+    // a custom role cloned from manager keeps the team ceiling
+    const clone = await call(w.app, "POST", `/v1/roles/${mgr}/clone`, { cookie: w.owner.cookie, tenant: "acme", body: { label: "Night lead" } })
+    expect(clone.status).toBe(201)
+    const cloneId = ((await clone.json()) as Json).id
+    await ownerTenantQuery(w.tenant.id, "update memberships set role_id = $1 where user_id = $2", [cloneId, admin.userId])
+    expect(await viaCreator()).not.toContain(w.owner.email)
+    expect(await viaKey()).toEqual(await viaCreator())
+    // the same through a staff-home creator (own scope only): never anyone else
+    const emp = await roleIdOf(w.deps, w.tenant.id, "employee")
+    await ownerTenantQuery(w.tenant.id, "update memberships set role_id = $1 where user_id = $2", [emp, admin.userId])
+    expect((await w.withKey(k.key, "GET", "/v1/people")).status).toBe(200) // reports:read survives (employee reports write)
+    expect(await viaKey()).toEqual([admin.email])
+  })
+
+  test("I2: the tenant MFA policy is not reachable by a key (any method)", async () => {
+    const w = await world()
+    const k = await w.mint(w.owner, ["settings:write"])
+    for (const [m, body] of [["GET", undefined], ["PUT", { mode: "off", roles: [] }]] as const) {
+      const r = await w.withKey(k.key, m, "/v1/settings/mfa-policy", { body })
+      expect(r.status, m).toBe(403)
+      expect(await code(r)).toBe("api_key_forbidden_route")
+    }
+    expect((await ownerQuery("select mfa_policy from tenants where id = $1", [w.tenant.id]))[0].mfa_policy).toEqual({ mode: "off", roles: [] })
+  })
+
   test("creator removed / suspended / erased, or tenant suspended: 401 invalid_api_key", async () => {
     const w = await world()
     const mk = async () => {

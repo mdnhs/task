@@ -96,6 +96,15 @@ describe("assertSafeUrl", () => {
   })
 })
 
+describe("resolver timeout", () => {
+  const hang: Resolver = () => new Promise(() => {})
+  test("a hanging resolver is refused after the timeout (resolve_timeout), not hung", async () => {
+    const t0 = Date.now()
+    expect(await codeOf(assertSafeUrl("https://slow.example.com/x", hang, 80))).toBe("resolve_timeout")
+    expect(Date.now() - t0).toBeLessThan(2000)
+  })
+})
+
 describe("sendPinned: connects to the vetted IP, never follows redirects, bounded read", () => {
   let server: Server
   let port = 0
@@ -112,6 +121,9 @@ describe("sendPinned: connects to the vetted IP, never follows redirects, bounde
         res.writeHead(200)
         res.write(Buffer.alloc(200_000, 97))
         res.end()
+      } else if (req.url === "/stall") {
+        res.writeHead(200)
+        res.write("partial") // headers + a little body, then the body stalls forever
       } else if (req.url === "/slow") {
         // never answers
       } else {
@@ -140,6 +152,10 @@ describe("sendPinned: connects to the vetted IP, never follows redirects, bounde
   })
   test("reads at most maxBytes of the body and only the status is returned", async () => {
     const r = await sendPinned({ ...base, url: new URL(`https://hooks.example.invalid:${port}/big`) })
+    expect(r).toEqual({ status: 200 })
+  })
+  test("a body that stalls AFTER the status line is not a timeout: the status is returned", async () => {
+    const r = await sendPinned({ ...base, timeoutMs: 200, url: new URL(`https://hooks.example.invalid:${port}/stall`) })
     expect(r).toEqual({ status: 200 })
   })
   test("a server that never answers times out (network error, not a hang)", async () => {

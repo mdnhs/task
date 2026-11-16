@@ -1,4 +1,6 @@
 import { createRoute, z } from "@hono/zod-openapi"
+import type { Context } from "hono"
+import type { AppEnv } from "../../core/context"
 import { Forbidden } from "../../core/errors"
 import { requirePermission } from "../../core/middleware/permission"
 import { requireTenant } from "../../core/middleware/tenant"
@@ -39,15 +41,25 @@ const revokeR = createRoute({
   responses: { 200: { description: "Revoked: the key answers 401 invalid_api_key from now on. 404 api_key_not_found, 409 api_key_revoked", content: { "application/json": { schema: KeyDto } } } },
 })
 
+/** Defence in depth behind the deny-list: only humans (not keys, not support sessions) manage keys. */
+const humanOnly = (c: Context<AppEnv>) => {
+  if (c.get("apiKey") || c.get("support")) throw Forbidden("api_key_forbidden_route")
+}
 const iso = (k: ApiKeyView) => ({ ...k, createdAt: k.createdAt.toISOString(), lastUsedAt: k.lastUsedAt?.toISOString() ?? null, revokedAt: k.revokedAt?.toISOString() ?? null })
 
 export const apiKeyRoutes = newRouter()
   .openapi(createR, async (c) => {
-    if (c.get("apiKey") || c.get("support")) throw Forbidden("api_key_forbidden_route") // defence in depth: only humans mint keys
+    humanOnly(c)
     const t = c.get("tenant")!
     const userId = c.get("member")!.userId
     const out = await createApiKey(c.get("deps"), t.id, { userId, access: await loadRoleAccess(c) }, c.req.valid("json"))
     return c.json({ ...iso(out.view), key: out.key }, 201)
   })
-  .openapi(listR, async (c) => c.json({ items: (await listApiKeys(c.get("deps"), c.get("tenant")!.id)).map(iso) }, 200))
-  .openapi(revokeR, async (c) => c.json(iso(await revokeApiKey(c.get("deps"), c.get("tenant")!.id, c.get("member")!.userId, c.req.valid("param").id)), 200))
+  .openapi(listR, async (c) => {
+    humanOnly(c)
+    return c.json({ items: (await listApiKeys(c.get("deps"), c.get("tenant")!.id)).map(iso) }, 200)
+  })
+  .openapi(revokeR, async (c) => {
+    humanOnly(c)
+    return c.json(iso(await revokeApiKey(c.get("deps"), c.get("tenant")!.id, c.get("member")!.userId, c.req.valid("param").id)), 200)
+  })

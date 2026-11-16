@@ -97,7 +97,8 @@ export const teamRoutes = newRouter()
   })
   .openapi(peopleRoute, async (c) => {
     const t = c.get("tenant")!
-    const me = c.get("member")!.userId
+    // an API key sees what its CREATOR would (scope is resolved from the creator's role; the creator is the `person` for team/own scope)
+    const me = c.get("apiKey")?.creatorId ?? c.get("member")!.userId
     const role = c.get("role")! // loaded by requirePermission
     const rows = await withTenant(c.get("deps").db, t.id, async (tx) => {
       const scope = resolveScope(await peopleAccess(tx, t.id, role, me), c.req.valid("query").scope)

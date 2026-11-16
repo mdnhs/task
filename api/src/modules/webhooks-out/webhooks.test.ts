@@ -171,6 +171,45 @@ describe("endpoints: create / list / patch / delete", () => {
     expect((await ownerTenantQuery(w.tenant.id, "select active, deleted_at from webhook_endpoints"))[0]).toEqual({ active: true, deleted_at: null })
   })
 
+  test("M5: PATCH with a non-string url is 422 invalid_webhook_url (not a 400)", async () => {
+    const w = await world()
+    const ep = await w.mint()
+    for (const url of [123, null, { a: 1 }, ["https://hooks.example.com/x"]]) {
+      const r = await w.req("PATCH", `/v1/webhooks/${ep.id}`, { body: { url } })
+      expect(r.status, JSON.stringify(url)).toBe(422)
+      expect(await code(r)).toBe("invalid_webhook_url")
+    }
+  })
+
+  test("M4: deleting an endpoint redacts its url to scheme+host (no path/query token survives)", async () => {
+    const w = await world()
+    const ep = await w.mint({ url: "https://hooks.example.com/in/TOKEN123?sig=abc" })
+    expect((await w.req("DELETE", `/v1/webhooks/${ep.id}`)).status).toBe(204)
+    const [row] = await ownerTenantQuery(w.tenant.id, "select url from webhook_endpoints")
+    expect(row.url).toBe("https://hooks.example.com")
+    expect(JSON.stringify(await ownerTenantQuery(w.tenant.id, "select after, before from audit_events where action like 'webhook.%'"))).not.toMatch(/TOKEN123|sig=abc/)
+  })
+
+  test("M3: a hanging resolver is 422 unsafe_webhook_url at create, and a retryable network error at delivery", async () => {
+    const w = await world()
+    const ep = await w.mint({ url: "https://hang.example.com/x" })
+    const real = w.net.resolve
+    w.net.resolve = (h) => (h === "hang.example.com" ? new Promise(() => {}) : real(h))
+    // shorten the 5 s timeout for the test by racing with fake timers is overkill: use real time on a short-lived tenant clock
+    const { RESOLVE_TIMEOUT_MS } = await import("../../core/net/ssrf-guard")
+    expect(RESOLVE_TIMEOUT_MS).toBe(5000)
+    const r = await w.create({ url: "https://hang.example.com/y" })
+    expect(r.status).toBe(422)
+    expect(await code(r)).toBe("unsafe_webhook_url")
+    await w.newTeam()
+    await w.relay()
+    await w.runNext()
+    const [d] = await w.deliveries()
+    expect(d).toMatchObject({ status: "pending", attempts: 1, last_error: "dns_timeout" })
+    expect(w.queue.jobs).toHaveLength(1) // a retry is scheduled
+    expect(ep.id).toBeTruthy()
+  }, 30_000)
+
   test("PATCH can pause and resume (resume clears the failing clock) and change events", async () => {
     const w = await world()
     const ep = await w.mint()

@@ -31,6 +31,7 @@ export function sendPinned(o: PinnedRequest): Promise<{ status: number }> {
   const send = o.request ?? httpsRequest
   return new Promise((resolve, reject) => {
     let settled = false
+    let status: number | null = null // set once the status line and headers have arrived
     let req: ClientRequest | undefined
     const done = (fn: () => void) => {
       if (settled) return
@@ -39,7 +40,8 @@ export function sendPinned(o: PinnedRequest): Promise<{ status: number }> {
       fn()
     }
     const timer = setTimeout(() => {
-      done(() => reject(new PinnedRequestError("timeout")))
+      // headers already received: a stalled body is not a failure (the status is what counts; the rest is discarded unseen)
+      done(() => (status !== null ? resolve({ status }) : reject(new PinnedRequestError("timeout"))))
       req?.destroy()
     }, o.timeoutMs)
     const opts: RequestOptions = {
@@ -54,18 +56,19 @@ export function sendPinned(o: PinnedRequest): Promise<{ status: number }> {
     }
     try {
       req = send(opts, (res) => {
-        const status = res.statusCode ?? 0
+        status = res.statusCode ?? 0
+        const got = status
         let read = 0
         res.on("data", (chunk: Buffer) => {
           read += chunk.length
           if (read >= o.maxBytes) {
-            done(() => resolve({ status }))
+            done(() => resolve({ status: got }))
             res.destroy()
           }
         })
-        res.on("end", () => done(() => resolve({ status })))
-        res.on("error", () => done(() => resolve({ status }))) // the status line already arrived
-        res.on("close", () => done(() => resolve({ status })))
+        res.on("end", () => done(() => resolve({ status: got })))
+        res.on("error", () => done(() => resolve({ status: got }))) // the status line already arrived
+        res.on("close", () => done(() => resolve({ status: got })))
       })
     } catch {
       done(() => reject(new PinnedRequestError("network")))

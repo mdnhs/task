@@ -15,9 +15,20 @@ const permissionGuards = new WeakSet<object>()
 export const markPermissionGuard = <T extends object>(h: T): T => (permissionGuards.add(h), h)
 export const isPermissionGuard = (h: unknown): boolean => typeof h === "function" && permissionGuards.has(h)
 
-export function apiKeyRole(k: { access: Record<Module, Access> }): ResolvedRole {
+/** The creator's real role identity, read fresh at use time (it decides data scope: people/report visibility follow it). */
+export type CreatorRole = { id: string; key: string; home: "staff" | "manager"; fieldRules: Record<string, string[]> }
+/** Fail closed: an unknown `home` is the narrowest ("staff" = own data only). */
+export const homeOf = (h: unknown): "staff" | "manager" => (h === "manager" ? "manager" : "staff")
+
+/**
+ * The synthetic role of an API key: module access = scopes ∩ the creator's current permissions (computed by the caller), but the
+ * role IDENTITY (id, key, home, field rules) is the creator's real one, so every data-scope rule that resolves from the role
+ * (reportScope / peopleAccess / cloned_from ceilings, field rules) gives the key exactly what the creator would see, never wider.
+ * The member stays the `apikey:<id>` sentinel; scope handlers take the creator's user id from c.var.apiKey.creatorId.
+ */
+export function apiKeyRole(k: { access: Record<Module, Access>; role: CreatorRole }): ResolvedRole {
   return Object.freeze({
-    id: API_KEY_ROLE_ID, key: API_KEY_ROLE_KEY, label: "API key", description: "Scopes of the key, limited by its creator's current role.",
-    home: "manager" as const, access: k.access, fieldRules: Object.freeze({}) as Record<string, string[]>,
+    id: k.role.id, key: k.role.key, label: "API key", description: "Scopes of the key, limited by its creator's current role.",
+    home: k.role.home, access: k.access, fieldRules: Object.freeze({ ...k.role.fieldRules }) as Record<string, string[]>,
   })
 }

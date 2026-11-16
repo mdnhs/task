@@ -30,7 +30,7 @@ async function vetUrl(deps: Deps, url: unknown): Promise<string> {
   try {
     return (await assertSafeUrl(url, deps.net.resolve)).url.toString()
   } catch (err) {
-    if (err instanceof WebhookUrlError) throw unprocessable(err.code)
+    if (err instanceof WebhookUrlError) throw unprocessable(err.code === "resolve_timeout" ? "unsafe_webhook_url" : err.code)
     throw err
   }
 }
@@ -72,7 +72,7 @@ export async function listEndpoints(deps: Deps, tenantId: string): Promise<Endpo
 }
 
 /** PATCH: url (re-vetted, 422), events (422), active (resuming clears the failing clock). 404 webhook_not_found (also another tenant's id). */
-export async function updateEndpoint(deps: Deps, tenantId: string, actorId: string, id: string, patch: { url?: string; events?: unknown; active?: boolean }): Promise<EndpointView> {
+export async function updateEndpoint(deps: Deps, tenantId: string, actorId: string, id: string, patch: { url?: unknown; events?: unknown; active?: boolean }): Promise<EndpointView> {
   const url = patch.url === undefined ? undefined : await vetUrl(deps, patch.url)
   const events = patch.events === undefined ? undefined : assertEvents(patch.events)
   const now = deps.clock.now()
@@ -100,7 +100,8 @@ export async function deleteEndpoint(deps: Deps, tenantId: string, actorId: stri
     await lock(tx, tenantId)
     const [cur] = await tx.select().from(webhookEndpoints).where(and(eq(webhookEndpoints.id, id), isNull(webhookEndpoints.deletedAt))).for("update")
     if (!cur) throw EndpointNotFound()
-    await tx.update(webhookEndpoints).set({ deletedAt: now, active: false, secretCiphertext: "" }).where(eq(webhookEndpoints.id, id))
+    // the secret is blanked and the URL redacted to scheme+host: no path or query token survives a delete
+    await tx.update(webhookEndpoints).set({ deletedAt: now, active: false, secretCiphertext: "", url: new URL(cur.url).origin }).where(eq(webhookEndpoints.id, id))
     await recordAudit(tx, tenantId, { action: "webhook.deleted", entity: "webhook", entityId: id, actorId, before: snap(cur), after: null }, now)
   })
 }

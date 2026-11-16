@@ -2,7 +2,7 @@ import { and, eq } from "drizzle-orm"
 import { can, type Module } from "@opsdesk/domain/permissions"
 import type { ResolvedRole } from "../../core/context"
 import { Forbidden } from "../../core/errors"
-import { apiKeyRole } from "../../core/middleware/principal"
+import { apiKeyRole, homeOf } from "../../core/middleware/principal"
 import { apiKeys, memberships, roles, user } from "../../db/schema"
 import type { TenantTx } from "../../db/tenant-tx"
 import { effectiveAccess } from "./key"
@@ -24,7 +24,7 @@ export async function lockApiKeyActor(tx: TenantTx, tenantId: string, keyId: str
     .where(and(eq(memberships.tenantId, tenantId), eq(memberships.userId, key.createdBy)))
     .for("share", { of: [memberships, roles] })
   if (!row || row.status !== "active" || row.erasedAt !== null) throw Forbidden("forbidden")
-  const role = apiKeyRole({ access: effectiveAccess(key.scopes, row.role.access as Record<string, string>) })
+  const role = apiKeyRole({ access: effectiveAccess(key.scopes, row.role.access as Record<string, string>), role: { id: row.role.id, key: row.role.key, home: homeOf(row.role.home), fieldRules: row.role.fieldRules } })
   if (!can(role, module, need)) throw Forbidden("forbidden")
   return role
 }

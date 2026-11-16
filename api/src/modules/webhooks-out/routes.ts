@@ -1,4 +1,7 @@
 import { createRoute, z } from "@hono/zod-openapi"
+import type { Context } from "hono"
+import type { AppEnv } from "../../core/context"
+import { Forbidden } from "../../core/errors"
 import { requirePermission } from "../../core/middleware/permission"
 import { requireTenant } from "../../core/middleware/tenant"
 import { newRouter } from "../../core/router"
@@ -19,7 +22,7 @@ const CreateBody = z.object({
   events: z.unknown().optional().openapi({ description: "Subset of the allow-list of event types (see WEBHOOK_EVENT_TYPES)", example: ["team.created", "file.uploaded"] }),
 }).openapi({ example: { url: URL_EX, events: ["team.created", "file.uploaded"] } })
 const PatchBody = z
-  .object({ url: z.string().max(8192).optional(), events: z.unknown().optional(), active: z.boolean().optional() })
+  .object({ url: z.unknown().optional(), events: z.unknown().optional(), active: z.boolean().optional() })
   .refine((v) => v.url !== undefined || v.events !== undefined || v.active !== undefined)
   .openapi({ example: { events: ["team.created"], active: true } })
 const IdParam = z.object({ id: z.uuid().openapi({ param: { name: "id", in: "path" }, example: WID }) })
@@ -43,16 +46,28 @@ const deleteR = createRoute({
   responses: { 204: { description: "Deleted (the secret is destroyed). 404 webhook_not_found" } },
 })
 
+/** Defence in depth behind the deny-list: only humans (not keys, not support sessions) manage webhooks. */
+const humanOnly = (c: Context<AppEnv>) => {
+  if (c.get("apiKey") || c.get("support")) throw Forbidden("api_key_forbidden_route")
+}
 const iso = (e: EndpointView) => ({ ...e, createdAt: e.createdAt.toISOString(), failingSince: e.failingSince?.toISOString() ?? null })
 
 export const webhookRoutes = newRouter()
   .openapi(createR, async (c) => {
+    humanOnly(c)
     const out = await createEndpoint(c.get("deps"), c.get("tenant")!.id, c.get("member")!.userId, c.req.valid("json"))
     return c.json({ ...iso(out.view), secret: out.secret }, 201)
   })
-  .openapi(listR, async (c) => c.json({ items: (await listEndpoints(c.get("deps"), c.get("tenant")!.id)).map(iso) }, 200))
-  .openapi(patchR, async (c) => c.json(iso(await updateEndpoint(c.get("deps"), c.get("tenant")!.id, c.get("member")!.userId, c.req.valid("param").id, c.req.valid("json"))), 200))
+  .openapi(listR, async (c) => {
+    humanOnly(c)
+    return c.json({ items: (await listEndpoints(c.get("deps"), c.get("tenant")!.id)).map(iso) }, 200)
+  })
+  .openapi(patchR, async (c) => {
+    humanOnly(c)
+    return c.json(iso(await updateEndpoint(c.get("deps"), c.get("tenant")!.id, c.get("member")!.userId, c.req.valid("param").id, c.req.valid("json"))), 200)
+  })
   .openapi(deleteR, async (c) => {
+    humanOnly(c)
     await deleteEndpoint(c.get("deps"), c.get("tenant")!.id, c.get("member")!.userId, c.req.valid("param").id)
     return c.body(null, 204)
   })

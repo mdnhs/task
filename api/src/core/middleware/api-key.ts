@@ -8,7 +8,7 @@ import { AppError, Forbidden, NotFound } from "../errors"
 import { errorInfo } from "../safe-error"
 import { EXPORT_OR_DOWNLOAD, routeDenied, type DenyRule } from "./deny-list"
 import { enforceBilling } from "./module"
-import { API_KEY_ROLE_ID, API_KEY_ROLE_KEY, apiKeyActor, isPermissionGuard } from "./principal"
+import { API_KEY_ROLE_ID, API_KEY_ROLE_KEY, apiKeyActor, homeOf, isPermissionGuard } from "./principal"
 
 export { API_KEY_ROLE_ID, API_KEY_ROLE_KEY, apiKeyActor, apiKeyRole, markPermissionGuard } from "./principal"
 
@@ -39,6 +39,7 @@ export { API_KEY_ROLE_ID, API_KEY_ROLE_KEY, apiKeyActor, apiKeyRole, markPermiss
 /** Routes a key may never call (403 api_key_forbidden_route). THE single key deny-list; matched like the support deny-list (deny-list.ts). */
 export const API_KEY_DENIED_ROUTES: readonly DenyRule[] = [
   { prefix: "/v1/api-keys", why: "a key must not mint, list or revoke keys" },
+  { prefix: "/v1/settings/mfa-policy", why: "tenant MFA policy: a key is MFA-exempt and must not weaken the policy (all methods)" },
   { prefix: "/v1/webhooks", why: "a key must not manage outgoing webhooks (the signing secret is shown at creation)" },
   { prefix: "/v1/roles", why: "role management (privilege escalation)" },
   { prefix: "/v1/members", why: "membership and role assignment (privilege escalation)" },
@@ -108,7 +109,7 @@ export async function enterApiKeyPath(c: Context<AppEnv>, token: string): Promis
         const [key] = await tx.select().from(apiKeys).where(and(eq(apiKeys.id, idx.keyId), eq(apiKeys.tenantId, tenant.id), eq(apiKeys.prefix, parsed.prefix)))
         if (!key) return null
         const [creator] = await tx
-          .select({ status: memberships.status, access: roles.access, erasedAt: user.erasedAt })
+          .select({ status: memberships.status, access: roles.access, roleId: roles.id, roleKey: roles.key, home: roles.home, fieldRules: roles.fieldRules, erasedAt: user.erasedAt })
           .from(memberships)
           .innerJoin(roles, eq(roles.id, memberships.roleId))
           .innerJoin(user, eq(user.id, memberships.userId))
@@ -132,7 +133,7 @@ export async function enterApiKeyPath(c: Context<AppEnv>, token: string): Promis
     sessionIdleHours: tenant.sessionIdleHours, mfaPolicy: tenant.mfaPolicy,
   })
   const access = effectiveAccess(key.scopes, creator.access as Record<string, string>)
-  c.set("apiKey", { id: key.id, prefix: key.prefix, scopes: key.scopes, creatorId: key.createdBy, access })
+  c.set("apiKey", { id: key.id, prefix: key.prefix, scopes: key.scopes, creatorId: key.createdBy, access, role: { id: creator.roleId, key: creator.roleKey, home: homeOf(creator.home), fieldRules: creator.fieldRules ?? {} } })
   c.set("member", { userId: apiKeyActor(key.id), roleId: API_KEY_ROLE_ID, roleKey: API_KEY_ROLE_KEY })
   await enforceBilling(c) // an unpaid / expired tenant's key reads but cannot write
   await touch(c, tenant.id, key.id)

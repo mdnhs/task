@@ -151,7 +151,8 @@ async function attempt(deps: Deps, tenantId: string, claim: Extract<Claim, { kin
   try {
     target = await assertSafeUrl(claim.url, deps.net.resolve) // re-resolved on EVERY delivery
   } catch (err) {
-    return { kind: "fail", status: null, error: err instanceof WebhookUrlError ? err.code : "unsafe_webhook_url" }
+    if (err instanceof WebhookUrlError && err.code === "resolve_timeout") return { kind: "retry", status: null, error: "dns_timeout" } // a slow resolver is a network error: retryable
+    return { kind: "fail", status: null, error: "unsafe_webhook_url" }
   }
   const body = JSON.stringify(claim.payload)
   const ts = Math.floor(deps.clock.now().getTime() / 1000)

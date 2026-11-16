@@ -20,7 +20,7 @@ export type AppEnv = {
     /** Set ONLY on the support-grant path of requireTenant (T3.5): the caller is platform staff reading under this grant. */
     support?: { grantId: string; staffUserId: string }
     /** Set ONLY on the API-key path of requireTenant (T3.6): the key, and its effective access (scopes ∩ the creator's current role). */
-    apiKey?: { id: string; prefix: string; scopes: string[]; creatorId: string; access: Record<Module, Access> }
+    apiKey?: { id: string; prefix: string; scopes: string[]; creatorId: string; access: Record<Module, Access>; role: { id: string; key: string; home: "staff" | "manager"; fieldRules: Record<string, string[]> } }
     role?: ResolvedRole
     /** The caller's platform staff identity (requirePlatformStaff, /v1/platform/* only). */
     staff?: { userId: string; role: PlatformRole }

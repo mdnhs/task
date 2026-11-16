@@ -17,7 +17,8 @@ import { isIP } from "node:net"
 export type Resolved = { address: string; family: number }
 export type Resolver = (host: string) => Promise<Resolved[]>
 export class WebhookUrlError extends Error {
-  constructor(public code: "invalid_webhook_url" | "unsafe_webhook_url") {
+  /** `resolve_timeout` is internal: create/PATCH report it as unsafe_webhook_url, a delivery treats it as a retryable network error. */
+  constructor(public code: "invalid_webhook_url" | "unsafe_webhook_url" | "resolve_timeout") {
     super(code)
   }
 }
@@ -120,7 +121,9 @@ export function parseWebhookUrl(raw: unknown): URL {
  * Parses and vets the URL: shape rules (422 invalid_webhook_url) then address rules (422 unsafe_webhook_url). Returns the
  * vetted addresses; the caller must connect to one of THESE (pinned), never re-resolve between check and connect.
  */
-export async function assertSafeUrl(raw: unknown, resolve: Resolver): Promise<{ url: URL; addresses: Resolved[] }> {
+export const RESOLVE_TIMEOUT_MS = 5_000
+
+export async function assertSafeUrl(raw: unknown, resolve: Resolver, timeoutMs: number = RESOLVE_TIMEOUT_MS): Promise<{ url: URL; addresses: Resolved[] }> {
   const url = parseWebhookUrl(raw)
   const host = url.hostname.startsWith("[") ? url.hostname.slice(1, -1) : url.hostname
   const family = isIP(host)
@@ -131,10 +134,19 @@ export async function assertSafeUrl(raw: unknown, resolve: Resolver): Promise<{ 
   const lower = host.toLowerCase().replace(/\.$/, "")
   if (lower === "localhost" || lower.endsWith(".localhost")) throw new WebhookUrlError("unsafe_webhook_url")
   let addresses: Resolved[]
+  let timer: ReturnType<typeof setTimeout> | undefined
   try {
-    addresses = await resolve(host)
-  } catch {
+    addresses = await Promise.race([
+      resolve(host),
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new WebhookUrlError("resolve_timeout")), timeoutMs)
+      }),
+    ])
+  } catch (err) {
+    if (err instanceof WebhookUrlError) throw err
     throw new WebhookUrlError("unsafe_webhook_url") // never leak the resolver error
+  } finally {
+    clearTimeout(timer)
   }
   if (addresses.length === 0 || addresses.some((a) => isBlockedIp(a.address))) throw new WebhookUrlError("unsafe_webhook_url")
   return { url, addresses }
