@@ -8,6 +8,10 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@hono/node-server": "^2.1.8",
+    "@hono/zod-openapi": "^1.6.3",
+    "hono": "^4.13.19",
+    "pino": "^10.4.0",
     "zod": "^4.6.7"
   },
   "devDependencies": {
