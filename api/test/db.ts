@@ -24,6 +24,23 @@ export async function ownerQuery(sqlText: string, params: unknown[] = []): Promi
   return (await owner().query(sqlText, params)).rows
 }
 
+/** Run SQL as app_owner inside a tenant context (FORCE RLS applies to the owner, so it only sees that tenant's rows). */
+export async function ownerTenantQuery(tenant: string, sqlText: string, params: unknown[] = []): Promise<Record<string, unknown>[]> {
+  const c = await owner().connect()
+  try {
+    await c.query("begin")
+    await c.query("select set_config('app.tenant_id', $1, true)", [tenant])
+    const res = await c.query(sqlText, params)
+    await c.query("commit")
+    return res.rows
+  } catch (e) {
+    await c.query("rollback")
+    throw e
+  } finally {
+    c.release()
+  }
+}
+
 export async function ownerInsertProbe(rows: { tenant: string; label: string }[]): Promise<void> {
   const c = await owner().connect()
   try {
