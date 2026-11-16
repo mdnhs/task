@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm"
-import { boolean, foreignKey, index, pgPolicy, pgTable, primaryKey, text, timestamp, uuid } from "drizzle-orm/pg-core"
+import { boolean, foreignKey, integer, index, pgPolicy, pgTable, primaryKey, text, timestamp, uuid } from "drizzle-orm/pg-core"
 import { memberships, tenants } from "./tenants"
 
 // Standard RLS template (R8); FORCE and the CHECK constraints are appended by hand in the migration.
@@ -18,6 +18,12 @@ export const devices = pgTable(
     label: text("label").notNull(),
     trusted: boolean("trusted").notNull().default(false),
     lastSeenAt: timestamp("last_seen_at", { withTimezone: true }),
+    // Enrolment (R28): sha256 hex of the one-time code, its expiry and wrong-attempt count; sha256 hex of the binding secret.
+    // Only hashes are stored. binding_hash null = not bound to any browser.
+    enrolHash: text("enrol_hash"),
+    enrolExpiresAt: timestamp("enrol_expires_at", { withTimezone: true }),
+    enrolAttempts: integer("enrol_attempts").notNull().default(0),
+    bindingHash: text("binding_hash"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [

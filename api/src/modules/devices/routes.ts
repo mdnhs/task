@@ -4,7 +4,8 @@ import { requirePermission } from "../../core/middleware/permission"
 import { requireTenant } from "../../core/middleware/tenant"
 import { newRouter } from "../../core/router"
 import { withTenant } from "../../db/tenant-tx"
-import { bindDevice, listDevices, listPolicies, registerDevice, setPolicy, updateDevice } from "./service"
+import { AppError } from "../../core/errors"
+import { bindDevice, issueEnrolment, listDevices, listPolicies, registerDevice, setPolicy, updateDevice } from "./service"
 
 const Id = z.uuid()
 const Type = z.enum(["pc", "android", "browser"])
@@ -22,6 +23,7 @@ const PatchBody = z
   .object({ type: Type.optional(), owner: Owner.optional(), label: Label.optional(), trusted: z.boolean().optional() })
   .refine((v) => Object.values(v).some((x) => x !== undefined))
   .openapi({ example: { trusted: false } })
+const BindBody = z.object({ code: z.string().max(64).optional() }).openapi({ example: { code: "ABCD2345JK" } })
 const PolicyBody = z.object({ allow: Allow }).openapi({ example: { allow: "trusted-company-pc" } })
 
 const listRoute = createRoute({
@@ -40,8 +42,13 @@ const patchRoute = createRoute({
 })
 const bindRoute = createRoute({
   method: "post", path: "/v1/devices/{id}/bind", middleware: [requireTenant] as const,
+  request: { params: z.object({ id: Id }), body: { content: { "application/json": { schema: BindBody } }, required: false } },
+  responses: { 200: { description: "Device bound to this browser (signed HttpOnly per-tenant od-device cookie) with a valid one-time enrolment code; only the allocated user, only while unbound (409 device_already_bound), wrong/expired code 422 invalid_enrolment_code", content: { "application/json": { schema: Device } } } },
+})
+const enrolRoute = createRoute({
+  method: "post", path: "/v1/devices/{id}/enrolment-code", middleware: [requireTenant, requirePermission("settings", "write")] as const,
   request: { params: z.object({ id: Id }) },
-  responses: { 200: { description: "Device bound to this browser by a signed HttpOnly od-device cookie; only the allocated user may do this", content: { "application/json": { schema: Device } } } },
+  responses: { 201: { description: "One-time enrolment code (shown once, valid 15 minutes); also resets the device's current binding", content: { "application/json": { schema: z.object({ code: z.string(), expiresAt: z.string() }) } } } },
 })
 const listPoliciesRoute = createRoute({
   method: "get", path: "/v1/device-policies", middleware: [requireTenant] as const,
@@ -71,13 +78,22 @@ export const deviceRoutes = newRouter()
     const actor = { userId: c.get("member")!.userId }
     return c.json(await withTenant(deps.db, t.id, (tx) => updateDevice(tx, t.id, actor, c.req.valid("param").id, c.req.valid("json"), deps.clock.now())), 200)
   })
+  .openapi(enrolRoute, async (c) => {
+    const deps = c.get("deps")
+    const t = c.get("tenant")!
+    const actor = { userId: c.get("member")!.userId }
+    return c.json(await withTenant(deps.db, t.id, (tx) => issueEnrolment(tx, t.id, actor, c.req.valid("param").id, deps.clock.now())), 201)
+  })
   .openapi(bindRoute, async (c) => {
     const deps = c.get("deps")
     const t = c.get("tenant")!
     const actor = { userId: c.get("member")!.userId }
-    const d = await withTenant(deps.db, t.id, (tx) => bindDevice(tx, t.id, actor, c.req.valid("param").id, deps.clock.now()))
-    await setDeviceCookie(c, d.id)
-    return c.json(d, 200)
+    const body = c.req.valid("json") as { code?: string } | undefined
+    const ua = c.req.header("user-agent") ?? ""
+    const r = await withTenant(deps.db, t.id, (tx) => bindDevice(tx, t.id, actor, c.req.valid("param").id, body?.code ?? "", ua, deps.clock.now()))
+    if (!r.ok) throw new AppError(422, "invalid_enrolment_code", "Unprocessable Entity")
+    await setDeviceCookie(c, t.id, r.device.id, r.secret)
+    return c.json(r.device, 200)
   })
   .openapi(listPoliciesRoute, async (c) => {
     const t = c.get("tenant")!

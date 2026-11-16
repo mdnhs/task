@@ -64,6 +64,13 @@
       "when": 1794849307483,
       "tag": "0008_devices",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1794849715399,
+      "tag": "0009_device_enrolment",
+      "breakpoints": true
     }
   ]
 }

@@ -1,7 +1,8 @@
+import { randomBytes, randomInt, timingSafeEqual } from "node:crypto"
 import { allowFor, DEVICE_FEATURES, type DeviceAllow, type DeviceFeature, type DeviceOwner, type DeviceType, type Device } from "@opsdesk/domain/devices"
 import { and, asc, eq, sql } from "drizzle-orm"
-import { toDevice } from "../../core/middleware/device"
-import { AppError, NotFound } from "../../core/errors"
+import { sha256Hex, toDevice } from "../../core/middleware/device"
+import { AppError, Conflict, NotFound } from "../../core/errors"
 import { devicePolicies, devices, memberships } from "../../db/schema"
 import type { TenantTx } from "../../db/tenant-tx"
 import { recordAudit } from "../audit"
@@ -65,17 +66,51 @@ export async function updateDevice(
   return toDevice(row)
 }
 
-/**
- * Binding: only the user the device is allocated to may bind it, and only for their own session. Anyone else gets 404
- * (the same as a missing device), so an admin can never mint a cookie that makes their browser look like another user's PC.
- */
-export async function bindDevice(tx: TenantTx, tenantId: string, actor: Actor, id: string, now: Date): Promise<Device> {
-  const [row] = await tx.select().from(devices).where(and(eq(devices.id, id), eq(devices.tenantId, tenantId), eq(devices.userId, actor.userId)))
-  if (!row) throw NotFound("device_not_found")
-  const d = toDevice(row)
-  await recordAudit(tx, tenantId, { action: "device.bound", entity: "device", entityId: id, actorId: actor.userId, before: null, after: snapshot(d) }, now)
-  return d
+// Enrolment (R28, CR-02). The code is issued by an admin on the trusted PC, typed there by its allocated user.
+const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789" // 32 symbols, no 0/O/1/I
+const CODE_LENGTH = 10
+const CODE_TTL_MS = 15 * 60_000
+const MAX_WRONG = 5
+
+/** Admin action: issues a one-time code (returned once, stored as sha256) AND resets the current binding. */
+export async function issueEnrolment(tx: TenantTx, tenantId: string, actor: Actor, id: string, now: Date): Promise<{ code: string; expiresAt: string }> {
+  await begin(tx, tenantId, actor)
+  const [cur] = await tx.select().from(devices).where(and(eq(devices.id, id), eq(devices.tenantId, tenantId))).for("update")
+  if (!cur) throw NotFound("device_not_found")
+  const code = Array.from({ length: CODE_LENGTH }, () => CODE_ALPHABET[randomInt(CODE_ALPHABET.length)]).join("")
+  const expires = new Date(now.getTime() + CODE_TTL_MS)
+  await tx.update(devices).set({ enrolHash: sha256Hex(code), enrolExpiresAt: expires, enrolAttempts: 0, bindingHash: null }).where(and(eq(devices.id, id), eq(devices.tenantId, tenantId)))
+  await recordAudit(tx, tenantId, { action: "device.enrolment_issued", entity: "device", entityId: id, actorId: actor.userId, before: { bound: cur.bindingHash !== null }, after: { bound: false, expiresAt: expires.toISOString() } }, now)
+  return { code, expiresAt: expires.toISOString() }
 }
+
+export type BindResult = { ok: true; device: Device; secret: string } | { ok: false }
+
+/**
+ * Binding: only the allocated user, with a valid unused unexpired code, and only while the device is unbound. Others get 404
+ * (same as a missing device). A wrong code returns {ok:false} (not a throw) so the attempt counter COMMITS; 5 wrong invalidate the code.
+ * Unknown / expired / used / invalidated codes are indistinguishable (no oracle).
+ */
+export async function bindDevice(tx: TenantTx, tenantId: string, actor: Actor, id: string, code: string, userAgent: string, now: Date): Promise<BindResult> {
+  const [row] = await tx.select().from(devices).where(and(eq(devices.id, id), eq(devices.tenantId, tenantId), eq(devices.userId, actor.userId))).for("update")
+  if (!row) throw NotFound("device_not_found")
+  if (row.bindingHash) throw Conflict("device_already_bound")
+  const live = row.enrolHash && row.enrolExpiresAt && row.enrolExpiresAt > now && row.enrolAttempts < MAX_WRONG
+  if (!live || !code || !hashEq(row.enrolHash!, sha256Hex(code.trim().toUpperCase()))) {
+    if (live) {
+      const attempts = row.enrolAttempts + 1
+      await tx.update(devices).set(attempts >= MAX_WRONG ? { enrolAttempts: attempts, enrolHash: null } : { enrolAttempts: attempts }).where(eq(devices.id, id))
+    }
+    return { ok: false }
+  }
+  const secret = randomBytes(32).toString("base64url")
+  await tx.update(devices).set({ bindingHash: sha256Hex(secret), enrolHash: null, enrolExpiresAt: null, enrolAttempts: 0 }).where(eq(devices.id, id))
+  const d = toDevice(row)
+  await recordAudit(tx, tenantId, { action: "device.bound", entity: "device", entityId: id, actorId: actor.userId, before: { bound: false }, after: { bound: true, userAgentHash: sha256Hex(userAgent) } }, now)
+  return { ok: true, device: d, secret }
+}
+
+const hashEq = (a: string, b: string) => a.length === b.length && timingSafeEqual(Buffer.from(a), Buffer.from(b))
 
 export type PolicyDto = { feature: DeviceFeature; allow: DeviceAllow }
 

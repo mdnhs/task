@@ -1,4 +1,4 @@
-import { createHmac } from "node:crypto"
+import { createHash, createHmac, timingSafeEqual } from "node:crypto"
 import { canUse, parsePolicies, resolveDevice, type Device, type DeviceFeature } from "@opsdesk/domain/devices"
 import { and, eq, isNull, lt, or } from "drizzle-orm"
 import type { Context, MiddlewareHandler } from "hono"
@@ -8,9 +8,18 @@ import { devicePolicies, devices } from "../../db/schema"
 import { withTenant } from "../../db/tenant-tx"
 import { Forbidden, Unauthorized } from "../errors"
 
-export const DEVICE_COOKIE = "od-device"
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const SECRET = /^[A-Za-z0-9_-]{43}$/ // 32 random bytes, base64url
 const SEEN_EVERY_MS = 5 * 60_000
+
+export const sha256Hex = (v: string) => createHash("sha256").update(v).digest("hex")
+const hashEquals = (a: string, b: string) => a.length === b.length && timingSafeEqual(Buffer.from(a), Buffer.from(b))
+
+/** One cookie per tenant (so tenants never overwrite each other): od-device-<first 8 chars of the tenant id>.
+ *  Under https (APP_URL) it is sent as `__Host-od-device-...` (Secure, Path=/, no Domain: subdomains cannot set or shadow it).
+ *  The `__Host-` prefix is forbidden without Secure, so plain-http dev/test (localhost) uses the same name without the prefix. */
+export const deviceCookieName = (tenantId: string) => `od-device-${tenantId.slice(0, 8)}`
+const secureCookies = (appUrl: string) => appUrl.startsWith("https:")
 
 /** Cookie signing key: derived from BETTER_AUTH_SECRET under its own context string, so it is never the raw secret
  *  and a device cookie signature cannot be replayed as anything else signed with that secret. */
@@ -27,12 +36,14 @@ export const toDevice = (r: DeviceRow): Device => ({
   lastSeen: r.lastSeenAt ? r.lastSeenAt.toISOString() : null,
 })
 
-/** Binds the device to this browser: a signed, HttpOnly cookie holding only the device id. Called by the device's own user. */
-export async function setDeviceCookie(c: Context<AppEnv>, deviceId: string): Promise<void> {
+/** Binds the device to this browser: a signed, HttpOnly cookie holding `deviceId.bindingSecret` (the server keeps only sha256 of the secret). Called by the device's own user. */
+export async function setDeviceCookie(c: Context<AppEnv>, tenantId: string, deviceId: string, secret: string): Promise<void> {
   const env = c.get("deps").env
-  await setSignedCookie(c, DEVICE_COOKIE, deviceId, cookieKey(env.BETTER_AUTH_SECRET), {
+  const secure = secureCookies(env.APP_URL)
+  await setSignedCookie(c, deviceCookieName(tenantId), `${deviceId}.${secret}`, cookieKey(env.BETTER_AUTH_SECRET), {
+    ...(secure ? { prefix: "host" as const } : {}),
     httpOnly: true,
-    secure: env.NODE_ENV === "production",
+    secure,
     sameSite: "Lax",
     path: "/",
     maxAge: 400 * 24 * 60 * 60, // the longest lifetime browsers honour
@@ -49,8 +60,9 @@ export const loadDevice: MiddlewareHandler<AppEnv> = async (c, next) => {
   const member = c.get("member")
   if (!tenant || !member) throw Unauthorized("unauthenticated") // fail closed
   const deps = c.get("deps")
-  const signed = await getSignedCookie(c, cookieKey(deps.env.BETTER_AUTH_SECRET), DEVICE_COOKIE) // false when tampered
-  const id = typeof signed === "string" && UUID.test(signed) ? signed : undefined
+  const signed = await getSignedCookie(c, cookieKey(deps.env.BETTER_AUTH_SECRET), deviceCookieName(tenant.id), secureCookies(deps.env.APP_URL) ? "host" : undefined) // false when tampered
+  const [idPart, secretPart] = typeof signed === "string" ? signed.split(".") : []
+  const id = idPart && UUID.test(idPart) && secretPart && SECRET.test(secretPart) ? idPart : undefined
   const now = deps.clock.now()
 
   const { device, policies } = await withTenant(deps.db, tenant.id, async (tx) => {
@@ -60,6 +72,8 @@ export const loadDevice: MiddlewareHandler<AppEnv> = async (c, next) => {
     let rows: DeviceRow[] = []
     if (id) {
       rows = await tx.select().from(devices).where(and(eq(devices.id, id), eq(devices.tenantId, tenant.id), eq(devices.userId, member.userId)))
+      // The binding secret must match the stored hash (timing-safe); a reset or never-bound device has no hash.
+      if (rows[0] && !(rows[0].bindingHash && hashEquals(rows[0].bindingHash, sha256Hex(secretPart!)))) rows = []
       if (rows[0]) {
         const stale = new Date(now.getTime() - SEEN_EVERY_MS)
         const [touched] = await tx

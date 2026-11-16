@@ -26,11 +26,19 @@ async function world() {
     expect(r.status).toBe(201)
     return (await r.json()) as Json
   }
-  /** Binds the device to a browser; returns the Cookie header fragment that browser would now send. */
-  const bind = async (id: string, as: P) => {
-    const r = await req("POST", `/v1/devices/${id}/bind`, as)
+  const CK = "od-device-" // per-tenant name od-device-<8 of tenant id>; http (test) APP_URL means no __Host- prefix
+  const deviceCookieOf = (r: Response) => r.headers.getSetCookie().map((c) => c.split(";")[0]).find((c) => c.startsWith(CK))
+  /** Admin issues a one-time enrolment code (also resets any binding). */
+  const enrol = async (id: string, as: P = admin) => {
+    const r = await req("POST", `/v1/devices/${id}/enrolment-code`, as)
+    expect(r.status).toBe(201)
+    return ((await r.json()) as Json).code as string
+  }
+  /** Full enrolment: admin issues a code, the allocated user binds; returns the Cookie fragment that browser now sends. */
+  const bind = async (id: string, as: P, by: P = admin) => {
+    const r = await req("POST", `/v1/devices/${id}/bind`, as, { code: await enrol(id, by) })
     expect(r.status).toBe(200)
-    return r.headers.getSetCookie().map((c) => c.split(";")[0]).find((c) => c.startsWith("od-device="))!
+    return deviceCookieOf(r)!
   }
   const putPolicy = (feature: string, allow: string, as: P = admin) => req("PUT", `/v1/device-policies/${feature}`, as, { allow })
   const probe = async (as: P, deviceCookie?: string) => {
@@ -39,7 +47,7 @@ async function world() {
     return (await r.json()) as Json
   }
   const lastAudit = async () => (await ownerTenantQuery(tenant.id, "select * from audit_events order by seq desc limit 1"))[0] as Json
-  return { ...t, tenant, who, admin, staff, staff2, req, register, bind, putPolicy, probe, lastAudit }
+  return { ...t, tenant, who, admin, staff, staff2, req, register, bind, enrol, deviceCookieOf, putPolicy, probe, lastAudit }
 }
 
 describe("devices", () => {
@@ -125,27 +133,118 @@ describe("devices", () => {
     const [name, value] = [cookie.slice(0, cookie.indexOf("=")), cookie.slice(cookie.indexOf("=") + 1)]
     expect((await w.probe(w.staff, `${name}=${value.slice(0, -4)}AAAA`)).links).toHaveLength(0) // bad signature
     expect((await w.probe(w.staff, `${name}=${pc.id}`)).links).toHaveLength(0) // unsigned id
+    expect((await w.probe(w.staff, `${name}=${pc.id}.${"A".repeat(43)}`)).links).toHaveLength(0) // unsigned, guessed secret
     expect((await w.probe(w.staff, `${name}=${pc.id}.${"A".repeat(43)}=`)).links).toHaveLength(0) // forged signature
   })
 
-  test("only the allocated user can bind a device: an admin cannot mint a cookie for someone else's PC", async () => {
+  test("bind without a code is 422 and sets no cookie", async () => {
     const w = await world()
     const pc = await w.register(w.staff.userId)
-    const r = await w.req("POST", `/v1/devices/${pc.id}/bind`, w.admin)
-    expect(r.status).toBe(404)
-    expect(r.headers.getSetCookie().some((c) => c.startsWith("od-device="))).toBe(false)
-    expect((await w.req("POST", `/v1/devices/${pc.id}/bind`, w.staff2)).status).toBe(404)
-    // user_id is immutable: PATCH cannot reallocate a device
+    for (const body of [undefined, {}, { code: "" }, { code: "WRONGCODE1" }]) {
+      const r = await w.req("POST", `/v1/devices/${pc.id}/bind`, w.staff, body)
+      expect(r.status).toBe(422)
+      expect(((await r.json()) as Json).code).toBe("invalid_enrolment_code")
+      expect(w.deviceCookieOf(r)).toBeUndefined()
+    }
+  })
+
+  test("valid code from the allocated user binds: 200, HttpOnly signed per-tenant cookie, audited without secrets", async () => {
+    const w = await world()
+    const pc = await w.register(w.staff.userId)
+    const code = await w.enrol(pc.id)
+    expect(code).toMatch(/^[A-HJ-NP-Z2-9]{10}$/)
+    const r = await w.req("POST", `/v1/devices/${pc.id}/bind`, w.staff, { code }, { "user-agent": "Mozilla/5.0 TestPC" })
+    expect(r.status).toBe(200)
+    const sc = r.headers.getSetCookie().find((c) => c.startsWith("od-device-"))!
+    expect(sc.startsWith(`od-device-${w.tenant.id.slice(0, 8)}=`)).toBe(true)
+    expect(sc).toMatch(/HttpOnly/i)
+    expect(sc).toMatch(/SameSite=Lax/i)
+    expect(sc).toMatch(/Path=\//)
+    expect(sc).not.toMatch(/Domain=/i)
+    const audit = await w.lastAudit()
+    expect(audit.action).toBe("device.bound")
+    expect(JSON.stringify(audit)).not.toContain(code)
+    expect(JSON.stringify(audit)).not.toContain("TestPC")
+    expect(audit.after.userAgentHash).toMatch(/^[0-9a-f]{64}$/)
+    const all = JSON.stringify(await ownerTenantQuery(w.tenant.id, "select * from audit_events"))
+    expect(all).not.toContain(code)
+    // the code is stored only as a hash and is single use
+    const [row] = await ownerTenantQuery(w.tenant.id, "select * from devices")
+    expect(JSON.stringify(row)).not.toContain(code)
+    expect((await w.req("POST", `/v1/devices/${pc.id}/bind`, w.staff, { code })).status).toBe(409)
+  })
+
+  test("second bind (e.g. from an Android) without a fresh code is 409 and sets no cookie", async () => {
+    const w = await world()
+    const pc = await w.register(w.staff.userId)
+    await w.putPolicy("drive", "trusted-company-pc")
+    const good = await w.bind(pc.id, w.staff)
+    for (const code of ["", "ANYTHING12"]) {
+      const r = await w.req("POST", `/v1/devices/${pc.id}/bind`, w.staff, { code })
+      expect(r.status).toBe(409)
+      expect(((await r.json()) as Json).code).toBe("device_already_bound")
+      expect(w.deviceCookieOf(r)).toBeUndefined()
+    }
+    expect((await w.probe(w.staff, good)).links).toHaveLength(1)
+    expect((await w.probe(w.staff)).links).toHaveLength(0) // the "android" has no cookie
+  })
+
+  test("a new enrolment code resets the binding: the old cookie is unregistered at once", async () => {
+    const w = await world()
+    const pc = await w.register(w.staff.userId)
+    await w.putPolicy("drive", "trusted-company-pc")
+    const old = await w.bind(pc.id, w.staff)
+    expect((await w.probe(w.staff, old)).links).toHaveLength(1)
+    await w.enrol(pc.id)
+    expect((await w.probe(w.staff, old)).links).toHaveLength(0)
+    expect((await w.lastAudit()).action).toBe("device.enrolment_issued")
+    // re-enrolling issues a different cookie; the old one stays dead
+    const fresh = await w.bind(pc.id, w.staff)
+    expect(fresh).not.toBe(old)
+    expect((await w.probe(w.staff, fresh)).links).toHaveLength(1)
+    expect((await w.probe(w.staff, old)).links).toHaveLength(0)
+  })
+
+  test("an expired code (16 minutes) is 422; 14 minutes still works", async () => {
+    const w = await world()
+    const pc = await w.register(w.staff.userId)
+    const code = await w.enrol(pc.id)
+    w.clock.advance({ minutes: 16 })
+    expect((await w.req("POST", `/v1/devices/${pc.id}/bind`, w.staff, { code })).status).toBe(422)
+  })
+
+  test("5 wrong codes invalidate the code, even the right one then", async () => {
+    const w = await world()
+    const pc = await w.register(w.staff.userId)
+    const code = await w.enrol(pc.id)
+    for (let i = 0; i < 5; i++) expect((await w.req("POST", `/v1/devices/${pc.id}/bind`, w.staff, { code: "WRONGCODE1" })).status).toBe(422)
+    const r = await w.req("POST", `/v1/devices/${pc.id}/bind`, w.staff, { code })
+    expect(r.status).toBe(422)
+    expect(w.deviceCookieOf(r)).toBeUndefined()
+    // an admin can issue a fresh code afterwards
+    expect((await w.req("POST", `/v1/devices/${pc.id}/bind`, w.staff, { code: await w.enrol(pc.id) })).status).toBe(200)
+  })
+
+  test("another user cannot use the code or bind the device, admins included", async () => {
+    const w = await world()
+    const pc = await w.register(w.staff.userId)
+    const code = await w.enrol(pc.id)
+    for (const as of [w.staff2, w.admin]) {
+      const r = await w.req("POST", `/v1/devices/${pc.id}/bind`, as, { code })
+      expect(r.status).toBe(404)
+      expect(w.deviceCookieOf(r)).toBeUndefined()
+    }
+    // the allocated user can still use it (not burnt by others)
+    expect((await w.req("POST", `/v1/devices/${pc.id}/bind`, w.staff, { code })).status).toBe(200)
+  })
+
+  test("enrolment codes need settings:write; user_id is immutable", async () => {
+    const w = await world()
+    const pc = await w.register(w.staff.userId)
+    expect((await w.req("POST", `/v1/devices/${pc.id}/enrolment-code`, w.staff)).status).toBe(403)
     await w.req("PATCH", `/v1/devices/${pc.id}`, w.admin, { userId: w.admin.userId, label: "Re-owned" })
     const [row] = await ownerTenantQuery(w.tenant.id, "select user_id from devices")
     expect(row.user_id).toBe(w.staff.userId)
-    // the cookie is HttpOnly, signed and audited
-    const ok = await w.req("POST", `/v1/devices/${pc.id}/bind`, w.staff)
-    const setCookie = ok.headers.getSetCookie().find((c) => c.startsWith("od-device="))!
-    expect(setCookie).toMatch(/HttpOnly/i)
-    expect(setCookie).toMatch(/SameSite=Lax/i)
-    expect(decodeURIComponent(setCookie.split(";")[0])).toMatch(new RegExp(`^od-device=${pc.id}\\.`))
-    expect((await w.lastAudit()).action).toBe("device.bound")
   })
 
   test("requireFeatureOnDevice('payroll') with allow none is 403 device_policy", async () => {
@@ -207,6 +306,20 @@ describe("devices", () => {
     expect((await w.probe(w.staff, cookie)).links).toHaveLength(1)
     expect((await w.putPolicy("drive", "trusted-company-pc", oAdmin)).status).toBe(200)
     expect((await w.probe({ cookie: w.staff.cookie, slug: "other" }, cookie)).links).toHaveLength(0)
+  })
+
+  test("a cookie of tenant A is not read in tenant B", async () => {
+    const w = await world()
+    const other = await makeTenant(w.deps, { slug: "other" })
+    const oAdmin = await w.who("owner", other.id, "other")
+    const oPc = await w.register(oAdmin.userId, {}, oAdmin)
+    await w.putPolicy("drive", "trusted-company-pc", oAdmin)
+    const pc = await w.register(w.staff.userId)
+    const cookie = await w.bind(pc.id, w.staff)
+    // renaming A's cookie to B's name must not make it resolve there either
+    const asB = cookie.replace(w.tenant.id.slice(0, 8), other.id.slice(0, 8))
+    expect((await w.probe(oAdmin, asB)).links).toHaveLength(0)
+    expect((await w.probe(oAdmin, await w.bind(oPc.id, oAdmin, oAdmin))).links).toHaveLength(1)
   })
 
   test("devices and device_policies force row level security", async () => {
