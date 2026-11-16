@@ -8,6 +8,7 @@ import { strictestIdleHours } from "../session-policy"
 import { loadDevice } from "./device"
 import { enforceMfa } from "./mfa"
 import { establishSession } from "./session"
+import { enforceBilling } from "./module"
 
 /**
  * Resolves the tenant from X-Tenant and the caller's membership of it. Self-contained (it authenticates):
@@ -52,5 +53,7 @@ export const requireTenant: MiddlewareHandler<AppEnv> = async (c, next) => {
   await enforceMfa(c, async () => {})
   // Device policy (FR-M0-10) is evaluated per request, here, so no tenant route can skip it.
   await loadDevice(c, async () => {})
+  // Unpaid / expired trial (after the grace): non-GET routes answer 402, except billing and data export.
+  await enforceBilling(c)
   await next()
 }

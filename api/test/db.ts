@@ -61,7 +61,7 @@ export async function ownerInsertProbe(rows: { tenant: string; label: string }[]
 
 /** Truncate every table in public (as owner). Call in beforeEach. */
 export async function resetDb(): Promise<void> {
-  const rows = await ownerQuery("select tablename from pg_tables where schemaname = 'public'")
+  const rows = await ownerQuery("select tablename from pg_tables where schemaname = 'public' and tablename <> 'plans'") // plans is seeded reference data (migration 0022), not test state
   if (rows.length === 0) return
   const list = rows.map((r) => `"public"."${String(r.tablename)}"`).join(", ")
   await ownerQuery(`truncate ${list} restart identity cascade`)

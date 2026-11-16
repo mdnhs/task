@@ -58,7 +58,7 @@ import { base32 } from "@better-auth/utils/base32"
 import { createOTP } from "@better-auth/utils/otp"
 import type { MfaPolicy } from "@opsdesk/domain/mfa"
 import type { Deps } from "../src/deps"
-import { memberships, roles, tenants, user } from "../src/db/schema"
+import { memberships, roles, subscriptions, tenants, user, type SubscriptionStatus } from "../src/db/schema"
 import { withTenant } from "../src/db/tenant-tx"
 import { seedRoleTemplates } from "../src/modules/tenants"
 
@@ -68,14 +68,25 @@ const uniq = () => `${Date.now().toString(36)}${(seq++).toString(36)}`
 /** Inserts a tenant (no RLS on `tenants`) and seeds its role templates. */
 export async function makeTenant(
   deps: Deps,
-  over: Partial<{ slug: string; name: string; sessionIdleHours: number; mfaPolicy: MfaPolicy }> = {},
+  over: Partial<{
+    slug: string; name: string; sessionIdleHours: number; mfaPolicy: MfaPolicy
+    /** Ruling C2: defaults to an ACTIVE paid business subscription so existing tests are unaffected; trial/grace/402 tests opt in. */
+    subscription: Partial<{ planId: string; status: SubscriptionStatus; seats: number; trialEndsAt: Date | null }>
+  }> = {},
 ): Promise<{ id: string; slug: string }> {
   const slug = over.slug ?? `t-${uniq()}`
   const [row] = await deps.db
     .insert(tenants)
     .values({ slug, name: over.name ?? slug, ...(over.sessionIdleHours ? { sessionIdleHours: over.sessionIdleHours } : {}), ...(over.mfaPolicy ? { mfaPolicy: over.mfaPolicy } : {}) })
     .returning({ id: tenants.id, slug: tenants.slug })
-  await withTenant(deps.db, row.id, (tx) => seedRoleTemplates(tx, row.id))
+  await withTenant(deps.db, row.id, async (tx) => {
+    await seedRoleTemplates(tx, row.id)
+    const planId = over.subscription?.planId ?? "business"
+    await tx.insert(subscriptions).values({
+      tenantId: row.id, planId, status: over.subscription?.status ?? "active", seats: over.subscription?.seats ?? (planId === "business" ? 40 : 10),
+      trialEndsAt: over.subscription?.trialEndsAt ?? null,
+    })
+  })
   return row
 }
 

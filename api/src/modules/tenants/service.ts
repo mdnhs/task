@@ -1,13 +1,15 @@
 import { eq, sql } from "drizzle-orm"
-import { memberships, tenants, tenantSettings } from "../../db/schema"
+import { memberships, subscriptions, tenants, tenantSettings } from "../../db/schema"
 import type { Deps } from "../../deps"
 import { Conflict } from "../../core/errors"
 import { publish } from "../../core/events"
 import { recordAudit } from "../audit"
+import { entitlementsData, planFacts } from "../entitlements/data"
 import { onboardingDefaults } from "./defaults"
 import { seedRoleTemplates } from "./seed"
 
 export const DEFAULT_INVITE_TTL_DAYS = 7
+const DAY_MS = 86_400_000
 
 export type NewTenant = { name: string; slug: string; timezone?: string; currency?: string; locale?: string }
 
@@ -32,6 +34,11 @@ export async function createTenant(deps: Deps, userId: string, input: NewTenant)
       const now = deps.clock.now()
       await tx.insert(memberships).values({ tenantId: t.id, userId, roleId: roleIds.get("owner")!, joinedAt: now })
       await tx.insert(tenantSettings).values({ tenantId: t.id, key: "invite_ttl_days", value: DEFAULT_INVITE_TTL_DAYS })
+      // Every tenant starts a trial on the default plan (billing/entitlements.json) for that plan's trialDays (billing/plans.json).
+      const plan = planFacts(entitlementsData().defaultPlan)
+      await tx.insert(subscriptions).values({
+        tenantId: t.id, planId: plan.id, status: "trialing", seats: plan.limits.activeUsers ?? 0, trialEndsAt: new Date(now.getTime() + plan.trialDays * DAY_MS),
+      })
       await recordAudit(
         tx,
         t.id,

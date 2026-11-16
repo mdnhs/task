@@ -1,5 +1,6 @@
 import { createRoute, z } from "@hono/zod-openapi"
 import { loadRole, requirePermission } from "../../core/middleware/permission"
+import { requireModule } from "../../core/middleware/module"
 import { requireTenant } from "../../core/middleware/tenant"
 import { newRouter } from "../../core/router"
 import { withTenant } from "../../db/tenant-tx"
@@ -24,12 +25,12 @@ const Intent = z
 
 
 const intentRoute = createRoute({
-  method: "post", path: "/v1/files/uploads", middleware: [requireTenant, requirePermission("files", "write")] as const,
+  method: "post", path: "/v1/files/uploads", middleware: [requireTenant, requireModule("M4"), requirePermission("files", "write")] as const,
   request: { body: { content: { "application/json": { schema: IntentBody } }, required: true } },
   responses: { 201: { description: "A presigned PUT (300 s) to a staging key; Content-Type and Content-Length are signed, send exactly `headers`. 422 mime_not_allowed, invalid_name or file_too_large; 503 storage_not_configured", content: { "application/json": { schema: Intent } } } },
 })
 const completeRoute = createRoute({
-  method: "post", path: "/v1/files/{id}/complete", middleware: [requireTenant, requirePermission("files", "write")] as const,
+  method: "post", path: "/v1/files/{id}/complete", middleware: [requireTenant, requireModule("M4"), requirePermission("files", "write")] as const,
   request: { params: z.object({ id: Id }) },
   responses: { 200: { description: "Upload confirmed; status stays pending until the malware scan finishes. 422 upload_mismatch, 409 upload_missing. Idempotent", content: { "application/json": { schema: FileDto } } } },
 })
@@ -44,7 +45,7 @@ const downloadRoute = createRoute({
   responses: { 302: { description: "Redirect to a 60 s presigned GET (attachment). 409 file_not_ready until clean, 410 file_infected" } },
 })
 const deleteRoute = createRoute({
-  method: "delete", path: "/v1/files/{id}", middleware: [requireTenant, requirePermission("files", "write")] as const,
+  method: "delete", path: "/v1/files/{id}", middleware: [requireTenant, requireModule("M4"), requirePermission("files", "write")] as const,
   request: { params: z.object({ id: Id }) },
   responses: { 204: { description: "Soft-deleted and audited; the stored object is removed by a background job" } },
 })

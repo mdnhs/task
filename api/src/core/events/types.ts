@@ -4,7 +4,7 @@ import type { TenantTx } from "../../db/tenant-tx"
 export type EventType =
   | "member.joined" | "member.role_changed" | "invite.created" | "file.uploaded" | "file.scanned"
   | "member.removed" | "team.created" | "team.updated" | "team.deleted" | "file.deleted"
-  | "dsr.requested" | "dsr.completed" | "integration.connected" | "integration.disconnected"
+  | "dsr.requested" | "dsr.completed" | "integration.connected" | "integration.disconnected" | "billing.subscription_changed"
 
 export type DomainEvent = {
   id: string

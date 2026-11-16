@@ -12,6 +12,7 @@ import { withTenant } from "../../db/tenant-tx"
 import { publish } from "../../core/events"
 import { emailHmac } from "../../core/crypto/audit-hmac"
 import { recordAudit } from "../audit"
+import { assertSeatAvailable } from "../entitlements/service"
 import { assertNoEscalation, lockActor } from "../rbac"
 import { DEFAULT_INVITE_TTL_DAYS, onboardingDefaults } from "../tenants"
 
@@ -132,6 +133,7 @@ export const inviteRoutes = newRouter()
         .where(and(eq(memberships.tenantId, tenantId), eq(memberships.userId, me.id)))
       if (already) throw Conflict("already_member")
 
+      await assertSeatAvailable(tx, tenantId) // takes the per-tenant seat lock BEFORE the membership insert; 409 seat_limit
       try {
         // A savepoint keeps the tx usable; two different invites for the same user can both pass the check above.
         await tx.transaction((sp) => sp.insert(memberships).values({ tenantId, userId: me.id, roleId: inv.roleId, joinedAt: now }))

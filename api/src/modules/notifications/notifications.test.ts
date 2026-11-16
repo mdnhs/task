@@ -259,7 +259,7 @@ test("PUT preferences validates quiet hours (HH:MM, start != end) → 422 otherw
   // defaults for a user who never saved anything
   const d = (await (await call(w.app, "GET", "/v1/me/notification-preferences", { cookie: w.co, tenant: w.tenant.slug })).json()) as { quietStart: null; channels: Record<string, { email: boolean }> }
   expect(d.quietStart).toBeNull()
-  expect(Object.entries(d.channels).filter(([, v]) => v.email).map(([k]) => k).sort()).toEqual(["dsr", "invite", "security"])
+  expect(Object.entries(d.channels).filter(([, v]) => v.email).map(([k]) => k).sort()).toEqual(["billing", "dsr", "invite", "security"])
 })
 
 test("member.joined event notifies the tenant's owners", async () => {

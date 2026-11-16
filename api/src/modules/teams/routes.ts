@@ -1,6 +1,7 @@
 import { createRoute, z } from "@hono/zod-openapi"
 import { Forbidden } from "../../core/errors"
 import { requirePermission } from "../../core/middleware/permission"
+import { requireModule } from "../../core/middleware/module"
 import { requireTenant } from "../../core/middleware/tenant"
 import { newRouter } from "../../core/router"
 import { withTenant } from "../../db/tenant-tx"
@@ -52,7 +53,7 @@ const managerRoute = createRoute({
   responses: { 200: { description: "The member's primary manager (null = none)", content: { "application/json": { schema: z.object({ userId: z.string(), managerId: z.string().nullable() }) } } } },
 })
 const peopleRoute = createRoute({
-  method: "get", path: "/v1/people", middleware: [requireTenant, requirePermission("reports", "read")] as const,
+  method: "get", path: "/v1/people", middleware: [requireTenant, requireModule("M1"), requirePermission("reports", "read")] as const,
   request: { query: z.object({ scope: z.enum(["own", "team", "all"]).optional() }) },
   responses: { 200: { description: "People in the caller's report scope", content: { "application/json": { schema: z.array(Person) } } } },
 })

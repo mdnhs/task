@@ -1,9 +1,11 @@
 import { and, eq } from "drizzle-orm"
 import type { Context, MiddlewareHandler } from "hono"
+import { hasModule } from "@opsdesk/domain/entitlements"
 import { can, type Access, type Module } from "@opsdesk/domain/permissions"
 import type { AppEnv, ResolvedRole } from "../context"
 import { roles } from "../../db/schema"
 import { withTenant } from "../../db/tenant-tx"
+import { entitlementsFor } from "../../modules/entitlements/service"
 import { Forbidden } from "../errors"
 
 /** Loads the caller's role ONCE per request and caches it in c.var.role. Fails closed: no tenant context or role is 403. */
@@ -45,9 +47,10 @@ export function requirePermission(module: Module, need: "read" | "write"): Middl
 /**
  * The modules the caller may read: the single place that decides what a cross-module feature (global search) may
  * surface. Data-driven from the role's own access map (no hard-coded module list).
- * TODO(B3): also drop modules the tenant's plan does not entitle.
+ * Modules the tenant's plan (plus overrides) does not entitle are dropped too (FR-M0-15).
  */
 export async function visibleModules(c: Context<AppEnv>): Promise<Module[]> {
   const role = await loadRole(c)
-  return (Object.keys(role.access) as Module[]).filter((m) => can(role, m, "read"))
+  const ent = await entitlementsFor(c.get("deps"), c.get("tenant")!.id) // loadRole already proved a tenant is present
+  return (Object.keys(role.access) as Module[]).filter((m) => can(role, m, "read") && hasModule(ent, m))
 }
