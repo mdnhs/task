@@ -7,6 +7,7 @@ import { requestId } from "./core/middleware/request-id"
 import { auditRoutes } from "./modules/audit"
 import { deviceRoutes, probeRoutes } from "./modules/devices"
 import { fileRoutes } from "./modules/files"
+import { gdprRoutes } from "./modules/gdpr"
 import { mfaRoutes } from "./modules/mfa"
 import { notificationRoutes } from "./modules/notifications"
 import { integrationRoutes } from "./modules/integrations"
@@ -63,6 +64,7 @@ export function createApp(deps: Deps) {
   app.route("/", settingsRoutes)
   app.route("/", integrationRoutes)
   app.route("/", searchRoutes)
+  app.route("/", gdprRoutes)
   if (deps.env.NODE_ENV === "test") app.route("/", probeRoutes) // test-only; never registered elsewhere, not in the OpenAPI doc
 
   app.doc31("/v1/openapi.json", { openapi: "3.1.0", info: { title: "OpsDesk API", version: "1" } })

@@ -20,7 +20,10 @@ export const files = pgTable(
   {
     id: uuid("id").primaryKey().defaultRandom(),
     tenantId: uuid("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
-    ownerUserId: text("owner_user_id").notNull(),
+    // null = erased owner (GDPR) or system-generated; the FK is MATCH SIMPLE so null skips it.
+    ownerUserId: text("owner_user_id"),
+    // null = ordinary file; "dsr_export" = a generated GDPR export (download limited to its requester and settings:write).
+    purpose: text("purpose"),
     key: text("key").notNull(),
     name: text("name").notNull(),
     mime: text("mime").notNull(),

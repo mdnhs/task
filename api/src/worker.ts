@@ -3,6 +3,7 @@ import { relayOnce } from "./core/events"
 import { makeBullQueue, startWorker } from "./core/queue/bull-queue"
 import { registerJob } from "./core/queue/queue"
 import { registerFiles } from "./modules/files"
+import { registerGdpr } from "./modules/gdpr"
 import { registerIntegrations } from "./modules/integrations"
 import { registerNotifications } from "./modules/notifications"
 import { registerSearchIndexers } from "./modules/search"
@@ -16,6 +17,7 @@ export async function startWorkerProcess(env: Env = parseEnv(process.env)) {
   registerSearchIndexers() // search index: members, teams, files
   registerFiles() // file.scan + file.delete-object jobs
   registerIntegrations() // integration.refresh job (token refresh is otherwise lazy, see getAccessToken)
+  registerGdpr() // core DSR handlers + dsr.export / dsr.erase / dsr.export-expire jobs
   registerJob("events.relay", async (_data, d) => {
     await relayOnce(d)
   })

@@ -1,7 +1,9 @@
 import { createHash } from "node:crypto"
 import { PassThrough, type Readable } from "node:stream"
 import { and, eq } from "drizzle-orm"
-import { AppError, Conflict, NotFound } from "../../core/errors"
+import { can } from "@opsdesk/domain/permissions"
+import type { ResolvedRole } from "../../core/context"
+import { AppError, Conflict, Forbidden, NotFound } from "../../core/errors"
 import { fileKey, ObjectMissingError, PreconditionFailedError, stagingKey, type PresignedPut } from "../../core/storage/storage"
 import { files, type FileStatus } from "../../db/schema"
 import { withTenant, type TenantTx } from "../../db/tenant-tx"
@@ -23,6 +25,8 @@ export const MAX_SCAN_ATTEMPTS = 5
 export const scanBackoffMs = (attempt: number): number => 30_000 * 2 ** (attempt - 1)
 
 type Actor = { userId: string }
+/** A caller that may read: the role decides files:read, and who may open a DSR export. */
+export type FileReader = { userId: string; role: ResolvedRole }
 type Row = typeof files.$inferSelect
 export type FileDto = {
   id: string
@@ -32,7 +36,8 @@ export type FileDto = {
   status: FileStatus
   signature: string | null
   sha256: string | null
-  ownerUserId: string
+  /** null once the owner was erased (GDPR) or for a generated file. */
+  ownerUserId: string | null
   createdAt: string
   scannedAt: string | null
 }
@@ -48,6 +53,28 @@ const safeCode = (e: unknown): string => {
   return typeof c === "string" && /^[A-Za-z0-9_.-]{1,64}$/.test(c) ? c : "error"
 }
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/**
+ * Files with `purpose = 'dsr_export'` hold one person's personal data: only the requester (owner) and settings:write
+ * users may open them, whatever their files access. Anyone else gets the same 404 as for a missing file.
+ */
+const dsrAllowed = (row: Row, who: FileReader): boolean => row.purpose !== "dsr_export" || row.ownerUserId === who.userId || can(who.role, "settings", "write")
+
+/**
+ * The live file for a read. Ordinary files need files:read (403 first, as the route guard used to do, so a caller
+ * without access never learns whether an id exists); a DSR export is readable by its requester and settings:write
+ * without files access. Anything else about a DSR export is 404 file_not_found.
+ */
+async function readableFile(tx: TenantTx, tenantId: string, id: string, who: FileReader): Promise<Row> {
+  const canRead = can(who.role, "files", "read")
+  const [row] = await tx.select().from(files).where(and(eq(files.id, id), eq(files.tenantId, tenantId)))
+  if (!row) throw canRead ? NotFoundFile() : Forbidden("forbidden")
+  if (row.purpose === "dsr_export") {
+    if (!dsrAllowed(row, who)) throw NotFoundFile()
+  } else if (!canRead) throw Forbidden("forbidden")
+  if (row.status === "deleted") throw NotFoundFile()
+  return row
+}
 
 /** A live (not soft-deleted) file of this tenant, or 404. RLS plus an explicit tenant filter. */
 async function liveFile(tx: TenantTx, tenantId: string, id: string, lock = false): Promise<Row> {
@@ -124,16 +151,16 @@ export async function completeUpload(deps: Deps, tenantId: string, actor: Actor,
   })
 }
 
-export async function getFile(tx: TenantTx, tenantId: string, id: string): Promise<FileDto> {
-  return dto(await liveFile(tx, tenantId, id))
+export async function getFile(tx: TenantTx, tenantId: string, id: string, who: FileReader): Promise<FileDto> {
+  return dto(await readableFile(tx, tenantId, id, who))
 }
 
 /**
  * The 60 s download URL, only for a `clean` file. It always names the FINAL key, which only the server writes (copy at
  * `complete`), so the bytes behind it are exactly the ones that were scanned.
  */
-export async function downloadUrl(deps: Deps, tenantId: string, id: string): Promise<string> {
-  const row = await withTenant(deps.db, tenantId, (tx) => liveFile(tx, tenantId, id))
+export async function downloadUrl(deps: Deps, tenantId: string, id: string, who: FileReader): Promise<string> {
+  const row = await withTenant(deps.db, tenantId, (tx) => readableFile(tx, tenantId, id, who))
   if (row.status === "infected") throw new AppError(410, "file_infected", "Gone")
   if (row.status !== "clean") throw Conflict("file_not_ready")
   return deps.storage.presignGet(row.key, { name: row.name, mime: row.mime, expiresSec: DOWNLOAD_TTL_SEC })
@@ -141,14 +168,47 @@ export async function downloadUrl(deps: Deps, tenantId: string, id: string): Pro
 
 export async function deleteFile(deps: Deps, tenantId: string, actor: Actor, id: string): Promise<void> {
   await withTenantAfterCommit(deps, tenantId, async (tx, enqueue) => {
-    await lockActor(tx, tenantId, actor.userId, "files", "write")
+    const role = await lockActor(tx, tenantId, actor.userId, "files", "write")
     const row = await liveFile(tx, tenantId, id, true)
+    if (!dsrAllowed(row, { userId: actor.userId, role })) throw NotFoundFile()
     const now = deps.clock.now()
     await tx.update(files).set({ status: "deleted" }).where(and(eq(files.id, id), eq(files.tenantId, tenantId)))
     await recordAudit(tx, tenantId, { action: "file.deleted", entity: "file", entityId: id, actorId: actor.userId, before: { status: row.status, name: row.name, mime: row.mime, sizeBytes: row.sizeBytes }, after: { status: "deleted" } }, now)
     enqueue(DELETE_OBJECT_JOB, { fileId: id, tenantId }, { key: `${id}-${crypto.randomUUID()}` })
     await publish(tx, { tenantId, type: "file.deleted", payload: { fileId: id }, actorId: actor.userId }, now)
   })
+}
+
+/**
+ * A file the SERVER generated (a DSR export): written straight to the final key `t/<tenant>/<id>` and recorded as
+ * `clean` with no scan, because we produced the bytes ourselves (never a client upload). Deterministic ids make a
+ * re-run overwrite the same key and keep the same row (ON CONFLICT DO NOTHING), so there are no orphans.
+ */
+export async function storeGeneratedFile(
+  deps: Deps, tx: TenantTx,
+  f: { tenantId: string; id: string; ownerUserId: string | null; name: string; mime: string; body: Buffer; purpose: "dsr_export" },
+): Promise<void> {
+  const key = fileKey(f.tenantId, f.id)
+  await deps.storage.put(key, f.body, { contentType: f.mime })
+  const head = await deps.storage.head(key)
+  if (!head || head.size !== f.body.length) throw new Error("generated object missing after put")
+  const now = deps.clock.now()
+  await tx
+    .insert(files)
+    .values({
+      id: f.id, tenantId: f.tenantId, ownerUserId: f.ownerUserId, key, name: f.name, mime: f.mime, sizeBytes: f.body.length, purpose: f.purpose,
+      sha256: createHash("sha256").update(f.body).digest("hex"), status: "clean", etag: head.etag, createdAt: now, uploadedAt: now, scannedAt: now,
+    })
+    .onConflictDoNothing({ target: files.id })
+}
+
+/** Soft-deletes a live file and queues removal of its object (same path as deleteFile, for system actors). */
+export async function expireFile(tx: TenantTx, tenantId: string, id: string, enqueue: (name: string, data: unknown, o?: { key?: string }) => void): Promise<boolean> {
+  const [row] = await tx.select({ status: files.status }).from(files).where(and(eq(files.id, id), eq(files.tenantId, tenantId))).for("update")
+  if (!row || row.status === "deleted") return false
+  await tx.update(files).set({ status: "deleted" }).where(and(eq(files.id, id), eq(files.tenantId, tenantId)))
+  enqueue(DELETE_OBJECT_JOB, { fileId: id, tenantId }, { key: `${id}-${crypto.randomUUID()}` })
+  return true
 }
 
 // ---------------------------------------------------------------- jobs
@@ -219,7 +279,7 @@ async function recordVerdict(deps: Deps, row: Row, result: { clean: true } | { c
     }
     await tx.update(files).set({ status: "infected", signature: result.signature, sha256, scannedAt: now }).where(and(eq(files.id, row.id), eq(files.tenantId, row.tenantId)))
     await recordAudit(tx, row.tenantId, { action: "file.infected", entity: "file", entityId: row.id, actorId: null, before: { status: "pending" }, after: { status: "infected", signature: result.signature, sha256 } }, now)
-    await notify(tx, row.tenantId, { userId: row.ownerUserId, kind: "file", title: "File blocked", body: `"${row.name}" was blocked because malware was detected. It has been removed.` }, deps, enqueue)
+    if (row.ownerUserId) await notify(tx, row.tenantId, { userId: row.ownerUserId, kind: "file", title: "File blocked", body: `"${row.name}" was blocked because malware was detected. It has been removed.` }, deps, enqueue)
     enqueue(DELETE_OBJECT_JOB, { fileId: row.id, tenantId: row.tenantId }, { key: `${row.id}-${crypto.randomUUID()}` })
     await publish(tx, { tenantId: row.tenantId, type: "file.scanned", payload: { fileId: row.id, status: "infected", signature: result.signature }, actorId: null }, now)
   })

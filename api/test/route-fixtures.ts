@@ -21,7 +21,7 @@ import { notify, withTenantAfterCommit } from "../src/modules/notifications"
 export type Fixture = { kind: "id" | "static"; value: string }
 export type TenantFixtures = Record<string, Record<string, Fixture>>
 
-type Resource = "role" | "member" | "team" | "device" | "feature" | "notification" | "pushToken" | "file" | "integration"
+type Resource = "role" | "member" | "team" | "device" | "feature" | "notification" | "pushToken" | "file" | "integration" | "dataRequest"
 
 /** path template -> param -> which resource that param names on that route. */
 export const ROUTE_PARAMS: Record<string, Record<string, Resource>> = {
@@ -41,6 +41,9 @@ export const ROUTE_PARAMS: Record<string, Record<string, Resource>> = {
   "/v1/files/{id}/complete": { id: "file" },
   "/v1/files/{id}/download": { id: "file" },
   "/v1/integrations/{id}": { id: "integration" },
+  "/v1/data-requests/{id}": { id: "dataRequest" },
+  "/v1/data-requests/{id}/complete": { id: "dataRequest" },
+  "/v1/data-requests/{id}/reject": { id: "dataRequest" },
 }
 
 export type Actor = { userId: string; cookie: string; slug: string }
@@ -88,7 +91,9 @@ export async function fixtureIds(t: { app: AppType; deps: Deps }, tenant: { id: 
      on conflict (tenant_id, provider) do update set status = 'connected', token_ciphertext = 'v2:junk', account_email = $3 returning id`,
     [tenant.id, owner.userId, `drive-${uniq}@example.com`],
   )
-  const resources = { integration: String(integ.id), file: file.fileId, role: await roleIdOf(t.deps, tenant.id, "employee"), member: staff.userId, team: team.id, device: device.id, notification: String(notif.id), pushToken: ((await tokRes.json()) as { id: string }).id }
+  // a pending `correct` request about the staff member (correct is the one kind with no job and no open-request limit, so the fixture can be made again and again)
+  const dsr = await post("/v1/data-requests", { subjectUserId: staff.userId, kind: "correct", reason: `Fix ${uniq}` })
+  const resources = { dataRequest: dsr.id, integration: String(integ.id), file: file.fileId, role: await roleIdOf(t.deps, tenant.id, "employee"), member: staff.userId, team: team.id, device: device.id, notification: String(notif.id), pushToken: ((await tokRes.json()) as { id: string }).id }
   const fixtures: TenantFixtures = {}
   for (const [path, params] of Object.entries(ROUTE_PARAMS)) {
     fixtures[path] = {}
@@ -96,5 +101,5 @@ export async function fixtureIds(t: { app: AppType; deps: Deps }, tenant: { id: 
       fixtures[path][param] = res === "feature" ? { kind: "static", value: "drive" } : { kind: "id", value: resources[res] }
     }
   }
-  return { fixtures, resources, marks: [tenant.id, tenant.slug, String(integ.id), `drive-${uniq}@example.com`, team.id, device.id, file.fileId, `File ${uniq}.pdf`, staff.userId, owner.userId, `Team ${uniq}`, `Device ${uniq}`] }
+  return { fixtures, resources, marks: [tenant.id, tenant.slug, String(integ.id), `drive-${uniq}@example.com`, team.id, device.id, file.fileId, dsr.id, `Fix ${uniq}`, `File ${uniq}.pdf`, staff.userId, owner.userId, `Team ${uniq}`, `Device ${uniq}`] }
 }

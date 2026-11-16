@@ -70,6 +70,10 @@ const SPECS: Record<string, Spec> = {
   "DELETE /v1/files/{id}": { actor: "owner", expect: "file_not_found" },
   // the tenant's google connection (control: DELETE -> 204)
   "DELETE /v1/integrations/{id}": { actor: "owner", expect: "integration_not_found" },
+  // a pending `correct` request of A about its staff member (control: GET 200, complete 200, reject 200)
+  "GET /v1/data-requests/{id}": { actor: "owner", expect: "data_request_not_found" },
+  "POST /v1/data-requests/{id}/complete": { actor: "owner", expect: "data_request_not_found" },
+  "POST /v1/data-requests/{id}/reject": { actor: "owner", expect: "data_request_not_found" },
 }
 
 let t: ReturnType<typeof testApp>
@@ -96,7 +100,7 @@ const substitute = (path: string, params: Record<string, string>) => path.replac
 
 async function hashes(tenantId: string): Promise<Record<string, string>> {
   const out: Record<string, string> = {}
-  for (const tbl of ["roles", "memberships", "teams", "team_members", "reporting_lines", "devices", "device_policies", "invites", "audit_events", "tenant_settings", "notifications", "notification_preferences", "push_tokens", "notification_deliveries", "files", "integration_connections", "oauth_states", "public_holidays"]) {
+  for (const tbl of ["roles", "memberships", "teams", "team_members", "reporting_lines", "devices", "device_policies", "invites", "audit_events", "tenant_settings", "notifications", "notification_preferences", "push_tokens", "notification_deliveries", "files", "integration_connections", "oauth_states", "public_holidays", "data_requests"]) {
     const [r] = await ownerTenantQuery(tenantId, `select count(*)::text || ':' || coalesce(md5(string_agg(to_jsonb(x)::text, ',' order by to_jsonb(x)::text)), '') as h from ${tbl} x`)
     out[tbl] = String(r.h)
   }

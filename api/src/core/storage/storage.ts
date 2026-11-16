@@ -23,6 +23,8 @@ export type Storage = {
   copy(from: string, to: string, o?: { ifMatchEtag?: string }): Promise<void>
   /** null when the object does not exist. */
   head(key: string): Promise<ObjectHead | null>
+  /** Writes a whole (small, server-generated) object, replacing any existing one. Used for DSR exports. */
+  put(key: string, body: Buffer, o: { contentType: string }): Promise<void>
   /** Streams the object (chunked; the caller must consume or destroy it). */
   getStream(key: string): Promise<Readable>
   /** Idempotent: deleting a missing key succeeds. */
@@ -65,5 +67,5 @@ export function unconfiguredStorage(): Storage {
   const fail = (): never => {
     throw new Error("storage is not configured (set S3_BUCKET, S3_REGION, S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY)")
   }
-  return { presignPut: async () => fail(), probe: async () => fail(), presignGet: async () => fail(), copy: async () => fail(), head: async () => fail(), getStream: async () => fail(), delete: async () => fail() }
+  return { presignPut: async () => fail(), probe: async () => fail(), put: async () => fail(), presignGet: async () => fail(), copy: async () => fail(), head: async () => fail(), getStream: async () => fail(), delete: async () => fail() }
 }

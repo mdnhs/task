@@ -1,5 +1,5 @@
 import { createRoute, z } from "@hono/zod-openapi"
-import { requirePermission } from "../../core/middleware/permission"
+import { loadRole, requirePermission } from "../../core/middleware/permission"
 import { requireTenant } from "../../core/middleware/tenant"
 import { newRouter } from "../../core/router"
 import { withTenant } from "../../db/tenant-tx"
@@ -9,7 +9,7 @@ const Id = z.uuid()
 const FileDto = z.object({
   id: z.string(), name: z.string(), mime: z.string(), sizeBytes: z.number(),
   status: z.enum(["pending", "clean", "infected", "deleted"]), signature: z.string().nullable(), sha256: z.string().nullable(),
-  ownerUserId: z.string(), createdAt: z.string(), scannedAt: z.string().nullable(),
+  ownerUserId: z.string().nullable(), createdAt: z.string(), scannedAt: z.string().nullable(),
 })
 const IntentBody = z
   .object({
@@ -34,12 +34,12 @@ const completeRoute = createRoute({
   responses: { 200: { description: "Upload confirmed; status stays pending until the malware scan finishes. 422 upload_mismatch, 409 upload_missing. Idempotent", content: { "application/json": { schema: FileDto } } } },
 })
 const getRoute = createRoute({
-  method: "get", path: "/v1/files/{id}", middleware: [requireTenant, requirePermission("files", "read")] as const,
+  method: "get", path: "/v1/files/{id}", middleware: [requireTenant] as const,
   request: { params: z.object({ id: Id }) },
-  responses: { 200: { description: "File metadata (never the storage key). Another tenant's or a deleted id is 404 file_not_found", content: { "application/json": { schema: FileDto } } } },
+  responses: { 200: { description: "File metadata (never the storage key); needs files:read, except a DSR export which only its requester and settings:write may open. Another tenant's or a deleted id is 404 file_not_found", content: { "application/json": { schema: FileDto } } } },
 })
 const downloadRoute = createRoute({
-  method: "get", path: "/v1/files/{id}/download", middleware: [requireTenant, requirePermission("files", "read")] as const,
+  method: "get", path: "/v1/files/{id}/download", middleware: [requireTenant] as const,
   request: { params: z.object({ id: Id }) },
   responses: { 302: { description: "Redirect to a 60 s presigned GET (attachment). 409 file_not_ready until clean, 410 file_infected" } },
 })
@@ -60,11 +60,13 @@ export const fileRoutes = newRouter()
   })
   .openapi(getRoute, async (c) => {
     const t = c.get("tenant")!
-    return c.json(await withTenant(c.get("deps").db, t.id, (tx) => getFile(tx, t.id, c.req.valid("param").id)), 200)
+    const who = { userId: c.get("member")!.userId, role: await loadRole(c) } // files:read (or DSR-export access) is decided in the service
+    return c.json(await withTenant(c.get("deps").db, t.id, (tx) => getFile(tx, t.id, c.req.valid("param").id, who)), 200)
   })
   .openapi(downloadRoute, async (c) => {
     const t = c.get("tenant")!
-    const url = await downloadUrl(c.get("deps"), t.id, c.req.valid("param").id)
+    const who = { userId: c.get("member")!.userId, role: await loadRole(c) }
+    const url = await downloadUrl(c.get("deps"), t.id, c.req.valid("param").id, who)
     c.header("Cache-Control", "no-store")
     return c.redirect(url, 302)
   })

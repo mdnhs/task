@@ -94,6 +94,10 @@ export function makeS3Storage(source: StorageConfigSource, o: { now?: () => numb
       if (!(r.Body instanceof Readable)) throw new Error("storage returned no readable body")
       return r.Body
     },
+    async put(Key, body, p) {
+      const { cfg, client } = await current()
+      await client.send(new PutObjectCommand({ Bucket: cfg.bucket, Key, Body: body, ContentType: p.contentType }))
+    },
     async delete(Key) {
       const { cfg, client } = await current()
       await client.send(new DeleteObjectCommand({ Bucket: cfg.bucket, Key }))
