@@ -22,6 +22,27 @@ export async function mapAuthError(res: Response, requestId: string): Promise<Re
   return out
 }
 
+/**
+ * R27: Better Auth endpoints that reconfigure or escape the second factor (or other account security) with only a
+ * password. A session that has NOT passed MFA, belonging to a user who has 2FA, must not reach them, otherwise
+ * password-only access could disable/replace the victim's 2FA. verify-totp, verify-backup-code, sign-out,
+ * get-session and send-verification-email stay open.
+ */
+export const MFA_PROTECTED_AUTH_PATHS: readonly string[] = [
+  "/two-factor/disable",
+  "/two-factor/generate-backup-codes",
+  "/two-factor/enable",
+  "/two-factor/get-totp-uri",
+  "/change-email",
+  "/change-password",
+  "/link-social",
+  "/unlink-account",
+  "/delete-user",
+  "/revoke-sessions",
+  "/revoke-other-sessions",
+  "/update-user",
+]
+
 export const authRoutes = new Hono<AppEnv>()
 
 // Better Auth owns everything under /api/auth/* (sign-up, sign-in, 2FA, OAuth callbacks, ...).
@@ -30,7 +51,11 @@ export const authRoutes = new Hono<AppEnv>()
 // session (sign-in, sign-up, callbacks) pass straight through and touch nothing.
 authRoutes.on(["GET", "POST"], "/api/auth/*", async (c) => {
   const deps = c.get("deps")
-  await authenticateSession(deps, c.req.raw.headers, (userId) => strictestIdleHours(deps.db, userId))
+  const found = await authenticateSession(deps, c.req.raw.headers, (userId) => strictestIdleHours(deps.db, userId))
+  const sub = c.req.path.slice("/api/auth".length).replace(/\/+$/, "")
+  if (found && found.user.twoFactorEnabled === true && found.session.mfaPassed !== true && MFA_PROTECTED_AUTH_PATHS.includes(sub)) {
+    return problem(403, "mfa_required", "Forbidden", c.get("requestId"))
+  }
   const res = await deps.auth.handler(c.req.raw)
   // One place maps every Better Auth error to our problem+json shape. Its own error code (lower-cased,
   // e.g. invalid_email_or_password, email_not_verified) becomes `code`; its free-text message is dropped.

@@ -159,3 +159,48 @@ test("policy change is audited with old and new value, and normalised", async ()
   expect(a.before).toEqual({ mode: "off", roles: [] })
   expect(a.after).toEqual({ mode: "roles", roles: ["manager", "admin"] })
 })
+
+// R27: an un-MFA'd session of a 2FA user must not be able to reconfigure/escape 2FA with just the password.
+async function stale2fa() {
+  const w = await world()
+  const m = await w.who("manager")
+  const stale = (await signIn(w.app, m.email, m.password)).cookie
+  const e = await enrollTotp(w.deps, m.email, m.password)
+  const post = (path: string, body: unknown = { password: m.password }) =>
+    call(w.app, "POST", `/api/auth/${path}`, { cookie: stale, body, headers: ORIGIN })
+  return { w, m, stale, e, post }
+}
+test("R27: password-only calls from an unpassed session of a 2FA user are 403 mfa_required", async () => {
+  const { m, post } = await stale2fa()
+  const codesBefore = await ownerQuery('select backup_codes from two_factor')
+  for (const [path, body] of [
+    ["two-factor/generate-backup-codes", { password: m.password }],
+    ["two-factor/disable", { password: m.password }],
+    ["two-factor/enable", { password: m.password }],
+    ["change-password", { currentPassword: m.password, newPassword: "An0ther-long-pw!" }],
+  ] as const) {
+    const r = await post(path, body)
+    expect([path, r.status, await codeOf(r)]).toEqual([path, 403, "mfa_required"])
+  }
+  expect(await ownerQuery('select backup_codes from two_factor')).toEqual(codesBefore)
+  expect(await ownerQuery('select two_factor_enabled from "user"')).toEqual([{ two_factor_enabled: true }])
+  const [{ n }] = await ownerQuery("select count(*)::int as n from session where mfa_passed = false")
+  expect(n).toBe(1)
+})
+test("R27: allowed paths still work on an unpassed session, and the same calls succeed after verify-totp", async () => {
+  const { w, m, stale, e, post } = await stale2fa()
+  expect((await call(w.app, "GET", "/api/auth/get-session", { cookie: stale })).status).toBe(200)
+  const bad = await post("two-factor/verify-totp", { code: "000000" })
+  expect(bad.status).toBe(401) // verify-totp is reachable (a wrong code is Better Auth's 401, not mfa_required)
+  expect(await codeOf(bad)).not.toBe("mfa_required")
+  expect((await post("two-factor/verify-totp", { code: await totpCode(e.secret) })).status).toBe(200)
+  expect((await post("two-factor/generate-backup-codes", { password: m.password })).status).toBe(200)
+})
+test("R27: a user without 2FA can still enrol via /two-factor/enable", async () => {
+  const w = await world()
+  const m = await w.who("manager")
+  const { cookie } = await signIn(w.app, m.email, m.password)
+  const r = await call(w.app, "POST", "/api/auth/two-factor/enable", { cookie, body: { password: m.password }, headers: ORIGIN })
+  expect(r.status).toBe(200)
+  expect(((await r.json()) as Json).totpURI).toContain("otpauth://")
+})
