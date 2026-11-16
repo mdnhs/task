@@ -5,6 +5,7 @@ import { memberships, roles, tenants } from "../../db/schema"
 import { withTenant } from "../../db/tenant-tx"
 import { AppError, NotFound } from "../errors"
 import { strictestIdleHours } from "../session-policy"
+import { loadDevice } from "./device"
 import { enforceMfa } from "./mfa"
 import { establishSession } from "./session"
 
@@ -49,5 +50,7 @@ export const requireTenant: MiddlewareHandler<AppEnv> = async (c, next) => {
   c.set("member", { userId, roleId: member.roleId, roleKey: member.roleKey })
   // Forced MFA (FR-M0-04) is applied here so every tenant route is covered by construction (fail closed).
   await enforceMfa(c, async () => {})
+  // Device policy (FR-M0-10) is evaluated per request, here, so no tenant route can skip it.
+  await loadDevice(c, async () => {})
   await next()
 }

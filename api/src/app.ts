@@ -5,6 +5,7 @@ import { newRouter } from "./core/router"
 import { AppError, problem, statusCode, statusTitle } from "./core/errors"
 import { requestId } from "./core/middleware/request-id"
 import { auditRoutes } from "./modules/audit"
+import { deviceRoutes, probeRoutes } from "./modules/devices"
 import { mfaRoutes } from "./modules/mfa"
 import { rbacRoutes } from "./modules/rbac"
 import { authRoutes } from "./modules/auth/routes"
@@ -51,6 +52,8 @@ export function createApp(deps: Deps) {
   app.route("/", teamRoutes)
   app.route("/", mfaRoutes)
   app.route("/", auditRoutes)
+  app.route("/", deviceRoutes)
+  if (deps.env.NODE_ENV === "test") app.route("/", probeRoutes) // test-only; never registered elsewhere, not in the OpenAPI doc
 
   app.doc31("/v1/openapi.json", { openapi: "3.1.0", info: { title: "OpsDesk API", version: "1" } })
 
