@@ -55,7 +55,7 @@ export async function actorIn(t: { app: AppType; deps: Deps }, tenant: { id: str
 }
 
 /** Creates one role/member/team/device in the tenant (through the real API as its owner) and maps every walked route param to them. */
-export async function fixtureIds(t: { app: AppType; deps: Deps }, tenant: { id: string; slug: string }, owner: Actor, staff: Actor): Promise<{ fixtures: TenantFixtures; resources: World["resources"]; marks: string[] }> {
+export async function fixtureIds(t: { app: AppType; deps: Deps }, tenant: { id: string; slug: string }, owner: Actor, staff: Actor, deviceUser: Actor = staff): Promise<{ fixtures: TenantFixtures; resources: World["resources"]; marks: string[] }> {
   const uniq = `${tenant.slug}-${(n++).toString(36)}`
   const post = async (path: string, body: unknown) => {
     const r = await call(t.app, "POST", path, { cookie: owner.cookie, tenant: tenant.slug, body })
@@ -63,7 +63,7 @@ export async function fixtureIds(t: { app: AppType; deps: Deps }, tenant: { id: 
     return (await r.json()) as { id: string; name?: string; label?: string }
   }
   const team = await post("/v1/teams", { name: `Team ${uniq}`, kind: "team" })
-  const device = await post("/v1/devices", { userId: staff.userId, type: "pc", owner: "company", label: `Device ${uniq}`, trusted: true })
+  const device = await post("/v1/devices", { userId: deviceUser.userId, type: "pc", owner: "company", label: `Device ${uniq}`, trusted: true })
   const resources = { role: await roleIdOf(t.deps, tenant.id, "employee"), member: staff.userId, team: team.id, device: device.id }
   const fixtures: TenantFixtures = {}
   for (const [path, params] of Object.entries(ROUTE_PARAMS)) {

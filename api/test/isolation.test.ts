@@ -2,7 +2,7 @@ import { beforeAll, describe, expect, test } from "vitest"
 import { sql } from "drizzle-orm"
 import { call, resetDb, testApp } from "./harness"
 import { ownerTenantQuery } from "./db"
-import { makeMember, makeTenant } from "./factories"
+import { makeMember, makeTenant, signIn } from "./factories"
 import { actorIn, fixtureIds, ROUTE_PARAMS, type Actor, type World } from "./route-fixtures"
 import { memberships, roles } from "../src/db/schema"
 
@@ -33,25 +33,46 @@ const NOT_APPLICABLE: Record<string, string> = {
   "PUT /v1/device-policies/{feature}": "{feature} is a vocabulary word (drive|payroll); the policy row is keyed by the caller's tenant. Checked instead: B's policies are unchanged by A's PUT.",
 }
 
-/** The control run needs A-valid bodies where the documented example points at an id that cannot exist. */
-const CONTROL_BODY = (w: World, key: string): unknown | undefined => {
-  if (key === "PATCH /v1/members/{userId}") return { roleId: w.resources.role } // example roleId is the nil uuid
-  if (key === "PUT /v1/members/{userId}/manager") return { managerId: null }
-  if (key === "PUT /v1/teams/{id}/members") return { userIds: [w.resources.member] }
-  return undefined
+/**
+ * One spec per operation, used by BOTH the B-walk and the control run: the same actor, the same body, only the
+ * path ids differ (A's own vs B's). So the only thing that can turn the call into a 404 for B's ids is the tenant
+ * boundary. `expect` is the resource-specific 404 code the lookup of the path id throws (any other 404, e.g. a
+ * body-role lookup failing first, fails the walker). A route without a spec fails the walker.
+ *  - "owner": owner of A.  - "dual": a member of BOTH A and B, the allocated user of a device in A and one in B.
+ * `body(w)` gets the world whose ids are in the path (so bind can use a code issued for that very device).
+ */
+type Spec = { actor: "owner" | "dual"; expect: string; body?: (w: World) => Promise<unknown> | unknown }
+const issueCode = async (w: World) => {
+  const r = await call(t.app, "POST", `/v1/devices/${w.resources.device}/enrolment-code`, { cookie: w.owner.cookie, tenant: w.tenant.slug })
+  if (r.status !== 201) throw new Error(`enrolment code failed: ${r.status}`)
+  return { code: ((await r.json()) as Json).code }
+}
+const SPECS: Record<string, Spec> = {
+  "POST /v1/roles/{id}/clone": { actor: "owner", expect: "role_not_found" },
+  "PATCH /v1/roles/{id}": { actor: "owner", expect: "role_not_found" },
+  // body role is a REAL role of A: role lookup passes in both runs, so only the member lookup can 404
+  "PATCH /v1/members/{userId}": { actor: "owner", expect: "member_not_found", body: () => ({ roleId: a.resources.role }) },
+  "PUT /v1/members/{userId}/manager": { actor: "owner", expect: "member_not_found", body: () => ({ managerId: null }) },
+  "PATCH /v1/teams/{id}": { actor: "owner", expect: "team_not_found" },
+  "DELETE /v1/teams/{id}": { actor: "owner", expect: "team_not_found" },
+  "PUT /v1/teams/{id}/members": { actor: "owner", expect: "team_not_found", body: () => ({ userIds: [a.resources.member] }) },
+  "PATCH /v1/devices/{id}": { actor: "owner", expect: "device_not_found" },
+  "POST /v1/devices/{id}/enrolment-code": { actor: "owner", expect: "device_not_found" },
+  // actor is the allocated user of the device in BOTH tenants, with a live code issued for that exact device
+  "POST /v1/devices/{id}/bind": { actor: "dual", expect: "device_not_found", body: issueCode },
 }
 
 let t: ReturnType<typeof testApp>
 let ownerA: Actor
+let dual: Actor
 let a: World
 let b: World
 let doc: { paths: Record<string, Record<string, Json>> }
 
-async function buildWorld(slug: string): Promise<World> {
-  const tenant = await makeTenant(t.deps, { slug })
+async function buildWorld(tenant: { id: string; slug: string }, deviceUser?: Actor): Promise<World> {
   const owner = await actorIn(t, tenant, "owner")
   const staff = await actorIn(t, tenant, "employee")
-  const f = await fixtureIds(t, tenant, owner, staff)
+  const f = await fixtureIds(t, tenant, owner, staff, deviceUser)
   return { tenant, owner, staff, ...f, marks: [...f.marks, f.resources.role, owner.email, staff.email] }
 }
 
@@ -75,8 +96,14 @@ async function hashes(tenantId: string): Promise<Record<string, string>> {
 beforeAll(async () => {
   await resetDb()
   t = testApp()
-  a = await buildWorld("iso-alpha")
-  b = await buildWorld("iso-bravo")
+  const ta = await makeTenant(t.deps, { slug: "iso-alpha" })
+  const tb = await makeTenant(t.deps, { slug: "iso-bravo" })
+  // one user in both tenants: signs in once, X-Tenant picks the tenant
+  const du = await makeMember(t.deps, ta.id, "employee")
+  await makeMember(t.deps, tb.id, "employee", { email: du.email })
+  dual = { userId: du.userId, slug: ta.slug, cookie: (await signIn(t.app, du.email, du.password)).cookie }
+  a = await buildWorld(ta, dual)
+  b = await buildWorld(tb, dual)
   ownerA = a.owner
   doc = (await (await call(t.app, "GET", "/v1/openapi.json")).json()) as typeof doc
 }, 120_000)
@@ -106,59 +133,71 @@ describe("AC-M0-01 cross-tenant isolation walker", () => {
     expect(problems).toEqual([])
   })
 
-  test("as owner of A, every route with a path param returns 404 problem+json for tenant B's ids and leaks nothing", async () => {
-    const before = await hashes(b.tenant.id)
+  test("as A, every route with a path param returns the resource-specific 404 problem+json for tenant B's ids and leaks nothing", async () => {
     const ops = operations()
     const failures: string[] = []
-    const walked: string[] = []
     const skipped: string[] = []
+    const plan: { o: Op; spec: Spec; body: unknown; params: Record<string, string>; ghost: Record<string, string> }[] = []
     for (const o of ops) {
       const fx = b.fixtures[o.path]
-      const hasForeignId = o.params.some((p) => fx[p].kind === "id")
-      if (!hasForeignId) {
+      if (!o.params.some((p) => fx[p].kind === "id")) {
         skipped.push(o.key)
         continue
       }
-      const params = Object.fromEntries(o.params.map((p) => [p, fx[p].value]))
-      const body = bodyExample(o.op)
-      const send = (url: string) => call(t.app, o.method, url, { cookie: ownerA.cookie, tenant: a.tenant.slug, body: body.present ? body.example : undefined })
+      const spec = SPECS[o.key]
+      if (!spec) {
+        failures.push(`${o.key}: no SPECS entry (actor/body/expected 404 code)`)
+        continue
+      }
+      const ex = bodyExample(o.op)
+      const body = ex.present ? await (spec.body ? spec.body(b) : ex.example) : undefined // codes are issued BEFORE the snapshot below
+      plan.push({
+        o, spec, body,
+        params: Object.fromEntries(o.params.map((p) => [p, fx[p].value])),
+        ghost: Object.fromEntries(o.params.map((p) => [p, fx[p].kind === "id" ? (p === "userId" ? "usr_ghost" : NIL_UUID) : fx[p].value])),
+      })
+    }
+    const before = await hashes(b.tenant.id)
+    const walked: string[] = []
+    for (const { o, spec, body, params, ghost } of plan) {
+      const cookie = spec.actor === "dual" ? dual.cookie : ownerA.cookie
+      const send = (url: string) => call(t.app, o.method, url, { cookie, tenant: a.tenant.slug, body })
       const r = await send(substitute(o.path, params))
       walked.push(o.key)
       const text = await r.text()
+      const code = (JSON.parse(text) as Json).code
       if (r.status !== 404) failures.push(`${o.key} -> ${r.status} (want 404) ${text.slice(0, 120)}`)
+      else if (code !== spec.expect) failures.push(`${o.key}: 404 code ${code}, want ${spec.expect} (a different lookup failed first)`)
       if (!(r.headers.get("content-type") ?? "").startsWith("application/problem+json")) failures.push(`${o.key}: content-type ${r.headers.get("content-type")}`)
       for (const m of b.marks) if (text.includes(m)) failures.push(`${o.key}: 404 body leaks tenant-B value ${m}`)
       // B's id must look exactly like an id that never existed.
-      const ghost = Object.fromEntries(o.params.map((p) => [p, fx[p].kind === "id" ? (p === "userId" ? "usr_ghost" : NIL_UUID) : fx[p].value]))
       const g = await send(substitute(o.path, ghost))
-      const code = (s: string) => (JSON.parse(s) as Json).code
-      if (g.status === 404 && code(await g.text()) !== code(text)) failures.push(`${o.key}: B-id 404 code differs from a never-existing id's`)
+      if (g.status !== 404 || ((await g.json()) as Json).code !== spec.expect) failures.push(`${o.key}: never-existing id did not give 404 ${spec.expect}`)
     }
     expect(failures).toEqual([])
     expect(walked.length).toBeGreaterThanOrEqual(10)
     expect(walked.length + skipped.length).toBe(ops.length)
     expect(skipped.sort()).toEqual(Object.keys(NOT_APPLICABLE).sort()) // no silent skips
+    expect(Object.keys(SPECS).sort()).toEqual(walked.sort()) // no stale spec
     expect(await hashes(b.tenant.id)).toEqual(before) // nothing of B was written, deleted or audited
   }, 120_000)
 
-  test("control: the same operations with tenant A's OWN ids are not 404 (so the walker really reaches the lookup)", async () => {
+  test("control: same actor and body, tenant A's OWN ids: not 404 and not 5xx (so the walk really reaches the lookup)", async () => {
     const failures: string[] = []
     for (const o of operations()) {
       if (NOT_APPLICABLE[o.key]) continue
+      const spec = SPECS[o.key]
+      if (!spec) {
+        failures.push(`${o.key}: no SPECS entry`)
+        continue
+      }
       // fresh records per operation: some calls delete or consume them
-      const f = await fixtureIds(t, a.tenant, a.owner, a.staff)
+      const f = await fixtureIds(t, a.tenant, a.owner, a.staff, dual)
       const w: World = { ...a, ...f }
       const params = Object.fromEntries(o.params.map((p) => [p, f.fixtures[o.path][p].value]))
-      const body = bodyExample(o.op)
-      const override = CONTROL_BODY(w, o.key)
-      // bind is only answerable by the device's allocated user, with a code the owner issued first
-      const bind = o.key === "POST /v1/devices/{id}/bind"
-      let sendBody = body.present ? (override ?? body.example) : undefined
-      if (bind) {
-        const issued = await call(t.app, "POST", `/v1/devices/${f.resources.device}/enrolment-code`, { cookie: ownerA.cookie, tenant: a.tenant.slug })
-        sendBody = { code: ((await issued.json()) as Json).code }
-      }
-      const r = await call(t.app, o.method, substitute(o.path, params), { cookie: bind ? a.staff.cookie : ownerA.cookie, tenant: a.tenant.slug, body: sendBody })
+      const ex = bodyExample(o.op)
+      const body = ex.present ? await (spec.body ? spec.body(w) : ex.example) : undefined
+      const r = await call(t.app, o.method, substitute(o.path, params), { cookie: spec.actor === "dual" ? dual.cookie : ownerA.cookie, tenant: a.tenant.slug, body })
       if (r.status === 404 || r.status >= 500) failures.push(`${o.key} -> ${r.status} with A's own ids: ${(await r.text()).slice(0, 120)}`)
     }
     expect(failures).toEqual([])
