@@ -10,12 +10,17 @@
   "dependencies": {
     "@hono/node-server": "^2.1.8",
     "@hono/zod-openapi": "^1.6.3",
+    "drizzle-orm": "^0.45.4",
     "hono": "^4.13.19",
+    "pg": "^8.23.1",
     "pino": "^10.4.0",
     "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@testcontainers/postgresql": "^12.2.1",
     "@types/node": "^22",
+    "@types/pg": "^8.23.1",
+    "drizzle-kit": "^0.31.11",
     "typescript": "^5",
     "vitest": "^4.1.12"
   }

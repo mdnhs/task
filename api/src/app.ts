@@ -1,4 +1,5 @@
 import { OpenAPIHono } from "@hono/zod-openapi"
+import { sql } from "drizzle-orm"
 import pino from "pino"
 import type { Deps } from "./deps"
 import type { AppEnv } from "./core/context"
@@ -26,7 +27,7 @@ export function createApp(deps: Deps) {
   app.get("/healthz", (c) => c.json({ status: "ok" }))
   app.get("/readyz", async (c) => {
     try {
-      await deps.db.execute("select 1")
+      await deps.db.execute(sql`select 1`)
       return c.json({ status: "ready" })
     } catch (err) {
       logger.error({ err, requestId: c.get("requestId") }, "readiness check failed")

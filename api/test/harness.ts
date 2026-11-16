@@ -1,8 +1,10 @@
 import { createApp, type AppType } from "../src/app"
 import type { Deps } from "../src/deps"
+import { hasTestDb, testDb } from "./db"
 import { fakeClock, fakeMailer, type FakeClock, type FakeMailer } from "./fakes"
 
 export { fakeClock, fakeMailer }
+export { resetDb } from "./db"
 
 const testEnv: Deps["env"] = {
   NODE_ENV: "test",
@@ -20,7 +22,8 @@ export function testApp(over: Partial<Deps> = {}): { app: AppType; deps: Deps; m
   const clock = fakeClock()
   const deps: Deps = {
     env: testEnv,
-    db: { execute: async () => undefined },
+    // Real (lazy-connecting) Testcontainers db when global setup provided one; inert fake otherwise.
+    db: hasTestDb() ? testDb() : ({ execute: async () => undefined } as never),
     auth: undefined,
     clock,
     mailer,
