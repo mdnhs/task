@@ -6,8 +6,8 @@ import type { Person } from "./types"
 // directory person, and the rest keep their `s-*` id. Roster-only facts (home location, qualifications, leaving date) come from
 // `rosters/workforce.json`, keyed by the merged id.
 
-export type Qualification = { type: string; expires: string | null }
-export type WorkforceMember = { id: string; name: string; role: string; dept: string; homeLocationId: string | null; qualifications: Qualification[]; leftOn: string | null }
+import type { Qualification, WorkforceMember } from "@opsdesk/domain/contracts"
+export type { Qualification, WorkforceMember }
 export type StaffRow = { id: string; personId?: string; name: string; role: string; dept: string }
 export type WorkforceExtra = { id: string; homeLocationId?: string | null; qualifications?: Qualification[]; leftOn?: string | null }
 

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
 import { blocking, checkShifts, type RuleContext, type RuleId } from "./roster-rules"
 import type { RosterShift, ShiftTemplate } from "./rosters"
-import type { WorkforceMember } from "./workforce"
+import type { WorkforceMember } from "./contracts"
 
 const TZ = "Europe/Dublin"
 const SEV: Record<RuleId, "block" | "warn"> = { double_booking: "block", approved_leave: "block", unavailable: "warn", daily_rest: "warn", weekly_rest: "warn", avg_48h: "warn", expired_licence: "warn", left: "warn" }

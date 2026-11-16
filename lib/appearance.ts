@@ -2,10 +2,8 @@
 // The admin picks one option per setting; each maps to a CSS scale token on :root. The middle option is the stock look
 // and emits nothing, so the default stays byte-identical (same idea as brandCss for the default colour).
 
-export type Corners = "sharp" | "soft" | "round"
-export type TextSize = "small" | "default" | "large"
-export type Spacing = "compact" | "comfortable" | "spacious"
-export type Appearance = { corners: Corners; text: TextSize; spacing: Spacing }
+import type { Appearance, Corners, Spacing, TextSize } from "@opsdesk/domain/contracts"
+export type { Appearance, Corners, Spacing, TextSize }
 
 type Opt<T> = { value: T; label: string; scale: number }
 

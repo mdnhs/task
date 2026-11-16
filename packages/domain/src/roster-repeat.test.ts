@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest"
 import { autoRepeatDue, applyWeekTemplate, repeatWeek, saveWeekTemplate } from "./roster-repeat"
 import type { RuleContext, RuleId } from "./roster-rules"
 import type { RosterShift, RosterWeek, ShiftTemplate } from "./rosters"
-import type { WorkforceMember } from "./workforce"
+import type { WorkforceMember } from "./contracts"
 
 const TZ = "Europe/Dublin"
 const SEV: Record<RuleId, "block" | "warn"> = { double_booking: "block", approved_leave: "block", unavailable: "warn", daily_rest: "block", weekly_rest: "warn", avg_48h: "warn", expired_licence: "block", left: "block" }

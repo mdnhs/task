@@ -1,6 +1,7 @@
 // Hand-off for tasks created or changed outside /tasks (end-of-shift report FR-M1-26). Features can't import each other, so the creating
 // feature pushes here and the tasks store merges these in when a tasks screen mounts (features/tasks/store.ts).
 // Module state like lib/store.ts: survives client navigation, resets on reload.
+import type { TaskUpdate } from "@opsdesk/domain/contracts"
 export type IncomingTask = {
   /** Tenant the task belongs to; only that tenant's tasks screens merge it (FR-SAAS-02). */
   tenantId: string
@@ -26,22 +27,7 @@ export type IncomingTask = {
  * `itemStatus` is the report row status; the tasks store maps it with taskStatusFor() (lib/shift-report.ts). `id` is unique
  * per report version and task, so the store applies each update once.
  */
-export type TaskUpdate = {
-  id: string
-  tenantId: string
-  ref: string
-  itemStatus: "done" | "in_progress" | "blocked" | "not_started"
-  minutes: number
-  note: string
-  /** YYYY-MM-DDTHH:mm, tenant time. */
-  at: string
-  /** Display name of who submitted. */
-  by: string
-  /** Where it came from, for the timeline, e.g. "shift report Day patrol, 2026-10-19". */
-  source: string
-  /** Snoozed for the day: no status change and no time entry, just the timeline line. */
-  snooze?: boolean
-}
+export type { TaskUpdate }
 
 const items: IncomingTask[] = []
 const updates: TaskUpdate[] = []
