@@ -78,7 +78,7 @@ test("search never returns another tenant's documents even with identical text",
 
 test("q must be 2..100 chars after trim (422 invalid_query); limit is capped at 20; syntax never 500s", async () => {
   const w = await world()
-  for (const q of ["a", "  a ", "", "x".repeat(101)]) {
+  for (const q of ["a", "  a ", "", "x".repeat(101), "!!!", " ?? "]) {
     const res = await w.search(w.co, q)
     expect(res.status).toBe(422)
     expect(((await res.json()) as Json).code).toBe("invalid_query")
@@ -92,7 +92,7 @@ test("q must be 2..100 chars after trim (422 invalid_query); limit is capped at 
   expect((((await (await w.search(w.co, "crew", "&limit=3")).json()) as Json).hits as Json[])).toHaveLength(3)
   expect((((await (await w.search(w.co, "crew")).json()) as Json).hits as Json[])).toHaveLength(10) // default
   expect((((await (await w.search(w.co, "crew", "&limit=0")).json()) as Json).hits as Json[]).length).toBeGreaterThan(0) // clamped up, not an error
-  for (const q of ["a:* | !b & (c", "'; drop table x; --", "\\\\ ' \" <-> ((", "!!", "crew & | :*", "名前 テスト"]) {
+  for (const q of ["a:* | !b & (c", "'; drop table x; --", "\\\\ ' \" <-> (( crew", "crew & | :*", "名前 テスト"]) {
     const res = await w.search(w.co, q)
     expect(res.status, q).toBe(200)
   }
@@ -170,4 +170,26 @@ test("indexDocument upserts and removeDocument deletes", async () => {
   expect((await w.docs()).map((d) => d.title)).toEqual(["Second"])
   await withTenant(w.deps.db, w.tenant.id, (tx) => removeDocument(tx, w.tenant.id, "team", id))
   expect(await w.docs()).toEqual([])
+})
+
+test("non-Latin and decomposed names are found (combining marks are word characters)", async () => {
+  const w = await world()
+  const extra = await makeMember(w.deps, w.tenant.id, "employee")
+  const extra2 = await makeMember(w.deps, w.tenant.id, "employee")
+  await w.setName(w.employee.userId, "বাংলা দেশ")
+  await w.setName(extra.userId, "Ó Sé") // NFC
+  await w.setName(extra2.userId, "田中太郎")
+  for (const id of [w.employee.userId, extra.userId, extra2.userId]) await w.joined(id)
+  await w.relay()
+  expect(await w.titles(w.co, "বাংলা")).toEqual(["বাংলা দেশ"])
+  expect(await w.titles(w.co, "বাং")).toEqual(["বাংলা দেশ"]) // prefix
+  expect(await w.titles(w.co, "Ó Sé".normalize("NFD"))).toEqual(["Ó Sé"])
+  expect(await w.titles(w.co, "Ó Sé".normalize("NFC"))).toEqual(["Ó Sé"])
+  expect(await w.titles(w.co, "田中太郎")).toEqual(["田中太郎"])
+  // stored NFD name is normalised on the index side and found by an NFC query
+  await w.setName(extra.userId, "Ó Sé".normalize("NFD"))
+  await w.joined(extra.userId)
+  await w.relay()
+  expect(await w.titles(w.co, "Ó Sé".normalize("NFC"))).toEqual(["Ó Sé"])
+  expect((await w.docs()).find((d) => d.title === "Ó Sé")).toBeTruthy()
 })
