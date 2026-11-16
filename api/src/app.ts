@@ -9,6 +9,7 @@ import { mfaRoutes } from "./modules/mfa"
 import { rbacRoutes } from "./modules/rbac"
 import { authRoutes } from "./modules/auth/routes"
 import { inviteRoutes } from "./modules/invites"
+import { teamRoutes } from "./modules/teams"
 import { tenantRoutes } from "./modules/tenants"
 
 export function createApp(deps: Deps) {
@@ -47,6 +48,7 @@ export function createApp(deps: Deps) {
   app.route("/", tenantRoutes)
   app.route("/", inviteRoutes)
   app.route("/", rbacRoutes)
+  app.route("/", teamRoutes)
   app.route("/", mfaRoutes)
   app.route("/", auditRoutes)
 

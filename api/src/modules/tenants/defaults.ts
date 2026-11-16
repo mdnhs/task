@@ -9,7 +9,7 @@ function readJson<T>(path: string): T {
 }
 
 type OnboardingDefaults = { locale: string; timezones: { value: string }[]; inviteRoles: string[] }
-type RoleTemplate = { id: string; label: string; description?: string; home: string; access: Record<string, string>; platform?: boolean }
+type RoleTemplate = { id: string; label: string; description?: string; home: string; access: Record<string, string>; platform?: boolean; reportScope?: "team" }
 
 let defaults: OnboardingDefaults | undefined
 export function onboardingDefaults(): { timezone: string; locale: string; inviteRoles: string[] } {
@@ -22,4 +22,9 @@ let templates: RoleTemplate[] | undefined
 export function roleTemplates(): RoleTemplate[] {
   templates ??= readJson<{ roles: RoleTemplate[] }>("shell/roles.json").roles.filter((r) => r.id !== "platform" && !r.platform)
   return templates
+}
+
+/** The reportScope a role template declares in roles.json ("team" = sees only the people below it). */
+export function templateReportScope(key: string): "team" | undefined {
+  return roleTemplates().find((r) => r.id === key)?.reportScope
 }
