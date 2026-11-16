@@ -3,8 +3,12 @@
 FROM node:22-alpine AS deps
 WORKDIR /app
 RUN apk add --no-cache libc6-compat
+# npm workspaces: every workspace manifest must be present for npm ci to link.
+# Install only the web app + @opsdesk/domain (skip api deps: hono, pg, testcontainers).
 COPY package.json package-lock.json ./
-RUN npm ci
+COPY api/package.json ./api/package.json
+COPY packages/domain/package.json ./packages/domain/package.json
+RUN npm ci --include-workspace-root -w @opsdesk/domain
 
 FROM node:22-alpine AS build
 WORKDIR /app
