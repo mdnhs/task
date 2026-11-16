@@ -7,6 +7,7 @@ import { roles } from "../../db/schema"
 import { withTenant } from "../../db/tenant-tx"
 import { entitlementsFor } from "../../modules/entitlements/service"
 import { Forbidden } from "../errors"
+import { API_KEY_ROLE_ID, apiKeyRole, markPermissionGuard } from "./principal"
 import { SUPPORT_ROLE_ID, supportRole } from "./support"
 
 /** Loads the caller's role ONCE per request and caches it in c.var.role. Fails closed: no tenant context or role is 403. */
@@ -16,6 +17,15 @@ export async function loadRole(c: Context<AppEnv>): Promise<ResolvedRole> {
   const tenant = c.get("tenant")
   const member = c.get("member")
   if (!tenant || !member) throw Forbidden("forbidden")
+  // API-key path (T3.6): the key's scopes ∩ its creator's CURRENT role (computed per request by requireTenant), never a database
+  // role row. Keyed on the key context AND the sentinel id (not on a role key, which a tenant may also use for a custom role).
+  if (c.get("apiKey") || member.roleId === API_KEY_ROLE_ID) {
+    const key = c.get("apiKey")
+    if (!key || member.roleId !== API_KEY_ROLE_ID || c.get("support")) throw Forbidden("forbidden") // inconsistent context: fail closed
+    const role = apiKeyRole(key)
+    c.set("role", role)
+    return role
+  }
   // Support-grant path (T3.5): the synthetic read-only role, never a database row. Keyed on the grant context AND the
   // sentinel id (not on the role key, which a tenant may also use for a real custom role).
   if (c.get("support") || member.roleId === SUPPORT_ROLE_ID) {
@@ -46,11 +56,12 @@ export async function loadRole(c: Context<AppEnv>): Promise<ResolvedRole> {
  * extra queries.
  */
 export function requirePermission(module: Module, need: "read" | "write"): MiddlewareHandler<AppEnv> {
-  return async (c, next) => {
+  // Registered as a permission guard: an API key (T3.6) may only reach routes that carry one, so its scopes always bound it.
+  return markPermissionGuard<MiddlewareHandler<AppEnv>>(async (c, next) => {
     const role = await loadRole(c)
     if (!can(role, module, need)) throw Forbidden("forbidden")
     await next()
-  }
+  })
 }
 
 /**

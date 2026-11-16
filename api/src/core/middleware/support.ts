@@ -8,6 +8,7 @@ import { recordAudit } from "../../modules/audit/record"
 import { MODULES } from "../../modules/rbac/access"
 import { roleTemplates } from "../../modules/tenants/defaults"
 import { Forbidden, NotFound, Unauthorized } from "../errors"
+import { EXPORT_OR_DOWNLOAD, routeDenied, type DenyRule } from "./deny-list"
 
 /**
  * Support access grants (T3.5, SRS §2.2): the read-only path of requireTenant for platform staff who are NOT members.
@@ -24,8 +25,6 @@ export const SUPPORT_ROLE_ID = "00000000-0000-0000-0000-000000000000"
 export const SUPPORT_STAFF_ROLES = ["owner", "support"] as const
 const READ_METHODS = new Set(["GET", "HEAD"])
 
-type DenyRule = { readonly why: string } & ({ readonly prefix: string } | { readonly pattern: RegExp })
-
 /**
  * Ruling 4: GETs refused even under an active grant (403 support_forbidden_route, audited). THE single deny-list.
  * Matched against the matched route TEMPLATE (c.req.routePath, e.g. /v1/files/:id/download: canonical, immune to encoding
@@ -36,21 +35,16 @@ export const SUPPORT_DENIED_ROUTES: readonly DenyRule[] = [
   { prefix: "/v1/me/data-export", why: "personal data export" },
   { prefix: "/v1/audit/export", why: "bulk audit export (download)" },
   { pattern: /^\/v1\/files\/[^/]+\/download$/, why: "file download (presigned GET)" },
-  // any present or future export / download route, whatever module adds it
-  { pattern: /\/[^/]*(export|download)[^/]*(\/|$)/, why: "any data export or download route" },
+  EXPORT_OR_DOWNLOAD,
   { prefix: "/v1/integrations", why: "integrations: OAuth tokens and connection status" },
   { prefix: "/v1/settings/support-grants", why: "support must not see or alter its own grants from the tenant side" },
   { prefix: "/v1/api-keys", why: "API keys (none yet; reserved)" },
   { prefix: "/v1/settings/api-keys", why: "API keys (none yet; reserved)" },
 ]
 
-const norm = (p: string) => (p.toLowerCase().replace(/\/{2,}/g, "/").replace(/(.)\/$/, "$1"))
-const ruleHits = (r: DenyRule, p: string) => ("prefix" in r ? p === r.prefix || p.startsWith(`${r.prefix}/`) : r.pattern.test(p))
-
 /** True when a support session must not GET this route (template or path). */
 export function supportDenied(routePath: string, path: string): boolean {
-  const cands = [norm(routePath), norm(path)]
-  return SUPPORT_DENIED_ROUTES.some((r) => cands.some((p) => ruleHits(r, p)))
+  return routeDenied(SUPPORT_DENIED_ROUTES, routePath, path)
 }
 
 let cached: ResolvedRole | undefined

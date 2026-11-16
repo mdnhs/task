@@ -21,7 +21,7 @@ import { notify, withTenantAfterCommit } from "../src/modules/notifications"
 export type Fixture = { kind: "id" | "static"; value: string }
 export type TenantFixtures = Record<string, Record<string, Fixture>>
 
-type Resource = "role" | "member" | "team" | "device" | "feature" | "notification" | "pushToken" | "file" | "integration" | "dataRequest" | "supportGrant"
+type Resource = "role" | "member" | "team" | "device" | "feature" | "notification" | "pushToken" | "file" | "integration" | "dataRequest" | "supportGrant" | "apiKey" | "webhook"
 
 /** path template -> param -> which resource that param names on that route. */
 export const ROUTE_PARAMS: Record<string, Record<string, Resource>> = {
@@ -46,6 +46,8 @@ export const ROUTE_PARAMS: Record<string, Record<string, Resource>> = {
   "/v1/data-requests/{id}/reject": { id: "dataRequest" },
   "/v1/data-requests/{id}/retry": { id: "dataRequest" },
   "/v1/settings/support-grants/{id}": { id: "supportGrant" },
+  "/v1/api-keys/{id}": { id: "apiKey" },
+  "/v1/webhooks/{id}": { id: "webhook" },
 }
 
 export type Actor = { userId: string; cookie: string; slug: string }
@@ -102,7 +104,16 @@ export async function fixtureIds(t: { app: AppType; deps: Deps }, tenant: { id: 
     `insert into support_grants (tenant_id, staff_user_id, reason, granted_by, starts_at, expires_at) values ($1::uuid, $2, $3, $2, $4, $5) returning id`,
     [tenant.id, `usr_staff_${uniq}`, `Support ${uniq}`, now, new Date(now.getTime() + 3_600_000)],
   )
-  const resources = { supportGrant: String(sg.id), dataRequest: dsr.id, integration: String(integ.id), file: file.fileId, role: await roleIdOf(t.deps, tenant.id, "employee"), member: staff.userId, team: team.id, device: device.id, notification: String(notif.id), pushToken: ((await tokRes.json()) as { id: string }).id }
+  // an API key and a webhook endpoint of the tenant (T3.6), made through the real API as its owner
+  const keyRes = await call(t.app, "POST", "/v1/api-keys", { cookie: owner.cookie, tenant: tenant.slug, body: { name: `Key ${uniq}`, scopes: ["settings:write"] } })
+  if (keyRes.status !== 201) throw new Error(`fixture api key failed: ${keyRes.status} ${await keyRes.text()}`)
+  const apiKey = (await keyRes.json()) as { id: string; prefix: string }
+  // fixtures are made again and again (one per walked operation): retire earlier endpoints so the 10-per-tenant limit never bites
+  await ownerTenantQuery(tenant.id, "update webhook_endpoints set deleted_at = now(), active = false where deleted_at is null")
+  const hookRes = await call(t.app, "POST", "/v1/webhooks", { cookie: owner.cookie, tenant: tenant.slug, body: { url: `https://hooks-${uniq}.example.com/in`, events: ["team.created"] } })
+  if (hookRes.status !== 201) throw new Error(`fixture webhook failed: ${hookRes.status} ${await hookRes.text()}`)
+  const hook = (await hookRes.json()) as { id: string }
+  const resources = { apiKey: apiKey.id, webhook: hook.id, supportGrant: String(sg.id), dataRequest: dsr.id, integration: String(integ.id), file: file.fileId, role: await roleIdOf(t.deps, tenant.id, "employee"), member: staff.userId, team: team.id, device: device.id, notification: String(notif.id), pushToken: ((await tokRes.json()) as { id: string }).id }
   const fixtures: TenantFixtures = {}
   for (const [path, params] of Object.entries(ROUTE_PARAMS)) {
     fixtures[path] = {}
@@ -110,5 +121,5 @@ export async function fixtureIds(t: { app: AppType; deps: Deps }, tenant: { id: 
       fixtures[path][param] = res === "feature" ? { kind: "static", value: "drive" } : { kind: "id", value: resources[res] }
     }
   }
-  return { fixtures, resources, marks: [tenant.id, tenant.slug, String(integ.id), `drive-${uniq}@example.com`, team.id, device.id, file.fileId, dsr.id, `Fix ${uniq}`, `Support ${uniq}`, String(sg.id), `File ${uniq}.pdf`, staff.userId, owner.userId, `Team ${uniq}`, `Device ${uniq}`] }
+  return { fixtures, resources, marks: [tenant.id, tenant.slug, String(integ.id), `drive-${uniq}@example.com`, team.id, device.id, file.fileId, dsr.id, `Fix ${uniq}`, `Support ${uniq}`, String(sg.id), `File ${uniq}.pdf`, staff.userId, owner.userId, `Team ${uniq}`, `Device ${uniq}`, apiKey.id, apiKey.prefix, `Key ${uniq}`, hook.id, `hooks-${uniq}.example.com`] }
 }

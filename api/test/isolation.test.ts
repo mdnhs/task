@@ -77,6 +77,10 @@ const SPECS: Record<string, Spec> = {
   "POST /v1/data-requests/{id}/retry": { actor: "owner", expect: "data_request_not_found" }, // control: 409 request_not_failed (not 404)
   // an active support grant of A (control: owner revokes it -> 200)
   "DELETE /v1/settings/support-grants/{id}": { actor: "owner", expect: "grant_not_found" },
+  // T3.6: an API key (control: revoke -> 200) and a webhook endpoint (control: PATCH -> 200, DELETE -> 204) of A
+  "DELETE /v1/api-keys/{id}": { actor: "owner", expect: "api_key_not_found" },
+  "PATCH /v1/webhooks/{id}": { actor: "owner", expect: "webhook_not_found" },
+  "DELETE /v1/webhooks/{id}": { actor: "owner", expect: "webhook_not_found" },
 }
 
 let t: ReturnType<typeof testApp>
@@ -103,7 +107,7 @@ const substitute = (path: string, params: Record<string, string>) => path.replac
 
 async function hashes(tenantId: string): Promise<Record<string, string>> {
   const out: Record<string, string> = {}
-  for (const tbl of ["roles", "memberships", "teams", "team_members", "reporting_lines", "devices", "device_policies", "invites", "audit_events", "tenant_settings", "notifications", "notification_preferences", "push_tokens", "notification_deliveries", "files", "integration_connections", "oauth_states", "public_holidays", "data_requests", "support_grants"]) {
+  for (const tbl of ["roles", "memberships", "teams", "team_members", "reporting_lines", "devices", "device_policies", "invites", "audit_events", "tenant_settings", "notifications", "notification_preferences", "push_tokens", "notification_deliveries", "files", "integration_connections", "oauth_states", "public_holidays", "data_requests", "support_grants", "api_keys", "webhook_endpoints", "webhook_deliveries"]) {
     const [r] = await ownerTenantQuery(tenantId, `select count(*)::text || ':' || coalesce(md5(string_agg(to_jsonb(x)::text, ',' order by to_jsonb(x)::text)), '') as h from ${tbl} x`)
     out[tbl] = String(r.h)
   }
@@ -250,6 +254,41 @@ describe("AC-M0-01 cross-tenant isolation walker", () => {
   })
 })
 
+describe("C7: API-key variant of the isolation walker", () => {
+  const keyFor = async (w: World, slug: string) => {
+    const r = await call(t.app, "POST", "/v1/api-keys", { cookie: w.owner.cookie, tenant: slug, body: { name: "walker", scopes: ["settings:write"] } })
+    expect(r.status).toBe(201)
+    return ((await r.json()) as Json).key as string
+  }
+  test("a key minted in A against B's resources: 404 with the same code as a never-existing id, B unchanged (header absent, header = A, header = B)", async () => {
+    const keyA = await keyFor(a, a.tenant.slug)
+    const before = await hashes(b.tenant.id)
+    const ghost = NIL_UUID
+    const cases: { m: string; p: (id: string) => string; id: string; body?: unknown; code: string }[] = [
+      { m: "PATCH", p: (id) => `/v1/teams/${id}`, id: b.resources.team, body: { name: "pwned" }, code: "team_not_found" },
+      { m: "DELETE", p: (id) => `/v1/teams/${id}`, id: b.resources.team, code: "team_not_found" },
+      { m: "PUT", p: (id) => `/v1/teams/${id}/members`, id: b.resources.team, body: { userIds: [] }, code: "team_not_found" },
+    ]
+    for (const c of cases) {
+      for (const hdr of [undefined, a.tenant.slug]) {
+        const r = await call(t.app, c.m, c.p(c.id), { headers: { authorization: `Bearer ${keyA}` }, tenant: hdr, body: c.body })
+        expect(r.status, `${c.m} ${c.p(c.id)} x-tenant=${hdr}`).toBe(404)
+        expect(((await r.json()) as Json).code).toBe(c.code)
+        const g = await call(t.app, c.m, c.p(ghost), { headers: { authorization: `Bearer ${keyA}` }, tenant: hdr, body: c.body })
+        expect(g.status).toBe(404)
+        expect(((await g.json()) as Json).code).toBe(c.code)
+      }
+      const viaB = await call(t.app, c.m, c.p(c.id), { headers: { authorization: `Bearer ${keyA}` }, tenant: b.tenant.slug, body: c.body })
+      expect(viaB.status).toBe(404)
+      expect(((await viaB.json()) as Json).code).toBe("not_found") // header names another tenant: the generic 404
+    }
+    expect(await hashes(b.tenant.id)).toEqual(before)
+    // control: the same key reaches A's own team (so the 404s above come from the tenant boundary)
+    const own = await call(t.app, "PATCH", `/v1/teams/${a.resources.team}`, { headers: { authorization: `Bearer ${keyA}` }, body: { name: "renamed by key" } })
+    expect(own.status).toBe(200)
+  })
+})
+
 describe("every /v1 route is registered through OpenAPI (no hidden routes)", () => {
   const EXCLUDED = (p: string) => p.startsWith("/api/auth") || p === "/healthz" || p === "/readyz" || p === "/v1/openapi.json" || p.startsWith("/v1/_probe/") || p.startsWith("/webhooks/billing/") // ruling C5: raw-body, signature-authenticated provider webhooks
   test("app.routes minus the documented exclusions equals the OpenAPI paths", () => {
@@ -262,7 +301,7 @@ describe("every /v1 route is registered through OpenAPI (no hidden routes)", () 
     const documented = new Set<string>()
     for (const [path, item] of Object.entries(doc.paths)) for (const m of METHODS) if (item[m]) documented.add(`${m.toUpperCase()} ${path}`)
     expect(registered.size).toBeGreaterThan(20)
-    for (const k of ["GET /v1/platform/staff", "POST /v1/platform/staff", "PATCH /v1/platform/staff/{userId}", "GET /v1/platform/audit", "GET /v1/platform/audit/export", "GET /v1/platform/settings/email", "PUT /v1/platform/settings/email", "POST /v1/platform/settings/email/test", "GET /v1/platform/settings/storage", "PUT /v1/platform/settings/storage", "POST /v1/platform/settings/storage/test", "GET /v1/platform/settings/billing", "PUT /v1/platform/settings/billing", "GET /v1/billing/subscription", "GET /v1/billing/invoices", "POST /v1/billing/checkout", "POST /v1/billing/portal", "POST /v1/billing/cancel", "POST /v1/billing/resume", "PUT /v1/billing/seats", "POST /v1/platform/tenants/{tenantId}/support-grants", "DELETE /v1/platform/support-grants/{id}", "GET /v1/settings/support-grants", "DELETE /v1/settings/support-grants/{id}"]) {
+    for (const k of ["GET /v1/platform/staff", "POST /v1/platform/staff", "PATCH /v1/platform/staff/{userId}", "GET /v1/platform/audit", "GET /v1/platform/audit/export", "GET /v1/platform/settings/email", "PUT /v1/platform/settings/email", "POST /v1/platform/settings/email/test", "GET /v1/platform/settings/storage", "PUT /v1/platform/settings/storage", "POST /v1/platform/settings/storage/test", "GET /v1/platform/settings/billing", "PUT /v1/platform/settings/billing", "GET /v1/billing/subscription", "GET /v1/billing/invoices", "POST /v1/billing/checkout", "POST /v1/billing/portal", "POST /v1/billing/cancel", "POST /v1/billing/resume", "PUT /v1/billing/seats", "POST /v1/platform/tenants/{tenantId}/support-grants", "DELETE /v1/platform/support-grants/{id}", "GET /v1/settings/support-grants", "DELETE /v1/settings/support-grants/{id}", "POST /v1/api-keys", "GET /v1/api-keys", "DELETE /v1/api-keys/{id}", "POST /v1/webhooks", "GET /v1/webhooks", "PATCH /v1/webhooks/{id}", "DELETE /v1/webhooks/{id}"]) {
       expect(registered.has(k), `${k} registered`).toBe(true)
       expect(documented.has(k), `${k} in OpenAPI`).toBe(true)
     }

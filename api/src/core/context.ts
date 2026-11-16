@@ -1,6 +1,7 @@
 import type { Role } from "@opsdesk/domain/permissions"
 import type { Device, DevicePolicy } from "@opsdesk/domain/devices"
 import type { MfaPolicy } from "@opsdesk/domain/mfa"
+import type { Access, Module } from "@opsdesk/domain/permissions"
 import type { Deps } from "../deps"
 
 /** The caller's role in the current tenant, loaded once per request by requirePermission. */
@@ -18,6 +19,8 @@ export type AppEnv = {
     member?: { userId: string; roleId: string; roleKey: string }
     /** Set ONLY on the support-grant path of requireTenant (T3.5): the caller is platform staff reading under this grant. */
     support?: { grantId: string; staffUserId: string }
+    /** Set ONLY on the API-key path of requireTenant (T3.6): the key, and its effective access (scopes ∩ the creator's current role). */
+    apiKey?: { id: string; prefix: string; scopes: string[]; creatorId: string; access: Record<Module, Access> }
     role?: ResolvedRole
     /** The caller's platform staff identity (requirePlatformStaff, /v1/platform/* only). */
     staff?: { userId: string; role: PlatformRole }

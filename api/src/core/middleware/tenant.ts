@@ -10,6 +10,7 @@ import { enforceMfa } from "./mfa"
 import { establishSession } from "./session"
 import { enforceBilling } from "./module"
 import { enterSupportPath } from "./support"
+import { enterApiKeyPath, presentedApiKey } from "./api-key"
 
 /**
  * Resolves the tenant from X-Tenant and the caller's membership of it. Self-contained (it authenticates):
@@ -22,10 +23,21 @@ import { enterSupportPath } from "./support"
  * member, read-only (non-GET 403 before any handler), deny-listed GETs refused, every request audited. Without a grant it
  * is the same 404 as any non-member. A member who is also staff always takes the normal path below, unchanged.
  *
+ * API keys (T3.6): a `Bearer odk_...` Authorization header takes the key path (api-key.ts) instead of all of the above: tenant from
+ * the key, creator's live role ∩ scopes, no MFA / device / idle gates (by design, ruling C7), enforceBilling still applies.
+ *
  * Responses never distinguish "no such tenant" from "not a member" (both 404), and an unauthenticated caller
  * gets 401 for any slug, so slugs cannot be probed without a session.
  */
 export const requireTenant: MiddlewareHandler<AppEnv> = async (c, next) => {
+  // API-key principal (T3.6): `Authorization: Bearer odk_...` takes this path ALONE (any session cookie is ignored, X-Tenant is
+  // optional but must match the key's tenant). See api-key.ts for the whole contract, incl. the gates that do not apply.
+  const apiKey = presentedApiKey(c)
+  if (apiKey !== null) {
+    await enterApiKeyPath(c, apiKey)
+    await next()
+    return
+  }
   const slug = c.req.header("x-tenant")?.trim()
   if (!slug) throw new AppError(400, "tenant_required", "Bad Request")
   const deps = c.get("deps")

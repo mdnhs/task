@@ -6,6 +6,8 @@ import { memberships, roles } from "../../db/schema"
 import type { TenantTx } from "../../db/tenant-tx"
 import { publish } from "../../core/events"
 import { recordAudit } from "../audit"
+import { API_KEY_ACTOR_PREFIX } from "../../core/middleware/principal"
+import { lockApiKeyActor } from "../api-keys/lock"
 import { exceeds } from "./access"
 
 export type RoleRow = typeof roles.$inferSelect
@@ -42,6 +44,8 @@ export async function lockRbac(tx: TenantTx, tenantId: string): Promise<void> {
  * cache in requirePermission stays for reads; mutations never trust it.
  */
 export async function lockActor(tx: TenantTx, tenantId: string, userId: string, module: Module, need: "read" | "write"): Promise<ResolvedRole> {
+  // API-key principal (T3.6): scopes ∩ the creator's current role, re-read here with the same locking (api-keys/lock.ts).
+  if (userId.startsWith(API_KEY_ACTOR_PREFIX)) return lockApiKeyActor(tx, tenantId, userId.slice(API_KEY_ACTOR_PREFIX.length), module, need)
   const [row] = await tx
     .select({ role: roles, status: memberships.status })
     .from(memberships)

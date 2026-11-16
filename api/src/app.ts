@@ -5,7 +5,9 @@ import { newRouter } from "./core/router"
 import { AppError, problem, statusCode, statusTitle } from "./core/errors"
 import { errorInfo } from "./core/safe-error"
 import { requestId } from "./core/middleware/request-id"
-import { auditRoutes } from "./modules/audit"
+import { auditRoutes } from "./modules/audit" // keep before any module that imports core/middleware/permission first (latent import cycle via entitlements -> audit)
+import { apiKeyRoutes } from "./modules/api-keys"
+import { webhookRoutes } from "./modules/webhooks-out"
 import { deviceRoutes, probeRoutes } from "./modules/devices"
 import { billingRoutes, billingSettingsRoutes, billingWebhookRoutes } from "./modules/billing"
 import { entitlementProbeRoutes, entitlementRoutes } from "./modules/entitlements"
@@ -77,6 +79,8 @@ export function createApp(deps: Deps) {
   app.route("/", platformAuditRoutes)
   app.route("/", platformConsoleRoutes)
   app.route("/", supportGrantRoutes)
+  app.route("/", apiKeyRoutes)
+  app.route("/", webhookRoutes)
   app.route("/", emailSettingsRoutes)
   app.route("/", storageSettingsRoutes)
   app.route("/", billingSettingsRoutes)
