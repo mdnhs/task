@@ -11,7 +11,8 @@
     "format": "prettier --write \"**/*.{ts,tsx}\"",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "smoke": "node scripts/smoke.mjs"
+    "smoke": "node scripts/smoke.mjs",
+    "test:api": "npm -w api test"
   },
   "dependencies": {
     "@ark-ui/react": "^5.39.3",
@@ -54,5 +55,9 @@
     "tailwindcss": "^4",
     "typescript": "^5",
     "vitest": "^4.1.12"
-  }
+  },
+  "workspaces": [
+    "api",
+    "packages/*"
+  ]
 }
