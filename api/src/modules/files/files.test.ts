@@ -2,7 +2,7 @@ import { createHash } from "node:crypto"
 import { Readable } from "node:stream"
 import { beforeEach, afterEach, expect, test } from "vitest"
 import { ownerTenantQuery } from "../../../test/db"
-import { call, putObject, resetDb, testApp } from "../../../test/harness"
+import { call, putObject, resetDb, testApp, testEnv } from "../../../test/harness"
 import { makeMember, makeTenant, signIn } from "../../../test/factories"
 import { resetSubscribers } from "../../core/events"
 import { runJob } from "../../core/queue/queue"
@@ -10,6 +10,7 @@ import type { MalwareScanner } from "../../core/scan/scanner"
 import { fakeScanner } from "../../core/scan/fake-scanner"
 import { registerNotifications } from "../notifications"
 import { ALLOWED_MIMES, registerFiles } from "."
+import { fileKey, stagingKey } from "../../core/storage/storage"
 
 const EICAR = "X5O!P%@AP[4\\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*"
 const PDF = "application/pdf"
@@ -36,27 +37,27 @@ async function world(over: Parameters<typeof testApp>[0] = {}) {
   return { ...t, tenant, owner, staff, co, cs, cr }
 }
 type W = Awaited<ReturnType<typeof world>>
-type Upload = { url: string; fields: Record<string, string> }
+type Upload = { method: "PUT"; url: string; headers: Record<string, string> }
 type Json = Record<string, any> // eslint-disable-line @typescript-eslint/no-explicit-any
 
 const req = (w: W, method: string, path: string, cookie = w.co, body?: unknown) => call(w.app, method, path, { cookie, tenant: w.tenant.slug, body })
 const intent = (w: W, body: unknown, cookie = w.co) => req(w, "POST", "/v1/files/uploads", cookie, body)
 
-/** Browser-style multipart POST to the presigned URL (fields first, file last). */
-async function post(up: Upload, content: Buffer | string, fieldOverride: Record<string, string> = {}): Promise<Response> {
-  const form = new FormData()
-  for (const [k, v] of Object.entries({ ...up.fields, ...fieldOverride })) form.append(k, v)
-  form.append("file", new Blob([content]), "whatever.bin")
-  return fetch(up.url, { method: "POST", body: form })
+/** Browser-style PUT to the presigned URL with the headers the API returned (overridable to prove they are signed). */
+async function put(up: Upload, content: Buffer | string, o: { headers?: Record<string, string>; url?: string } = {}): Promise<Response> {
+  const { "Content-Length": _len, ...headers } = up.headers // fetch sets Content-Length itself from the body
+  return fetch(o.url ?? up.url, { method: "PUT", headers: { ...headers, ...o.headers }, body: Buffer.from(content) })
 }
+const keyOfUrl = (url: string) => /(u\/[0-9a-f-]{36}\/[0-9a-f-]{36})/.exec(url)![1]
+
 /** Full happy path up to (and including) the object being in storage; returns the file id. */
 async function stage(w: W, content: Buffer | string, o: { name?: string; mime?: string } = {}) {
   const buf = Buffer.from(content)
   const r = await intent(w, { name: o.name ?? "report.pdf", mime: o.mime ?? PDF, sizeBytes: buf.length })
   expect(r.status).toBe(201)
   const j = (await r.json()) as { fileId: string; upload: Upload }
-  const up = await post(j.upload, buf)
-  expect(up.status).toBe(204)
+  const up = await put(j.upload, buf)
+  expect(up.status).toBe(200)
   return { id: j.fileId, upload: j.upload, buf }
 }
 const complete = (w: W, id: string, cookie = w.co) => req(w, "POST", `/v1/files/${id}/complete`, cookie)
@@ -72,38 +73,40 @@ const scanned = async (w: W, content: Buffer | string, o: { name?: string; mime?
   return s
 }
 
-test("upload intent returns a presigned POST scoped to t/<tenant>/<fileId> expiring in 300 s", async () => {
+test("upload intent returns a presigned PUT to the staging key u/<tenant>/<fileId> expiring in 300 s with Content-Type and Content-Length signed", async () => {
   const w = await world()
-  const before = Date.now()
   const r = await intent(w, { name: "report.pdf", mime: PDF, sizeBytes: 1234 })
   expect(r.status).toBe(201)
   const j = (await r.json()) as { fileId: string; upload: Upload }
   const key = `t/${w.tenant.id}/${j.fileId}`
-  expect(j.upload.fields.key).toBe(key)
-  expect(j.upload.fields["Content-Type"]).toBe(PDF)
-  const policy = JSON.parse(Buffer.from(j.upload.fields.Policy, "base64").toString()) as { expiration: string; conditions: unknown[] }
-  const ttl = (new Date(policy.expiration).getTime() - before) / 1000
-  expect(ttl).toBeGreaterThan(290)
-  expect(ttl).toBeLessThanOrEqual(301)
-  const flat = JSON.stringify(policy.conditions)
-  expect(flat).toContain(JSON.stringify(["content-length-range", 1, 1234]))
-  expect(flat).toContain(JSON.stringify(["eq", "$Content-Type", PDF]))
-  expect(flat).toContain(JSON.stringify({ key })) // exact-match condition on the key
+  expect(j.upload.method).toBe("PUT")
+  expect(j.upload.headers).toEqual({ "Content-Type": PDF, "Content-Length": "1234" })
+  const u = new URL(j.upload.url)
+  expect(keyOfUrl(j.upload.url)).toBe(`u/${w.tenant.id}/${j.fileId}`) // uploads only ever name the staging key
+  expect(j.upload.url).not.toContain(key) // the final key never appears in any upload URL
+  expect(u.searchParams.get("X-Amz-Expires")).toBe("300")
+  const signed = (u.searchParams.get("X-Amz-SignedHeaders") ?? "").split(";")
+  expect(signed).toContain("content-type")
+  expect(signed).toContain("content-length")
   const row = await rowOf(w, j.fileId)
   expect(row).toMatchObject({ key, status: "pending", name: "report.pdf", mime: PDF, owner_user_id: w.owner.userId })
   expect(Number(row.size_bytes)).toBe(1234)
   expect(JSON.stringify(j)).not.toContain(w.tenant.slug)
 })
 
-test("the presigned POST really works against storage and enforces content-type and size limits", async () => {
+test("the presigned PUT really works against storage and rejects a different Content-Type, length or key", async () => {
   const w = await world()
   const r = await intent(w, { name: "a.pdf", mime: PDF, sizeBytes: 10 })
-  const { upload } = (await r.json()) as { upload: Upload }
-  expect((await post(upload, "x".repeat(11))).status).toBeGreaterThanOrEqual(400) // over the intent size
-  expect((await post(upload, "x".repeat(5), { "Content-Type": "text/html" })).status).toBeGreaterThanOrEqual(400) // signed type differs
-  expect((await post(upload, "x".repeat(5), { key: `t/${w.tenant.id}/other` })).status).toBeGreaterThanOrEqual(400) // key is pinned
-  expect((await post(upload, "")).status).toBeGreaterThanOrEqual(400) // 0 bytes
-  expect((await post(upload, "x".repeat(10))).status).toBe(204)
+  const j = (await r.json()) as { fileId: string; upload: Upload }
+  const { upload } = j
+  expect((await put(upload, "x".repeat(10), { headers: { "Content-Type": "text/html" } })).status).toBe(403) // signed type differs
+  expect((await put(upload, "x".repeat(11))).status).toBe(403) // signed length differs
+  expect((await put(upload, "x".repeat(5))).status).toBe(403)
+  expect((await put(upload, "x".repeat(10), { url: upload.url.replace(`/u/${w.tenant.id}/`, `/t/${w.tenant.id}/`) })).status).toBe(403) // the key is part of the signature
+  expect((await put(upload, "x".repeat(10), { url: upload.url.replace(j.fileId, crypto.randomUUID()) })).status).toBe(403)
+  expect(await w.deps.storage.head(`u/${w.tenant.id}/${j.fileId}`)).toBeNull()
+  expect((await put(upload, "x".repeat(10))).status).toBe(200)
+  expect(await w.deps.storage.head(fileKey(w.tenant.id, j.fileId))).toBeNull() // nothing at the final key until complete
 })
 
 test("intent validation: mime allow-list (no svg/html/zip/js/exe), size limit, bad bodies", async () => {
@@ -126,25 +129,33 @@ test("intent validation: mime allow-list (no svg/html/zip/js/exe), size limit, b
   }
 })
 
-test("complete rejects when the stored object's size or content-type differs from the intent (422 upload_mismatch)", async () => {
+test("complete rejects (and deletes the staging object) when the stored object's size or content-type differs from the intent (422 upload_mismatch)", async () => {
   const w = await world()
-  // size: intent says 20, the browser uploads 10 (allowed by 1..20) -> mismatch
+  // size: written straight to storage (bypassing the signed PUT) with 10 bytes while the intent says 20
   const r1 = await intent(w, { name: "a.pdf", mime: PDF, sizeBytes: 20 })
-  const j1 = (await r1.json()) as { fileId: string; upload: Upload }
-  expect((await post(j1.upload, "x".repeat(10))).status).toBe(204)
+  const j1 = (await r1.json()) as { fileId: string }
+  await putObject(stagingKey(w.tenant.id, j1.fileId), Buffer.alloc(10, 1), PDF)
   const c1 = await complete(w, j1.fileId)
   expect(c1.status).toBe(422)
   expect(((await c1.json()) as Json).code).toBe("upload_mismatch")
   expect((await rowOf(w, j1.fileId)).status).toBe("pending")
+  expect(await w.deps.storage.head(stagingKey(w.tenant.id, j1.fileId))).toBeNull()
+  expect(await w.deps.storage.head(fileKey(w.tenant.id, j1.fileId))).toBeNull()
   expect(w.queue.jobs).toHaveLength(0)
-  // content-type: write an object with a different type under the same key straight to storage
+  // content-type
   const r2 = await intent(w, { name: "b.pdf", mime: PDF, sizeBytes: 5 })
   const j2 = (await r2.json()) as { fileId: string }
-  const key = `t/${w.tenant.id}/${j2.fileId}`
-  await putObject(key, Buffer.from("hello"), "text/html")
+  await putObject(stagingKey(w.tenant.id, j2.fileId), Buffer.from("hello"), "text/html")
   const c2 = await complete(w, j2.fileId)
   expect(c2.status).toBe(422)
   expect(((await c2.json()) as Json).code).toBe("upload_mismatch")
+  expect(await w.deps.storage.head(stagingKey(w.tenant.id, j2.fileId))).toBeNull()
+  // over FILE_MAX_BYTES even if it equals a (tampered) declared size
+  const big = await world({ env: { ...testEnv, FILE_MAX_BYTES: 8 } })
+  const r3 = await intent(big, { name: "c.pdf", mime: PDF, sizeBytes: 8 })
+  const j3 = (await r3.json()) as { fileId: string }
+  await putObject(stagingKey(big.tenant.id, j3.fileId), Buffer.alloc(9, 1), PDF)
+  expect((await complete(big, j3.fileId)).status).toBe(422)
 })
 
 test("complete before any upload is 409 upload_missing", async () => {
@@ -165,7 +176,8 @@ test("complete keeps status pending, queues file.scan once, publishes file.uploa
   expect(c2.status).toBe(200)
   expect(((await c2.json()) as Json).status).toBe("pending")
   const scans = w.queue.jobs.filter((j) => j.name === "file.scan")
-  expect(scans).toHaveLength(1) // same jobId the second time: deduplicated
+  expect(scans).toHaveLength(2) // a repeat while pending re-queues a scan (own nonce id; the scan itself is a no-op once decided)
+  expect(new Set(scans.map((j) => j.opts?.jobId)).size).toBe(2)
   expect(scans[0].data).toMatchObject({ fileId: s.id, tenantId: w.tenant.id })
   expect(scans[0].opts?.jobId).toMatch(/^[A-Za-z0-9._-]+$/)
   const ev = await q(w.tenant.id, "select type, payload from domain_events where type = 'file.uploaded'")
@@ -283,14 +295,14 @@ test("client-supplied names with ../ or slashes never reach the object key", asy
     const r = await intent(w, { name, mime: PDF, sizeBytes: 5 })
     expect(r.status, name).toBe(201)
     const j = (await r.json()) as { fileId: string; upload: Upload }
-    expect(j.upload.fields.key).toBe(`t/${w.tenant.id}/${j.fileId}`)
-    expect(j.upload.fields.key).not.toMatch(/\.\.|passwd|other-tenant|win\.pdf/)
+    expect(keyOfUrl(j.upload.url)).toBe(`u/${w.tenant.id}/${j.fileId}`)
+    expect(keyOfUrl(j.upload.url)).not.toMatch(/\.\.|passwd|other-tenant|win\.pdf/)
     expect((await rowOf(w, j.fileId)).key).toBe(`t/${w.tenant.id}/${j.fileId}`)
   }
   // and the download name is encoded, so it cannot inject header parameters or newlines
   const s = await scanned(w, "x", { name: `a"; filename="evil.exe` })
   const loc = new URL((await download(w, s.id)).headers.get("location")!)
-  expect(loc.searchParams.get("response-content-disposition")).toBe(`attachment; filename*=UTF-8''a%22%3B%20filename%3D%22evil.exe`)
+  expect(loc.searchParams.get("response-content-disposition")).toBe(`attachment; filename*=UTF-8''a%22%3B%20filename%3D%22evil.pdf`)
 })
 
 test("the files table forces key = t/<tenant>/<id> and a closed status set", async () => {
@@ -329,21 +341,99 @@ test("the delete-object job never removes a pending or clean object and rejects 
   expect(await w.deps.storage.head(key)).not.toBeNull() // clean: untouched
   const p = await stage(w, "pending one")
   await runJob("file.delete-object", { fileId: p.id, tenantId: w.tenant.id }, w.deps)
-  expect(await w.deps.storage.head(`t/${w.tenant.id}/${p.id}`)).not.toBeNull() // pending: untouched
+  expect(await w.deps.storage.head(stagingKey(w.tenant.id, p.id))).not.toBeNull() // pending: untouched
   await expect(runJob("file.delete-object", { fileId: "not-a-uuid", tenantId: w.tenant.id }, w.deps)).rejects.toThrow()
 })
 
-test("an object replaced through the still-valid presigned POST after the scan is not downloadable and is rescanned", async () => {
+test("re-PUTting to the old presigned URL after complete only writes the staging key; downloads keep serving the scanned bytes", async () => {
   const w = await world()
   const s = await scanned(w, "original content")
-  expect((await download(w, s.id)).status).toBe(302)
-  // within the 300 s window the client re-posts different bytes of the same size to the same key
-  expect((await post(s.upload, "tampered conten")).status).toBe(204) // 15 bytes; intent was 16: allowed by 1..16
-  const r = await download(w, s.id)
-  expect(r.status).toBe(409)
-  expect(((await r.json()) as Json).code).toBe("file_not_ready")
-  expect((await rowOf(w, s.id)).status).toBe("pending")
-  expect(w.queue.jobs.some((j) => j.name === "file.scan")).toBe(true)
+  const first = await download(w, s.id)
+  expect(first.status).toBe(302)
+  const oldUrl = first.headers.get("location")!
+  const finalKey = fileKey(w.tenant.id, s.id)
+  const etagBefore = (await w.deps.storage.head(finalKey))!.etag
+  expect(await w.deps.storage.head(stagingKey(w.tenant.id, s.id))).toBeNull() // staging cleaned by the delete job
+  // within the 300 s window the client re-posts different bytes with the same (exact) policy
+  expect((await put(s.upload, "tampered conten!")).status).toBe(200)
+  expect((await put(s.upload, "X".repeat(16))).status).toBe(200)
+  expect(await w.deps.storage.head(stagingKey(w.tenant.id, s.id))).not.toBeNull() // landed in staging only
+  expect((await w.deps.storage.head(finalKey))!.etag).toBe(etagBefore)
+  expect((await rowOf(w, s.id)).status).toBe("clean")
+  // a GET url issued BEFORE the re-POST still returns the original bytes, and so does a fresh one
+  expect(await (await fetch(oldUrl)).text()).toBe("original content")
+  const fresh = await download(w, s.id)
+  expect(fresh.status).toBe(302)
+  expect(await (await fetch(fresh.headers.get("location")!)).text()).toBe("original content")
+  // the signed URL cannot be redirected to t/...
+  expect(s.upload.url).not.toContain(`/t/`)
+  expect((await put(s.upload, "x".repeat(16), { url: s.upload.url.replace(`/u/${w.tenant.id}/`, `/t/${w.tenant.id}/`) })).status).toBe(403)
+  // the abandoned staging object is removed by a job queued at complete; delete removes both keys
+  await runJob("file.delete-object", { fileId: s.id, tenantId: w.tenant.id, staging: true }, w.deps)
+  expect(await w.deps.storage.head(stagingKey(w.tenant.id, s.id))).toBeNull()
+})
+
+test("complete copies staging to the final key, deletes staging via a queued job, and a second complete after that is a no-op", async () => {
+  const w = await world()
+  const s = await stage(w, "hello pdf")
+  expect(await w.deps.storage.head(fileKey(w.tenant.id, s.id))).toBeNull()
+  expect((await complete(w, s.id)).status).toBe(200)
+  expect(await w.deps.storage.head(fileKey(w.tenant.id, s.id))).not.toBeNull()
+  expect(w.queue.jobs.map((j) => j.name).sort()).toEqual(["file.delete-object", "file.scan"])
+  await drain(w)
+  expect(await w.deps.storage.head(stagingKey(w.tenant.id, s.id))).toBeNull()
+  expect((await rowOf(w, s.id)).status).toBe("clean")
+  const again = await complete(w, s.id)
+  expect(again.status).toBe(200)
+  expect(((await again.json()) as Json).status).toBe("clean")
+  expect(w.queue.jobs).toHaveLength(0)
+})
+
+test("download name: the extension is forced to the declared mime's canonical one", async () => {
+  const w = await world()
+  const cases: [string, string, string][] = [
+    ["invoice.exe", PDF, "invoice.pdf"],
+    ["x.html", "text/plain", "x.txt"],
+    ["noext", "image/png", "noext.png"],
+    ["photo.JPG", "image/jpeg", "photo.JPG"],
+    ["photo.jpeg", "image/jpeg", "photo.jpeg"],
+    ["v1.2", PDF, "v1.2.pdf"],
+    ["a.exe.", PDF, "a.pdf"],
+  ]
+  for (const [name, mime, want] of cases) {
+    const s = await scanned(w, "x", { name, mime })
+    expect((await rowOf(w, s.id)).name, name).toBe(want)
+    const loc = new URL((await download(w, s.id)).headers.get("location")!)
+    expect(loc.searchParams.get("response-content-disposition"), name).toBe(`attachment; filename*=UTF-8''${encodeURIComponent(want)}`)
+  }
+  const long = await intent(w, { name: "a".repeat(255), mime: PDF, sizeBytes: 5 })
+  expect(long.status).toBe(201)
+  expect((await rowOf(w, ((await long.json()) as { fileId: string }).fileId)).name).toHaveLength(255)
+})
+
+test("names that are not well-formed UTF-16 are 422 invalid_name", async () => {
+  const w = await world()
+  for (const name of ["\ud800", "ok\udc00.pdf"]) {
+    const r = await call(w.app, "POST", "/v1/files/uploads", { cookie: w.co, tenant: w.tenant.slug, headers: { "content-type": "application/json" }, body: JSON.parse(JSON.stringify({ name, mime: PDF, sizeBytes: 5 })) })
+    expect(r.status, name).toBe(422)
+    expect(((await r.json()) as Json).code).toBe("invalid_name")
+  }
+})
+
+test("scan and delete job ids carry a per-request nonce so retained completed jobs never dedupe a new request", async () => {
+  const w = await world()
+  const s = await stage(w, "hello")
+  await complete(w, s.id)
+  await complete(w, s.id)
+  const scanIds = w.queue.jobs.filter((j) => j.name === "file.scan").map((j) => j.opts?.jobId)
+  expect(new Set(scanIds).size).toBe(scanIds.length)
+  expect(scanIds.every((id) => /^[A-Za-z0-9._-]+$/.test(id!))).toBe(true)
+  await drain(w)
+  await req(w, "DELETE", `/v1/files/${s.id}`)
+  await complete(w, s.id).catch(() => undefined)
+  const del = w.queue.jobs.filter((j) => j.name === "file.delete-object")
+  expect(del).toHaveLength(1)
+  expect(del[0].opts?.jobId).toMatch(/^file\.delete-object\.[0-9a-f-]{36}-[0-9a-f-]{36}$/)
 })
 
 test("a scanner failure fails closed: the file stays pending and the scan is retried with backoff, then given up after 5 attempts", async () => {
@@ -352,8 +442,8 @@ test("a scanner failure fails closed: the file stays pending and the scan is ret
   const s = await stage(w, "hello")
   await complete(w, s.id)
   for (let attempt = 1; attempt <= 5; attempt++) {
-    const jobs = w.queue.jobs.splice(0)
-    expect(jobs.map((j) => j.name)).toEqual(["file.scan"])
+    const jobs = w.queue.jobs.splice(0).filter((j) => j.name === "file.scan")
+    expect(jobs).toHaveLength(1)
     expect(jobs[0].data).toMatchObject({ fileId: s.id, tenantId: w.tenant.id, ...(attempt > 1 ? { attempt } : {}) })
     if (attempt > 1) expect(jobs[0].opts?.delayMs).toBeGreaterThan(0)
     expect(jobs[0].opts?.jobId).toMatch(/^[A-Za-z0-9._-]+$/)

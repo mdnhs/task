@@ -9,8 +9,7 @@ import { makeMailer } from "./modules/platform-email"
 import { makeLoggingPush } from "./core/push"
 import { clamdFromEnv } from "./core/scan/clamd-scanner"
 import { unconfiguredScanner } from "./core/scan/scanner"
-import { s3FromEnv } from "./core/storage/s3-storage"
-import { unconfiguredStorage } from "./core/storage/storage"
+import { makeStorage } from "./modules/platform-storage"
 import { makeBullQueue } from "./core/queue/bull-queue"
 import { parseEnv, type Env } from "./env"
 
@@ -19,7 +18,7 @@ export function makeDeps(env: Env): Deps {
   const clock = { now: () => new Date() }
   const logger = pino({ level: "info" })
   const mailer = makeMailer({ env, db, logger })
-  return { env, db, auth: buildAuth({ env, db, clock, mailer, logger }), clock, mailer, logger, queue: makeBullQueue(env.REDIS_URL), push: makeLoggingPush(logger), storage: s3FromEnv(env) ?? unconfiguredStorage(), scanner: clamdFromEnv(env) ?? unconfiguredScanner() }
+  return { env, db, auth: buildAuth({ env, db, clock, mailer, logger }), clock, mailer, logger, queue: makeBullQueue(env.REDIS_URL), push: makeLoggingPush(logger), storage: makeStorage({ env, db }), scanner: clamdFromEnv(env) ?? unconfiguredScanner() }
 }
 
 export function start(env: Env = parseEnv(process.env)) {

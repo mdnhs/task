@@ -24,3 +24,34 @@ export function normalizeMime(input: string): AllowedMime | null {
   const m = input.trim().toLowerCase()
   return (ALLOWED_MIMES as readonly string[]).includes(m) ? (m as AllowedMime) : null
 }
+
+const EXT: Record<AllowedMime, string[]> = {
+  "image/png": ["png"],
+  "image/jpeg": ["jpg", "jpeg"],
+  "image/webp": ["webp"],
+  "image/heic": ["heic"],
+  "application/pdf": ["pdf"],
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document": ["docx"],
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": ["xlsx"],
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation": ["pptx"],
+  "text/csv": ["csv"],
+  "text/plain": ["txt"],
+}
+
+/**
+ * The stored (and downloaded) name: its extension is forced to the declared mime's canonical one, so the allow-list
+ * cannot be bypassed through the name (`invoice.exe` + application/pdf -> `invoice.pdf`, `x.html` + text/plain ->
+ * `x.txt`). A matching extension is kept as typed; a missing or purely numeric one (`v1.2`) gets the canonical one
+ * appended; trailing dots/spaces are dropped. The base is shortened so the result stays within 255 characters.
+ */
+export function canonicalName(name: string, mime: AllowedMime): string {
+  const accepted = EXT[mime]
+  const trimmed = name.replace(/[. ]+$/, "")
+  const dot = trimmed.lastIndexOf(".")
+  const ext = dot > 0 ? trimmed.slice(dot + 1) : ""
+  if (ext && accepted.includes(ext.toLowerCase())) return trimmed
+  const base = ext && /^[A-Za-z0-9]{1,10}$/.test(ext) && !/^[0-9]+$/.test(ext) ? trimmed.slice(0, dot) : trimmed
+  const suffix = `.${accepted[0]}`
+  const room = 255 - suffix.length
+  return (Array.from(base || "file").slice(0, room).join("")) + suffix
+}

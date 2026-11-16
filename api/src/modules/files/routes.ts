@@ -18,13 +18,15 @@ const IntentBody = z
     sizeBytes: z.number().int().min(1),
   })
   .openapi({ example: { name: "shift-report.pdf", mime: "application/pdf", sizeBytes: 482113 } })
-const Intent = z.object({ fileId: z.string(), upload: z.object({ url: z.string(), fields: z.record(z.string(), z.string()) }) })
+const Intent = z
+  .object({ fileId: z.string(), upload: z.object({ method: z.literal("PUT"), url: z.string(), headers: z.record(z.string(), z.string()) }) })
+  .openapi({ example: { fileId: "0b6f4c1e-8f0e-4c53-9a3e-6a4c1b2d7e90", upload: { method: "PUT", url: "https://<account_id>.r2.cloudflarestorage.com/<bucket>/u/<tenant>/<fileId>?X-Amz-...", headers: { "Content-Type": "application/pdf", "Content-Length": "482113" } } } })
 
 
 const intentRoute = createRoute({
   method: "post", path: "/v1/files/uploads", middleware: [requireTenant, requirePermission("files", "write")] as const,
   request: { body: { content: { "application/json": { schema: IntentBody } }, required: true } },
-  responses: { 201: { description: "A presigned POST (300 s) for the object t/<tenant>/<fileId>: exact Content-Type, size 1..sizeBytes. 422 mime_not_allowed or file_too_large", content: { "application/json": { schema: Intent } } } },
+  responses: { 201: { description: "A presigned PUT (300 s) to a staging key; Content-Type and Content-Length are signed, send exactly `headers`. 422 mime_not_allowed, invalid_name or file_too_large; 503 storage_not_configured", content: { "application/json": { schema: Intent } } } },
 })
 const completeRoute = createRoute({
   method: "post", path: "/v1/files/{id}/complete", middleware: [requireTenant, requirePermission("files", "write")] as const,

@@ -4,6 +4,7 @@ export {
   InMemoryAuditSink,
   sendTestEmail,
   setEmailSettings,
+  type AuditSnapshot,
   type EmailSettings,
   type EmailSettingsDeps,
   type PlatformAuditSink,

@@ -4,7 +4,7 @@ import { parseEnv } from "./env"
 const base = { DATABASE_URL: "postgres://a", DATABASE_OWNER_URL: "postgres://o", REDIS_URL: "redis://r",
   BETTER_AUTH_SECRET: "x".repeat(32), APP_URL: "http://localhost:3000", DATA_REGION: "eu-west-1" }
 
-const prodFiles = { S3_BUCKET: "b", S3_REGION: "eu-west-1", S3_ACCESS_KEY_ID: "k", S3_SECRET_ACCESS_KEY: "s", CLAMD_HOST: "clamd" }
+const prodFiles = { CLAMD_HOST: "clamd" }
 
 test("parseEnv rejects missing DATABASE_URL", () => {
   const { DATABASE_URL: _omit, ...rest } = base
@@ -72,8 +72,8 @@ test("file env: defaults, empty strings are unset, bool and number parsing", () 
   expect(() => parseEnv({ ...base, S3_FORCE_PATH_STYLE: "maybe" })).toThrow(/S3_FORCE_PATH_STYLE/)
   expect(() => parseEnv({ ...base, CLAMD_PORT: "70000" })).toThrow(/CLAMD_PORT/)
 })
-test("file env: production requires bucket, region, keys and clamd host; S3_ENDPOINT stays optional", () => {
-  expect(parseEnv({ ...prodBase, ...prodFiles })).toMatchObject({ S3_BUCKET: "b" })
+test("file env: production requires the clamd host; S3_* are optional (R2 settings live in the DB)", () => {
+  expect(parseEnv({ ...prodBase, ...prodFiles }).CLAMD_HOST).toBe("clamd")
   for (const k of Object.keys(prodFiles)) {
     expect(() => parseEnv({ ...prodBase, ...prodFiles, [k]: "" }), k).toThrow(new RegExp(k))
   }

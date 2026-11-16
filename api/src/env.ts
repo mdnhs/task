@@ -34,7 +34,8 @@ const schema = z.object({
   // Optional bootstrap mail config; the platform admin's stored settings take precedence.
   RESEND_API_KEY: optional,
   MAIL_FROM: optional,
-  // File storage (S3-compatible: AWS S3 leaves S3_ENDPOINT unset; MinIO/R2 set it and usually S3_FORCE_PATH_STYLE=true).
+  // File storage BOOTSTRAP fallback (production uses Cloudflare R2 settings stored by the platform admin; these also drive
+  // MinIO in tests). R2: S3_ENDPOINT=https://<account_id>.r2.cloudflarestorage.com, S3_REGION=auto, S3_FORCE_PATH_STYLE=true.
   S3_ENDPOINT: optional,
   S3_REGION: optional,
   S3_BUCKET: optional,
@@ -63,7 +64,8 @@ const schema = z.object({
     ctx.addIssue({ code: "custom", path: ["SECRETS_KEY"], message: "required in production (or SECRETS_KEYS)" })
   }
   if (e.NODE_ENV === "production") {
-    for (const k of ["S3_BUCKET", "S3_REGION", "S3_ACCESS_KEY_ID", "S3_SECRET_ACCESS_KEY", "CLAMD_HOST"] as const) {
+    // S3_* are only a bootstrap fallback: the platform admin configures R2 in the DB (storage fails closed with 503 otherwise)
+    for (const k of ["CLAMD_HOST"] as const) {
       if (!e[k]) ctx.addIssue({ code: "custom", path: [k], message: "required in production" })
     }
   }

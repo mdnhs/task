@@ -6,7 +6,7 @@ import { buildAuth } from "../src/modules/auth/auth"
 import { hasTestDb, testDb } from "./db"
 import { fakePush, type FakePush } from "../src/core/push/fake-push"
 import { fakeScanner } from "../src/core/scan/fake-scanner"
-import { s3FromEnv } from "../src/core/storage/s3-storage"
+import { makeStorage } from "../src/modules/platform-storage"
 import { fakeQueue, type FakeQueue } from "../src/core/queue/fake-queue"
 import { fakeClock, fakeMailer, type FakeClock, type FakeMailer } from "./fakes"
 
@@ -48,7 +48,7 @@ export function testApp(over: Partial<Deps> = {}): { app: AppType; deps: Deps; m
   const mailer = (over.mailer ?? fakeMailer()) as FakeMailer // the one actually used
   const queue = (over.queue ?? fakeQueue()) as FakeQueue
   const push = (over.push ?? fakePush()) as FakePush
-  const storage = over.storage ?? s3FromEnv(env)!
+  const storage = over.storage ?? makeStorage({ env, db })
   const scanner = over.scanner ?? fakeScanner() // auto: flags EICAR, everything else clean
   const deps: Deps = { env, db, clock: usedClock, mailer, logger, queue, push, storage, scanner, auth: over.auth ?? buildAuth({ env, db, clock: usedClock, mailer, logger }) }
   const app = createApp(deps)

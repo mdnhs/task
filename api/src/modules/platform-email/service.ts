@@ -13,7 +13,9 @@ export type EmailSettings =
 
 /** Secrets-free snapshot used in audit entries. */
 export type EmailSettingsSnapshot = { configured: boolean; keyLast4?: string; fromAddress?: string; fromName?: string }
-export type PlatformAuditEntry = { action: string; actorId: string; before: EmailSettingsSnapshot; after: EmailSettingsSnapshot; at: Date }
+/** Secrets-free snapshot of any platform settings (email, storage); never put secrets in it. */
+export type AuditSnapshot = { configured: boolean; [k: string]: unknown }
+export type PlatformAuditEntry = { action: string; actorId: string; before: AuditSnapshot; after: AuditSnapshot; at: Date }
 // TODO(B3): replace with the real platform audit table once platform staff auth exists.
 export interface PlatformAuditSink { record(entry: PlatformAuditEntry): Promise<void> }
 export class InMemoryAuditSink implements PlatformAuditSink {
