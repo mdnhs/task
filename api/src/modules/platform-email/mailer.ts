@@ -17,7 +17,7 @@ export function makeMailer({ env, db, logger }: { env: Env; db: Db; logger: Logg
   const source = {
     get: async (): Promise<MailConfig | null> => {
       // Without SECRETS_KEY (dev) stored settings can't be decrypted, so skip straight to env.
-      const stored = env.SECRETS_KEY ? await loadMailConfig(db, env) : null
+      const stored = env.SECRETS_KEY || env.SECRETS_KEYS ? await loadMailConfig(db, env) : null
       return stored ?? envConfig()
     },
   }

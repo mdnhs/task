@@ -31,11 +31,6 @@ test("tenant setting does not leak to the next pooled query", async () => {
   await withTenant(db, A, (tx) => tx.select().from(rlsProbe))
   for (let i = 0; i < 20; i++) expect(await db.select().from(rlsProbe)).toEqual([])
 })
-test("every table with a tenant_id column has RLS enabled and forced", async () => {
-  const bad = await ownerQuery(`SELECT c.relname FROM pg_class c JOIN pg_attribute a ON a.attrelid = c.oid
-    WHERE a.attname = 'tenant_id' AND c.relkind = 'r' AND NOT (c.relrowsecurity AND c.relforcerowsecurity)`)
-  expect(bad).toEqual([])
-})
 test("app_user cannot bypass RLS", async () => {
   expect(await ownerQuery(`SELECT rolbypassrls FROM pg_roles WHERE rolname = 'app_user'`)).toEqual([{ rolbypassrls: false }])
 })

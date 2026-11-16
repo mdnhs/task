@@ -1,4 +1,5 @@
 import { z } from "zod"
+import { parseKeyMap } from "./core/crypto/secret-box"
 
 // An empty string in an env file ("GOOGLE_CLIENT_ID=") means "not configured".
 const optional = z.preprocess((v) => (v === "" ? undefined : v), z.string().optional())
@@ -24,10 +25,30 @@ const schema = z.object({
   MICROSOFT_CLIENT_ID: optional,
   MICROSOFT_CLIENT_SECRET: optional,
   SECRETS_KEY: secretsKey,
+  // Optional keyring for rotation: JSON {"<kid>": "<base64 32 bytes>"}; SECRETS_KEY_ID picks the current one.
+  // When absent, SECRETS_KEY is the single key with id "k1".
+  SECRETS_KEYS: optional,
+  SECRETS_KEY_ID: optional,
   // Optional bootstrap mail config; the platform admin's stored settings take precedence.
   RESEND_API_KEY: optional,
   MAIL_FROM: optional,
-}).refine((e) => e.NODE_ENV !== "production" || e.SECRETS_KEY, { path: ["SECRETS_KEY"], message: "required in production" })
+}).superRefine((e, ctx) => {
+  if (e.SECRETS_KEYS) {
+    try {
+      const map = parseKeyMap(e.SECRETS_KEYS)
+      if (!e.SECRETS_KEY_ID || !(e.SECRETS_KEY_ID in map)) {
+        ctx.addIssue({ code: "custom", path: ["SECRETS_KEY_ID"], message: "must name a key in SECRETS_KEYS" })
+      }
+    } catch (err) {
+      ctx.addIssue({ code: "custom", path: ["SECRETS_KEYS"], message: (err as Error).message })
+    }
+  } else if (e.SECRETS_KEY_ID) {
+    ctx.addIssue({ code: "custom", path: ["SECRETS_KEY_ID"], message: "requires SECRETS_KEYS" })
+  }
+  if (e.NODE_ENV === "production" && !e.SECRETS_KEY && !e.SECRETS_KEYS) {
+    ctx.addIssue({ code: "custom", path: ["SECRETS_KEY"], message: "required in production (or SECRETS_KEYS)" })
+  }
+})
 
 export type Env = z.infer<typeof schema>
 

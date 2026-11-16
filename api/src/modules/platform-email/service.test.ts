@@ -1,7 +1,8 @@
-import { randomBytes } from "node:crypto"
+import { createCipheriv, randomBytes } from "node:crypto"
 import { beforeEach, expect, test, vi } from "vitest"
 import { ownerQuery } from "../../../test/db"
 import { resetDb, testApp } from "../../../test/harness"
+import { loadMailConfig } from "./service"
 import { getEmailSettings, InMemoryAuditSink, sendTestEmail, setEmailSettings } from "./index"
 import { testDb } from "../../../test/db"
 
@@ -26,7 +27,7 @@ test("getEmailSettings never exposes the key; shows last4", async () => {
   expect(s).toMatchObject({ configured: true, provider: "resend", fromAddress: "no-reply@x.ie", fromName: "OpsDesk", keyLast4: "1234", updatedBy: "admin-1" })
   expect(JSON.stringify(s)).not.toContain(KEY)
   const [row] = await ownerQuery("select api_key_ciphertext, api_key_last4 from platform_email_settings")
-  expect(row.api_key_ciphertext).toMatch(/^v1:/)
+  expect(row.api_key_ciphertext).toMatch(/^v2:k1:/)
   expect(String(row.api_key_ciphertext)).not.toContain(KEY)
   expect(row.api_key_last4).toBe("1234")
 })
@@ -84,4 +85,25 @@ test("sendTestEmail returns sanitized error when the SDK rejects", async () => {
   expect(r.ok).toBe(false)
   expect(JSON.stringify(r)).not.toContain("re_test_key")
   expect(await sendTestEmail(deps, "bad")).toMatchObject({ ok: false })
+})
+
+test("getEmailSettings path lazily re-seals a v1 ciphertext to v2 on first load, without audit or updated_at change", async () => {
+  const { db, deps, audit } = ctx()
+  await setEmailSettings(db, deps, input, "u")
+  // Rewrite the row as a legacy v1 value (no AAD, single key).
+  const key = Buffer.from(b64, "base64")
+  const iv = randomBytes(12)
+  const c = createCipheriv("aes-256-gcm", key, iv, { authTagLength: 16 })
+  const ct = Buffer.concat([c.update(KEY, "utf8"), c.final()])
+  const v1 = ["v1", iv.toString("base64"), c.getAuthTag().toString("base64"), ct.toString("base64")].join(":")
+  await ownerQuery("update platform_email_settings set api_key_ciphertext = $1", [v1])
+  const [b4] = await ownerQuery("select updated_at from platform_email_settings")
+  const auditBefore = audit.entries.length
+
+  expect((await loadMailConfig(db, deps.env))?.apiKey).toBe(KEY)
+  const [row] = await ownerQuery("select api_key_ciphertext, updated_at from platform_email_settings")
+  expect(row.api_key_ciphertext).toMatch(/^v2:k1:/)
+  expect(row.updated_at).toEqual(b4.updated_at)
+  expect(audit.entries.length).toBe(auditBefore)
+  expect((await loadMailConfig(db, deps.env))?.apiKey).toBe(KEY)
 })

@@ -26,6 +26,8 @@ export async function mapAuthError(res: Response, requestId: string): Promise<Re
  * password. A session that has NOT passed MFA, belonging to a user who has 2FA, must not reach them, otherwise
  * password-only access could disable/replace the victim's 2FA. verify-totp, verify-backup-code, sign-out,
  * get-session and send-verification-email stay open.
+ * Maintenance: when upgrading better-auth, re-list its routes and add any new endpoint that changes credentials, the
+ * second factor, linked accounts or email; the list is an allow-nothing-new deny-list, so a missed path is open.
  */
 export const MFA_PROTECTED_AUTH_PATHS: readonly string[] = [
   "/two-factor/disable",

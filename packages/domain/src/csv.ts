@@ -5,8 +5,8 @@
 /** Quotes a cell when it needs it. */
 export const csvEscape = (v: string) => (/[",\n\r]/.test(v) || /^\s|\s$/.test(v) ? `"${v.replace(/"/g, '""')}"` : v)
 
-/** Spreadsheet formula injection: a text cell starting with = + - @ is prefixed with a quote. */
-export const csvSafe = (v: string) => (/^[=+\-@]/.test(v) ? `'${v}` : v)
+/** Spreadsheet formula injection: a text cell starting with = + - @ (or a tab / carriage return, which spreadsheets also read as a formula lead) is prefixed with a quote. */
+export const csvSafe = (v: string) => (/^[=+\-@\t\r]/.test(v) ? `'${v}` : v)
 
 /** One text cell, safe and escaped. */
 export const csvCell = (v: string) => csvEscape(csvSafe(v))

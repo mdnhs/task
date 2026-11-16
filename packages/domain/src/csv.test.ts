@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import { csvCell, toCsv } from "./csv"
+import { csvCell, csvSafe, toCsv } from "./csv"
 
 describe("toCsv", () => {
   const columns = [{ key: "name", label: "Name" }, { key: "mrr", label: "MRR" }]
@@ -24,5 +24,13 @@ describe("toCsv", () => {
     expect(csvCell("-12")).toBe("'-12")
     // Numbers are data, not formulas: a negative number stays as it is.
     expect(toCsv([{ name: "x", mrr: -12 }], columns).split("\r\n")[1]).toBe("x,-12")
+  })
+})
+
+describe("csvSafe", () => {
+  it("prefixes cells starting with tab or carriage return", () => {
+    expect(csvSafe("\t=1")).toBe("'\t=1")
+    expect(csvSafe("\r=1")).toBe("'\r=1")
+    expect(csvSafe("plain")).toBe("plain")
   })
 })

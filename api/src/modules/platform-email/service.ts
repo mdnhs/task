@@ -1,12 +1,11 @@
-import { eq } from "drizzle-orm"
+import { and, eq } from "drizzle-orm"
 import { z } from "zod"
 import { sanitizeMailError } from "../../core/mail/sanitize"
-import { open, seal } from "../../core/crypto/secret-box"
+import { buildKeyring, isCurrent, open, seal, type Keyring, type KeyringEnv } from "../../core/crypto/secret-box"
 import { AppError } from "../../core/errors"
 import type { Db } from "../../db/client"
 import { platformEmailSettings as t } from "../../db/schema"
 import type { Deps } from "../../deps"
-import type { Env } from "../../env"
 
 export type EmailSettings =
   | { configured: false }
@@ -24,9 +23,11 @@ export class InMemoryAuditSink implements PlatformAuditSink {
 
 export type EmailSettingsDeps = Pick<Deps, "env" | "clock" | "mailer"> & { audit: PlatformAuditSink }
 
-export function secretsKey(env: Pick<Env, "SECRETS_KEY">): Buffer {
-  if (!env.SECRETS_KEY) throw new Error("SECRETS_KEY is not set")
-  return Buffer.from(env.SECRETS_KEY, "base64")
+/** AAD binding the stored Resend key to its column; a ciphertext copied elsewhere will not open. */
+export const EMAIL_KEY_AAD = "platform.email.api_key"
+
+export function secretsKeyring(env: KeyringEnv): Keyring {
+  return buildKeyring(env)
 }
 
 const snapshot = (s: EmailSettings): EmailSettingsSnapshot =>
@@ -60,11 +61,11 @@ export async function setEmailSettings(
   const before = await getEmailSettings(db)
   if (!before.configured && !apiKey) throw bad("api_key_required", "API key required")
 
-  const key = secretsKey(deps.env)
+  const ring = secretsKeyring(deps.env)
   const now = deps.clock.now()
   const values = { fromAddress, fromName, updatedBy: actorId, updatedAt: now }
   if (apiKey) {
-    const keyValues = { ...values, apiKeyCiphertext: seal(apiKey, key), apiKeyLast4: apiKey.slice(-4) }
+    const keyValues = { ...values, apiKeyCiphertext: seal(apiKey, ring, EMAIL_KEY_AAD), apiKeyLast4: apiKey.slice(-4) }
     await db.insert(t).values({ id: 1, ...keyValues }).onConflictDoUpdate({ target: t.id, set: keyValues })
   } else {
     await db.update(t).set(values).where(eq(t.id, 1))
@@ -76,10 +77,17 @@ export async function setEmailSettings(
 }
 
 /** Decrypts the stored key. Only the mailer config source calls this. */
-export async function loadMailConfig(db: Db, env: Pick<Env, "SECRETS_KEY">): Promise<{ apiKey: string; from: string } | null> {
+export async function loadMailConfig(db: Db, env: KeyringEnv): Promise<{ apiKey: string; from: string } | null> {
   const [r] = await db.select().from(t).where(eq(t.id, 1))
   if (!r) return null
-  return { apiKey: open(r.apiKeyCiphertext, secretsKey(env)), from: `${r.fromName} <${r.fromAddress}>` }
+  const ring = secretsKeyring(env)
+  const apiKey = open(r.apiKeyCiphertext, ring, EMAIL_KEY_AAD)
+  if (!isCurrent(r.apiKeyCiphertext, ring)) {
+    // Lazy migration (v1 -> v2, or an old key id -> the current one): one compare-and-set UPDATE, deliberately not audited
+    // and not touching updated_at/updated_by, since nothing the admin configured has changed.
+    await db.update(t).set({ apiKeyCiphertext: seal(apiKey, ring, EMAIL_KEY_AAD) }).where(and(eq(t.id, 1), eq(t.apiKeyCiphertext, r.apiKeyCiphertext)))
+  }
+  return { apiKey, from: `${r.fromName} <${r.fromAddress}>` }
 }
 
 export async function sendTestEmail(deps: Pick<Deps, "mailer">, to: string): Promise<{ ok: true } | { ok: false; error: string }> {
