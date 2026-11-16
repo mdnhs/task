@@ -1,4 +1,6 @@
+import { eq } from "drizzle-orm"
 import { betterAuth } from "better-auth"
+import { APIError, createAuthMiddleware, getSessionFromCtx } from "better-auth/api"
 import { drizzleAdapter } from "better-auth/adapters/drizzle"
 import { twoFactor } from "better-auth/plugins/two-factor"
 import type { Db } from "../../db/client"
@@ -60,7 +62,11 @@ export function buildAuth({ env, db, clock, mailer, logger }: AuthDeps, opts: Au
     session: {
       expiresIn: 30 * DAY,
       updateAge: DAY,
-      additionalFields: { lastSeenAt: { type: "date", required: false, input: false } },
+      additionalFields: {
+        lastSeenAt: { type: "date", required: false, input: false },
+        // Never client-writable; only the hook below sets it, after a verified second factor.
+        mfaPassed: { type: "boolean", required: false, input: false, defaultValue: false },
+      },
     },
     advanced: {
       // Explicit: Better Auth otherwise skips origin/CSRF checks when NODE_ENV=test, hiding bugs from tests.
@@ -68,6 +74,18 @@ export function buildAuth({ env, db, clock, mailer, logger }: AuthDeps, opts: Au
       disableCSRFCheck: false,
       useSecureCookies: env.NODE_ENV === "production",
       defaultCookieAttributes: { httpOnly: true, sameSite: "lax" },
+    },
+    hooks: {
+      // R14: a session is MFA-passed only if it completed a TOTP or backup-code verification through Better Auth.
+      // Sign-in with a second factor creates the session inside verify-*, and a pre-existing session (enrolment,
+      // step-up after another device enrolled) is the one the request carries. OAuth callbacks and plain sign-ins
+      // never reach here, so their sessions stay false. Disabling 2FA touches nothing.
+      after: createAuthMiddleware(async (ctx) => {
+        if (ctx.path !== "/two-factor/verify-totp" && ctx.path !== "/two-factor/verify-backup-code") return
+        if (ctx.context.returned instanceof APIError || ctx.context.returned instanceof Error) return // failed attempt
+        const sessionId = ctx.context.newSession?.session.id ?? (await getSessionFromCtx(ctx))?.session.id
+        if (sessionId) await db.update(schema.session).set({ mfaPassed: true }).where(eq(schema.session.id, sessionId))
+      }),
     },
     databaseHooks: {
       session: {

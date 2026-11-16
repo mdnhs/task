@@ -54,3 +54,12 @@ export function call(
   }
   return Promise.resolve(app.request(path, { method, headers, body }))
 }
+
+/** GET routes from the OpenAPI document that have no path params, minus /v1/me* and the spec itself (R6). */
+export function tenantGetRoutes(app: AppType): string[] {
+  const doc = app.getOpenAPI31Document({ openapi: "3.1.0", info: { title: "t", version: "1" } })
+  return Object.entries(doc.paths ?? {})
+    .filter(([path, item]) => "get" in (item ?? {}) && !path.includes("{") && !path.startsWith("/v1/me") && path !== "/v1/openapi.json")
+    .map(([path]) => path)
+    .sort()
+}

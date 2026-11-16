@@ -5,6 +5,7 @@ import { newRouter } from "./core/router"
 import { AppError, problem, statusCode, statusTitle } from "./core/errors"
 import { requestId } from "./core/middleware/request-id"
 import { auditRoutes } from "./modules/audit"
+import { mfaRoutes } from "./modules/mfa"
 import { rbacRoutes } from "./modules/rbac"
 import { authRoutes } from "./modules/auth/routes"
 import { inviteRoutes } from "./modules/invites"
@@ -46,6 +47,7 @@ export function createApp(deps: Deps) {
   app.route("/", tenantRoutes)
   app.route("/", inviteRoutes)
   app.route("/", rbacRoutes)
+  app.route("/", mfaRoutes)
   app.route("/", auditRoutes)
 
   app.doc31("/v1/openapi.json", { openapi: "3.1.0", info: { title: "OpsDesk API", version: "1" } })

@@ -26,6 +26,8 @@ export const session = pgTable(
     userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
     // Idle-timeout clock (NFR-04). Set from deps.clock, not the DB clock; see modules/auth/auth.ts.
     lastSeenAt: ts("last_seen_at").notNull().defaultNow(),
+    // True only once THIS session completed a TOTP/backup-code verification (set by the auth.ts hook).
+    mfaPassed: boolean("mfa_passed").notNull().default(false),
     createdAt: ts("created_at").notNull().defaultNow(),
     updatedAt: ts("updated_at").notNull().defaultNow(),
   },

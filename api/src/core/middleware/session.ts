@@ -43,10 +43,10 @@ export async function establishSession(c: Context<AppEnv>, idle: IdleHours) {
     id: found.session.id,
     userId: found.user.id,
     lastSeenAt: found.now,
-    // Fail closed until T1.5 records the per-session second-factor flag. Nothing reads this yet.
-    mfaPassed: false,
+    // Per-session flag set by the auth.ts hook after a TOTP/backup-code verification (R14); fail closed.
+    mfaPassed: found.session.mfaPassed === true,
   })
-  c.set("user", { id: found.user.id, email: found.user.email })
+  c.set("user", { id: found.user.id, email: found.user.email, twoFactorEnabled: found.user.twoFactorEnabled === true })
 }
 
 // Idempotent: requireTenant already authenticated (with the strictest hours across memberships, R23), so it is not re-run (or re-stamped).

@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm"
 import { boolean, index, integer, jsonb, pgPolicy, pgTable, primaryKey, text, timestamp, unique, uuid } from "drizzle-orm/pg-core"
+import type { MfaPolicy } from "@opsdesk/domain/mfa"
 import { user } from "./auth"
 
 // No tenant_id column, so no RLS: looked up by slug before a tenant context exists.
@@ -13,6 +14,8 @@ export const tenants = pgTable("tenants", {
   locale: text("locale").notNull().default("en-IE"),
   sessionIdleHours: integer("session_idle_hours").notNull().default(12),
   status: text("status").notNull().default("active"),
+  // Role KEYS when mode is "roles" (see @opsdesk/domain/mfa). FR-M0-04.
+  mfaPolicy: jsonb("mfa_policy").$type<MfaPolicy>().notNull().default({ mode: "off", roles: [] }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 })
 

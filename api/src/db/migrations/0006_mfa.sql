@@ -1,0 +1,2 @@
+ALTER TABLE "tenants" ADD COLUMN "mfa_policy" jsonb DEFAULT '{"mode":"off","roles":[]}'::jsonb NOT NULL;--> statement-breakpoint
+ALTER TABLE "session" ADD COLUMN "mfa_passed" boolean DEFAULT false NOT NULL;

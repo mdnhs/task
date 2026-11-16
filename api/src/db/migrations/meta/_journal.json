@@ -43,6 +43,13 @@
       "when": 1794845797352,
       "tag": "0005_tenancy",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1794847945049,
+      "tag": "0006_mfa",
+      "breakpoints": true
     }
   ]
 }

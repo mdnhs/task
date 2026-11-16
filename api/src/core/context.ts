@@ -1,4 +1,5 @@
 import type { Role } from "@opsdesk/domain/permissions"
+import type { MfaPolicy } from "@opsdesk/domain/mfa"
 import type { Deps } from "../deps"
 
 /** The caller's role in the current tenant, loaded once per request by requirePermission. */
@@ -10,8 +11,8 @@ export type AppEnv = {
     deps: Deps
     requestId: string
     session?: { id: string; userId: string; lastSeenAt: Date; mfaPassed: boolean }
-    user?: { id: string; email: string }
-    tenant?: { id: string; slug: string; timezone: string; currency: string; locale: string; sessionIdleHours: number }
+    user?: { id: string; email: string; twoFactorEnabled: boolean }
+    tenant?: { id: string; slug: string; timezone: string; currency: string; locale: string; sessionIdleHours: number; mfaPolicy: MfaPolicy }
     member?: { userId: string; roleId: string; roleKey: string }
     role?: ResolvedRole
     device?: unknown
