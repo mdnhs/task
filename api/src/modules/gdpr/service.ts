@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto"
-import { and, desc, eq, inArray, sql } from "drizzle-orm"
+import { and, desc, eq, gt, inArray, or, sql } from "drizzle-orm"
 import { AppError, Conflict, NotFound } from "../../core/errors"
 import { fileKey } from "../../core/storage/storage"
 import { publish } from "../../core/events"
@@ -111,6 +111,12 @@ async function assertNotLastOwner(tx: TenantTx, tenantId: string, userId: string
     .orderBy(memberships.userId)
   const owners = lockRows ? await q.for("update", { of: memberships }) : await q
   if (owners.some((o) => o.userId === userId) && owners.length <= 1) throw new AppError(409, "last_owner", "Conflict")
+}
+
+/** An erase must never delete a membership that began AFTER the request was made (the person re-joined). */
+async function assertNotRejoined(tx: TenantTx, tenantId: string, req: Row): Promise<void> {
+  const [m] = await tx.select({ joinedAt: memberships.joinedAt }).from(memberships).where(and(eq(memberships.tenantId, tenantId), eq(memberships.userId, req.subjectUserId)))
+  if (m && m.joinedAt.getTime() > req.createdAt.getTime()) throw new AppError(409, "subject_rejoined", "Conflict")
 }
 
 async function isMember(tx: TenantTx, tenantId: string, userId: string): Promise<boolean> {
@@ -240,6 +246,7 @@ export async function retryRequest(deps: Deps, tenantId: string, actor: Actor, i
     await lockActor(tx, tenantId, actor.userId, "settings", "write")
     const cur = await requestIn(tx, tenantId, id, true)
     if (cur.status !== "failed" || (cur.kind !== "export" && cur.kind !== "erase")) throw Conflict("request_not_failed")
+    if (cur.kind === "erase") await assertNotRejoined(tx, tenantId, cur)
     const now = deps.clock.now()
     const [row] = await tx.update(dataRequests).set({ status: "pending", errorCode: null, startedAt: null }).where(and(eq(dataRequests.id, id), eq(dataRequests.tenantId, tenantId))).returning()
     await recordAudit(tx, tenantId, { action: "dsr.retried", entity: "data_request", entityId: id, actorId: actor.userId, before: { status: "failed", errorCode: cur.errorCode }, after: { status: "pending", kind: cur.kind, subjectUserId: cur.subjectUserId } }, now)
@@ -255,21 +262,25 @@ export async function retryRequest(deps: Deps, tenantId: string, actor: Actor, i
  */
 export async function sweepRequests(_data: unknown, deps: Deps): Promise<void> {
   const now = deps.clock.now()
-  const ids = await deps.db.select({ id: tenants.id }).from(tenants).where(eq(tenants.status, "active")) // `tenants` has no RLS
+  const ids = await deps.db.select({ id: tenants.id }).from(tenants) // `tenants` has no RLS; every status: GDPR duties continue for suspended tenants
   for (const { id: tenantId } of ids) {
-    const due = await withTenant(deps.db, tenantId, (tx) =>
-      tx
-        .select({ id: dataRequests.id, kind: dataRequests.kind })
-        .from(dataRequests)
-        .where(and(
-          eq(dataRequests.tenantId, tenantId), inArray(dataRequests.kind, ["export", "erase"]),
-          sql`((${dataRequests.status} = 'pending' and ${dataRequests.createdAt} < ${new Date(now.getTime() - SWEEP_PENDING_MS).toISOString()}::timestamptz)
-            or (${dataRequests.status} = 'running' and coalesce(${dataRequests.startedAt}, ${dataRequests.createdAt}) < ${new Date(now.getTime() - SWEEP_RUNNING_MS).toISOString()}::timestamptz))`,
-        )),
-    )
-    for (const r of due) {
-      const name = r.kind === "export" ? EXPORT_JOB : ERASE_JOB
-      await deps.queue.add(name, { requestId: r.id, tenantId }, { jobId: `${name}.${r.id}-${crypto.randomUUID()}` })
+    try {
+      const due = await withTenant(deps.db, tenantId, (tx) =>
+        tx
+          .select({ id: dataRequests.id, kind: dataRequests.kind })
+          .from(dataRequests)
+          .where(and(
+            eq(dataRequests.tenantId, tenantId), inArray(dataRequests.kind, ["export", "erase"]),
+            sql`((${dataRequests.status} = 'pending' and ${dataRequests.createdAt} < ${new Date(now.getTime() - SWEEP_PENDING_MS).toISOString()}::timestamptz)
+              or (${dataRequests.status} = 'running' and coalesce(${dataRequests.startedAt}, ${dataRequests.createdAt}) < ${new Date(now.getTime() - SWEEP_RUNNING_MS).toISOString()}::timestamptz))`,
+          )),
+      )
+      for (const r of due) {
+        const name = r.kind === "export" ? EXPORT_JOB : ERASE_JOB
+        await deps.queue.add(name, { requestId: r.id, tenantId }, { jobId: `${name}.${r.id}-${crypto.randomUUID()}` })
+      }
+    } catch (err) {
+      deps.logger.error({ tenantId, errCode: safeCode(err) }, "dsr sweep failed for a tenant") // one tenant never stops the rest
     }
   }
 }
@@ -342,11 +353,16 @@ export async function runExport(data: unknown, deps: Deps): Promise<void> {
       await lockDsr(tx, job.tenantId) // serialises with erase requests: no export is written for someone being erased
       const cur = await requestIn(tx, job.tenantId, job.requestId, true)
       if (cur.status !== "running") return
+      const [mem] = await tx.select({ joinedAt: memberships.joinedAt }).from(memberships).where(and(eq(memberships.tenantId, job.tenantId), eq(memberships.userId, cur.subjectUserId)))
+      // An erase blocks while it is open, or when it finished AFTER the current membership began (a person who re-joined later may export again).
       const [erase] = await tx
         .select({ id: dataRequests.id })
         .from(dataRequests)
-        .where(and(eq(dataRequests.tenantId, job.tenantId), eq(dataRequests.subjectUserId, cur.subjectUserId), eq(dataRequests.kind, "erase"), inArray(dataRequests.status, ["pending", "running", "completed"])))
-      if (erase || !(await isMember(tx, job.tenantId, cur.subjectUserId))) throw new AppError(409, "subject_erased", "Conflict")
+        .where(and(
+          eq(dataRequests.tenantId, job.tenantId), eq(dataRequests.subjectUserId, cur.subjectUserId), eq(dataRequests.kind, "erase"),
+          or(inArray(dataRequests.status, ["pending", "running"]), and(eq(dataRequests.status, "completed"), mem ? gt(dataRequests.completedAt, mem.joinedAt) : undefined)),
+        ))
+      if (erase || !mem) throw new AppError(409, "subject_erased", "Conflict")
       const now = deps.clock.now()
       const modules: Record<string, unknown> = {}
       for (const [name, h] of dsrHandlers()) modules[name] = await h.export(tx, job.tenantId, cur.subjectUserId)
@@ -425,6 +441,7 @@ export async function runErase(data: unknown, deps: Deps): Promise<void> {
         .innerJoin(roles, eq(roles.id, memberships.roleId))
         .where(and(eq(memberships.tenantId, job.tenantId), eq(memberships.userId, subject)))
         .for("update", { of: memberships })
+      await assertNotRejoined(tx, job.tenantId, req)
       if (m && m.roleKey === "owner" && m.status === "active") await assertNotLastOwner(tx, job.tenantId, subject, true)
       const now = deps.clock.now()
       for (const [name, h] of dsrHandlers()) {

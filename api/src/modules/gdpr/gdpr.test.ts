@@ -567,10 +567,13 @@ test("[F5] new audit rows never hold a raw email: invite.created and integration
   const state = new URL(((await start.json()) as { url: string }).url).searchParams.get("state")!
   const cb = await call(w.app, "GET", `/v1/integrations/google/callback?${new URLSearchParams({ code: w.oauth.codeFor("drive@example.com"), state })}`, { cookie: w.c.owner })
   expect(cb.status).toBe(302)
-  const rows = await q(w.tenant.id, `select action, before, after from audit_events where action in ('invite.created','integration.connected') order by seq`)
-  expect(rows.map((r) => r.action)).toEqual(["invite.created", "integration.connected"])
+  const [conn] = await q(w.tenant.id, `select id from integration_connections`)
+  expect((await w.req("DELETE", `/v1/integrations/${conn.id}`, w.c.owner)).status).toBe(204)
+  const rows = await q(w.tenant.id, `select action, before, after from audit_events where action in ('invite.created','integration.connected','integration.disconnected') order by seq`)
+  expect(rows.map((r) => r.action)).toEqual(["invite.created", "integration.connected", "integration.disconnected"])
   expect(JSON.stringify(rows)).not.toContain("@")
-  for (const r of rows) expect((r.after as Json).emailHmac).toMatch(/^[0-9a-f]{64}$/)
+  for (const r of rows.slice(0, 2)) expect((r.after as Json).emailHmac).toMatch(/^[0-9a-f]{64}$/)
+  expect((rows[2].before as Json).emailHmac).toMatch(/^[0-9a-f]{64}$/)
   // same address, same tenant -> same value (so it can still be correlated); another tenant -> another value
   const again = await w.req("POST", "/v1/invites", w.c.owner, { email: "New.Hire@example.ie", roleId: await roleIdOf(w.deps, w.tenant.id, "employee") })
   expect(again.status).toBe(201)
@@ -605,4 +608,67 @@ test("[F7] erase removes the search document of a CLEAN indexed file the subject
   expect(await w.get(r.body.id)).toMatchObject({ status: "completed" })
   expect(await q(t, `select 1 from search_documents where entity_id = $1`, [fileId])).toEqual([])
   expect((await q(t, `select owner_user_id from files where id = $1`, [fileId]))[0].owner_user_id).toBeNull()
+})
+
+// ------------------------------------------------------------------ fix round 2
+
+test("[G2a] an erase that is retried or re-run after the subject re-joined is refused 409 subject_rejoined and deletes nothing", async () => {
+  const w = await world()
+  const er = await w.open("owner", w.mary.userId, "erase")
+  w.queue.jobs.length = 0
+  await q(w.tenant.id, `update data_requests set status = 'failed', error_code = 'x' where id = $1`, [er.body.id])
+  w.clock.advance({ days: 1 })
+  await q(w.tenant.id, `update memberships set joined_at = $2 where user_id = $1`, [w.mary.userId, w.deps.clock.now()]) // a NEW membership after the request
+  w.c.owner = (await signIn(w.app, w.owner.email, w.owner.password)).cookie
+  w.c.admin = (await signIn(w.app, w.admin.email, w.admin.password)).cookie
+  const retry = await w.req("POST", `/v1/data-requests/${er.body.id}/retry`, w.c.owner)
+  expect(retry.status).toBe(409)
+  expect(((await retry.json()) as Json).code).toBe("subject_rejoined")
+  await runJob("dsr.erase", { requestId: er.body.id, tenantId: w.tenant.id }, w.deps) // a stray job (sweeper) is refused too
+  expect(await w.get(er.body.id)).toMatchObject({ status: "failed", errorCode: "subject_rejoined" })
+  expect(await q(w.tenant.id, `select 1 from memberships where user_id = $1`, [w.mary.userId])).toHaveLength(1)
+  expect((await ownerQuery(`select name from "user" where id = $1`, [w.mary.userId]))[0].name).toBe("Mary Byrne")
+})
+
+test("[G2b] a re-joined member can export again after an earlier completed erase; a pending erase still blocks", async () => {
+  const w = await world()
+  const er = await w.open("owner", w.mary.userId, "erase")
+  await w.jobs()
+  expect(await w.get(er.body.id)).toMatchObject({ status: "completed" })
+  w.clock.advance({ days: 1 })
+  const [role] = await q(w.tenant.id, `select id from roles where key = 'employee'`)
+  await q(w.tenant.id, `insert into memberships (tenant_id, user_id, role_id, joined_at) values ($1, $2, $3, $4)`, [w.tenant.id, w.mary.userId, role.id, w.deps.clock.now()])
+  w.c.admin = (await signIn(w.app, w.admin.email, w.admin.password)).cookie
+  const ex = await w.open("admin", w.mary.userId, "export")
+  expect(ex.status).toBe(201)
+  await w.jobs()
+  expect(await w.get(ex.body.id)).toMatchObject({ status: "completed", errorCode: null })
+  // a pending erase for the (re-joined) subject blocks an export job
+  const id = crypto.randomUUID()
+  await q(w.tenant.id, `insert into data_requests (id, tenant_id, subject_user_id, kind, status, requested_by, reason, created_at, due_at) values ($1, $2, $3, 'export', 'pending', $4, 'r', now(), now() + interval '1 day')`, [id, w.tenant.id, w.mary.userId, w.admin.userId])
+  await q(w.tenant.id, `insert into data_requests (tenant_id, subject_user_id, kind, status, requested_by, reason, created_at, due_at) values ($1, $2, 'erase', 'pending', $3, 'r', now(), now() + interval '1 day')`, [w.tenant.id, w.mary.userId, w.admin.userId])
+  await runJob("dsr.export", { requestId: id, tenantId: w.tenant.id }, w.deps)
+  expect(await w.get(id)).toMatchObject({ status: "failed", errorCode: "subject_erased" })
+})
+
+test("[G2c] dsr.sweep covers suspended tenants and one failing tenant does not stop the others", async () => {
+  const w = await world()
+  const beta = await makeTenant(w.deps, { slug: "beta" })
+  const bo = await makeMember(w.deps, beta.id, "owner")
+  const bm = await makeMember(w.deps, beta.id, "employee")
+  const cb = (await signIn(w.app, bo.email, bo.password)).cookie
+  const r1 = await w.open("owner", w.mary.userId, "export")
+  const r2 = await call(w.app, "POST", "/v1/data-requests", { cookie: cb, tenant: "beta", body: { subjectUserId: bm.userId, kind: "export", reason: "r" } })
+  expect(r2.status).toBe(201)
+  w.queue.jobs.length = 0
+  await ownerQuery(`update tenants set status = 'suspended' where id = $1`, [w.tenant.id]) // GDPR duties continue
+  w.clock.advance({ minutes: 5 })
+  const real = w.deps.queue
+  const seen: string[] = []
+  ;(w.deps as { queue: typeof real }).queue = { ...real, add: async (n, d, o) => { const t = (d as { tenantId: string }).tenantId; seen.push(t); if (t === w.tenant.id) throw new Error("redis down"); return real.add(n, d, o) } }
+  await runJob("dsr.sweep", {}, w.deps) // must not throw
+  expect(seen.sort()).toEqual([beta.id, w.tenant.id].sort()) // the suspended tenant was visited, the failure did not stop beta
+  expect(w.queue.jobs.map((j) => (j.data as { tenantId: string }).tenantId)).toEqual([beta.id])
+  expect(logs.join("\n")).not.toContain("redis down") // code only
+  expect(r1.status).toBe(201)
 })

@@ -218,7 +218,7 @@ export async function disconnect(deps: Deps, tenantId: string, userId: string, i
     await tx.update(integrationConnections).set({ status: "revoked", tokenCiphertext: null }).where(eq(integrationConnections.id, id))
     await recordAudit(
       tx, tenantId,
-      { action: "integration.disconnected", entity: "integration", entityId: id, actorId: userId, before: { status: row.status, accountEmail: row.accountEmail, scopes: row.scopes }, after: { status: "revoked" } },
+      { action: "integration.disconnected", entity: "integration", entityId: id, actorId: userId, before: { status: row.status, emailHmac: hmacOf(deps, tenantId, row.accountEmail), scopes: row.scopes }, after: { status: "revoked" } },
       now,
     )
     await publish(tx, { tenantId, type: "integration.disconnected", payload: { integrationId: id, provider: row.provider }, actorId: userId }, now)
