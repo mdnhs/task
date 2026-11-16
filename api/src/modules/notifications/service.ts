@@ -9,7 +9,7 @@ import type { Deps } from "../../deps"
 import { isHHMM, quietWindow } from "./quiet-hours"
 import { KINDS, loadPrefs, type NotificationKind, type Prefs } from "./prefs"
 
-export type NotifyInput = { userId: string; kind: NotificationKind; title: string; body: string; link?: string }
+export type NotifyInput = { userId: string; kind: NotificationKind; title: string; body: string; link?: string; subjectUserId?: string }
 export type Enqueue = (name: string, data: unknown, opts?: { delayMs?: number; key?: string }) => void
 
 export const SEND_JOB = "notification.send"
@@ -42,7 +42,7 @@ export async function notify(tx: TenantTx, tenantId: string, input: NotifyInput,
   const now = deps.clock.now()
   const [n] = await tx
     .insert(notifications)
-    .values({ tenantId, userId: input.userId, kind: input.kind, title: input.title, body: input.body, link: input.link ?? null, inApp: ch.inApp, createdAt: now })
+    .values({ tenantId, userId: input.userId, kind: input.kind, title: input.title, body: input.body, link: input.link ?? null, subjectUserId: input.subjectUserId ?? null, inApp: ch.inApp, createdAt: now })
     .returning({ id: notifications.id })
   if (channels.length === 0) return
   const [t] = await tx.select({ tz: tenants.timezone }).from(tenants).where(eq(tenants.id, tenantId))
@@ -135,7 +135,7 @@ export async function sendNotification(data: unknown, deps: Deps): Promise<void>
         return { kind: "rehold", delayMs: Math.max(0, w.endsAt.getTime() - now.getTime()), sendAfter: w.endsAt }
       }
     }
-    const base = { kind: "send" as const, channel: row.channel, attempt: row.attempts + 1, userId: row.n.userId, title: row.n.title, body: row.n.body, link: row.n.link }
+    const base = { kind: "send" as const, channel: row.channel, attempt: row.attempts + 1, userId: row.n.userId, title: row.n.title, body: await renderBody(tx, tenantId, row.n), link: row.n.link }
     let extra: { to?: string; sealed?: string[] } = {}
     if (row.channel === "email") {
       const [u] = await tx.select({ email: user.email }).from(user).where(eq(user.id, row.n.userId))
@@ -195,8 +195,25 @@ export async function sendNotification(data: unknown, deps: Deps): Promise<void>
 
 const NotFoundN = () => NotFound("notification_not_found")
 
-const view = (n: typeof notifications.$inferSelect) => ({
-  id: n.id, kind: n.kind as NotificationKind, title: n.title, body: n.body, link: n.link, createdAt: n.createdAt.toISOString(), readAt: n.readAt?.toISOString() ?? null,
+export const SUBJECT_TOKEN = "{{subject}}"
+
+/**
+ * Renders the person a notice is about at READ time, from the current records: their name while they are a member,
+ * "Erased user" once erased, "A former member" once removed. So an erase never has to chase copies of a name.
+ */
+export async function renderBody(tx: TenantTx, tenantId: string, n: { body: string; subjectUserId: string | null }): Promise<string> {
+  if (!n.subjectUserId || !n.body.includes(SUBJECT_TOKEN)) return n.body
+  const [r] = await tx
+    .select({ name: user.name, erasedAt: user.erasedAt, member: memberships.userId })
+    .from(user)
+    .leftJoin(memberships, and(eq(memberships.userId, user.id), eq(memberships.tenantId, tenantId)))
+    .where(eq(user.id, n.subjectUserId))
+  const label = !r ? "A former member" : r.erasedAt ? "Erased user" : !r.member ? "A former member" : r.name
+  return n.body.split(SUBJECT_TOKEN).join(label)
+}
+
+const view = (n: typeof notifications.$inferSelect, body: string = n.body) => ({
+  id: n.id, kind: n.kind as NotificationKind, title: n.title, body, link: n.link, createdAt: n.createdAt.toISOString(), readAt: n.readAt?.toISOString() ?? null,
 })
 
 export async function listNotifications(tx: TenantTx, tenantId: string, userId: string, o: { unreadOnly: boolean; limit: number }) {
@@ -208,7 +225,9 @@ export async function listNotifications(tx: TenantTx, tenantId: string, userId: 
     .orderBy(desc(notifications.createdAt), desc(notifications.id))
     .limit(o.limit)
   const [{ n }] = await tx.select({ n: sql<number>`count(*)::int` }).from(notifications).where(and(mine, sql`${notifications.readAt} is null`))
-  return { items: rows.map(view), unread: n }
+  const items = []
+  for (const r of rows) items.push(view(r, await renderBody(tx, tenantId, r)))
+  return { items, unread: n }
 }
 
 /** Another user's (or tenant's) id is indistinguishable from a missing one: 404 notification_not_found. */
@@ -219,7 +238,7 @@ export async function markRead(tx: TenantTx, tenantId: string, userId: string, i
     .where(and(eq(notifications.id, id), eq(notifications.tenantId, tenantId), eq(notifications.userId, userId), eq(notifications.inApp, true)))
     .returning()
   if (!row) throw NotFoundN()
-  return view(row)
+  return view(row, await renderBody(tx, tenantId, row))
 }
 
 export async function markAllRead(tx: TenantTx, tenantId: string, userId: string, now: Date): Promise<number> {

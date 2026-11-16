@@ -8,10 +8,11 @@ import { publish, relayOnce, resetSubscribers } from "../../core/events"
 import { runJob } from "../../core/queue/queue"
 import { withTenant } from "../../db/tenant-tx"
 import { notify, registerNotifications, withTenantAfterCommit } from "../notifications"
-import { registerSearchIndexers } from "../search"
+import { indexDocument, registerSearchIndexers } from "../search"
 import { registerFiles } from "../files"
 import { verifyChain } from "../audit"
 import { registerDsrHandler, registerGdpr, scrubPayload } from "."
+import { exportFileId as exportFileIdOf } from "./service"
 import { resetDsrHandlers } from "./registry"
 
 type Json = Record<string, any> // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -444,4 +445,164 @@ test("scrubPayload replaces the email (anywhere in a string) and a whole-value n
   expect(s.changed).toBe(true)
   expect(s.value).toEqual({ email: "[erased]", note: "sent to [erased] today", name: "[erased]", team: "Mary Byrne's team", n: 3, list: ["x", "[erased]"] })
   expect(scrubPayload({ a: 1 }, "x@y.ie", "Nobody").changed).toBe(false)
+})
+
+// ------------------------------------------------------------------ fix round 1
+
+const notesOf = async (w: W, cookie: string) => JSON.stringify(((await (await w.req("GET", "/v1/notifications", cookie)).json()) as Json).items)
+
+test("[F1] erase leaves no subject name in other people's inboxes; a member.joined relayed after erase creates no named notification", async () => {
+  const w = await world()
+  await seedMary(w) // member.joined relayed: the owner got "<name> joined the team."
+  const joined = () => withTenant(w.deps.db, w.tenant.id, (tx) => publish(tx, { tenantId: w.tenant.id, type: "member.joined", payload: { userId: w.mary.userId }, actorId: w.mary.userId }, w.deps.clock.now()))
+  expect(await notesOf(w, w.c.owner)).toContain("joined the team")
+  await joined() // published but NOT relayed yet
+  const r = await w.open("owner", w.mary.userId, "erase")
+  await w.jobs()
+  expect(await w.get(r.body.id)).toMatchObject({ status: "completed" })
+  const ownerNotes = await notesOf(w, w.c.owner)
+  expect(ownerNotes).not.toContain("Mary Byrne")
+  expect(ownerNotes).toContain("joined the team") // the notice itself stays, de-identified
+  const before = (await q(w.tenant.id, `select count(*)::int n from notifications`))[0].n
+  await w.relay() // the stale event is delivered after the erase
+  expect((await q(w.tenant.id, `select count(*)::int n from notifications`))[0].n).toBe(before)
+  expect(JSON.stringify(await q(w.tenant.id, `select title, body from notifications`))).not.toMatch(/Mary Byrne|Erased user/)
+})
+
+test("[F2] retry: a request that failed after the membership was removed can be retried and finishes the identity erasure", async () => {
+  const w = await world()
+  await ownerQuery(`create function zz_boom() returns trigger language plpgsql as $$ begin raise exception 'boom'; end $$`)
+  await ownerQuery(`create trigger zz_boom before delete on session for each row execute function zz_boom()`)
+  try {
+    const r = await w.open("owner", w.mary.userId, "erase")
+    await w.jobs()
+    expect(await w.get(r.body.id)).toMatchObject({ status: "failed" })
+    expect(await q(w.tenant.id, `select 1 from memberships where user_id = $1`, [w.mary.userId])).toHaveLength(0) // step 1 already committed
+    expect((await w.open("owner", w.mary.userId, "erase")).status).toBe(404) // a new request cannot help
+    expect((await w.req("POST", `/v1/data-requests/${r.body.id}/retry`, w.c.other)).status).toBe(403)
+    await ownerQuery(`drop trigger zz_boom on session`)
+    const retry = await w.req("POST", `/v1/data-requests/${r.body.id}/retry`, w.c.owner)
+    expect(retry.status).toBe(200)
+    expect(await retry.json()).toMatchObject({ status: "pending", errorCode: null })
+    await w.jobs()
+    expect(await w.get(r.body.id)).toMatchObject({ status: "completed" })
+    expect((await ownerQuery(`select name from "user" where id = $1`, [w.mary.userId]))[0].name).toBe("Erased user")
+    expect((await w.req("POST", `/v1/data-requests/${r.body.id}/retry`, w.c.owner)).status).toBe(409) // only failed ones
+    expect((await q(w.tenant.id, `select count(*)::int n from audit_events where action = 'dsr.retried'`))[0].n).toBe(1)
+  } finally {
+    await ownerQuery(`drop trigger if exists zz_boom on session`)
+    await ownerQuery(`drop function if exists zz_boom()`)
+  }
+})
+
+test("[F2] dsr.sweep re-enqueues pending requests older than 2 min and stale running ones older than 30 min, nothing else", async () => {
+  const w = await world()
+  const r = await w.open("owner", w.mary.userId, "erase")
+  w.queue.jobs.length = 0 // the post-commit enqueue was lost
+  await runJob("dsr.sweep", {}, w.deps)
+  expect(w.queue.jobs).toEqual([]) // too young
+  w.clock.advance({ minutes: 3 })
+  await runJob("dsr.sweep", {}, w.deps)
+  expect(w.queue.jobs.map((j) => j.name)).toEqual(["dsr.erase"])
+  await w.jobs()
+  expect(await w.get(r.body.id)).toMatchObject({ status: "completed" })
+  await runJob("dsr.sweep", {}, w.deps)
+  expect(w.queue.jobs).toEqual([]) // finished: nothing to do
+
+  const e = await w.open("admin", w.other.userId, "export")
+  w.queue.jobs.length = 0
+  await q(w.tenant.id, `update data_requests set status = 'running', started_at = $2 where id = $1`, [e.body.id, w.deps.clock.now()])
+  w.clock.advance({ minutes: 20 })
+  await runJob("dsr.sweep", {}, w.deps)
+  expect(w.queue.jobs).toEqual([]) // running 20 min: still considered live
+  w.clock.advance({ minutes: 15 })
+  await runJob("dsr.sweep", {}, w.deps)
+  expect(w.queue.jobs.map((j) => j.name)).toEqual(["dsr.export"])
+  await w.jobs()
+  expect(await w.get(e.body.id)).toMatchObject({ status: "completed" })
+})
+
+test("[F3] opening an erase cancels open exports of the same subject; an export job for an erased subject fails with subject_erased and writes no file", async () => {
+  const w = await world()
+  const ex = await w.open("admin", w.mary.userId, "export")
+  const er = await w.open("owner", w.mary.userId, "erase")
+  expect(er.status).toBe(201)
+  expect(await w.get(ex.body.id)).toMatchObject({ status: "rejected", errorCode: "superseded_by_erase" })
+  expect((await q(w.tenant.id, `select count(*)::int n from audit_events where action = 'dsr.rejected'`))[0].n).toBe(1)
+  await w.jobs() // the cancelled export job is a no-op, the erase completes
+  expect(await q(w.tenant.id, `select 1 from files where purpose = 'dsr_export'`)).toEqual([])
+
+  // an export that slipped in anyway (request row inserted behind the API) for the erased subject
+  const id = crypto.randomUUID()
+  await q(w.tenant.id, `insert into data_requests (id, tenant_id, subject_user_id, kind, status, requested_by, reason, created_at, due_at) values ($1, $2, $3, 'export', 'pending', $4, 'r', now(), now() + interval '1 day')`, [id, w.tenant.id, w.mary.userId, w.admin.userId])
+  await runJob("dsr.export", { requestId: id, tenantId: w.tenant.id }, w.deps)
+  expect(await w.get(id)).toMatchObject({ status: "failed", errorCode: "subject_erased", resultFileId: null })
+  expect(await q(w.tenant.id, `select 1 from files where purpose = 'dsr_export'`)).toEqual([])
+  expect(await w.deps.storage.head(`t/${w.tenant.id}/${exportFileIdOf(id)}`)).toBeNull()
+})
+
+test("[F4] a real address that starts with erased+ is still erased (detection uses user.erased_at, not the email shape)", async () => {
+  const w = await world()
+  await ownerQuery(`update "user" set email = $1 where id = $2`, ["erased+real@gmail.test", w.mary.userId])
+  await seedMary(w)
+  expect((await q(w.tenant.id, `select count(*)::int n from invites where email = 'erased+real@gmail.test'`))[0].n).toBe(0) // seedMary used the old email
+  const [role] = await q(w.tenant.id, `select id from roles where key = 'employee'`)
+  await q(w.tenant.id, `insert into invites (tenant_id, email, role_id, token_hash, invited_by, created_at, expires_at) values ($1, 'erased+real@gmail.test', $2, 'h2', $3, now(), now() + interval '1 day')`, [w.tenant.id, role.id, w.owner.userId])
+  await withTenant(w.deps.db, w.tenant.id, (tx) => publish(tx, { tenantId: w.tenant.id, type: "invite.created", payload: { email: "erased+real@gmail.test" }, actorId: w.owner.userId }, w.deps.clock.now()))
+  const r = await w.open("owner", w.mary.userId, "erase")
+  await w.jobs()
+  expect(await w.get(r.body.id)).toMatchObject({ status: "completed" })
+  const [u] = (await ownerQuery(`select name, email, erased_at from "user" where id = $1`, [w.mary.userId])) as Json[]
+  expect(u.name).toBe("Erased user")
+  expect(u.email).toMatch(/^erased\+[0-9a-f-]{36}@invalid$/)
+  expect(u.erased_at).toBeTruthy()
+  expect((await q(w.tenant.id, `select count(*)::int n from invites where email = 'erased+real@gmail.test'`))[0].n).toBe(0)
+  expect(JSON.stringify(await q(w.tenant.id, `select payload from domain_events`))).not.toContain("erased+real@gmail.test")
+})
+
+test("[F5] new audit rows never hold a raw email: invite.created and integration.connected carry an HMAC", async () => {
+  const w = await world()
+  expect((await w.req("POST", "/v1/invites", w.c.owner, { email: "new.hire@example.ie", roleId: await roleIdOf(w.deps, w.tenant.id, "employee") })).status).toBe(201)
+  const start = await w.req("POST", "/v1/integrations/google/start", w.c.owner)
+  const state = new URL(((await start.json()) as { url: string }).url).searchParams.get("state")!
+  const cb = await call(w.app, "GET", `/v1/integrations/google/callback?${new URLSearchParams({ code: w.oauth.codeFor("drive@example.com"), state })}`, { cookie: w.c.owner })
+  expect(cb.status).toBe(302)
+  const rows = await q(w.tenant.id, `select action, before, after from audit_events where action in ('invite.created','integration.connected') order by seq`)
+  expect(rows.map((r) => r.action)).toEqual(["invite.created", "integration.connected"])
+  expect(JSON.stringify(rows)).not.toContain("@")
+  for (const r of rows) expect((r.after as Json).emailHmac).toMatch(/^[0-9a-f]{64}$/)
+  // same address, same tenant -> same value (so it can still be correlated); another tenant -> another value
+  const again = await w.req("POST", "/v1/invites", w.c.owner, { email: "New.Hire@example.ie", roleId: await roleIdOf(w.deps, w.tenant.id, "employee") })
+  expect(again.status).toBe(201)
+  const h = (await q(w.tenant.id, `select after->>'emailHmac' h from audit_events where action = 'invite.created' order by seq`)).map((r) => r.h)
+  expect(h[0]).toBe(h[1])
+})
+
+test("[F6] a failing export leaves no object behind in storage", async () => {
+  const w = await world()
+  const real = w.deps.storage
+  // put succeeds, then the post-put verification fails -> the tx rolls back after the object was written
+  ;(w.deps as { storage: typeof real }).storage = { ...real, head: async (k: string) => (k.startsWith(`t/${w.tenant.id}/`) ? null : real.head(k)) }
+  const id = ((await (await w.req("POST", "/v1/me/data-export", w.c.mary)).json()) as Json).id
+  const puts: string[] = []
+  const inner = w.deps.storage.put
+  ;(w.deps.storage as { put: typeof inner }).put = async (k, b, o) => (puts.push(k), inner(k, b, o))
+  await w.jobs()
+  expect(await w.get(id)).toMatchObject({ status: "failed", resultFileId: null })
+  expect(puts).toHaveLength(1) // it really wrote
+  expect(await real.head(puts[0])).toBeNull() // and cleaned up
+})
+
+test("[F7] erase removes the search document of a CLEAN indexed file the subject owns", async () => {
+  const w = await world()
+  const t = w.tenant.id
+  const fileId = crypto.randomUUID()
+  await q(t, `insert into files (id, tenant_id, owner_user_id, key, name, mime, size_bytes, status, created_at) values ($1::uuid, $2::uuid, $3, 't/' || $2::text || '/' || $1::text, 'Mary payslip.pdf', 'application/pdf', 10, 'clean', now())`, [fileId, t, w.mary.userId])
+  await withTenant(w.deps.db, t, (tx) => indexDocument(tx, { tenantId: t, entity: "file", entityId: fileId, module: "files", title: "Mary payslip.pdf", body: "" }, w.deps.clock.now()))
+  expect(await q(t, `select 1 from search_documents where entity_id = $1`, [fileId])).toHaveLength(1)
+  const r = await w.open("owner", w.mary.userId, "erase")
+  await w.jobs()
+  expect(await w.get(r.body.id)).toMatchObject({ status: "completed" })
+  expect(await q(t, `select 1 from search_documents where entity_id = $1`, [fileId])).toEqual([])
+  expect((await q(t, `select owner_user_id from files where id = $1`, [fileId]))[0].owner_user_id).toBeNull()
 })

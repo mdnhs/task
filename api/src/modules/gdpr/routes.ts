@@ -4,7 +4,7 @@ import { requireTenant } from "../../core/middleware/tenant"
 import { newRouter } from "../../core/router"
 import { withTenant } from "../../db/tenant-tx"
 import { DSR_KINDS, DSR_STATUSES } from "../../db/schema"
-import { completeCorrection, createRequest, getRequest, listRequests, MAX_LIST, rejectRequest } from "./service"
+import { completeCorrection, createRequest, getRequest, listRequests, MAX_LIST, rejectRequest, retryRequest } from "./service"
 
 const Id = z.uuid()
 const Kind = z.enum(DSR_KINDS)
@@ -55,6 +55,11 @@ const rejectRoute = createRoute({
   request: { params: z.object({ id: Id }), body: { content: { "application/json": { schema: RejectBody } }, required: true } },
   responses: { 200: { description: "A pending or failed request turned down; the reason is stored in notes. 409 request_closed", content: { "application/json": { schema: RequestDto } } } },
 })
+const retryRouteDef = createRoute({
+  method: "post", path: "/v1/data-requests/{id}/retry", middleware: [requireTenant, requirePermission("settings", "write")] as const,
+  request: { params: z.object({ id: Id }) },
+  responses: { 200: { description: "A failed export/erase put back to pending and queued again (audited dsr.retried). 409 request_not_failed", content: { "application/json": { schema: RequestDto } } } },
+})
 const meCreateRoute = createRoute({
   method: "post", path: "/v1/me/data-export", middleware: [requireTenant] as const,
   responses: { 201: { description: "Self-service: opens an export request for the caller (any active member). The requester downloads the finished file from /v1/files/{resultFileId}/download. 409 request_open", content: { "application/json": { schema: RequestDto } } } },
@@ -87,6 +92,10 @@ export const gdprRoutes = newRouter()
   .openapi(rejectRoute, async (c) => {
     const t = c.get("tenant")!
     return c.json(await rejectRequest(c.get("deps"), t.id, { userId: c.get("member")!.userId }, c.req.valid("param").id, c.req.valid("json").notes), 200)
+  })
+  .openapi(retryRouteDef, async (c) => {
+    const t = c.get("tenant")!
+    return c.json(await retryRequest(c.get("deps"), t.id, { userId: c.get("member")!.userId }, c.req.valid("param").id), 200)
   })
   .openapi(meCreateRoute, async (c) => {
     const t = c.get("tenant")!

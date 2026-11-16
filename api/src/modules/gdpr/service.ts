@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto"
 import { and, desc, eq, inArray, sql } from "drizzle-orm"
 import { AppError, Conflict, NotFound } from "../../core/errors"
+import { fileKey } from "../../core/storage/storage"
 import { publish } from "../../core/events"
 import { dataRequests, files, memberships, roles, session, account, twoFactor, user, verification, tenants, type DsrKind, type DsrStatus } from "../../db/schema"
 import { withTenant, withUser, type TenantTx } from "../../db/tenant-tx"
@@ -15,6 +16,11 @@ import { dsrHandlers } from "./registry"
 export const EXPORT_JOB = "dsr.export"
 export const ERASE_JOB = "dsr.erase"
 export const EXPIRE_JOB = "dsr.export-expire"
+export const SWEEP_JOB = "dsr.sweep"
+/** The sweeper re-enqueues `pending` requests older than this (their post-commit enqueue was probably lost)... */
+export const SWEEP_PENDING_MS = 2 * 60 * 1000
+/** ...and `running` ones older than this (a crashed worker). */
+export const SWEEP_RUNNING_MS = 30 * 60 * 1000
 /** GDPR answers within one month; we use 30 calendar days in the tenant's timezone. */
 export const DUE_DAYS = 30
 /** A generated export file is deleted this long after it was produced. */
@@ -152,6 +158,15 @@ export async function createRequest(
       .returning()
     await recordAudit(tx, tenantId, { action: "dsr.requested", entity: "data_request", entityId: row.id, actorId: actor.userId, before: null, after: { kind: row.kind, subjectUserId: row.subjectUserId, status: "pending", dueAt: row.dueAt } }, now)
     await publish(tx, { tenantId, type: "dsr.requested", payload: { requestId: row.id, kind: row.kind, subjectUserId: row.subjectUserId }, actorId: actor.userId }, now)
+    if (row.kind === "erase") {
+      // An export of someone about to be erased is pointless and would write their data to a file: cancel the open ones.
+      const cancelled = await tx
+        .update(dataRequests)
+        .set({ status: "rejected", errorCode: "superseded_by_erase", completedAt: now })
+        .where(and(eq(dataRequests.tenantId, tenantId), eq(dataRequests.subjectUserId, input.subjectUserId), eq(dataRequests.kind, "export"), inArray(dataRequests.status, ["pending", "running"])))
+        .returning({ id: dataRequests.id })
+      for (const c of cancelled) await recordAudit(tx, tenantId, { action: "dsr.rejected", entity: "data_request", entityId: c.id, actorId: actor.userId, before: { status: "pending" }, after: { status: "rejected", kind: "export", subjectUserId: input.subjectUserId, errorCode: "superseded_by_erase" } }, now)
+    }
     if (row.kind === "export") enqueue(EXPORT_JOB, { requestId: row.id, tenantId }, { key: row.id })
     if (row.kind === "erase") enqueue(ERASE_JOB, { requestId: row.id, tenantId }, { key: row.id })
     return dto(row, now)
@@ -212,6 +227,51 @@ export async function rejectRequest(deps: Deps, tenantId: string, actor: Actor, 
     if (cur.requestedBy !== actor.userId) await tellRequester(tx, deps, enqueue, cur, "Data request rejected", "A data request was rejected.")
     return dto(row, now)
   })
+}
+
+/**
+ * Puts a `failed` request back to `pending` and enqueues its job again (fresh job id, so BullMQ does not drop it as a
+ * duplicate). Needed because erase step 1 may already have removed the membership: a new request would 404, the same
+ * request must be finishable. Steps are idempotent. Audited as `dsr.retried`.
+ */
+export async function retryRequest(deps: Deps, tenantId: string, actor: Actor, id: string): Promise<DataRequestDto> {
+  return withTenantAfterCommit(deps, tenantId, async (tx, enqueue) => {
+    await lockDsr(tx, tenantId)
+    await lockActor(tx, tenantId, actor.userId, "settings", "write")
+    const cur = await requestIn(tx, tenantId, id, true)
+    if (cur.status !== "failed" || (cur.kind !== "export" && cur.kind !== "erase")) throw Conflict("request_not_failed")
+    const now = deps.clock.now()
+    const [row] = await tx.update(dataRequests).set({ status: "pending", errorCode: null, startedAt: null }).where(and(eq(dataRequests.id, id), eq(dataRequests.tenantId, tenantId))).returning()
+    await recordAudit(tx, tenantId, { action: "dsr.retried", entity: "data_request", entityId: id, actorId: actor.userId, before: { status: "failed", errorCode: cur.errorCode }, after: { status: "pending", kind: cur.kind, subjectUserId: cur.subjectUserId } }, now)
+    enqueue(cur.kind === "export" ? EXPORT_JOB : ERASE_JOB, { requestId: id, tenantId }, { key: `${id}-${crypto.randomUUID()}` })
+    return dto(row, now)
+  })
+}
+
+/**
+ * Job `dsr.sweep` (every 5 min in the worker). Re-enqueues export/erase requests that no worker is on: `pending` older
+ * than 2 min (enqueue lost) and `running` older than 30 min (crashed worker). A duplicate job is harmless: `claim` lets
+ * only one run and finished requests are a no-op.
+ */
+export async function sweepRequests(_data: unknown, deps: Deps): Promise<void> {
+  const now = deps.clock.now()
+  const ids = await deps.db.select({ id: tenants.id }).from(tenants).where(eq(tenants.status, "active")) // `tenants` has no RLS
+  for (const { id: tenantId } of ids) {
+    const due = await withTenant(deps.db, tenantId, (tx) =>
+      tx
+        .select({ id: dataRequests.id, kind: dataRequests.kind })
+        .from(dataRequests)
+        .where(and(
+          eq(dataRequests.tenantId, tenantId), inArray(dataRequests.kind, ["export", "erase"]),
+          sql`((${dataRequests.status} = 'pending' and ${dataRequests.createdAt} < ${new Date(now.getTime() - SWEEP_PENDING_MS).toISOString()}::timestamptz)
+            or (${dataRequests.status} = 'running' and coalesce(${dataRequests.startedAt}, ${dataRequests.createdAt}) < ${new Date(now.getTime() - SWEEP_RUNNING_MS).toISOString()}::timestamptz))`,
+        )),
+    )
+    for (const r of due) {
+      const name = r.kind === "export" ? EXPORT_JOB : ERASE_JOB
+      await deps.queue.add(name, { requestId: r.id, tenantId }, { jobId: `${name}.${r.id}-${crypto.randomUUID()}` })
+    }
+  }
 }
 
 // ---------------------------------------------------------------- jobs
@@ -279,8 +339,14 @@ export async function runExport(data: unknown, deps: Deps): Promise<void> {
   if (!req) return
   try {
     await withTenantAfterCommit(deps, job.tenantId, async (tx, enqueue) => {
+      await lockDsr(tx, job.tenantId) // serialises with erase requests: no export is written for someone being erased
       const cur = await requestIn(tx, job.tenantId, job.requestId, true)
       if (cur.status !== "running") return
+      const [erase] = await tx
+        .select({ id: dataRequests.id })
+        .from(dataRequests)
+        .where(and(eq(dataRequests.tenantId, job.tenantId), eq(dataRequests.subjectUserId, cur.subjectUserId), eq(dataRequests.kind, "erase"), inArray(dataRequests.status, ["pending", "running", "completed"])))
+      if (erase || !(await isMember(tx, job.tenantId, cur.subjectUserId))) throw new AppError(409, "subject_erased", "Conflict")
       const now = deps.clock.now()
       const modules: Record<string, unknown> = {}
       for (const [name, h] of dsrHandlers()) modules[name] = await h.export(tx, job.tenantId, cur.subjectUserId)
@@ -296,6 +362,21 @@ export async function runExport(data: unknown, deps: Deps): Promise<void> {
     })
   } catch (err) {
     await markFailed(deps, job, err)
+    await dropUncommittedExport(deps, job)
+  }
+}
+
+/**
+ * The export object is written before its tx commits (the file row needs its size/etag). If the tx then failed there is
+ * no files row, so the object holds personal data nobody can reach: delete it. With a row (a successful earlier run) it is kept.
+ */
+async function dropUncommittedExport(deps: Deps, job: JobData): Promise<void> {
+  const id = exportFileId(job.requestId)
+  try {
+    const [row] = await withTenant(deps.db, job.tenantId, (tx) => tx.select({ id: files.id }).from(files).where(and(eq(files.id, id), eq(files.tenantId, job.tenantId))))
+    if (!row) await deps.storage.delete(fileKey(job.tenantId, id))
+  } catch (e) {
+    deps.logger.error({ requestId: job.requestId, errCode: safeCode(e) }, "could not remove an uncommitted export object")
   }
 }
 
@@ -385,13 +466,13 @@ export async function runErase(data: unknown, deps: Deps): Promise<void> {
  */
 async function eraseGlobalIdentity(deps: Deps, userId: string): Promise<boolean> {
   return withUser(deps.db, userId, async (tx) => {
-    const [u] = await tx.select({ id: user.id, email: user.email }).from(user).where(eq(user.id, userId)).for("update")
+    const [u] = await tx.select({ id: user.id, email: user.email, erasedAt: user.erasedAt }).from(user).where(eq(user.id, userId)).for("update")
     if (!u) return false
-    if (u.email.startsWith("erased+")) return true // an earlier run already anonymised it
+    if (u.erasedAt) return true // an earlier run already anonymised it (erased_at, never the email shape)
     const left = await tx.select({ t: memberships.tenantId }).from(memberships).where(eq(memberships.userId, userId))
     if (left.length > 0) return false
     const now = deps.clock.now()
-    await tx.update(user).set({ email: `erased+${crypto.randomUUID()}@invalid`, name: "Erased user", image: null, emailVerified: false, twoFactorEnabled: false, updatedAt: now }).where(eq(user.id, userId))
+    await tx.update(user).set({ email: `erased+${crypto.randomUUID()}@invalid`, name: "Erased user", image: null, emailVerified: false, twoFactorEnabled: false, erasedAt: now, updatedAt: now }).where(eq(user.id, userId))
     await tx.delete(session).where(eq(session.userId, userId))
     await tx.delete(account).where(eq(account.userId, userId))
     await tx.delete(twoFactor).where(eq(twoFactor.userId, userId))

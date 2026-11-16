@@ -19,6 +19,8 @@ export const notifications = pgTable(
     title: text("title").notNull(),
     body: text("body").notNull(),
     link: text("link"),
+    // The person a notice is ABOUT (e.g. the joiner). `body` then holds the placeholder {{subject}}, filled in at read time from the current user record.
+    subjectUserId: text("subject_user_id"),
     inApp: boolean("in_app").notNull().default(true),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
     readAt: timestamp("read_at", { withTimezone: true }),

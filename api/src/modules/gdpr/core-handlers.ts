@@ -13,8 +13,8 @@ const iso = (d: Date | null | undefined): string | null => d?.toISOString() ?? n
 const likeEscape = (s: string): string => s.replace(/[\\%_]/g, (c) => `\\${c}`)
 const AUDIT_EXPORT_CAP = 10_000
 
-async function subjectUser(tx: TenantTx, userId: string): Promise<{ name: string; email: string } | undefined> {
-  const [u] = await tx.select({ name: user.name, email: user.email }).from(user).where(eq(user.id, userId))
+async function subjectUser(tx: TenantTx, userId: string): Promise<{ name: string; email: string; erasedAt: Date | null } | undefined> {
+  const [u] = await tx.select({ name: user.name, email: user.email, erasedAt: user.erasedAt }).from(user).where(eq(user.id, userId))
   return u
 }
 
@@ -84,6 +84,11 @@ export function registerCoreDsrHandlers(): void {
     },
     // delivery rows cascade from notifications (composite FK)
     async erase(tx, tenantId, userId) {
+      // Notices written BEFORE names were rendered at read time may hold the subject's name in other people's inboxes.
+      const u = await subjectUser(tx, userId)
+      if (u && !u.erasedAt && u.name.trim().length >= 3) {
+        await tx.execute(sql`update notifications set body = replace(body, ${u.name}, 'A former member'), title = replace(title, ${u.name}, 'A former member') where tenant_id = ${tenantId} and (body like ${"%" + likeEscape(u.name) + "%"} or title like ${"%" + likeEscape(u.name) + "%"})`)
+      }
       await tx.delete(notificationDeliveries).where(sql`${notificationDeliveries.tenantId} = ${tenantId} and ${notificationDeliveries.notificationId} in (select id from notifications where tenant_id = ${tenantId} and user_id = ${userId})`)
       await tx.delete(notifications).where(and(eq(notifications.tenantId, tenantId), eq(notifications.userId, userId)))
       await tx.delete(notificationPreferences).where(and(eq(notificationPreferences.tenantId, tenantId), eq(notificationPreferences.userId, userId)))
@@ -119,6 +124,17 @@ export function registerCoreDsrHandlers(): void {
     async erase(tx, tenantId, userId) {
       await tx.delete(teamMembers).where(and(eq(teamMembers.tenantId, tenantId), eq(teamMembers.userId, userId)))
       await tx.delete(reportingLines).where(and(eq(reportingLines.tenantId, tenantId), or(eq(reportingLines.userId, userId), eq(reportingLines.managerId, userId))))
+    },
+  })
+
+  // Runs BEFORE "files": it finds the subject's file documents through files.owner_user_id, which "files" nulls.
+  registerDsrHandler("search", {
+    async export(tx, tenantId, userId) {
+      const res = await tx.execute(sql`select entity, entity_id, title from search_documents where tenant_id = ${tenantId} and entity = 'member' and entity_id = ${userId}`)
+      return { documents: (res.rows as { entity: string; entity_id: string; title: string }[]).map((r) => ({ entity: r.entity, entityId: r.entity_id, title: r.title })) }
+    },
+    async erase(tx, tenantId, userId) {
+      await removeDocumentsForUser(tx, tenantId, userId)
     },
   })
 
@@ -162,18 +178,8 @@ export function registerCoreDsrHandlers(): void {
     // invites addressed to the subject's email are deleted; invites THEY sent stay (the invitee's data, with `invited_by` an id)
     async erase(tx, tenantId, userId) {
       const u = await subjectUser(tx, userId)
-      if (!u || u.email.startsWith("erased+")) return
+      if (!u || u.erasedAt) return
       await tx.delete(invites).where(and(eq(invites.tenantId, tenantId), sql`lower(${invites.email}) = ${u.email.toLowerCase()}`))
-    },
-  })
-
-  registerDsrHandler("search", {
-    async export(tx, tenantId, userId) {
-      const res = await tx.execute(sql`select entity, entity_id, title from search_documents where tenant_id = ${tenantId} and entity = 'member' and entity_id = ${userId}`)
-      return { documents: (res.rows as { entity: string; entity_id: string; title: string }[]).map((r) => ({ entity: r.entity, entityId: r.entity_id, title: r.title })) }
-    },
-    async erase(tx, tenantId, userId) {
-      await removeDocumentsForUser(tx, tenantId, userId)
     },
   })
 
@@ -184,7 +190,7 @@ export function registerCoreDsrHandlers(): void {
     /** Scrubs the subject's email/name inside this tenant's domain_events payloads (e.g. invite.created); ids and types stay. */
     async erase(tx, tenantId, userId) {
       const u = await subjectUser(tx, userId)
-      if (!u || u.email.startsWith("erased+")) return
+      if (!u || u.erasedAt) return
       const needles = [u.email, JSON.stringify(u.name).slice(1, -1)].filter((s) => s.trim().length > 0)
       const rows = await tx
         .select({ id: domainEvents.id, payload: domainEvents.payload })

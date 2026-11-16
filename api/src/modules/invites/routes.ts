@@ -10,6 +10,7 @@ import { sanitizeMailError } from "../../core/mail/sanitize"
 import { invites, memberships, roles, tenants, tenantSettings, user } from "../../db/schema"
 import { withTenant } from "../../db/tenant-tx"
 import { publish } from "../../core/events"
+import { emailHmac } from "../../core/crypto/audit-hmac"
 import { recordAudit } from "../audit"
 import { assertNoEscalation, lockActor } from "../rbac"
 import { DEFAULT_INVITE_TTL_DAYS, onboardingDefaults } from "../tenants"
@@ -89,7 +90,7 @@ export const inviteRoutes = newRouter()
       await recordAudit(
         tx,
         tenant.id,
-        { action: "invite.created", entity: "invite", entityId: inv.id, actorId, before: null, after: { email, roleKey: role.key, expiresAt } },
+        { action: "invite.created", entity: "invite", entityId: inv.id, actorId, before: null, after: { emailHmac: emailHmac(deps.env, tenant.id, email), roleKey: role.key, expiresAt } },
         now,
       )
       await publish(tx, { tenantId: tenant.id, type: "invite.created", payload: { inviteId: inv.id, email, roleKey: role.key }, actorId }, now)

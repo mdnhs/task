@@ -44,6 +44,7 @@ export const ROUTE_PARAMS: Record<string, Record<string, Resource>> = {
   "/v1/data-requests/{id}": { id: "dataRequest" },
   "/v1/data-requests/{id}/complete": { id: "dataRequest" },
   "/v1/data-requests/{id}/reject": { id: "dataRequest" },
+  "/v1/data-requests/{id}/retry": { id: "dataRequest" },
 }
 
 export type Actor = { userId: string; cookie: string; slug: string }

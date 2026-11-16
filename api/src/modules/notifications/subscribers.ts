@@ -1,8 +1,8 @@
 import { and, eq, ne } from "drizzle-orm"
 import { subscribe } from "../../core/events"
 import { registerJob } from "../../core/queue/queue"
-import { memberships, roles, user } from "../../db/schema"
-import { notify, SEND_JOB, sendNotification } from "./service"
+import { memberships, roles } from "../../db/schema"
+import { notify, SEND_JOB, sendNotification, SUBJECT_TOKEN } from "./service"
 
 /**
  * Registers the `notification.send` job handler and the event subscribers. Call once per process (worker.ts, tests);
@@ -19,9 +19,13 @@ export function registerNotifications(): void {
         .from(memberships)
         .innerJoin(roles, eq(roles.id, memberships.roleId))
         .where(and(eq(memberships.tenantId, e.tenantId), eq(roles.key, "owner"), eq(memberships.status, "active"), ...(joiner ? [ne(memberships.userId, joiner)] : [])))
-      const [who] = joiner ? await tx.select({ name: user.name }).from(user).where(eq(user.id, joiner)) : []
+      if (!joiner) return
+      // The person may have left or been erased between the event and its relay: then there is nobody to announce.
+      const [still] = await tx.select({ u: memberships.userId }).from(memberships).where(and(eq(memberships.tenantId, e.tenantId), eq(memberships.userId, joiner)))
+      if (!still) return
       for (const o of owners) {
-        await notify(tx, e.tenantId, { userId: o.userId, kind: "member", title: "New member joined", body: who?.name ? `${who.name} joined the team.` : "A new member joined the team." }, deps, enqueue)
+        // The name is not stored: the body carries {{subject}}, rendered when the notice is read or sent.
+        await notify(tx, e.tenantId, { userId: o.userId, kind: "member", title: "New member joined", body: `${SUBJECT_TOKEN} joined the team.`, subjectUserId: joiner }, deps, enqueue)
       }
     })
   } catch (err) {

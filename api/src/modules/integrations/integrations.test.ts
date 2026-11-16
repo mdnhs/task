@@ -220,7 +220,8 @@ test("reconnect updates the single connection per tenant; a different admin can 
   expect(row).toMatchObject({ account_email: "two@example.com", connected_by: w.admin.userId, status: "connected" })
   const a = await audits(w, "integration.connected")
   expect(a).toHaveLength(2)
-  expect(a[1].before).toMatchObject({ status: "connected", accountEmail: "one@example.com" })
+  expect(a[1].before).toMatchObject({ status: "connected", emailHmac: expect.stringMatching(/^[0-9a-f]{64}$/) })
+  expect(JSON.stringify(a)).not.toContain("@") // B14: no raw email in the immutable audit log
 })
 
 test("getAccessToken returns the stored token, refreshes lazily below 5 minutes of life and keeps the refresh token", async () => {

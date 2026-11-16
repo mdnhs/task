@@ -10,6 +10,8 @@ export const user = pgTable("user", {
   email: text("email").notNull().unique(),
   emailVerified: boolean("email_verified").notNull().default(false),
   image: text("image"),
+  // Set by a GDPR erasure of the last membership. Never infer "erased" from the email shape (a real address may look like it).
+  erasedAt: ts("erased_at"),
   twoFactorEnabled: boolean("two_factor_enabled").default(false),
   createdAt: ts("created_at").notNull().defaultNow(),
   updatedAt: ts("updated_at").notNull().defaultNow(),

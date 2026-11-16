@@ -1,3 +1,4 @@
+import { emailHmac } from "../../core/crypto/audit-hmac"
 import { createHash, randomBytes } from "node:crypto"
 import { and, asc, eq, lt, or, sql, isNotNull } from "drizzle-orm"
 import { AppError, NotFound } from "../../core/errors"
@@ -11,6 +12,9 @@ import type { Deps } from "../../deps"
 import { recordAudit } from "../audit"
 import { notify, withTenantAfterCommit } from "../notifications"
 import { lockActor } from "../rbac"
+
+/** Audit never holds the raw account email (ruling B14): an HMAC reference instead. */
+const hmacOf = (deps: Deps, tenantId: string, email: string | null | undefined): string | null => (email ? emailHmac(deps.env, tenantId, email) : null)
 
 export const REFRESH_JOB = "integration.refresh"
 /** An OAuth authorisation must be completed within 10 minutes of `start`. */
@@ -179,8 +183,8 @@ export async function completeGoogle(deps: Deps, s: ConsumedState, userId: strin
         tx, s.tenantId,
         {
           action: "integration.connected", entity: "integration", entityId: id, actorId: userId,
-          before: cur ? { status: cur.status, accountEmail: cur.accountEmail, scopes: cur.scopes, connectedBy: cur.connectedBy } : null,
-          after: { provider: "google", status: "connected", accountEmail: t.accountEmail ?? null, scopes: t.scopes },
+          before: cur ? { status: cur.status, emailHmac: hmacOf(deps, s.tenantId, cur.accountEmail), scopes: cur.scopes, connectedBy: cur.connectedBy } : null,
+          after: { provider: "google", status: "connected", emailHmac: hmacOf(deps, s.tenantId, t.accountEmail), scopes: t.scopes },
         },
         now,
       )

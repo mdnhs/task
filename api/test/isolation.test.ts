@@ -74,6 +74,7 @@ const SPECS: Record<string, Spec> = {
   "GET /v1/data-requests/{id}": { actor: "owner", expect: "data_request_not_found" },
   "POST /v1/data-requests/{id}/complete": { actor: "owner", expect: "data_request_not_found" },
   "POST /v1/data-requests/{id}/reject": { actor: "owner", expect: "data_request_not_found" },
+  "POST /v1/data-requests/{id}/retry": { actor: "owner", expect: "data_request_not_found" }, // control: 409 request_not_failed (not 404)
 }
 
 let t: ReturnType<typeof testApp>
