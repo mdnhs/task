@@ -30,8 +30,8 @@ test("exchange posts the code + PKCE verifier and reads the account email; provi
   const p = new URLSearchParams(seen[0].body)
   expect(Object.fromEntries(p)).toMatchObject({ grant_type: "authorization_code", code: "the-code", code_verifier: "the-verifier", client_id: "cid", client_secret: "csecret" })
   const bad = (async () => Response.json({ error: "invalid_grant", error_description: "secret-code-echo" }, { status: 400 })) as unknown as typeof fetch
-  const err = await makeGoogleOAuth(env, bad).refresh("rt").catch((e) => e as OAuthError)
+  const err = await makeGoogleOAuth(env, bad).refresh("rt").then(() => null, (e: unknown) => e as OAuthError)
   expect(err).toBeInstanceOf(OAuthError)
-  expect(err.code).toBe("invalid_grant")
-  expect(String(err.message)).not.toContain("secret-code-echo")
+  expect(err!.code).toBe("invalid_grant")
+  expect(String(err!.message)).not.toContain("secret-code-echo")
 })

@@ -115,13 +115,36 @@ test("callback stores tokens sealed (v2, AAD integration:<tenant>:google), redir
   expect(JSON.stringify(ev)).not.toMatch(/at-1|rt-1/)
   // the state is consumed
   expect((await q(w.tenant.id, "select used_at from oauth_states"))[0].used_at).not.toBeNull()
-  // PKCE: the fake saw the right verifier for this challenge
-  const ex = w.oauth.calls.find((c) => c.op === "exchange")!
-  expect(ex.arg.startsWith("code-1|")).toBe(true)
+  // PKCE: the fake only issues tokens when sha256(verifier) equals the challenge from the auth URL and the redirect URI matches
+  expect(w.oauth.verified).toHaveLength(1)
+  expect(w.oauth.verified[0].code).toBe("code-1")
+  expect(w.oauth.verified[0].challenge).toBe(s256(open(String((await q(w.tenant.id, "select verifier_ciphertext from oauth_states"))[0].verifier_ciphertext), buildKeyring(testEnv), `oauth_verifier:${w.tenant.id}:${w.owner.userId}`)))
+})
+
+test("a code issued for ANOTHER flow (different challenge) is rejected: exchange_failed, no connection", async () => {
+  const w = await world()
+  const a = await w.start()
+  const b = await w.start()
+  void a
+  const foreign = w.oauth.codeFor("drive@example.com", 0) // bound to flow A's challenge
+  const r = await w.callback({ code: foreign, state: b.state }) // presented with flow B's verifier
+  expect(r.headers.get("location")).toBe(`${testEnv.APP_URL}/settings/integrations?status=error&reason=exchange_failed`)
+  expect(await connections(w)).toHaveLength(0)
+  expect(w.oauth.verified).toHaveLength(0)
+})
+
+test("a replayed code fails the second time", async () => {
+  const w = await world()
+  const s1 = await w.start()
+  const code = w.oauth.codeFor()
+  expect((await w.callback({ code, state: s1.state })).headers.get("location")).toContain("status=connected")
+  const s2 = await w.start() // fresh state, same (spent) code
+  expect((await w.callback({ code, state: s2.state })).headers.get("location")).toBe(`${testEnv.APP_URL}/settings/integrations?status=error&reason=exchange_failed`)
 })
 
 test("callback with unknown, expired or reused state -> 400 invalid_oauth_state, no connection", async () => {
   const w = await world()
+  await w.start() // a flow for codeFor to bind to
   const bad = async (state: string | undefined, cookie = w.co) => {
     const r = await w.callback({ code: w.oauth.codeFor(), ...(state ? { state } : {}) }, cookie)
     return [r.status, ((await r.json()) as Json).code]
