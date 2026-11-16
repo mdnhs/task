@@ -2,6 +2,7 @@ import { and, asc, eq, inArray, sql } from "drizzle-orm"
 import { reportScope, type ReportAccess } from "@opsdesk/domain/permissions"
 import type { ResolvedRole } from "../../core/context"
 import { AppError, Conflict, NotFound } from "../../core/errors"
+import { publish } from "../../core/events"
 import { memberships, reportingLines, roles, teamMembers, teams, user } from "../../db/schema"
 import type { TenantTx } from "../../db/tenant-tx"
 import { recordAudit } from "../audit"
@@ -62,6 +63,7 @@ export async function createTeam(tx: TenantTx, tenantId: string, actor: Actor, i
   await assertNameFree(tx, tenantId, input.name)
   const [row] = await tx.insert(teams).values({ tenantId, name: input.name, kind: input.kind }).returning()
   await recordAudit(tx, tenantId, { action: "team.created", entity: "team", entityId: row.id, actorId: actor.userId, before: null, after: { name: row.name, kind: row.kind } }, now)
+  await publish(tx, { tenantId, type: "team.created", payload: { teamId: row.id, name: row.name, kind: row.kind }, actorId: actor.userId }, now)
   return dto(row, [])
 }
 
@@ -71,6 +73,7 @@ export async function updateTeam(tx: TenantTx, tenantId: string, actor: Actor, i
   if (patch.name !== undefined) await assertNameFree(tx, tenantId, patch.name, id)
   const [row] = await tx.update(teams).set({ ...(patch.name !== undefined ? { name: patch.name } : {}), ...(patch.kind !== undefined ? { kind: patch.kind } : {}) }).where(and(eq(teams.id, id), eq(teams.tenantId, tenantId))).returning()
   await recordAudit(tx, tenantId, { action: "team.updated", entity: "team", entityId: id, actorId: actor.userId, before: { name: cur.name, kind: cur.kind }, after: { name: row.name, kind: row.kind } }, now)
+  await publish(tx, { tenantId, type: "team.updated", payload: { teamId: id, name: row.name, kind: row.kind }, actorId: actor.userId }, now)
   return dto(row, await memberIdsOf(tx, tenantId, id))
 }
 
@@ -80,6 +83,7 @@ export async function deleteTeam(tx: TenantTx, tenantId: string, actor: Actor, i
   const memberIds = await memberIdsOf(tx, tenantId, id)
   await tx.delete(teams).where(and(eq(teams.id, id), eq(teams.tenantId, tenantId))) // team_members rows cascade
   await recordAudit(tx, tenantId, { action: "team.deleted", entity: "team", entityId: id, actorId: actor.userId, before: { name: cur.name, kind: cur.kind, userIds: memberIds }, after: null }, now)
+  await publish(tx, { tenantId, type: "team.deleted", payload: { teamId: id }, actorId: actor.userId }, now)
 }
 
 /** Replaces the whole member set of a team. Every id must be a member of THIS tenant, else 422 not_a_member. */

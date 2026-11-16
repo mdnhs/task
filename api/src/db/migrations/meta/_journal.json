@@ -120,6 +120,13 @@
       "when": 1794859282837,
       "tag": "0016_integrations_settings",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1794860216275,
+      "tag": "0017_search_documents",
+      "breakpoints": true
     }
   ]
 }

@@ -10,6 +10,7 @@ import { fileRoutes } from "./modules/files"
 import { mfaRoutes } from "./modules/mfa"
 import { notificationRoutes } from "./modules/notifications"
 import { integrationRoutes } from "./modules/integrations"
+import { searchRoutes } from "./modules/search"
 import { settingsRoutes } from "./modules/settings"
 import { rbacRoutes } from "./modules/rbac"
 import { authRoutes } from "./modules/auth/routes"
@@ -61,6 +62,7 @@ export function createApp(deps: Deps) {
   app.route("/", fileRoutes)
   app.route("/", settingsRoutes)
   app.route("/", integrationRoutes)
+  app.route("/", searchRoutes)
   if (deps.env.NODE_ENV === "test") app.route("/", probeRoutes) // test-only; never registered elsewhere, not in the OpenAPI doc
 
   app.doc31("/v1/openapi.json", { openapi: "3.1.0", info: { title: "OpsDesk API", version: "1" } })

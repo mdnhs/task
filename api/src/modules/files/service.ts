@@ -147,6 +147,7 @@ export async function deleteFile(deps: Deps, tenantId: string, actor: Actor, id:
     await tx.update(files).set({ status: "deleted" }).where(and(eq(files.id, id), eq(files.tenantId, tenantId)))
     await recordAudit(tx, tenantId, { action: "file.deleted", entity: "file", entityId: id, actorId: actor.userId, before: { status: row.status, name: row.name, mime: row.mime, sizeBytes: row.sizeBytes }, after: { status: "deleted" } }, now)
     enqueue(DELETE_OBJECT_JOB, { fileId: id, tenantId }, { key: `${id}-${crypto.randomUUID()}` })
+    await publish(tx, { tenantId, type: "file.deleted", payload: { fileId: id }, actorId: actor.userId }, now)
   })
 }
 

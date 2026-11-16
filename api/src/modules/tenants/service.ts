@@ -2,6 +2,7 @@ import { eq, sql } from "drizzle-orm"
 import { memberships, tenants, tenantSettings } from "../../db/schema"
 import type { Deps } from "../../deps"
 import { Conflict } from "../../core/errors"
+import { publish } from "../../core/events"
 import { recordAudit } from "../audit"
 import { onboardingDefaults } from "./defaults"
 import { seedRoleTemplates } from "./seed"
@@ -44,6 +45,8 @@ export async function createTenant(deps: Deps, userId: string, input: NewTenant)
         },
         now,
       )
+      // The founding owner is a member too: lets subscribers (search index) see them like any joiner. Publish stays last.
+      await publish(tx, { tenantId: t.id, type: "member.joined", payload: { userId, roleKey: "owner" }, actorId: userId }, now)
       return { id: t.id, slug: t.slug }
     })
   } catch (err) {
