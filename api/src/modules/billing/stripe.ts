@@ -112,11 +112,11 @@ export class StripeBillingProvider implements BillingProvider {
     return { customerId: c.id }
   }
 
-  async createCheckout(i: { customerId: string; priceId: string; seats: number; successUrl: string; cancelUrl: string; trialDays?: number }) {
+  async createCheckout(i: { customerId: string; priceId: string; successUrl: string; cancelUrl: string; trialDays?: number }) {
     const s = await (await this.stripe()).checkout.sessions.create({
       mode: "subscription",
       customer: i.customerId,
-      line_items: [{ price: i.priceId, quantity: i.seats }],
+      line_items: [{ price: i.priceId, quantity: 1 }],
       success_url: i.successUrl,
       cancel_url: i.cancelUrl,
       ...(i.trialDays && i.trialDays > 0 ? { subscription_data: { trial_period_days: i.trialDays } } : {}),
@@ -136,14 +136,6 @@ export class StripeBillingProvider implements BillingProvider {
 
   async resume(i: { subscriptionId: string }) {
     await (await this.stripe()).subscriptions.update(i.subscriptionId, { cancel_at_period_end: false })
-  }
-
-  async updateSeats(i: { subscriptionId: string; seats: number }) {
-    const stripe = await this.stripe()
-    const sub = await stripe.subscriptions.retrieve(i.subscriptionId)
-    const item = sub.items.data[0]
-    if (!item) throw new Error("subscription_no_item")
-    await stripe.subscriptions.update(i.subscriptionId, { items: [{ id: item.id, quantity: i.seats }], proration_behavior: "create_prorations" })
   }
 
   async retrieveSubscription(subscriptionId: string): Promise<SubscriptionSnapshot> {

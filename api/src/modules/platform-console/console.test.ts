@@ -1,6 +1,6 @@
 import { beforeEach, expect, test } from "vitest"
 import { ownerQuery, ownerTenantQuery } from "../../../test/db"
-import { makeMember, makeStaff, makeTenant, signIn } from "../../../test/factories"
+import { makeMember, makeStaff, makeTenant, signIn, signInWithTotp } from "../../../test/factories"
 import { call, resetDb, testApp } from "../../../test/harness"
 import { dataRequests } from "../../db/schema"
 import { withTenant } from "../../db/tenant-tx"
@@ -156,10 +156,11 @@ test("extend-trial: only trialing, days 1..30, max(now, trial_end) + days, audit
   expect([r.status, await code(r)]).toEqual([422, "not_trialing"])
 })
 
-test("metrics: MRR sums active+past_due per currency in minor units; trials excluded; churn counts cancellations in the last 30 days", async () => {
+test("metrics: MRR sums ACTIVE flat plan prices per currency (past_due excluded) in minor units; trials excluded; churn counts cancellations in the last 30 days", async () => {
   const w = await world()
-  await makeTenant(w.deps, { subscription: { planId: "starter", seats: 2 } }) // active 4900 x 2
-  await makeTenant(w.deps, { subscription: { planId: "business", status: "past_due", seats: 1 } }) // 14900
+  await makeTenant(w.deps, { subscription: { planId: "starter", seats: 2 } }) // active: flat 4900 (seats never multiply, ruling C10)
+  await makeTenant(w.deps, { subscription: { planId: "business", seats: 30 } }) // active: flat 14900
+  await makeTenant(w.deps, { subscription: { planId: "business", status: "past_due", seats: 1 } }) // past_due: counted, NOT in MRR (ruling C11)
   await makeTenant(w.deps, { subscription: { planId: "starter", status: "trialing", seats: 5 } }) // excluded
   const c = await makeTenant(w.deps, { subscription: { planId: "business", seats: 1 } })
   await changeSubscription(w.deps, c.id, "test", { status: "canceled" }) // churn now
@@ -169,7 +170,7 @@ test("metrics: MRR sums active+past_due per currency in minor units; trials excl
   const res = await w.req("GET", "/v1/platform/metrics")
   expect(res.status).toBe(200)
   expect(await w.json(res)).toEqual({
-    mrrMinor: { EUR: 4900 * 2 + 14900 }, arrMinor: { EUR: (4900 * 2 + 14900) * 12 },
+    mrrMinor: { EUR: 4900 + 14900 }, arrMinor: { EUR: (4900 + 14900) * 12 },
     trials: 1, pastDue: 1, churnLast30Days: 1,
   })
 })
@@ -248,4 +249,32 @@ test("recordPlatformAudit lowercases targetTenantId so an uppercase uuid still v
   const [row] = await platAudit()
   expect(row.target_tenant_id).toBe(tn.id)
   expect(await verifyPlatformChain(w.deps.db)).toMatchObject({ ok: true })
+})
+
+test("unknown tenant wins over bad input (404 before 422); non-string reason is 422; bad status/plan filters are 422", async () => {
+  const w = await world()
+  const ghost = "00000000-0000-4000-8000-000000000000"
+  for (const [m, p, b] of [["POST", "/suspend", {}], ["POST", "/reactivate", {}], ["POST", "/extend-trial", { days: 99 }], ["PUT", "/modules", { overrides: [{ module: "nope", mode: "grant" }] }]] as [string, string, unknown][]) {
+    const r = await w.req(m, `/v1/platform/tenants/${ghost}${p}`, w.owner.cookie, b)
+    expect([m, p, r.status, await code(r)]).toEqual([m, p, 404, "tenant_not_found"])
+  }
+  const tn = await makeTenant(w.deps)
+  const r = await w.req("POST", `/v1/platform/tenants/${tn.id}/suspend`, w.owner.cookie, { reason: 123 })
+  expect([r.status, await code(r)]).toEqual([422, "invalid_reason"])
+  const s = await w.req("GET", "/v1/platform/tenants?status=bogus")
+  expect([s.status, await code(s)]).toEqual([422, "invalid_status"])
+  const p = await w.req("GET", "/v1/platform/tenants?plan=bogus")
+  expect([p.status, await code(p)]).toEqual([422, "invalid_plan"])
+})
+
+test("lastActivityDate ignores platform-actor audit rows", async () => {
+  const w = await world()
+  const tn = await makeTenant(w.deps)
+  const before = (await w.json(await w.req("GET", `/v1/platform/tenants/${tn.id}`))).lastActivityDate
+  w.clock.advance({ days: 5 })
+  const cookie = (await signInWithTotp(w.app, w.owner.email, w.owner.password, w.owner.totpSecret!)).cookie // the old session idled out
+  expect((await w.req("POST", `/v1/platform/tenants/${tn.id}/suspend`, cookie, { reason: "x" })).status).toBe(200)
+  const g = await w.req("GET", `/v1/platform/tenants/${tn.id}`, cookie)
+  expect(g.status).toBe(200)
+  expect((await w.json(g)).lastActivityDate).toBe(before)
 })

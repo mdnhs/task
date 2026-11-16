@@ -11,7 +11,7 @@ const NOW = "2026-11-17T09:00:00.000Z"
 const Param = z.object({ tenantId: z.string().min(1).max(64).openapi({ param: { name: "tenantId", in: "path" }, example: TID }) })
 const Paging = { page: z.coerce.number().int().min(1).default(1).openapi({ example: 1 }), pageSize: z.coerce.number().int().min(1).max(100).default(50).openapi({ example: 50 }) }
 // reason / days are checked by the service (422), not by zod (which would answer 400).
-const Reason = z.string().optional().openapi({ description: "Required: 1..500 characters (422 invalid_reason otherwise)", example: "Payment overdue 30 days" })
+const Reason = z.unknown().optional().openapi({ description: "Required: 1..500 characters (422 invalid_reason otherwise)", example: "Payment overdue 30 days" })
 
 const ListItem = z.object({
   id: z.string(), slug: z.string(), name: z.string(), status: z.string(), createdAt: z.string(),
@@ -46,7 +46,7 @@ const DsrDto = z.object({ items: z.array(DsrItem), page: z.number().int(), pageS
   .openapi({ example: { items: [{ id: TID, tenantId: TID, tenantName: "Coppers Cafe", kind: "erase", status: "pending", createdAt: NOW, dueAt: "2026-12-17T09:00:00.000Z", overdue: false }], page: 1, pageSize: 50, total: 1 } })
 
 const ReasonBody = z.object({ reason: Reason }).openapi({ example: { reason: "Payment overdue 30 days" } })
-const TrialBody = z.object({ days: z.number().optional().openapi({ description: "Integer 1..30 (422 invalid_days otherwise)", example: 7 }), reason: Reason }).openapi({ example: { days: 7, reason: "Sales call" } })
+const TrialBody = z.object({ days: z.unknown().optional().openapi({ description: "Integer 1..30 (422 invalid_days otherwise)", example: 7 }), reason: Reason }).openapi({ example: { days: 7, reason: "Sales call" } })
 const ModulesBody = z.object({
   overrides: z.array(z.object({ module: z.string().min(1).max(64), mode: z.enum(["grant", "revoke"]) })).max(50),
   reason: Reason,
@@ -58,7 +58,7 @@ const notFound = "404 tenant_not_found. "
 const listRoute = createRoute({
   method: "get", path: "/v1/platform/tenants", middleware: [requirePlatformStaff("owner", "support", "billing", "viewer")] as const,
   request: { query: z.object({ q: z.string().max(100).optional(), status: z.string().max(32).optional(), plan: z.string().max(64).optional(), ...Paging }) },
-  responses: { 200: { description: "Tenants with plan and subscription status (page of `pageSize`, newest first). Metadata only", content: { "application/json": { schema: ListDto } } } },
+  responses: { 200: { description: "Tenants with plan and subscription status (page of `pageSize`, newest first). Metadata only. 422 invalid_status | invalid_plan", content: { "application/json": { schema: ListDto } } } },
 })
 const detailRoute = createRoute({
   method: "get", path: "/v1/platform/tenants/{tenantId}", middleware: [requirePlatformStaff("owner", "support", "billing", "viewer")] as const, request: { params: Param },

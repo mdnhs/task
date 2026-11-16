@@ -16,17 +16,16 @@ export type PlatformMetrics = {
 }
 
 /**
- * Monthly equivalent of one subscription in minor units. The plan price is stored per seat per month (Stripe bills
- * `price x quantity`, quantity = seats), so it is price x seats. Plans carry no billing interval today: if a yearly
- * price is ever stored, it contributes Math.round(price / 12) here (integer math only, never floats).
+ * Monthly equivalent of one subscription in minor units. Plans are FLAT monthly prices with an activeUsers cap (ruling C10),
+ * so seats never multiply the price. Plans carry no billing interval today: if a yearly price is ever stored, it contributes
+ * Math.round(price / 12) here (integer math only, never floats).
  */
-export function monthlyEquivalentMinor(priceMinor: number, seats: number, interval: "month" | "year" = "month"): number {
-  const unit = interval === "year" ? Math.round(priceMinor / 12) : priceMinor
-  return unit * seats
+export function monthlyEquivalentMinor(priceMinor: number, interval: "month" | "year" = "month"): number {
+  return interval === "year" ? Math.round(priceMinor / 12) : priceMinor
 }
 
 /**
- * MRR/ARR from active + past_due subscriptions, trials and past_due counts, and churn. Churn = subscriptions that moved to
+ * MRR/ARR from active subscriptions, trials and past_due counts, and churn. Churn = subscriptions that moved to
  * canceled in the last 30 days, read from the tenant audit chain (`subscription.changed` with before.status != canceled and
  * after.status = canceled): the subscriptions table has no canceled_at, and the audit row is the exact transition time.
  * O(tenants) under per-tenant RLS (see eachTenant).
@@ -52,9 +51,9 @@ export async function platformMetrics(db: Db, now: Date): Promise<PlatformMetric
     if (!s) continue
     if (s.status === "trialing") m.trials++
     if (s.status === "past_due") m.pastDue++
-    if (s.status === "active" || s.status === "past_due") {
+    if (s.status === "active") { // ruling C11: MRR counts active only; past_due is its own count
       const cur = s.currency.toUpperCase()
-      m.mrrMinor[cur] = (m.mrrMinor[cur] ?? 0) + monthlyEquivalentMinor(s.price, s.seats)
+      m.mrrMinor[cur] = (m.mrrMinor[cur] ?? 0) + monthlyEquivalentMinor(s.price)
     }
   }
   for (const [cur, v] of Object.entries(m.mrrMinor)) m.arrMinor[cur] = v * 12

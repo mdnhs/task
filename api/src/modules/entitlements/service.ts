@@ -88,6 +88,11 @@ export async function entitlementsFor(deps: Deps, tenantId: string): Promise<Ent
   return derive(raw, now)
 }
 
+/** Takes the per-tenant seat advisory lock (released at commit). Take it BEFORE counting seats or writing the cap. */
+export async function lockSeats(tx: TenantTx, tenantId: string): Promise<void> {
+  await tx.execute(sql`select pg_advisory_xact_lock(${SEAT_LOCK_NS}::int4, hashtext(${tenantId}::text))`)
+}
+
 export async function seatsUsed(tx: TenantTx, tenantId: string): Promise<number> {
   const [r] = await tx.select({ n: count() }).from(memberships).where(and(eq(memberships.tenantId, tenantId), eq(memberships.status, "active")))
   return r.n
@@ -98,7 +103,7 @@ export async function seatsUsed(tx: TenantTx, tenantId: string): Promise<number>
  * same tx, so concurrent joins are serialised and cannot both take the last seat. Reads the subscription fresh (never the cache).
  */
 export async function assertSeatAvailable(tx: TenantTx, tenantId: string): Promise<void> {
-  await tx.execute(sql`select pg_advisory_xact_lock(${SEAT_LOCK_NS}::int4, hashtext(${tenantId}::text))`)
+  await lockSeats(tx, tenantId)
   const raw = await loadRaw(tx, tenantId)
   if ((await seatsUsed(tx, tenantId)) >= raw.seats) throw Conflict("seat_limit")
 }

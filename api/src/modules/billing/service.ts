@@ -3,7 +3,7 @@ import { AppError, Conflict } from "../../core/errors"
 import { billingCustomers, invoices, plans, subscriptions } from "../../db/schema"
 import { withTenant } from "../../db/tenant-tx"
 import type { Deps } from "../../deps"
-import { changeSubscription, entitlementsFor, seatsUsed, type BillingState, type SubscriptionStatus } from "../entitlements"
+import { changeSubscription, changeSubscriptionTx, entitlementsFor, invalidateEntitlements, lockSeats, planFacts, seatsUsed, type BillingState, type SubscriptionStatus } from "../entitlements"
 import { errorInfo } from "../../core/safe-error"
 import { resolvePriceId } from "./settings"
 
@@ -94,7 +94,7 @@ export async function startCheckout(deps: Deps, tenant: { id: string; name: stri
   const trialDays = sub.status === "trialing" && sub.trialEndsAt && sub.trialEndsAt > now ? Math.ceil((sub.trialEndsAt.getTime() - now.getTime()) / DAY_MS) : undefined
   const base = `${deps.env.APP_URL}/settings/billing`
   const { url, sessionId } = await viaProvider(deps, "createCheckout", () =>
-    deps.billing.createCheckout({ customerId, priceId, seats: input.seats, successUrl: `${base}?status=success`, cancelUrl: `${base}?status=cancelled`, trialDays }),
+    deps.billing.createCheckout({ customerId, priceId, successUrl: `${base}?status=success`, cancelUrl: `${base}?status=cancelled`, trialDays }),
   )
   await changeSubscription(deps, tenant.id, actor.userId, { checkoutSessionId: sessionId })
   return { url }
@@ -128,11 +128,22 @@ export async function resumeSubscription(deps: Deps, tenantId: string, actorId: 
   await changeSubscription(deps, tenantId, actorId, { cancelAtPeriodEnd: false })
 }
 
+/**
+ * Local seat cap change only (ruling C10: plans are flat prices, the provider never sees seats). Valid range: the active member
+ * count up to the plan's activeUsers limit. The seat lock serialises it with joins (assertSeatAvailable), so the count and the write agree.
+ */
 export async function updateSeats(deps: Deps, tenantId: string, actorId: string, seats: number): Promise<void> {
-  const { subscriptionId } = await needSubscription(deps, tenantId)
-  await assertSeats(deps, tenantId, seats)
-  await viaProvider(deps, "updateSeats", () => deps.billing.updateSeats({ subscriptionId, seats }))
-  await changeSubscription(deps, tenantId, actorId, { seats })
+  const now = deps.clock.now()
+  await withTenant(deps.db, tenantId, async (tx) => {
+    await lockSeats(tx, tenantId)
+    const [sub] = await tx.select({ planId: subscriptions.planId }).from(subscriptions).where(eq(subscriptions.tenantId, tenantId))
+    if (!sub) throw new AppError(404, "subscription_not_found", "Not Found")
+    const limit = planFacts(sub.planId).limits.activeUsers
+    if (limit !== undefined && seats > limit) throw unprocessable("seat_limit_exceeds_plan")
+    if (seats < (await seatsUsed(tx, tenantId))) throw unprocessable("seats_below_members")
+    await changeSubscriptionTx(tx, tenantId, actorId, { seats }, now)
+  })
+  invalidateEntitlements(tenantId)
 }
 
 export type InvoiceRow = typeof invoices.$inferSelect

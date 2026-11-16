@@ -70,8 +70,9 @@ test("checkout requires owner; admin gets 403 forbidden; success/cancel URLs are
   expect(r.status).toBe(200)
   expect(((await r.json()) as Json).url).toMatch(/^https:\/\/billing\.fake\/checkout\//)
   expect(w.billing.last("createCheckout")).toMatchObject({
-    priceId: "price_business1", seats: 5, successUrl: `${testEnv.APP_URL}/settings/billing?status=success`, cancelUrl: `${testEnv.APP_URL}/settings/billing?status=cancelled`,
+    priceId: "price_business1", successUrl: `${testEnv.APP_URL}/settings/billing?status=success`, cancelUrl: `${testEnv.APP_URL}/settings/billing?status=cancelled`,
   })
+  expect(w.billing.last("createCheckout")).not.toHaveProperty("seats") // flat plan price: the provider line item is quantity 1 (stripe.test.ts)
   // the customer is created once, linked in the platform map and mirrored on the subscription
   expect(w.billing.last("ensureCustomer")).toMatchObject({ tenantId: w.tenant.id, email: w.owner.email })
   expect(await ownerQuery("select provider, customer_id from billing_customers")).toEqual([{ provider: "fake", customer_id: `cus_fake_${w.tenant.id.slice(0, 8)}` }])
@@ -140,20 +141,22 @@ test("a blocked (canceled) tenant can still reach billing writes (not 402)", asy
   expect((await owner(w, "POST", "/v1/billing/portal")).status).toBe(200)
 })
 
-test("PUT /seats: owner only, never below active members, provider then local, audited", async () => {
-  const w = await world()
+test("PUT /seats: owner only, local cap between active members and the plan limit, no provider call, audited", async () => {
+  const w = await world({ planId: "business", seats: 20 })
   await link(w)
   expect((await req(w, w.ac, "PUT", "/v1/billing/seats", { seats: 20 })).status).toBe(403)
-  expect(await code(await owner(w, "PUT", "/v1/billing/seats", { seats: 2 }))).toBe("seats_below_members")
-  expect(w.billing.calls.filter((c) => c.method === "updateSeats")).toHaveLength(0)
+  expect(await code(await owner(w, "PUT", "/v1/billing/seats", { seats: 2 }))).toBe("seats_below_members") // 3 active members
+  const over = await owner(w, "PUT", "/v1/billing/seats", { seats: 41 }) // business limit is 40
+  expect([over.status, await code(over)]).toEqual([422, "seat_limit_exceeds_plan"])
+  expect((await subRow(w)).seats).toBe(20)
   const r = await owner(w, "PUT", "/v1/billing/seats", { seats: 25 })
   expect(r.status).toBe(200)
   expect(((await r.json()) as Json).seats).toBe(25)
-  expect(w.billing.last("updateSeats")).toEqual({ subscriptionId: "sub_A", seats: 25 })
-  expect((await subRow(w)).seats).toBe(25)
-  w.billing.failNext("updateSeats")
-  expect((await owner(w, "PUT", "/v1/billing/seats", { seats: 30 })).status).toBe(502)
-  expect((await subRow(w)).seats).toBe(25) // local state untouched when the provider failed
+  expect((await owner(w, "PUT", "/v1/billing/seats", { seats: 40 })).status).toBe(200)
+  expect((await subRow(w)).seats).toBe(40)
+  expect(w.billing.calls.filter((c) => (c.method as string) === "updateSeats")).toHaveLength(0)
+  const audit = await ownerTenantQuery(w.tenant.id, "select actor_id, before, after from audit_events where action = 'subscription.changed' order by seq")
+  expect(audit.map((a) => [a.actor_id, (a.before as Json).seats, (a.after as Json).seats])).toEqual([[w.owner.userId, 20, 25], [w.owner.userId, 25, 40]])
 })
 
 test("GET /subscription and /invoices: owner and admin read, others 403; invoices paginate newest first", async () => {
@@ -275,10 +278,10 @@ test("subscription.updated changes plan -> entitlements invalidated immediately 
   const w = await world({ planId: "starter", seats: 10 })
   await link(w)
   expect((await owner(w, "GET", "/v1/_probe/m1a")).status).toBe(403) // starter: cached now
-  const r = await wh(w, subEvent({ priceId: PRICES.business, seats: 40, createdAt: at(1) }))
+  const r = await wh(w, subEvent({ priceId: PRICES.business, seats: 1, createdAt: at(1) }))
   expect(r.status).toBe(200)
   expect((await owner(w, "GET", "/v1/_probe/m1a")).status).toBe(200) // same clock instant: no 60 s wait
-  expect(await subRow(w)).toMatchObject({ plan_id: "business", seats: 40, status: "active", provider_subscription_id: "sub_A" })
+  expect(await subRow(w)).toMatchObject({ plan_id: "business", seats: 10, status: "active", provider_subscription_id: "sub_A" }) // the webhook quantity (1) never overwrites the local seat cap
   const audit = await ownerTenantQuery(w.tenant.id, "select actor_id, before, after from audit_events where action = 'subscription.changed'")
   expect(audit).toHaveLength(1)
   expect(audit[0]).toMatchObject({ actor_id: "system:billing" })
@@ -502,7 +505,7 @@ test("I2: a webhook for subscription Y while X is live leaves the row on X (igno
   expect(await ownerQuery("select kind from billing_events where provider_event_id = 'evt_y1'")).toEqual([{ kind: "ignored.foreign_subscription" }])
   await ownerTenantQuery(w.tenant.id, "update subscriptions set status = 'canceled'")
   expect((await wh(w, subEvent({ providerEventId: "evt_y2", subscriptionId: "sub_Y", seats: 99, createdAt: at(2) }))).status).toBe(200)
-  expect(await subRow(w)).toMatchObject({ provider_subscription_id: "sub_Y", seats: 99, status: "active", checkout_session_id: null })
+  expect(await subRow(w)).toMatchObject({ provider_subscription_id: "sub_Y", seats: 40, status: "active", checkout_session_id: null })
 })
 
 test("M1: webhook bodies over 256 KB are 413 problem+json before any parsing", async () => {

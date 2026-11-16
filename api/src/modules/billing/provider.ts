@@ -8,11 +8,10 @@ import type { SubscriptionStatus } from "../../db/schema"
 export interface BillingProvider {
   readonly id: "stripe" | "fake"
   ensureCustomer(i: { tenantId: string; email: string; name: string }): Promise<{ customerId: string }>
-  createCheckout(i: { customerId: string; priceId: string; seats: number; successUrl: string; cancelUrl: string; trialDays?: number }): Promise<{ url: string; sessionId: string }>
+  createCheckout(i: { customerId: string; priceId: string; successUrl: string; cancelUrl: string; trialDays?: number }): Promise<{ url: string; sessionId: string }>
   createPortal(i: { customerId: string; returnUrl: string }): Promise<{ url: string }>
   cancelAtPeriodEnd(i: { subscriptionId: string }): Promise<void>
   resume(i: { subscriptionId: string }): Promise<void>
-  updateSeats(i: { subscriptionId: string; seats: number }): Promise<void>
   /** Current provider state of a subscription (used to settle same-second event ties). Throws when it cannot be read. */
   retrieveSubscription(subscriptionId: string): Promise<SubscriptionSnapshot>
   /** Current provider state of an invoice (used to settle same-second event ties). Throws when it cannot be read. */

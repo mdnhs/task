@@ -39,7 +39,6 @@ export function fakeBilling(): FakeBillingProvider {
     createPortal: (i) => rec("createPortal", i, { url: `https://billing.fake/portal/${i.customerId}` }),
     cancelAtPeriodEnd: (i) => rec("cancelAtPeriodEnd", i, undefined),
     resume: (i) => rec("resume", i, undefined),
-    updateSeats: (i) => rec("updateSeats", i, undefined),
     retrieveSubscription: async (id) => {
       const s = await rec("retrieveSubscription", { id }, subscriptions.get(id))
       if (!s) throw new Error("not_found")

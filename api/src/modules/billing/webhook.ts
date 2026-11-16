@@ -8,7 +8,7 @@ import { billingCustomers, billingEvents, invoices, memberships, platformBilling
 import { withTenant, type TenantTx } from "../../db/tenant-tx"
 import type { Deps } from "../../deps"
 import { recordAudit } from "../audit"
-import { changeSubscriptionTx, invalidateEntitlements } from "../entitlements"
+import { changeSubscriptionTx, invalidateEntitlements, planFacts } from "../entitlements"
 import { notify, withTenantAfterCommit, type Enqueue } from "../notifications"
 import { InvalidSignatureError, type BillingEvent, type InvoiceSnapshot, type SubscriptionSnapshot } from "./provider"
 
@@ -65,7 +65,8 @@ async function applySubscription(tx: TenantTx, deps: Deps, tenantId: string, ev:
       return {
         status: keepTrial ? "trialing" : cur.status,
         ...(planId ? { planId } : {}),
-        seats: cur.seats,
+        // seats: the LOCAL cap is kept (ruling C10): Stripe's quantity is always 1 and never overwrites it.
+        ...(before.seats < 1 ? { seats: planFacts(planId ?? before.planId).limits.activeUsers ?? 1 } : {}),
         ...(keepTrial ? {} : { trialEndsAt: cur.trialEnd }),
         currentPeriodEnd: cur.currentPeriodEnd,
         cancelAtPeriodEnd: cur.cancelAtPeriodEnd,

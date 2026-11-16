@@ -31,13 +31,13 @@ test("ensureCustomer: idempotent per tenant, tenant id in metadata", async () =>
   expect(m.ctor).toHaveBeenCalledWith(cfg.secretKey, expect.anything())
 })
 
-test("createCheckout: subscription mode, seats as quantity, trial days only when positive", async () => {
+test("createCheckout: subscription mode, flat plan = quantity 1, trial days only when positive", async () => {
   m.sessionsCreate.mockResolvedValue({ id: "cs_1", url: "https://checkout.stripe.com/x" })
   const p = mk()
-  const base = { customerId: "cus_1", priceId: "price_1", seats: 7, successUrl: "https://app/s", cancelUrl: "https://app/c" }
+  const base = { customerId: "cus_1", priceId: "price_1", successUrl: "https://app/s", cancelUrl: "https://app/c" }
   expect(await p.createCheckout({ ...base, trialDays: 5 })).toEqual({ url: "https://checkout.stripe.com/x", sessionId: "cs_1" })
   expect(m.sessionsCreate).toHaveBeenLastCalledWith({
-    mode: "subscription", customer: "cus_1", line_items: [{ price: "price_1", quantity: 7 }], success_url: "https://app/s", cancel_url: "https://app/c", subscription_data: { trial_period_days: 5 },
+    mode: "subscription", customer: "cus_1", line_items: [{ price: "price_1", quantity: 1 }], success_url: "https://app/s", cancel_url: "https://app/c", subscription_data: { trial_period_days: 5 },
   })
   await p.createCheckout(base)
   expect(m.sessionsCreate.mock.lastCall![0]).not.toHaveProperty("subscription_data")
@@ -45,7 +45,7 @@ test("createCheckout: subscription mode, seats as quantity, trial days only when
   await expect(p.createCheckout(base)).rejects.toThrow()
 })
 
-test("portal, cancel, resume, seats call Stripe with the right params", async () => {
+test("portal, cancel, resume call Stripe with the right params", async () => {
   const p = mk()
   m.portalCreate.mockResolvedValue({ url: "https://billing.stripe.com/p" })
   expect(await p.createPortal({ customerId: "cus_1", returnUrl: "https://app/r" })).toEqual({ url: "https://billing.stripe.com/p" })
@@ -54,9 +54,6 @@ test("portal, cancel, resume, seats call Stripe with the right params", async ()
   expect(m.subUpdate).toHaveBeenLastCalledWith("sub_1", { cancel_at_period_end: true })
   await p.resume({ subscriptionId: "sub_1" })
   expect(m.subUpdate).toHaveBeenLastCalledWith("sub_1", { cancel_at_period_end: false })
-  m.subRetrieve.mockResolvedValue({ items: { data: [{ id: "si_1" }] } })
-  await p.updateSeats({ subscriptionId: "sub_1", seats: 12 })
-  expect(m.subUpdate).toHaveBeenLastCalledWith("sub_1", { items: [{ id: "si_1", quantity: 12 }], proration_behavior: "create_prorations" })
 })
 
 test("unconfigured -> 503 billing_not_configured before any Stripe call", async () => {

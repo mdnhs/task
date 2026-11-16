@@ -25,12 +25,13 @@ type Staff = { userId: string }
  * One transaction per lifecycle action. Order (ruling 3): domain lock, the change, the TENANT audit row (actor platform:<staffId>),
  * then the PLATFORM audit row (its lock is taken last). The entitlement cache is dropped after commit.
  */
-async function lifecycle<T>(deps: Deps, tenantId: string, staff: Staff, fn: (tx: TenantTx, id: string, now: Date, actorId: string) => Promise<T>): Promise<T> {
-  const meta = await getTenantMeta(deps.db, tenantId) // 404 tenant_not_found before anything else
+async function lifecycle<T, P>(deps: Deps, tenantId: string, staff: Staff, prepare: () => P, fn: (tx: TenantTx, id: string, now: Date, actorId: string, p: P) => Promise<T>): Promise<T> {
+  const meta = await getTenantMeta(deps.db, tenantId) // 404 tenant_not_found FIRST, before any input validation (422)
+  const prepared = prepare()
   const now = deps.clock.now()
   const result = await withTenant(deps.db, meta.id, async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(${LIFE_LOCK_NS}::int4, hashtext(${meta.id}::text))`)
-    return fn(tx, meta.id, now, `platform:${staff.userId}`)
+    return fn(tx, meta.id, now, `platform:${staff.userId}`, prepared)
   })
   invalidateEntitlements(meta.id)
   return result
@@ -42,9 +43,7 @@ async function audit(tx: TenantTx, id: string, staff: Staff, actorId: string, no
 }
 
 async function setStatus(deps: Deps, tenantId: string, staff: Staff, reasonIn: unknown, from: "active" | "suspended", to: "active" | "suspended", conflict: string) {
-  const reason = assertReason(reasonIn)
-  await getTenantMeta(deps.db, tenantId)
-  return lifecycle(deps, tenantId, staff, async (tx, id, now, actorId) => {
+  return lifecycle(deps, tenantId, staff, () => assertReason(reasonIn), async (tx, id, now, actorId, reason) => {
     const [row] = await tx.select({ status: tenants.status }).from(tenants).where(eq(tenants.id, id)).for("update")
     if (row.status !== from) throw Conflict(conflict)
     await tx.update(tenants).set({ status: to }).where(eq(tenants.id, id))
@@ -63,11 +62,13 @@ export const reactivateTenant = (deps: Deps, tenantId: string, staff: Staff, rea
 
 /** Extends a running trial: new trial_end = max(now, trial_end) + days (1..30). 422 not_trialing for any other status. */
 export async function extendTrial(deps: Deps, tenantId: string, staff: Staff, input: { days?: unknown; reason?: unknown }): Promise<{ trialEndsAt: Date }> {
-  const reason = assertReason(input.reason)
-  const days = input.days
-  if (typeof days !== "number" || !Number.isInteger(days) || days < 1 || days > 30) throw unprocessable("invalid_days")
-  await getTenantMeta(deps.db, tenantId)
-  return lifecycle(deps, tenantId, staff, async (tx, id, now, actorId) => {
+  const prepare = () => {
+    const reason = assertReason(input.reason)
+    const days = input.days
+    if (typeof days !== "number" || !Number.isInteger(days) || days < 1 || days > 30) throw unprocessable("invalid_days")
+    return { reason, days }
+  }
+  return lifecycle(deps, tenantId, staff, prepare, async (tx, id, now, actorId, { reason, days }) => {
     const [sub] = await tx.select().from(subscriptions).where(eq(subscriptions.tenantId, id)).for("update")
     if (!sub) throw new AppError(404, "subscription_not_found", "Not Found")
     if (sub.status !== "trialing") throw unprocessable("not_trialing")
@@ -89,17 +90,19 @@ export type OverrideInput = { module: string; mode: "grant" | "revoke" }
  * module 422, revoking a core module 422 core_module, duplicates 422. Removing a module never deletes its data.
  */
 export async function setTenantModules(deps: Deps, tenantId: string, staff: Staff, input: { overrides: OverrideInput[]; reason?: unknown }): Promise<{ overrides: OverrideInput[] }> {
-  const reason = assertReason(input.reason)
-  const data = entitlementsData()
-  const seen = new Set<string>()
-  for (const o of input.overrides) {
-    if (!data.productModules.some((p) => p.id === o.module)) throw unprocessable("unknown_module")
-    if (o.mode === "revoke" && data.core?.includes(o.module)) throw unprocessable("core_module")
-    if (seen.has(o.module)) throw unprocessable("duplicate_module")
-    seen.add(o.module)
+  const prepare = () => {
+    const reason = assertReason(input.reason)
+    const data = entitlementsData()
+    const seen = new Set<string>()
+    for (const o of input.overrides) {
+      if (!data.productModules.some((p) => p.id === o.module)) throw unprocessable("unknown_module")
+      if (o.mode === "revoke" && data.core?.includes(o.module)) throw unprocessable("core_module")
+      if (seen.has(o.module)) throw unprocessable("duplicate_module")
+      seen.add(o.module)
+    }
+    return reason
   }
-  await getTenantMeta(deps.db, tenantId)
-  return lifecycle(deps, tenantId, staff, async (tx, id, now, actorId) => {
+  return lifecycle(deps, tenantId, staff, prepare, async (tx, id, now, actorId, reason) => {
     const existing = await tx.select({ module: moduleOverrides.module, mode: moduleOverrides.mode }).from(moduleOverrides).where(eq(moduleOverrides.tenantId, id)).for("update")
     const byModule = new Map(existing.map((e) => [e.module, e.mode]))
     const keep = input.overrides.map((o) => o.module)

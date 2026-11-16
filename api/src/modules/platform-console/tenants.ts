@@ -1,6 +1,6 @@
-import { and, count, desc, eq, ilike, inArray, max, or, type SQL } from "drizzle-orm"
-import { NotFound } from "../../core/errors"
-import { auditEvents, dataRequests, memberships, moduleOverrides, subscriptions, tenants } from "../../db/schema"
+import { and, count, desc, eq, ilike, inArray, isNull, max, not, like, or, type SQL } from "drizzle-orm"
+import { AppError, NotFound } from "../../core/errors"
+import { auditEvents, dataRequests, memberships, moduleOverrides, plans, subscriptions, tenants } from "../../db/schema"
 import { withTenant } from "../../db/tenant-tx"
 import type { Db } from "../../deps"
 
@@ -33,9 +33,12 @@ export async function eachTenant<T>(db: Db, ids: string[], fn: (tx: Parameters<P
 export type ListQuery = { q?: string; status?: string; plan?: string; page: number; pageSize: number }
 export type TenantListItem = { id: string; slug: string; name: string; status: string; createdAt: Date; planId: string | null; subscriptionStatus: string | null; seats: number | null }
 
+export const TENANT_STATUSES = ["active", "suspended"]
 const escapeLike = (s: string) => s.replace(/[\\%_]/g, (m) => `\\${m}`)
 
 export async function listTenants(db: Db, q: ListQuery): Promise<{ items: TenantListItem[]; page: number; pageSize: number; total: number }> {
+  if (q.status !== undefined && !TENANT_STATUSES.includes(q.status)) throw new AppError(422, "invalid_status", "Unprocessable Entity")
+  if (q.plan !== undefined && !(await db.select({ id: plans.id }).from(plans).where(eq(plans.id, q.plan))).length) throw new AppError(422, "invalid_plan", "Unprocessable Entity")
   const conds: SQL[] = []
   if (q.q?.trim()) {
     const like = `%${escapeLike(q.q.trim())}%`
@@ -84,7 +87,7 @@ export async function tenantDetail(db: Db, tenantId: string): Promise<TenantDeta
     const [seats] = await tx.select({ n: count() }).from(memberships).where(and(eq(memberships.tenantId, id), eq(memberships.status, "active")))
     const [members] = await tx.select({ n: count() }).from(memberships).where(eq(memberships.tenantId, id))
     const overrides = await tx.select({ module: moduleOverrides.module, mode: moduleOverrides.mode, reason: moduleOverrides.reason, setAt: moduleOverrides.setAt }).from(moduleOverrides).where(eq(moduleOverrides.tenantId, id)).orderBy(moduleOverrides.module)
-    const [last] = await tx.select({ at: max(auditEvents.at) }).from(auditEvents).where(eq(auditEvents.tenantId, id))
+    const [last] = await tx.select({ at: max(auditEvents.at) }).from(auditEvents).where(and(eq(auditEvents.tenantId, id), or(isNull(auditEvents.actorId), not(like(auditEvents.actorId, "platform:%")))))
     const [open] = await tx.select({ n: count() }).from(dataRequests).where(and(eq(dataRequests.tenantId, id), inArray(dataRequests.status, ["pending", "running"])))
     return {
       tenant,
