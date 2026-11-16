@@ -24,6 +24,17 @@ export const toRoleDto = (r: RoleRow) => ({
 
 const snapshot = (r: Pick<RoleRow, "label" | "access" | "fieldRules">) => ({ label: r.label, access: r.access, fieldRules: r.fieldRules })
 
+// Namespace for the two-key advisory lock, so RBAC cannot collide with the audit lock's single-key space.
+const RBAC_LOCK_NS = 0x72626163 // "rbac"
+
+/**
+ * One RBAC mutation at a time per tenant (role edits, member role changes, clones). Take it FIRST, before lockActor and any
+ * row lock: with row locks alone, holders of a role editing it (FOR SHARE on own role, FOR UPDATE on target) deadlock.
+ */
+export async function lockRbac(tx: TenantTx, tenantId: string): Promise<void> {
+  await tx.execute(sql`select pg_advisory_xact_lock(${RBAC_LOCK_NS}::int, hashtext(${tenantId}::text))`)
+}
+
 /**
  * R25: re-reads the actor's membership + role INSIDE the mutation tx with FOR SHARE and re-checks the permission there,
  * so a concurrent demotion (which takes the row lock) either commits first and is seen, or waits for us. The request-level
@@ -64,6 +75,7 @@ export async function listRoles(tx: TenantTx, tenantId: string): Promise<RoleRow
 const slug = (label: string) => label.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40) || "role"
 
 export async function cloneRole(tx: TenantTx, tenantId: string, actor: Actor, sourceId: string, label: string, now: Date): Promise<RoleRow> {
+  await lockRbac(tx, tenantId)
   await lockActor(tx, tenantId, actor.userId, "settings", "write")
   const src = await roleIn(tx, tenantId, sourceId)
   if (src.key === "owner") throw Conflict("owner_not_clonable")
@@ -92,10 +104,12 @@ export async function updateRole(
   tx: TenantTx, tenantId: string, actor: Actor, id: string,
   patch: { label?: string; access?: Record<string, string>; fieldRules?: Record<string, string[]> }, now: Date,
 ): Promise<RoleRow> {
+  await lockRbac(tx, tenantId)
   const me = await lockActor(tx, tenantId, actor.userId, "settings", "write")
   const [cur] = await tx.select().from(roles).where(and(eq(roles.id, id), eq(roles.tenantId, tenantId))).for("update")
   if (!cur) throw NotFound("role_not_found")
   if (cur.isTemplate) throw Conflict("template_locked")
+  assertNoEscalation(me, cur.access) // never touch (rename, re-scope, demote) a role that outranks you, whatever the patch
   if (patch.access) assertNoEscalation(me, patch.access) // only the modules being set; others are unchanged
   const access = patch.access ? { ...cur.access, ...patch.access } : cur.access
   const next = { label: patch.label ?? cur.label, access, fieldRules: patch.fieldRules ?? cur.fieldRules }
@@ -111,9 +125,7 @@ export async function updateRole(
 export async function changeMemberRole(
   tx: TenantTx, tenantId: string, actor: Actor, userId: string, roleId: string, now: Date,
 ): Promise<{ userId: string; roleId: string; roleKey: string }> {
-  // One member-role change at a time per tenant: with row locks alone, two owners demoting each other lock each other's
-  // row first and then deadlock on the owner count. The FOR UPDATE locks below stay as defence in depth.
-  await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${"member-roles:" + tenantId}))`)
+  await lockRbac(tx, tenantId)
   const me = await lockActor(tx, tenantId, actor.userId, "settings", "write")
   const target = await roleIn(tx, tenantId, roleId)
   // Order matters for the 404/403 split: the new role must exist in this tenant before anything about the member is revealed.

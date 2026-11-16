@@ -189,6 +189,39 @@ describe("no escalation (R24: administrative modules only)", () => {
     expect((await w.req("PATCH", `/v1/roles/${c.id}`, w.owner, { access: { audit: "write" } })).status).toBe(200)
   })
 
+  test("a non-owner cannot edit a role that outranks them on an administrative module (any kind of patch)", async () => {
+    const w = await world()
+    await ownerTenantQuery(w.tenant.id, "insert into roles (tenant_id, key, label, home, access) select tenant_id, 'adminc', 'Admin copy', home, access from roles where key='admin'")
+    const rid = (await ownerTenantQuery(w.tenant.id, "select id from roles where key='adminc'"))[0].id as string
+    const before = (await ownerTenantQuery(w.tenant.id, "select label, access, field_rules from roles where id=$1", [rid]))[0]
+    for (const body of [{ access: { audit: "none" } }, { label: "Renamed" }, { fieldRules: { member: ["payRate"] } }, { access: { payroll: "write" } }]) {
+      const r = await w.req("PATCH", `/v1/roles/${rid}`, w.limited, body) // limited: audit none < adminc's audit write
+      expect(r.status).toBe(403)
+      expect(((await r.json()) as Json).code).toBe("role_escalation")
+    }
+    expect((await ownerTenantQuery(w.tenant.id, "select label, access, field_rules from roles where id=$1", [rid]))[0]).toEqual(before)
+    expect((await w.req("PATCH", `/v1/roles/${rid}`, w.owner, { access: { audit: "none" } })).status).toBe(200)
+  })
+
+  test("two holders of a role patching it at once never hit a deadlock (no 500)", async () => {
+    const w = await world()
+    await ownerTenantQuery(w.tenant.id, "insert into roles (tenant_id, key, label, home, access) select tenant_id, 'adminc', 'Admin copy', home, access from roles where key='admin'")
+    const rid = (await ownerTenantQuery(w.tenant.id, "select id from roles where key='adminc'"))[0].id as string
+    const a = await w.who("adminc")
+    const b = await w.who("adminc")
+    for (let i = 0; i < 6; i++) {
+      const rs = await Promise.all([
+        w.req("PATCH", `/v1/roles/${rid}`, a, { label: `A${i}` }),
+        w.req("PATCH", `/v1/roles/${rid}`, b, { label: `B${i}` }),
+        w.req("PATCH", `/v1/members/${b.userId}`, a, { roleId: await w.roleId("employee") }).then(async (r) => {
+          await w.req("PATCH", `/v1/members/${b.userId}`, w.owner, { roleId: rid }) // put b back
+          return r
+        }),
+      ])
+      for (const r of rs) expect(r.status).toBeLessThan(500)
+    }
+  })
+
   test("fieldRules edits need settings write and no further check", async () => {
     const w = await world()
     const c = (await (await w.req("POST", `/v1/roles/${await w.roleId("employee")}/clone`, w.limited, { label: "Crew" })).json()) as Json
