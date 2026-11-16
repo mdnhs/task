@@ -3,12 +3,13 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle"
 import { twoFactor } from "better-auth/plugins/two-factor"
 import type { Db } from "../../db/client"
 import * as schema from "../../db/schema"
+import type { Logger } from "pino"
 import type { Clock, Mailer } from "../../deps"
 import type { Env } from "../../env"
 
 const DAY = 24 * 60 * 60
 
-type AuthDeps = { env: Env; db: Db; clock: Clock; mailer: Mailer }
+type AuthDeps = { env: Env; db: Db; clock: Clock; mailer: Mailer; logger: Logger }
 // Verification links live 24 hours (NFR/T1.1b). The override exists only so a test can expire one quickly.
 type AuthOpts = { verificationTtlSeconds?: number }
 
@@ -17,7 +18,7 @@ type AuthOpts = { verificationTtlSeconds?: number }
  * Better Auth's absolute `expiresIn` is 30 days with a daily rolling refresh, so it never
  * fires first. It uses real time internally, which is why the idle clock is ours (deps.clock).
  */
-export function buildAuth({ env, db, clock, mailer }: AuthDeps, opts: AuthOpts = {}) {
+export function buildAuth({ env, db, clock, mailer, logger }: AuthDeps, opts: AuthOpts = {}) {
   const socialProviders: Record<string, { clientId: string; clientSecret: string }> = {}
   // Both id and secret must be non-empty; empty strings never register a provider.
   if (env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET) {
@@ -47,7 +48,10 @@ export function buildAuth({ env, db, clock, mailer }: AuthDeps, opts: AuthOpts =
             subject: "Verify your email",
             text: `Confirm your email address to finish signing up:\n\n${env.APP_URL}/verify-email?token=${token}\n\nThe link expires in 24 hours.`,
           })
-          .catch(() => undefined)
+          .catch((err) => {
+            // Never log the token, link or body: only who it was for (by id) and the error.
+            logger.error({ err, userId: user.id }, "verification email send failed")
+          })
       },
     },
     socialProviders,

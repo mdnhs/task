@@ -1,3 +1,4 @@
+import pino from "pino"
 import { createApp, type AppType } from "../src/app"
 import type { Deps } from "../src/deps"
 import { buildAuth } from "../src/modules/auth/auth"
@@ -28,8 +29,9 @@ export function testApp(over: Partial<Deps> = {}): { app: AppType; deps: Deps; m
   // Real (lazy-connecting) Testcontainers db when global setup provided one; inert fake otherwise.
   const db = over.db ?? (hasTestDb() ? testDb() : ({ execute: async () => undefined } as never))
   const usedClock = over.clock ?? clock
+  const logger = over.logger ?? pino({ level: "silent" })
   const usedMailer = over.mailer ?? mailer
-  const deps: Deps = { env, db, auth: buildAuth({ env, db, clock: usedClock, mailer: usedMailer }), clock: usedClock, mailer: usedMailer, ...over }
+  const deps: Deps = { env, db, auth: buildAuth({ env, db, clock: usedClock, mailer: usedMailer, logger }), clock: usedClock, mailer: usedMailer, logger, ...over }
   const app = createApp(deps)
   mailerOf.set(app, usedMailer as FakeMailer)
   return { app, deps, mailer, clock }

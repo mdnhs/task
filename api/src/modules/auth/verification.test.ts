@@ -1,3 +1,4 @@
+import pino from "pino"
 import { beforeEach, expect, test } from "vitest"
 import { call, fakeMailer, resetDb, testApp, testEnv } from "../../../test/harness"
 import { ownerQuery } from "../../../test/db"
@@ -88,4 +89,20 @@ test("cookieless sign-in from an untrusted origin is 403 (login CSRF)", async ()
   })
   expect(r.status).toBe(403)
   expect(r.headers.getSetCookie()).toEqual([])
+})
+test("a failing mailer does not fail sign-up; the error is logged without the token", async () => {
+  const lines: string[] = []
+  const logger = pino({ level: "error" }, { write: (l: string) => void lines.push(l) })
+  const mailer = { send: async () => { throw new Error("smtp down") } }
+  const { deps } = testApp()
+  const auth = buildAuth({ ...deps, mailer, logger })
+  const { app } = testApp({ auth, mailer, logger })
+  const r = await signUp(app, EMAIL, PW, "V", { verify: false })
+  expect(r.status).toBe(200)
+  await new Promise((res) => setTimeout(res, 20))
+  expect(lines).toHaveLength(1)
+  const entry = JSON.parse(lines[0]) as { msg: string; userId: string }
+  expect(entry.msg).toBe("verification email send failed")
+  expect(entry.userId).toEqual(expect.any(String))
+  expect(lines[0]).not.toMatch(/token|verify-email/i)
 })

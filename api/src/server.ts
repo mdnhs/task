@@ -1,4 +1,5 @@
 import { pathToFileURL } from "node:url"
+import pino from "pino"
 import { serve } from "@hono/node-server"
 import { createApp } from "./app"
 import { makeDb } from "./db/client"
@@ -10,8 +11,9 @@ import { parseEnv, type Env } from "./env"
 function makeDeps(env: Env): Deps {
   const db = makeDb(env.DATABASE_URL)
   const clock = { now: () => new Date() }
+  const logger = pino({ level: "info" })
   const mailer = { send: async () => undefined }
-  return { env, db, auth: buildAuth({ env, db, clock, mailer }), clock, mailer }
+  return { env, db, auth: buildAuth({ env, db, clock, mailer, logger }), clock, mailer, logger }
 }
 
 export function start(env: Env = parseEnv(process.env)) {

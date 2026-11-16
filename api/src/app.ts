@@ -1,7 +1,6 @@
 import { OpenAPIHono } from "@hono/zod-openapi"
 import { sql } from "drizzle-orm"
 import { HTTPException } from "hono/http-exception"
-import pino from "pino"
 import type { Deps } from "./deps"
 import type { AppEnv } from "./core/context"
 import { AppError, problem } from "./core/errors"
@@ -18,7 +17,7 @@ const STATUS_TITLES: Record<number, string> = {
 }
 
 export function createApp(deps: Deps) {
-  const logger = pino({ level: deps.env.NODE_ENV === "test" ? "silent" : "info" })
+  const { logger } = deps
   const app = new OpenAPIHono<AppEnv>()
 
   app.use("*", async (c, next) => {
