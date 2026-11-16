@@ -5,7 +5,7 @@ import { registerJob } from "./core/queue/queue"
 import { registerFiles } from "./modules/files"
 import { registerGdpr, SWEEP_JOB } from "./modules/gdpr"
 import { registerIntegrations } from "./modules/integrations"
-import { registerNotifications } from "./modules/notifications"
+import { NOTIFICATION_SWEEP_JOB, registerNotifications } from "./modules/notifications"
 import { registerSearchIndexers } from "./modules/search"
 import { parseEnv, type Env } from "./env"
 import { makeDeps } from "./server"
@@ -25,6 +25,7 @@ export async function startWorkerProcess(env: Env = parseEnv(process.env)) {
   const queue = makeBullQueue(env.REDIS_URL)
   await queue.raw.upsertJobScheduler("events.relay", { every: 1000 }, { name: "events.relay", opts: { removeOnComplete: true, removeOnFail: 100 } })
   await queue.raw.upsertJobScheduler(SWEEP_JOB, { every: 5 * 60_000 }, { name: SWEEP_JOB, opts: { removeOnComplete: true, removeOnFail: 100 } }) // re-enqueue lost/stale data requests
+  await queue.raw.upsertJobScheduler(NOTIFICATION_SWEEP_JOB, { every: 5 * 60_000 }, { name: NOTIFICATION_SWEEP_JOB, opts: { removeOnComplete: true, removeOnFail: 100 } }) // re-enqueue lost/stale deliveries
   deps.logger.info("worker started")
   return {
     async close() {

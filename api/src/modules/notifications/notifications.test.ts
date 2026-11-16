@@ -8,6 +8,7 @@ import { buildKeyring, open } from "../../core/crypto/secret-box"
 import { publish, relayOnce, resetSubscribers } from "../../core/events"
 import { runJob } from "../../core/queue/queue"
 import { withTenant } from "../../db/tenant-tx"
+import { makeLoggingPush } from "../../core/push"
 import { notify, registerNotifications, withTenantAfterCommit } from "."
 
 beforeEach(async () => {
@@ -272,4 +273,100 @@ test("member.joined event notifies the tenant's owners", async () => {
   expect(rows.every((r) => r.kind === "member")).toBe(true)
   expect(await relayOnce(w.deps)).toBe(0) // exactly once
   expect(await q(w.tenant.id, "select 1 from notifications")).toHaveLength(2)
+})
+
+// ---------------------------------------------------------------- fix wave: stuck deliveries
+
+test("a running job never dedupes its own re-hold: job ids carry a per-enqueue nonce, no ':'", async () => {
+  const w = await world({ clock: fakeClock(new Date("2026-11-16T23:30:00Z")) })
+  await putPrefs(w, w.cs, { channels: {}, quietStart: "22:00", quietEnd: "07:00" })
+  await send(w, w.staff.userId, "invite")
+  const first = w.queue.jobs.splice(0)
+  await runJob(first[0].name, first[0].data, w.deps) // re-hold
+  await runJob(first[0].name, first[0].data, w.deps) // and again for the same sendAfter: must still enqueue
+  expect(w.queue.jobs).toHaveLength(2)
+  const ids = w.queue.jobs.map((j) => j.opts?.jobId as string)
+  expect(new Set(ids).size).toBe(2)
+  for (const id of ids) expect(id).not.toContain(":")
+})
+
+test("sweep: a queued delivery whose job was lost is sent; a held delivery past send_after is sent", async () => {
+  const w = await world({ clock: fakeClock(new Date("2026-11-16T12:00:00Z")) })
+  await addToken(w, w.cs)
+  await send(w, w.staff.userId, "invite") // email + push queued
+  w.queue.jobs.length = 0 // the jobs are lost
+  await q(w.tenant.id, "update notification_deliveries set status = 'held', send_after = $1 where channel = 'push'", [new Date("2026-11-16T12:03:00Z")])
+  await runJob("notification.sweep", {}, w.deps)
+  expect(w.queue.jobs).toHaveLength(0) // nothing is stale yet (< 2 min)
+  w.clock.advance({ minutes: 6 })
+  await runJob("notification.sweep", {}, w.deps)
+  expect(w.queue.jobs).toHaveLength(2)
+  await run(w)
+  expect(w.mailer.sent).toHaveLength(1)
+  expect(w.push.sent).toHaveLength(1)
+  expect((await deliveries(w)).map((x) => x.status)).toEqual(["sent", "sent"])
+})
+
+test("sweep skips deliveries that are leased, and one tenant failing does not stop the rest", async () => {
+  const w = await world({ clock: fakeClock(new Date("2026-11-16T12:00:00Z")) })
+  await send(w, w.staff.userId, "invite")
+  w.queue.jobs.length = 0
+  w.clock.advance({ minutes: 10 })
+  await q(w.tenant.id, "update notification_deliveries set status = 'sending', claimed_until = $1", [new Date("2026-11-16T12:11:00Z")])
+  await runJob("notification.sweep", {}, w.deps)
+  expect(w.queue.jobs).toHaveLength(0)
+  w.clock.advance({ minutes: 5 }) // lease expired
+  await runJob("notification.sweep", {}, w.deps)
+  expect(w.queue.jobs).toHaveLength(1)
+})
+
+test("two concurrent sends of the same delivery produce exactly one email", async () => {
+  const w = await world()
+  await send(w, w.staff.userId, "invite")
+  const job = w.queue.jobs.splice(0)[0]
+  let release!: () => void
+  const gate = new Promise<void>((r) => (release = r))
+  const realSend = w.deps.mailer.send.bind(w.deps.mailer)
+  w.deps.mailer.send = async (m) => {
+    await gate
+    return realSend(m)
+  }
+  const a = runJob(job.name, job.data, w.deps)
+  const b = runJob(job.name, job.data, w.deps)
+  await new Promise((r) => setTimeout(r, 300))
+  release()
+  await Promise.all([a, b])
+  expect(w.mailer.sent).toHaveLength(1)
+  const d = (await q(w.tenant.id, "select status, claimed_until from notification_deliveries"))[0]
+  expect(d.status).toBe("sent")
+})
+
+test("a failed send goes back to queued with backoff and its lease cleared; an expired lease can be reclaimed", async () => {
+  const w = await world({ clock: fakeClock(new Date("2026-11-16T12:00:00Z")) })
+  await send(w, w.staff.userId, "invite")
+  const job = w.queue.jobs.splice(0)[0]
+  w.deps.mailer.send = async () => {
+    throw new Error("smtp down")
+  }
+  await runJob(job.name, job.data, w.deps)
+  expect((await deliveries(w))[0]).toMatchObject({ status: "queued", attempts: 1 })
+  expect((await q(w.tenant.id, "select claimed_until from notification_deliveries"))[0].claimed_until).toBeNull()
+  expect(w.queue.jobs).toHaveLength(1)
+  // a crashed worker: status sending with an expired lease is claimable again, a live lease is not
+  await q(w.tenant.id, "update notification_deliveries set status = 'sending', claimed_until = $1", [new Date("2026-11-16T12:01:00Z")])
+  const sent: string[] = []
+  w.deps.mailer.send = async (m) => void sent.push(m.to)
+  await runJob(job.name, job.data, w.deps) // lease still live at 12:00
+  expect(sent).toHaveLength(0)
+  w.clock.advance({ minutes: 3 })
+  await runJob(job.name, job.data, w.deps)
+  expect(sent).toHaveLength(1)
+})
+
+test("with no push provider (logging adapter) the push delivery is skipped/no_provider, not sent", async () => {
+  const w = await world({ push: makeLoggingPush(pino({ level: "silent" })) })
+  await addToken(w, w.cs)
+  await send(w, w.staff.userId, "system")
+  await run(w)
+  expect((await deliveries(w))[0]).toMatchObject({ channel: "push", status: "skipped", last_error: "no_provider" })
 })

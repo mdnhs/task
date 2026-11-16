@@ -3,6 +3,7 @@ import { HTTPException } from "hono/http-exception"
 import type { Deps } from "./deps"
 import { newRouter } from "./core/router"
 import { AppError, problem, statusCode, statusTitle } from "./core/errors"
+import { errorInfo } from "./core/safe-error"
 import { requestId } from "./core/middleware/request-id"
 import { auditRoutes } from "./modules/audit"
 import { deviceRoutes, probeRoutes } from "./modules/devices"
@@ -35,7 +36,7 @@ export function createApp(deps: Deps) {
     if (err instanceof HTTPException) {
       return problem(err.status, statusCode(err.status), statusTitle(err.status), rid)
     }
-    logger.error({ err, requestId: rid }, "unhandled error")
+    logger.error({ ...errorInfo(err), requestId: rid }, "unhandled error") // never the message or object: Drizzle messages carry query params
     return problem(500, "internal", "Internal Server Error", rid)
   })
   app.notFound((c) => problem(404, "not_found", "Not Found", c.get("requestId")))

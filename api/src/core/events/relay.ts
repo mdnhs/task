@@ -3,6 +3,7 @@ import { and, asc, eq, isNull, notExists, sql } from "drizzle-orm"
 import type { Deps } from "../../deps"
 import { withTenant, type TenantTx } from "../../db/tenant-tx"
 import { domainEvents, eventDeliveries, eventDeliveryFailures, eventRelayHints } from "../../db/schema"
+import { errorInfo } from "../safe-error"
 import { subscribersFor } from "./bus"
 import type { DomainEvent, EnqueueOpts, EventType } from "./types"
 
@@ -142,13 +143,4 @@ async function dropHintIfIdle(tx: TenantTx, tenantId: string): Promise<void> {
     .where(and(eq(domainEvents.tenantId, tenantId), isNull(domainEvents.relayedAt)))
     .limit(1)
   if (!still) await tx.delete(eventRelayHints).where(eq(eventRelayHints.tenant, tenantId))
-}
-
-/** Only the error class name and the pg SQLSTATE (`cause.code`), never the message. */
-function errorInfo(e: unknown): { name: string; code?: string } {
-  const name = e instanceof Error ? e.name : "NonError"
-  const cause = (e as { cause?: { code?: unknown } } | null)?.cause
-  const own = (e as { code?: unknown } | null)?.code
-  const code = typeof cause?.code === "string" ? cause.code : typeof own === "string" ? own : undefined
-  return { name, code }
 }

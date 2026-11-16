@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto"
-import { and, desc, eq, gt, inArray, or, sql } from "drizzle-orm"
+import { and, desc, eq, gt, inArray, ne, or, sql } from "drizzle-orm"
 import { AppError, Conflict, NotFound } from "../../core/errors"
 import { fileKey } from "../../core/storage/storage"
 import { publish } from "../../core/events"
@@ -257,7 +257,8 @@ export async function retryRequest(deps: Deps, tenantId: string, actor: Actor, i
 
 /**
  * Job `dsr.sweep` (every 5 min in the worker). Re-enqueues export/erase requests that no worker is on: `pending` older
- * than 2 min (enqueue lost) and `running` older than 30 min (crashed worker). A duplicate job is harmless: `claim` lets
+ * than 2 min (enqueue lost) and `running` older than 30 min (crashed worker), and expires completed exports whose file
+ * is still available 30 days after completion (the delayed expire job was lost). A duplicate job is harmless: `claim` lets
  * only one run and finished requests are a no-op.
  */
 export async function sweepRequests(_data: unknown, deps: Deps): Promise<void> {
@@ -279,6 +280,19 @@ export async function sweepRequests(_data: unknown, deps: Deps): Promise<void> {
         const name = r.kind === "export" ? EXPORT_JOB : ERASE_JOB
         await deps.queue.add(name, { requestId: r.id, tenantId }, { jobId: `${name}.${r.id}-${crypto.randomUUID()}` })
       }
+      // The 30-day expiry normally rides a delayed job; if that job was lost, expire the export from here.
+      const stale = await withTenant(deps.db, tenantId, (tx) =>
+        tx
+          .select({ id: dataRequests.id, fileId: files.id })
+          .from(dataRequests)
+          .innerJoin(files, and(eq(files.tenantId, dataRequests.tenantId), eq(files.id, dataRequests.resultFileId)))
+          .where(and(
+            eq(dataRequests.tenantId, tenantId), eq(dataRequests.kind, "export"), eq(dataRequests.status, "completed"),
+            eq(files.purpose, "dsr_export"), ne(files.status, "deleted"),
+            sql`${dataRequests.completedAt} + (${EXPORT_TTL_MS}::bigint * interval '1 millisecond') < ${now.toISOString()}::timestamptz`,
+          )),
+      )
+      for (const r of stale) await deps.queue.add(EXPIRE_JOB, { requestId: r.id, tenantId, fileId: r.fileId }, { jobId: `${EXPIRE_JOB}.${r.id}-${crypto.randomUUID()}` })
     } catch (err) {
       deps.logger.error({ tenantId, errCode: safeCode(err) }, "dsr sweep failed for a tenant") // one tenant never stops the rest
     }

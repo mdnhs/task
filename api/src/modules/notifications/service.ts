@@ -13,6 +13,13 @@ export type NotifyInput = { userId: string; kind: NotificationKind; title: strin
 export type Enqueue = (name: string, data: unknown, opts?: { delayMs?: number; key?: string }) => void
 
 export const SEND_JOB = "notification.send"
+export const SWEEP_JOB = "notification.sweep"
+/** A claimed delivery is leased this long; after that another worker may take it over (crashed worker). */
+export const LEASE_MS = 2 * 60_000
+/** The sweep re-enqueues deliveries that are due for longer than this and not leased. */
+export const SWEEP_STALE_MS = 2 * 60_000
+/** Job ids get a per-enqueue nonce so a running job never dedupes its own re-hold/retry (BullMQ ids: no ':'). */
+const nonce = (): string => crypto.randomUUID()
 /** Delivery attempts per external channel before the delivery is marked failed. */
 export const MAX_ATTEMPTS = 5
 /** Wait before attempt n+1 after attempt n failed: 30 s, 60 s, 120 s, 240 s (own scheduling, see sendNotification). */
@@ -112,14 +119,16 @@ export async function sendNotification(data: unknown, deps: Deps): Promise<void>
 
   const claim = await withTenant(deps.db, tenantId, async (tx): Promise<Claim> => {
     const [row] = await tx
-      .select({ status: notificationDeliveries.status, channel: notificationDeliveries.channel, attempts: notificationDeliveries.attempts, n: notifications })
+      .select({ status: notificationDeliveries.status, claimedUntil: notificationDeliveries.claimedUntil, channel: notificationDeliveries.channel, attempts: notificationDeliveries.attempts, n: notifications })
       .from(notificationDeliveries)
       .innerJoin(notifications, and(eq(notifications.tenantId, notificationDeliveries.tenantId), eq(notifications.id, notificationDeliveries.notificationId)))
       .where(eq(notificationDeliveries.id, deliveryId))
       .for("update", { of: [notificationDeliveries] })
-    if (!row || (row.status !== "queued" && row.status !== "held")) return { kind: "done" }
+    const nowTs = deps.clock.now()
+    const claimable = row && (row.status === "queued" || row.status === "held" || (row.status === "sending" && (!row.claimedUntil || row.claimedUntil.getTime() <= nowTs.getTime())))
+    if (!row || !claimable) return { kind: "done" }
     const skip = async (why: string): Promise<Claim> => {
-      await tx.update(notificationDeliveries).set({ status: "skipped", lastError: why }).where(eq(notificationDeliveries.id, deliveryId))
+      await tx.update(notificationDeliveries).set({ status: "skipped", lastError: why, claimedUntil: null }).where(eq(notificationDeliveries.id, deliveryId))
       return { kind: "done" }
     }
     const security = row.n.kind === "security"
@@ -131,7 +140,7 @@ export async function sendNotification(data: unknown, deps: Deps): Promise<void>
       const now = deps.clock.now()
       const w = quietFor(prefs, t?.tz, now)
       if (w.quiet) {
-        await tx.update(notificationDeliveries).set({ status: "held", sendAfter: w.endsAt }).where(eq(notificationDeliveries.id, deliveryId))
+        await tx.update(notificationDeliveries).set({ status: "held", sendAfter: w.endsAt, claimedUntil: null }).where(eq(notificationDeliveries.id, deliveryId))
         return { kind: "rehold", delayMs: Math.max(0, w.endsAt.getTime() - now.getTime()), sendAfter: w.endsAt }
       }
     }
@@ -146,34 +155,38 @@ export async function sendNotification(data: unknown, deps: Deps): Promise<void>
       if (toks.length === 0) return skip("no_token")
       extra = { sealed: toks.map((x) => x.c) }
     }
-    await tx.update(notificationDeliveries).set({ status: "queued", attempts: base.attempt }).where(eq(notificationDeliveries.id, deliveryId))
+    await tx.update(notificationDeliveries).set({ status: "sending", attempts: base.attempt, claimedUntil: new Date(nowTs.getTime() + LEASE_MS) }).where(eq(notificationDeliveries.id, deliveryId))
     return { ...base, ...extra }
   })
 
   if (claim.kind === "done") return
   if (claim.kind === "rehold") {
-    await deps.queue.add(SEND_JOB, data, { delayMs: claim.delayMs, jobId: `${SEND_JOB}.${deliveryId}.h${claim.sendAfter.getTime()}` })
+    await deps.queue.add(SEND_JOB, data, { delayMs: claim.delayMs, jobId: `${SEND_JOB}.${deliveryId}.h${claim.sendAfter.getTime()}.${nonce()}` })
     return
   }
 
   let failure: string | null = null
+  let skippedReason: string | null = null
   try {
     if (claim.channel === "email") {
       const link = claim.link ? (claim.link.startsWith("/") ? `${deps.env.APP_URL}${claim.link}` : claim.link) : null
       await deps.mailer.send({ to: claim.to!, subject: claim.title, text: link ? `${claim.body}\n\n${link}` : claim.body })
     } else {
       let ok = 0
+      let skipped: string | null = null
       let last = "push_failed"
       for (const sealed of claim.sealed ?? []) {
         try {
           const token = open(sealed, ring, pushAad(tenantId, claim.userId))
-          await deps.push.send(token, { title: claim.title, body: claim.body, data: claim.link ? { link: claim.link } : undefined })
-          ok++
+          const res = await deps.push.send(token, { title: claim.title, body: claim.body, data: claim.link ? { link: claim.link } : undefined })
+          if (res && res.status === "skipped") skipped = res.reason
+          else ok++
         } catch (err) {
           last = safeCode(err)
         }
       }
-      if (ok === 0) failure = last
+      if (ok === 0 && skipped !== null && last === "push_failed") skippedReason = skipped // nothing went out and nothing failed: no provider
+      else if (ok === 0) failure = last
     }
   } catch (err) {
     failure = safeCode(err)
@@ -183,12 +196,42 @@ export async function sendNotification(data: unknown, deps: Deps): Promise<void>
   await withTenant(deps.db, tenantId, (tx) =>
     tx
       .update(notificationDeliveries)
-      .set(failure === null ? { status: "sent", lastError: null } : { status: final ? "failed" : "queued", lastError: failure })
+      .set(skippedReason !== null ? { status: "skipped", lastError: skippedReason, claimedUntil: null } : failure === null ? { status: "sent", lastError: null, claimedUntil: null } : { status: final ? "failed" : "queued", lastError: failure, claimedUntil: null })
       .where(eq(notificationDeliveries.id, deliveryId)),
   )
   if (failure === null) return
   deps.logger[final ? "error" : "warn"]({ deliveryId, tenantId, channel: claim.channel, attempt: claim.attempt, errCode: failure, final }, "notification delivery failed")
-  if (!final) await deps.queue.add(SEND_JOB, data, { delayMs: backoffMs(claim.attempt), jobId: `${SEND_JOB}.${deliveryId}.a${claim.attempt}` })
+  if (!final) await deps.queue.add(SEND_JOB, data, { delayMs: backoffMs(claim.attempt), jobId: `${SEND_JOB}.${deliveryId}.a${claim.attempt}.${nonce()}` })
+}
+
+/**
+ * Job `notification.sweep` (every 5 min in the worker). Per tenant: deliveries still `queued`/`held` whose send_after is
+ * more than 2 min past (their job was lost, or the Redis add failed after commit), or `sending` with an expired lease
+ * (crashed worker), get a fresh `notification.send` job with a nonce id. Leased deliveries are left alone. A duplicate
+ * job is harmless: the claim lets only one run. One tenant failing never stops the rest (ids and safe code logged).
+ */
+export async function sweepNotifications(_data: unknown, deps: Deps): Promise<void> {
+  const now = deps.clock.now()
+  const cutoff = new Date(now.getTime() - SWEEP_STALE_MS).toISOString()
+  const ids = await deps.db.select({ id: tenants.id }).from(tenants) // `tenants` has no RLS; every status
+  for (const { id: tenantId } of ids) {
+    try {
+      const due = await withTenant(deps.db, tenantId, (tx) =>
+        tx
+          .select({ id: notificationDeliveries.id })
+          .from(notificationDeliveries)
+          .where(and(
+            eq(notificationDeliveries.tenantId, tenantId),
+            sql`((${notificationDeliveries.status} in ('queued', 'held') and ${notificationDeliveries.sendAfter} < ${cutoff}::timestamptz)
+              or (${notificationDeliveries.status} = 'sending' and ${notificationDeliveries.claimedUntil} < ${now.toISOString()}::timestamptz))`,
+          ))
+          .limit(500),
+      )
+      for (const r of due) await deps.queue.add(SEND_JOB, { deliveryId: r.id, tenantId }, { jobId: `${SEND_JOB}.${r.id}.s${nonce()}` })
+    } catch (err) {
+      deps.logger.error({ tenantId, errCode: safeCode(err) }, "notification sweep failed for a tenant")
+    }
+  }
 }
 
 // ---------------------------------------------------------------- inbox + preferences + tokens (used by routes.ts)

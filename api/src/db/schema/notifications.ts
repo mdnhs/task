@@ -77,10 +77,12 @@ export const notificationDeliveries = pgTable(
     tenantId: uuid("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
     notificationId: uuid("notification_id").notNull(),
     channel: text("channel", { enum: ["email", "push"] }).notNull(),
-    status: text("status", { enum: ["queued", "held", "sent", "failed", "skipped"] }).notNull(),
+    status: text("status", { enum: ["queued", "held", "sending", "sent", "failed", "skipped"] }).notNull(),
     sendAfter: timestamp("send_after", { withTimezone: true }).notNull(),
     attempts: integer("attempts").notNull().default(0),
     lastError: text("last_error"),
+    /** Lease while `sending`: another worker may claim the delivery only after this instant. */
+    claimedUntil: timestamp("claimed_until", { withTimezone: true }),
   },
   (t) => [
     foreignKey({ columns: [t.tenantId, t.notificationId], foreignColumns: [notifications.tenantId, notifications.id], name: "notification_deliveries_notification_fk" }).onDelete("cascade"),

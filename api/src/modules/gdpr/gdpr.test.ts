@@ -672,3 +672,24 @@ test("[G2c] dsr.sweep covers suspended tenants and one failing tenant does not s
   expect(logs.join("\n")).not.toContain("redis down") // code only
   expect(r1.status).toBe(201)
 })
+
+test("[FW] dsr.sweep expires a completed export whose 30 days are over even when its delayed expire job was lost", async () => {
+  const w = await world()
+  const created = (await (await w.req("POST", "/v1/me/data-export", w.c.mary)).json()) as Json
+  await w.jobs()
+  const fileId = (await w.get(created.id)).resultFileId as string
+  w.queue.jobs.length = 0 // the delayed dsr.export-expire job is lost
+  w.clock.advance({ days: 29 })
+  await runJob("dsr.sweep", {}, w.deps)
+  expect(w.queue.jobs.filter((j) => j.name === "dsr.export-expire")).toEqual([]) // not yet due
+  w.clock.advance({ days: 2 })
+  await runJob("dsr.sweep", {}, w.deps)
+  const exp = w.queue.jobs.filter((j) => j.name === "dsr.export-expire")
+  expect(exp).toHaveLength(1)
+  expect(exp[0].opts?.jobId).not.toContain(":")
+  await w.jobs(["dsr.export-expire", "file.delete-object"])
+  expect((await q(w.tenant.id, `select status from files where id = $1`, [fileId]))[0].status).toBe("deleted")
+  w.queue.jobs.length = 0
+  await runJob("dsr.sweep", {}, w.deps)
+  expect(w.queue.jobs).toEqual([]) // expired: nothing more to do
+})

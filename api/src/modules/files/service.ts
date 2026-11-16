@@ -16,7 +16,7 @@ import { canonicalName, normalizeMime } from "./mime"
 
 export const SCAN_JOB = "file.scan"
 export const DELETE_OBJECT_JOB = "file.delete-object"
-/** Presigned POST validity (FR-M0-12: short-lived, never above 300 s). */
+/** Presigned PUT validity (FR-M0-12: short-lived, never above 300 s). */
 export const UPLOAD_TTL_SEC = 300
 /** Presigned GET validity. */
 export const DOWNLOAD_TTL_SEC = 60

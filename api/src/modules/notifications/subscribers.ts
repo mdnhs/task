@@ -2,7 +2,7 @@ import { and, eq, ne } from "drizzle-orm"
 import { subscribe } from "../../core/events"
 import { registerJob } from "../../core/queue/queue"
 import { memberships, roles } from "../../db/schema"
-import { notify, SEND_JOB, sendNotification, SUBJECT_TOKEN } from "./service"
+import { notify, SEND_JOB, SWEEP_JOB, sendNotification, sweepNotifications, SUBJECT_TOKEN } from "./service"
 
 /**
  * Registers the `notification.send` job handler and the event subscribers. Call once per process (worker.ts, tests);
@@ -10,6 +10,7 @@ import { notify, SEND_JOB, sendNotification, SUBJECT_TOKEN } from "./service"
  */
 export function registerNotifications(): void {
   registerJob(SEND_JOB, sendNotification)
+  registerJob(SWEEP_JOB, sweepNotifications)
   try {
     // member.joined -> every active owner of the tenant (except the joiner) gets a "member" notification.
     subscribe("member.joined", "notifications.member-joined", async (e, { tx, deps, enqueue }) => {

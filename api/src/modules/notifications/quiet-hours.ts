@@ -17,6 +17,8 @@
  *  4. Compare minutes-since-local-midnight of `now` with start/end to decide `quiet`. endsAt is built from the LOCAL
  *     calendar date (today, or tomorrow when the window spans midnight and we are before midnight) at `end`, via
  *     wallToInstant, so it is always 07:00 local even if the night is 23 or 25 hours long.
+ *  5. Guarantee: endsAt > now and the instant endsAt is not quiet. If the end wall time falls in a DST gap, or the
+ *     instant it resolved to is still inside the window, step forward in minutes to the first non-quiet instant.
  */
 export type QuietPrefs = { quietStart: string | null; quietEnd: string | null }
 
@@ -54,6 +56,12 @@ function wallToInstant(tz: string, w: Wall): Date {
   return new Date(second)
 }
 
+function inWindow(tz: string, at: Date, start: number, end: number): boolean {
+  const w = wallClock(tz, at)
+  const cur = w.h * 60 + w.mi
+  return start > end ? cur >= start || cur < end : cur >= start && cur < end
+}
+
 export function quietWindow(prefs: QuietPrefs, tz: string, now: Date): { quiet: boolean; endsAt: Date } {
   const { quietStart, quietEnd } = prefs
   if (!quietStart || !quietEnd || quietStart === quietEnd || !isHHMM(quietStart.slice(0, 5)) || !isHHMM(quietEnd.slice(0, 5))) return { quiet: false, endsAt: now }
@@ -62,10 +70,15 @@ export function quietWindow(prefs: QuietPrefs, tz: string, now: Date): { quiet: 
   const w = wallClock(tz, now)
   const cur = w.h * 60 + w.mi
   const spans = start > end
-  const quiet = spans ? cur >= start || cur < end : cur >= start && cur < end
+  const quiet = inWindow(tz, now, start, end)
   if (!quiet) return { quiet: false, endsAt: now }
   const nextDay = spans && cur >= start // before midnight inside a midnight-spanning window: the end is tomorrow
   const day = new Date(Date.UTC(w.y, w.mo - 1, w.d + (nextDay ? 1 : 0)))
-  const endsAt = wallToInstant(tz, { y: day.getUTCFullYear(), mo: day.getUTCMonth() + 1, d: day.getUTCDate(), h: Math.floor(end / 60), mi: end % 60 })
+  let endsAt = wallToInstant(tz, { y: day.getUTCFullYear(), mo: day.getUTCMonth() + 1, d: day.getUTCDate(), h: Math.floor(end / 60), mi: end % 60 })
+  // A DST gap (or an overlap resolved to its earlier pass) can leave the computed end at or before now, or still inside
+  // the window. Guarantee endsAt > now and not quiet there: step forward minute by minute (bounded, 26 h).
+  let t = Math.max(endsAt.getTime(), now.getTime() + 1000)
+  for (let i = 0; i < 26 * 60 && inWindow(tz, new Date(t), start, end); i++) t += 60_000
+  if (t !== endsAt.getTime()) endsAt = new Date(t)
   return { quiet: true, endsAt }
 }

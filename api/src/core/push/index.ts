@@ -1,1 +1,1 @@
-export { makeLoggingPush, type PushSender } from "./push"
+export { makeLoggingPush, type PushResult, type PushSender } from "./push"

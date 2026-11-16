@@ -62,3 +62,33 @@ describe("quietWindow", () => {
     expect(w(g, "Europe/Dublin", "2027-03-28T01:00:00Z")).toEqual({ quiet: true, endsAt: "2027-03-28T02:00:00.000Z" }) // 02:00 IST .. 03:00 IST
   })
 })
+
+describe("quietWindow endsAt is always a real, non-quiet instant after now (DST gaps, UTC-negative zones)", () => {
+  const zones = ["America/New_York", "America/Los_Angeles", "America/Sao_Paulo", "Europe/Dublin", "Europe/Berlin", "Australia/Sydney", "Australia/Lord_Howe", "Asia/Kolkata"]
+  // days around the 2026/2027 transitions of every zone above (UTC dates, one day either side)
+  const days = ["2026-03-07", "2026-03-08", "2026-03-09", "2026-03-28", "2026-03-29", "2026-04-04", "2026-04-05", "2026-10-03", "2026-10-04", "2026-10-24", "2026-10-25", "2026-11-01", "2026-11-02",
+    "2027-03-13", "2027-03-14", "2027-03-27", "2027-03-28", "2027-04-03", "2027-04-04", "2027-10-02", "2027-10-03", "2027-10-30", "2027-10-31", "2027-11-07", "2027-11-08"]
+  const windows = [["22:00", "02:30"], ["22:00", "07:00"], ["23:00", "01:30"], ["21:00", "02:15"], ["00:30", "02:30"], ["01:00", "03:00"], ["13:00", "14:30"], ["22:30", "02:00"]] as const
+
+  test("property: endsAt > now and not quiet at endsAt", () => {
+    let checked = 0
+    for (const tz of zones) for (const day of days) for (const [quietStart, quietEnd] of windows) for (let h = 0; h < 24; h++) for (const m of [0, 30]) {
+      const now = new Date(`${day}T${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:00Z`)
+      const r = quietWindow({ quietStart, quietEnd }, tz, now)
+      if (!r.quiet) continue
+      checked++
+      const ctx = `${tz} ${quietStart}-${quietEnd} now=${now.toISOString()} endsAt=${r.endsAt.toISOString()}`
+      expect(r.endsAt.getTime(), ctx).toBeGreaterThan(now.getTime())
+      expect(quietWindow({ quietStart, quietEnd }, tz, r.endsAt).quiet, ctx).toBe(false)
+      expect(r.endsAt.getTime() - now.getTime(), ctx).toBeLessThanOrEqual(27 * 3600_000)
+    }
+    expect(checked).toBeGreaterThan(1000)
+  })
+
+  test("regression: New York 22:00-02:30 on the night of the spring change ends at 03:00 EDT, not 01:30 EST", () => {
+    const r = quietWindow({ quietStart: "22:00", quietEnd: "02:30" }, "America/New_York", new Date("2026-03-08T03:00:00Z")) // 22:00 EST
+    expect(r.quiet).toBe(true)
+    expect(quietWindow({ quietStart: "22:00", quietEnd: "02:30" }, "America/New_York", r.endsAt).quiet).toBe(false)
+    expect(r.endsAt.getTime()).toBeGreaterThan(new Date("2026-03-08T06:59:00Z").getTime())
+  })
+})
