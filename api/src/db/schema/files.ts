@@ -1,0 +1,44 @@
+import { sql } from "drizzle-orm"
+import { bigint, foreignKey, index, pgPolicy, pgTable, text, timestamp, unique, uuid } from "drizzle-orm/pg-core"
+import { memberships, tenants } from "./tenants"
+
+// Standard RLS template (R8); FORCE and the CHECK constraints are appended by hand in the migration.
+const tenantMatch = sql`tenant_id = nullif(current_setting('app.tenant_id', true), '')::uuid`
+const tenantPolicy = () => pgPolicy("tenant_isolation", { as: "permissive", for: "all", using: tenantMatch, withCheck: tenantMatch })
+
+export const FILE_STATUSES = ["pending", "clean", "infected", "deleted"] as const
+export type FileStatus = (typeof FILE_STATUSES)[number]
+
+/**
+ * File metadata; the bytes live in object storage under `key` = `t/<tenant_id>/<id>` (a CHECK constraint pins it, so a
+ * key can never come from a client name). `etag` is the storage ETag the scan verdict applies to: a download re-checks
+ * it, so an object replaced after the scan is never served on the old verdict. `uploaded_at` is set by the first
+ * successful `complete`.
+ */
+export const files = pgTable(
+  "files",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    tenantId: uuid("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    ownerUserId: text("owner_user_id").notNull(),
+    key: text("key").notNull(),
+    name: text("name").notNull(),
+    mime: text("mime").notNull(),
+    sizeBytes: bigint("size_bytes", { mode: "number" }).notNull(),
+    sha256: text("sha256"),
+    status: text("status").notNull().default("pending"),
+    signature: text("signature"),
+    etag: text("etag"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    uploadedAt: timestamp("uploaded_at", { withTimezone: true }),
+    scannedAt: timestamp("scanned_at", { withTimezone: true }),
+  },
+  (t) => [
+    // No cascade: removing a membership must not silently drop metadata of objects that still exist in storage.
+    foreignKey({ columns: [t.tenantId, t.ownerUserId], foreignColumns: [memberships.tenantId, memberships.userId], name: "files_owner_fk" }),
+    unique("files_tenant_id_id").on(t.tenantId, t.id),
+    unique("files_key").on(t.key),
+    index("files_tenant_created_idx").on(t.tenantId, t.createdAt),
+    tenantPolicy(),
+  ],
+).enableRLS()

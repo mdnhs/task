@@ -1,9 +1,12 @@
+import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3"
 import pino from "pino"
 import { createApp, type AppType } from "../src/app"
 import type { Deps } from "../src/deps"
 import { buildAuth } from "../src/modules/auth/auth"
 import { hasTestDb, testDb } from "./db"
 import { fakePush, type FakePush } from "../src/core/push/fake-push"
+import { fakeScanner } from "../src/core/scan/fake-scanner"
+import { s3FromEnv } from "../src/core/storage/s3-storage"
 import { fakeQueue, type FakeQueue } from "../src/core/queue/fake-queue"
 import { fakeClock, fakeMailer, type FakeClock, type FakeMailer } from "./fakes"
 
@@ -21,6 +24,15 @@ export const testEnv: Deps["env"] = {
   DATA_REGION: "eu-west-1",
   // Fixed test-only key (32 bytes of 0x07), never a real secret.
   SECRETS_KEY: Buffer.alloc(32, 7).toString("base64"),
+  // Real MinIO from global setup (TEST_S3_*); inert placeholders when the suite runs without it.
+  S3_ENDPOINT: process.env.TEST_S3_ENDPOINT,
+  S3_REGION: process.env.TEST_S3_REGION ?? "eu-west-1",
+  S3_BUCKET: process.env.TEST_S3_BUCKET ?? "opsdesk-test",
+  S3_ACCESS_KEY_ID: process.env.TEST_S3_ACCESS_KEY_ID ?? "test",
+  S3_SECRET_ACCESS_KEY: process.env.TEST_S3_SECRET_ACCESS_KEY ?? "test",
+  S3_FORCE_PATH_STYLE: true,
+  CLAMD_PORT: 3310,
+  FILE_MAX_BYTES: 26214400,
 }
 
 // Lets helpers (factories.ts) find an app's fake mailer from the app alone.
@@ -36,7 +48,9 @@ export function testApp(over: Partial<Deps> = {}): { app: AppType; deps: Deps; m
   const mailer = (over.mailer ?? fakeMailer()) as FakeMailer // the one actually used
   const queue = (over.queue ?? fakeQueue()) as FakeQueue
   const push = (over.push ?? fakePush()) as FakePush
-  const deps: Deps = { env, db, clock: usedClock, mailer, logger, queue, push, auth: over.auth ?? buildAuth({ env, db, clock: usedClock, mailer, logger }) }
+  const storage = over.storage ?? s3FromEnv(env)!
+  const scanner = over.scanner ?? fakeScanner() // auto: flags EICAR, everything else clean
+  const deps: Deps = { env, db, clock: usedClock, mailer, logger, queue, push, storage, scanner, auth: over.auth ?? buildAuth({ env, db, clock: usedClock, mailer, logger }) }
   const app = createApp(deps)
   mailerOf.set(app, mailer)
   return { app, deps, mailer, clock: usedClock as FakeClock, queue, push }
@@ -66,4 +80,19 @@ export function tenantGetRoutes(app: AppType): string[] {
     .filter(([path, item]) => "get" in (item ?? {}) && !path.includes("{") && !path.startsWith("/v1/me") && path !== "/v1/openapi.json")
     .map(([path]) => path)
     .sort()
+}
+
+/** Writes an object straight into the test bucket (simulates a client that bypassed the intent, or a replaced object). */
+export async function putObject(key: string, body: Buffer, contentType: string): Promise<void> {
+  const client = new S3Client({
+    region: testEnv.S3_REGION,
+    endpoint: testEnv.S3_ENDPOINT,
+    forcePathStyle: true,
+    credentials: { accessKeyId: testEnv.S3_ACCESS_KEY_ID!, secretAccessKey: testEnv.S3_SECRET_ACCESS_KEY! },
+  })
+  try {
+    await client.send(new PutObjectCommand({ Bucket: testEnv.S3_BUCKET, Key: key, Body: body, ContentType: contentType }))
+  } finally {
+    client.destroy()
+  }
 }

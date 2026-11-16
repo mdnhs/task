@@ -2,6 +2,7 @@ import { pathToFileURL } from "node:url"
 import { relayOnce } from "./core/events"
 import { makeBullQueue, startWorker } from "./core/queue/bull-queue"
 import { registerJob } from "./core/queue/queue"
+import { registerFiles } from "./modules/files"
 import { registerNotifications } from "./modules/notifications"
 import { parseEnv, type Env } from "./env"
 import { makeDeps } from "./server"
@@ -10,6 +11,7 @@ import { makeDeps } from "./server"
 export async function startWorkerProcess(env: Env = parseEnv(process.env)) {
   const deps = makeDeps(env)
   registerNotifications() // notification.send job + member.joined subscriber
+  registerFiles() // file.scan + file.delete-object jobs
   registerJob("events.relay", async (_data, d) => {
     await relayOnce(d)
   })

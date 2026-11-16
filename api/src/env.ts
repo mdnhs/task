@@ -10,6 +10,8 @@ const secretsKey = z.preprocess(
   z.string().refine((v) => /^[A-Za-z0-9+/]+={0,2}$/.test(v) && Buffer.from(v, "base64").length === 32, "must be base64 of exactly 32 bytes").optional(),
 )
 
+const unsetIfEmpty = (v: unknown) => (v === "" ? undefined : v)
+
 const schema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   PORT: z.preprocess((v) => (v === "" ? Number.NaN : v), z.coerce.number().int().min(1).max(65535)).default(8787),
@@ -32,6 +34,18 @@ const schema = z.object({
   // Optional bootstrap mail config; the platform admin's stored settings take precedence.
   RESEND_API_KEY: optional,
   MAIL_FROM: optional,
+  // File storage (S3-compatible: AWS S3 leaves S3_ENDPOINT unset; MinIO/R2 set it and usually S3_FORCE_PATH_STYLE=true).
+  S3_ENDPOINT: optional,
+  S3_REGION: optional,
+  S3_BUCKET: optional,
+  S3_ACCESS_KEY_ID: optional,
+  S3_SECRET_ACCESS_KEY: optional,
+  S3_FORCE_PATH_STYLE: z.preprocess(unsetIfEmpty, z.enum(["true", "false"]).default("false").transform((v) => v === "true")),
+  // Malware scanner (clamd INSTREAM over TCP).
+  CLAMD_HOST: optional,
+  CLAMD_PORT: z.preprocess(unsetIfEmpty, z.coerce.number().int().min(1).max(65535).default(3310)),
+  // Upper bound for one uploaded file (default 25 MiB); a per-plan limit can only lower it.
+  FILE_MAX_BYTES: z.preprocess(unsetIfEmpty, z.coerce.number().int().min(1).default(26214400)),
 }).superRefine((e, ctx) => {
   if (e.SECRETS_KEYS) {
     try {
@@ -47,6 +61,11 @@ const schema = z.object({
   }
   if (e.NODE_ENV === "production" && !e.SECRETS_KEY && !e.SECRETS_KEYS) {
     ctx.addIssue({ code: "custom", path: ["SECRETS_KEY"], message: "required in production (or SECRETS_KEYS)" })
+  }
+  if (e.NODE_ENV === "production") {
+    for (const k of ["S3_BUCKET", "S3_REGION", "S3_ACCESS_KEY_ID", "S3_SECRET_ACCESS_KEY", "CLAMD_HOST"] as const) {
+      if (!e[k]) ctx.addIssue({ code: "custom", path: [k], message: "required in production" })
+    }
   }
 })
 

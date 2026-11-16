@@ -4,6 +4,8 @@ import { parseEnv } from "./env"
 const base = { DATABASE_URL: "postgres://a", DATABASE_OWNER_URL: "postgres://o", REDIS_URL: "redis://r",
   BETTER_AUTH_SECRET: "x".repeat(32), APP_URL: "http://localhost:3000", DATA_REGION: "eu-west-1" }
 
+const prodFiles = { S3_BUCKET: "b", S3_REGION: "eu-west-1", S3_ACCESS_KEY_ID: "k", S3_SECRET_ACCESS_KEY: "s", CLAMD_HOST: "clamd" }
+
 test("parseEnv rejects missing DATABASE_URL", () => {
   const { DATABASE_URL: _omit, ...rest } = base
   expect(() => parseEnv(rest)).toThrow(/DATABASE_URL/)
@@ -38,8 +40,8 @@ test("SECRETS_KEY must be base64 of exactly 32 bytes, and is required in product
   expect(() => parseEnv({ ...base, SECRETS_KEY: Buffer.alloc(16).toString("base64") })).toThrow(/SECRETS_KEY/)
   expect(() => parseEnv({ ...base, SECRETS_KEY: "not base64 !!" })).toThrow(/SECRETS_KEY/)
   expect(parseEnv({ ...base, NODE_ENV: "development" }).SECRETS_KEY).toBeUndefined()
-  expect(() => parseEnv({ ...base, NODE_ENV: "production" })).toThrow(/SECRETS_KEY/)
-  expect(parseEnv({ ...base, NODE_ENV: "production", SECRETS_KEY: key32 }).NODE_ENV).toBe("production")
+  expect(() => parseEnv({ ...base, ...prodFiles, NODE_ENV: "production" })).toThrow(/SECRETS_KEY/)
+  expect(parseEnv({ ...base, ...prodFiles, NODE_ENV: "production", SECRETS_KEY: key32 }).NODE_ENV).toBe("production")
 })
 test("RESEND_API_KEY and MAIL_FROM: empty string is unset", () => {
   const env = parseEnv({ ...base, RESEND_API_KEY: "", MAIL_FROM: "" })
@@ -51,11 +53,28 @@ test("SECRETS_KEYS keyring: every key 32 bytes, SECRETS_KEY_ID must exist, satis
   const k = (n: number) => Buffer.alloc(n, 3).toString("base64")
   const keys = JSON.stringify({ k1: k(32), k2: k(32) })
   expect(parseEnv({ ...base, SECRETS_KEYS: keys, SECRETS_KEY_ID: "k2" }).SECRETS_KEY_ID).toBe("k2")
-  expect(parseEnv({ ...base, NODE_ENV: "production", SECRETS_KEYS: keys, SECRETS_KEY_ID: "k1" }).NODE_ENV).toBe("production")
+  expect(parseEnv({ ...base, ...prodFiles, NODE_ENV: "production", SECRETS_KEYS: keys, SECRETS_KEY_ID: "k1" }).NODE_ENV).toBe("production")
   expect(() => parseEnv({ ...base, SECRETS_KEYS: keys })).toThrow(/SECRETS_KEY_ID/)
   expect(() => parseEnv({ ...base, SECRETS_KEYS: keys, SECRETS_KEY_ID: "k3" })).toThrow(/SECRETS_KEY_ID/)
   expect(() => parseEnv({ ...base, SECRETS_KEYS: JSON.stringify({ k1: k(16) }), SECRETS_KEY_ID: "k1" })).toThrow(/SECRETS_KEYS/)
   expect(() => parseEnv({ ...base, SECRETS_KEYS: "{nope", SECRETS_KEY_ID: "k1" })).toThrow(/SECRETS_KEYS/)
   expect(() => parseEnv({ ...base, SECRETS_KEY_ID: "k1" })).toThrow(/SECRETS_KEY_ID/)
   expect(() => parseEnv({ ...base, SECRETS_KEYS: keys, SECRETS_KEY_ID: "constructor" })).toThrow(/SECRETS_KEY_ID/)
+})
+
+const prodBase = { ...base, NODE_ENV: "production", SECRETS_KEY: Buffer.alloc(32, 1).toString("base64") }
+test("file env: defaults, empty strings are unset, bool and number parsing", () => {
+  const e = parseEnv({ ...base, S3_ENDPOINT: "", S3_FORCE_PATH_STYLE: "", CLAMD_PORT: "", FILE_MAX_BYTES: "" })
+  expect(e).toMatchObject({ FILE_MAX_BYTES: 26214400, CLAMD_PORT: 3310, S3_FORCE_PATH_STYLE: false })
+  expect(e.S3_ENDPOINT).toBeUndefined()
+  expect(parseEnv({ ...base, S3_FORCE_PATH_STYLE: "true", CLAMD_PORT: "3311", FILE_MAX_BYTES: "1000" })).toMatchObject({ S3_FORCE_PATH_STYLE: true, CLAMD_PORT: 3311, FILE_MAX_BYTES: 1000 })
+  expect(() => parseEnv({ ...base, FILE_MAX_BYTES: "0" })).toThrow(/FILE_MAX_BYTES/)
+  expect(() => parseEnv({ ...base, S3_FORCE_PATH_STYLE: "maybe" })).toThrow(/S3_FORCE_PATH_STYLE/)
+  expect(() => parseEnv({ ...base, CLAMD_PORT: "70000" })).toThrow(/CLAMD_PORT/)
+})
+test("file env: production requires bucket, region, keys and clamd host; S3_ENDPOINT stays optional", () => {
+  expect(parseEnv({ ...prodBase, ...prodFiles })).toMatchObject({ S3_BUCKET: "b" })
+  for (const k of Object.keys(prodFiles)) {
+    expect(() => parseEnv({ ...prodBase, ...prodFiles, [k]: "" }), k).toThrow(new RegExp(k))
+  }
 })
