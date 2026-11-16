@@ -16,6 +16,8 @@ export type AppEnv = {
     user?: { id: string; email: string; twoFactorEnabled: boolean }
     tenant?: { id: string; slug: string; timezone: string; currency: string; locale: string; sessionIdleHours: number; mfaPolicy: MfaPolicy }
     member?: { userId: string; roleId: string; roleKey: string }
+    /** Set ONLY on the support-grant path of requireTenant (T3.5): the caller is platform staff reading under this grant. */
+    support?: { grantId: string; staffUserId: string }
     role?: ResolvedRole
     /** The caller's platform staff identity (requirePlatformStaff, /v1/platform/* only). */
     staff?: { userId: string; role: PlatformRole }

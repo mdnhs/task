@@ -75,6 +75,8 @@ const SPECS: Record<string, Spec> = {
   "POST /v1/data-requests/{id}/complete": { actor: "owner", expect: "data_request_not_found" },
   "POST /v1/data-requests/{id}/reject": { actor: "owner", expect: "data_request_not_found" },
   "POST /v1/data-requests/{id}/retry": { actor: "owner", expect: "data_request_not_found" }, // control: 409 request_not_failed (not 404)
+  // an active support grant of A (control: owner revokes it -> 200)
+  "DELETE /v1/settings/support-grants/{id}": { actor: "owner", expect: "grant_not_found" },
 }
 
 let t: ReturnType<typeof testApp>
@@ -101,7 +103,7 @@ const substitute = (path: string, params: Record<string, string>) => path.replac
 
 async function hashes(tenantId: string): Promise<Record<string, string>> {
   const out: Record<string, string> = {}
-  for (const tbl of ["roles", "memberships", "teams", "team_members", "reporting_lines", "devices", "device_policies", "invites", "audit_events", "tenant_settings", "notifications", "notification_preferences", "push_tokens", "notification_deliveries", "files", "integration_connections", "oauth_states", "public_holidays", "data_requests"]) {
+  for (const tbl of ["roles", "memberships", "teams", "team_members", "reporting_lines", "devices", "device_policies", "invites", "audit_events", "tenant_settings", "notifications", "notification_preferences", "push_tokens", "notification_deliveries", "files", "integration_connections", "oauth_states", "public_holidays", "data_requests", "support_grants"]) {
     const [r] = await ownerTenantQuery(tenantId, `select count(*)::text || ':' || coalesce(md5(string_agg(to_jsonb(x)::text, ',' order by to_jsonb(x)::text)), '') as h from ${tbl} x`)
     out[tbl] = String(r.h)
   }
@@ -260,7 +262,7 @@ describe("every /v1 route is registered through OpenAPI (no hidden routes)", () 
     const documented = new Set<string>()
     for (const [path, item] of Object.entries(doc.paths)) for (const m of METHODS) if (item[m]) documented.add(`${m.toUpperCase()} ${path}`)
     expect(registered.size).toBeGreaterThan(20)
-    for (const k of ["GET /v1/platform/staff", "POST /v1/platform/staff", "PATCH /v1/platform/staff/{userId}", "GET /v1/platform/audit", "GET /v1/platform/audit/export", "GET /v1/platform/settings/email", "PUT /v1/platform/settings/email", "POST /v1/platform/settings/email/test", "GET /v1/platform/settings/storage", "PUT /v1/platform/settings/storage", "POST /v1/platform/settings/storage/test", "GET /v1/platform/settings/billing", "PUT /v1/platform/settings/billing", "GET /v1/billing/subscription", "GET /v1/billing/invoices", "POST /v1/billing/checkout", "POST /v1/billing/portal", "POST /v1/billing/cancel", "POST /v1/billing/resume", "PUT /v1/billing/seats"]) {
+    for (const k of ["GET /v1/platform/staff", "POST /v1/platform/staff", "PATCH /v1/platform/staff/{userId}", "GET /v1/platform/audit", "GET /v1/platform/audit/export", "GET /v1/platform/settings/email", "PUT /v1/platform/settings/email", "POST /v1/platform/settings/email/test", "GET /v1/platform/settings/storage", "PUT /v1/platform/settings/storage", "POST /v1/platform/settings/storage/test", "GET /v1/platform/settings/billing", "PUT /v1/platform/settings/billing", "GET /v1/billing/subscription", "GET /v1/billing/invoices", "POST /v1/billing/checkout", "POST /v1/billing/portal", "POST /v1/billing/cancel", "POST /v1/billing/resume", "PUT /v1/billing/seats", "POST /v1/platform/tenants/{tenantId}/support-grants", "DELETE /v1/platform/support-grants/{id}", "GET /v1/settings/support-grants", "DELETE /v1/settings/support-grants/{id}"]) {
       expect(registered.has(k), `${k} registered`).toBe(true)
       expect(documented.has(k), `${k} in OpenAPI`).toBe(true)
     }

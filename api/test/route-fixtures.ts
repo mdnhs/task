@@ -21,7 +21,7 @@ import { notify, withTenantAfterCommit } from "../src/modules/notifications"
 export type Fixture = { kind: "id" | "static"; value: string }
 export type TenantFixtures = Record<string, Record<string, Fixture>>
 
-type Resource = "role" | "member" | "team" | "device" | "feature" | "notification" | "pushToken" | "file" | "integration" | "dataRequest"
+type Resource = "role" | "member" | "team" | "device" | "feature" | "notification" | "pushToken" | "file" | "integration" | "dataRequest" | "supportGrant"
 
 /** path template -> param -> which resource that param names on that route. */
 export const ROUTE_PARAMS: Record<string, Record<string, Resource>> = {
@@ -45,6 +45,7 @@ export const ROUTE_PARAMS: Record<string, Record<string, Resource>> = {
   "/v1/data-requests/{id}/complete": { id: "dataRequest" },
   "/v1/data-requests/{id}/reject": { id: "dataRequest" },
   "/v1/data-requests/{id}/retry": { id: "dataRequest" },
+  "/v1/settings/support-grants/{id}": { id: "supportGrant" },
 }
 
 export type Actor = { userId: string; cookie: string; slug: string }
@@ -94,7 +95,14 @@ export async function fixtureIds(t: { app: AppType; deps: Deps }, tenant: { id: 
   )
   // a pending `correct` request about the staff member (correct is the one kind with no job and no open-request limit, so the fixture can be made again and again)
   const dsr = await post("/v1/data-requests", { subjectUserId: staff.userId, kind: "correct", reason: `Fix ${uniq}` })
-  const resources = { dataRequest: dsr.id, integration: String(integ.id), file: file.fileId, role: await roleIdOf(t.deps, tenant.id, "employee"), member: staff.userId, team: team.id, device: device.id, notification: String(notif.id), pushToken: ((await tokRes.json()) as { id: string }).id }
+  // an ACTIVE support grant (T3.5) for a made-up staff id, starting now by deps.clock (the revoke checks that clock)
+  const now = t.deps.clock.now()
+  const [sg] = await ownerTenantQuery(
+    tenant.id,
+    `insert into support_grants (tenant_id, staff_user_id, reason, granted_by, starts_at, expires_at) values ($1::uuid, $2, $3, $2, $4, $5) returning id`,
+    [tenant.id, `usr_staff_${uniq}`, `Support ${uniq}`, now, new Date(now.getTime() + 3_600_000)],
+  )
+  const resources = { supportGrant: String(sg.id), dataRequest: dsr.id, integration: String(integ.id), file: file.fileId, role: await roleIdOf(t.deps, tenant.id, "employee"), member: staff.userId, team: team.id, device: device.id, notification: String(notif.id), pushToken: ((await tokRes.json()) as { id: string }).id }
   const fixtures: TenantFixtures = {}
   for (const [path, params] of Object.entries(ROUTE_PARAMS)) {
     fixtures[path] = {}
@@ -102,5 +110,5 @@ export async function fixtureIds(t: { app: AppType; deps: Deps }, tenant: { id: 
       fixtures[path][param] = res === "feature" ? { kind: "static", value: "drive" } : { kind: "id", value: resources[res] }
     }
   }
-  return { fixtures, resources, marks: [tenant.id, tenant.slug, String(integ.id), `drive-${uniq}@example.com`, team.id, device.id, file.fileId, dsr.id, `Fix ${uniq}`, `File ${uniq}.pdf`, staff.userId, owner.userId, `Team ${uniq}`, `Device ${uniq}`] }
+  return { fixtures, resources, marks: [tenant.id, tenant.slug, String(integ.id), `drive-${uniq}@example.com`, team.id, device.id, file.fileId, dsr.id, `Fix ${uniq}`, `Support ${uniq}`, String(sg.id), `File ${uniq}.pdf`, staff.userId, owner.userId, `Team ${uniq}`, `Device ${uniq}`] }
 }

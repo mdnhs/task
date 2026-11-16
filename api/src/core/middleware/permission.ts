@@ -7,6 +7,7 @@ import { roles } from "../../db/schema"
 import { withTenant } from "../../db/tenant-tx"
 import { entitlementsFor } from "../../modules/entitlements/service"
 import { Forbidden } from "../errors"
+import { SUPPORT_ROLE_ID, supportRole } from "./support"
 
 /** Loads the caller's role ONCE per request and caches it in c.var.role. Fails closed: no tenant context or role is 403. */
 export async function loadRole(c: Context<AppEnv>): Promise<ResolvedRole> {
@@ -15,6 +16,14 @@ export async function loadRole(c: Context<AppEnv>): Promise<ResolvedRole> {
   const tenant = c.get("tenant")
   const member = c.get("member")
   if (!tenant || !member) throw Forbidden("forbidden")
+  // Support-grant path (T3.5): the synthetic read-only role, never a database row. Keyed on the grant context AND the
+  // sentinel id (not on the role key, which a tenant may also use for a real custom role).
+  if (c.get("support") || member.roleId === SUPPORT_ROLE_ID) {
+    if (!c.get("support") || member.roleId !== SUPPORT_ROLE_ID) throw Forbidden("forbidden") // inconsistent context: fail closed
+    const role = supportRole()
+    c.set("role", role)
+    return role
+  }
   const [row] = await withTenant(c.get("deps").db, tenant.id, (tx) =>
     tx.select().from(roles).where(and(eq(roles.id, member.roleId), eq(roles.tenantId, tenant.id))),
   )

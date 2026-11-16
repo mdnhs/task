@@ -1,0 +1,67 @@
+import { createRoute, z } from "@hono/zod-openapi"
+import type { MiddlewareHandler } from "hono"
+import type { AppEnv } from "../../core/context"
+import { Forbidden } from "../../core/errors"
+import { requirePlatformStaff } from "../../core/middleware/platform"
+import { SUPPORT_STAFF_ROLES } from "../../core/middleware/support"
+import { requireTenant } from "../../core/middleware/tenant"
+import { newRouter } from "../../core/router"
+import { createSupportGrant, listSupportGrants, revokeSupportGrantAsStaff, revokeSupportGrantAsTenant, type GrantView } from "./support-grants"
+
+const TID = "0b9d6f3e-5c1a-4f6e-9a57-2f1d3c8e7a10"
+const GID = "7c2e9a41-3b5d-4e8f-9a10-6d4c2b1e0f93"
+const SID = "usr_8Kq2mZ4tW1"
+const NOW = "2026-11-17T09:00:00.000Z"
+const LATER = "2026-11-17T11:00:00.000Z"
+
+const Grant = z.object({
+  id: z.string(), tenantId: z.string(), staffUserId: z.string(), reason: z.string(), grantedBy: z.string(),
+  startsAt: z.string(), expiresAt: z.string(), revokedAt: z.string().nullable(), status: z.enum(["active", "expired", "revoked"]),
+})
+const GrantExample = { id: GID, tenantId: TID, staffUserId: SID, reason: "Ticket 4411: report totals look wrong", grantedBy: SID, startsAt: NOW, expiresAt: LATER, revokedAt: null, status: "active" as const }
+const GrantDto = Grant.openapi({ example: GrantExample })
+const TenantGrant = Grant.extend({ staffName: z.string().nullable() })
+const TenantGrantList = z.object({ items: z.array(TenantGrant) }).openapi({ example: { items: [{ ...GrantExample, staffName: "Aoife Support" }] } })
+
+// reason / hours are checked by the service (422), not by zod (which would answer 400). Unknown keys (e.g. a staffUserId) are dropped:
+// a grant is always for the caller.
+const CreateBody = z.object({
+  reason: z.unknown().optional().openapi({ description: "Required: 1..500 characters (422 invalid_reason otherwise)", example: "Ticket 4411: report totals look wrong" }),
+  hours: z.unknown().optional().openapi({ description: "Integer 1..24 (422 invalid_hours otherwise)", example: 2 }),
+}).openapi({ example: { reason: "Ticket 4411: report totals look wrong", hours: 2 } })
+const TenantParam = z.object({ tenantId: z.string().min(1).max(64).openapi({ param: { name: "tenantId", in: "path" }, example: TID }) })
+const GrantParam = z.object({ id: z.string().min(1).max(64).openapi({ param: { name: "id", in: "path" }, example: GID }) })
+
+const roleGate = (...keys: string[]): MiddlewareHandler<AppEnv> => async (c, next) => {
+  const member = c.get("member")
+  if (!member || !keys.includes(member.roleKey)) throw Forbidden("forbidden")
+  await next()
+}
+
+const createGrantRoute = createRoute({
+  method: "post", path: "/v1/platform/tenants/{tenantId}/support-grants", middleware: [requirePlatformStaff(...SUPPORT_STAFF_ROLES)] as const,
+  request: { params: TenantParam, body: { content: { "application/json": { schema: CreateBody } }, required: true } },
+  responses: { 201: { description: "Read-only support access to the tenant FOR THE CALLER, from now for `hours`. Tenant owners are notified at once. Audited in both chains. 404 tenant_not_found (also suspended), 409 grant_exists, 422 invalid_reason | invalid_hours", content: { "application/json": { schema: GrantDto } } } },
+})
+const revokeStaffRoute = createRoute({
+  method: "delete", path: "/v1/platform/support-grants/{id}", middleware: [requirePlatformStaff(...SUPPORT_STAFF_ROLES)] as const,
+  request: { params: GrantParam },
+  responses: { 200: { description: "Revoked (platform owner: any grant; otherwise only the grantee's own: 403 platform_forbidden). 404 grant_not_found, 409 grant_inactive", content: { "application/json": { schema: GrantDto } } } },
+})
+const listTenantRoute = createRoute({
+  method: "get", path: "/v1/settings/support-grants", middleware: [requireTenant, roleGate("owner", "admin")] as const,
+  responses: { 200: { description: "The tenant's support grants (newest first, at most 200) with the staff display name (owner or admin)", content: { "application/json": { schema: TenantGrantList } } } },
+})
+const revokeTenantRoute = createRoute({
+  method: "delete", path: "/v1/settings/support-grants/{id}", middleware: [requireTenant, roleGate("owner")] as const,
+  request: { params: GrantParam },
+  responses: { 200: { description: "Revoked by a tenant owner; support loses access on its next request. Audited in both chains. 404 grant_not_found, 409 grant_inactive", content: { "application/json": { schema: GrantDto } } } },
+})
+
+const iso = (g: GrantView) => ({ ...g, startsAt: g.startsAt.toISOString(), expiresAt: g.expiresAt.toISOString(), revokedAt: g.revokedAt?.toISOString() ?? null })
+
+export const supportGrantRoutes = newRouter()
+  .openapi(createGrantRoute, async (c) => c.json(iso(await createSupportGrant(c.get("deps"), c.req.valid("param").tenantId, c.get("staff")!, c.req.valid("json"))), 201))
+  .openapi(revokeStaffRoute, async (c) => c.json(iso(await revokeSupportGrantAsStaff(c.get("deps"), c.req.valid("param").id, c.get("staff")!)), 200))
+  .openapi(listTenantRoute, async (c) => c.json({ items: (await listSupportGrants(c.get("deps"), c.get("tenant")!.id)).map((g) => ({ ...iso(g), staffName: g.staffName })) }, 200))
+  .openapi(revokeTenantRoute, async (c) => c.json(iso(await revokeSupportGrantAsTenant(c.get("deps"), c.get("tenant")!.id, c.get("member")!.userId, c.req.valid("param").id)), 200))

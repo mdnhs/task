@@ -9,12 +9,18 @@ import { loadDevice } from "./device"
 import { enforceMfa } from "./mfa"
 import { establishSession } from "./session"
 import { enforceBilling } from "./module"
+import { enterSupportPath } from "./support"
 
 /**
  * Resolves the tenant from X-Tenant and the caller's membership of it. Self-contained (it authenticates):
  * the idle check (R23) uses the user's STRICTEST session_idle_hours across all active memberships, never the
  * target tenant's, so it cannot be dodged by switching tenants and cannot reveal a foreign tenant's policy.
  * Order: header -> session (strictest idle) -> 404 if tenant missing/inactive -> membership.
+ *
+ * Support grants (T3.5): ONLY when the caller has no active membership of the tenant, the grant path (support.ts,
+ * enterSupportPath) decides: active owner/support platform staff + MFA + an active grant for this tenant and this staff
+ * member, read-only (non-GET 403 before any handler), deny-listed GETs refused, every request audited. Without a grant it
+ * is the same 404 as any non-member. A member who is also staff always takes the normal path below, unchanged.
  *
  * Responses never distinguish "no such tenant" from "not a member" (both 404), and an unauthenticated caller
  * gets 401 for any slug, so slugs cannot be probed without a session.
@@ -37,9 +43,7 @@ export const requireTenant: MiddlewareHandler<AppEnv> = async (c, next) => {
       .where(and(eq(memberships.tenantId, tenant.id), eq(memberships.userId, userId)))
     return row
   })
-  if (!member || member.status !== "active") throw NotFound()
-
-  c.set("tenant", {
+  const tenantCtx = {
     id: tenant.id,
     slug: tenant.slug,
     timezone: tenant.timezone,
@@ -47,7 +51,15 @@ export const requireTenant: MiddlewareHandler<AppEnv> = async (c, next) => {
     locale: tenant.locale,
     sessionIdleHours: tenant.sessionIdleHours,
     mfaPolicy: tenant.mfaPolicy,
-  })
+  }
+  if (!member || member.status !== "active") {
+    await enterSupportPath(c, tenant) // throws NotFound() unless an active support grant applies
+    c.set("tenant", tenantCtx)
+    await next()
+    return
+  }
+
+  c.set("tenant", tenantCtx)
   c.set("member", { userId, roleId: member.roleId, roleKey: member.roleKey })
   // Forced MFA (FR-M0-04) is applied here so every tenant route is covered by construction (fail closed).
   await enforceMfa(c, async () => {})

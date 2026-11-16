@@ -176,6 +176,13 @@
       "when": 1794867123902,
       "tag": "0024_billing_fix1",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1794868985592,
+      "tag": "0025_support_grants",
+      "breakpoints": true
     }
   ]
 }
