@@ -30,22 +30,53 @@ describe("hash chain", () => {
     expect(Number(r1.seq)).toBe(1)
     expect(r2.prev_hash).toBe(r1.hash)
     expect(r2.hash).toBe(
-      sha256(String(r1.hash) + canonicalJson({ seq: 2, at: now.toISOString(), actorId: e2.actorId, action: e2.action, entity: e2.entity, entityId: e2.entityId, before: e2.before, after: e2.after })),
+      sha256(String(r1.hash) + canonicalJson({ tenantId: A, seq: 2, at: now.toISOString(), actorId: e2.actorId, action: e2.action, entity: e2.entity, entityId: e2.entityId, before: e2.before, after: e2.after })),
     )
-    expect(await verifyChain(db, A)).toEqual({ ok: true })
+    expect(await verifyChain(db, A)).toEqual({ ok: true, head: { seq: 2, hash: String(r2.hash) } })
   })
   test("canonicalJson sorts keys recursively", () => {
     expect(canonicalJson({ b: 1, a: { d: [{ z: 1, y: 2 }], c: null } })).toBe('{"a":{"c":null,"d":[{"y":2,"z":1}]},"b":1}')
+  })
+  test("canonicalJson throws on Date, BigInt and non-plain objects", () => {
+    expect(() => canonicalJson({ d: new Date() })).toThrow()
+    expect(() => canonicalJson({ n: 1n })).toThrow()
+    expect(() => canonicalJson({ m: new Map() })).toThrow()
+  })
+  test("after with a Date and an undefined key is normalised, stored as-is and verifies", async () => {
+    const d = new Date("2026-11-15T09:00:00.000Z")
+    await withTenant(db, A, async (tx) => {
+      await recordAudit(tx, A, { ...e1, after: { d, gone: undefined, k: 1 } }, now)
+      await recordAudit(tx, A, e2, now)
+    })
+    expect((await rows(A))[0].after).toEqual({ d: d.toISOString(), k: 1 })
+    expect(await verifyChain(db, A)).toMatchObject({ ok: true })
+  })
+  test("editing a row's hash column is detected", async () => {
+    await withTenant(db, A, async (tx) => {
+      for (const i of [1, 2]) await recordAudit(tx, A, { ...e1, entityId: String(i) }, now)
+    })
+    await ownerTenantQuery(A, `UPDATE audit_events SET hash = repeat('a', 64) WHERE seq = 2`)
+    expect(await verifyChain(db, A)).toEqual({ ok: false, brokenAt: (await rows(A))[1].id })
+  })
+  test("a chain copied verbatim into another tenant fails verification", async () => {
+    await withTenant(db, A, async (tx) => {
+      for (const i of [1, 2]) await recordAudit(tx, A, { ...e1, entityId: String(i) }, now)
+    })
+    for (const r of await rows(A)) {
+      await ownerTenantQuery(B, `INSERT INTO audit_events (tenant_id, seq, at, actor_id, action, entity, entity_id, before, after, prev_hash, hash)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`, [B, r.seq, r.at, r.actor_id, r.action, r.entity, r.entity_id, r.before, r.after, r.prev_hash, r.hash])
+    }
+    expect(await verifyChain(db, B)).toEqual({ ok: false, brokenAt: (await rows(B))[0].id })
   })
   test("null before/after (create/delete) and a null actor verify", async () => {
     await withTenant(db, A, async (tx) => {
       await recordAudit(tx, A, { ...e1, actorId: null, before: null, after: null }, now)
       await recordAudit(tx, A, { ...e1, before: { a: 1 }, after: null }, now)
     })
-    expect(await verifyChain(db, A)).toEqual({ ok: true })
+    expect(await verifyChain(db, A)).toMatchObject({ ok: true })
   })
-  test("verifyChain on an empty tenant is ok", async () => {
-    expect(await verifyChain(db, A)).toEqual({ ok: true })
+  test("verifyChain on an empty tenant is ok with a null head", async () => {
+    expect(await verifyChain(db, A)).toEqual({ ok: true, head: null })
   })
   test("chains are per tenant", async () => {
     await withTenant(db, A, (tx) => recordAudit(tx, A, e1, now))
@@ -72,7 +103,7 @@ describe("hash chain", () => {
   test("concurrent writes in one tenant keep seq gap-free", async () => {
     await Promise.all(Array.from({ length: 10 }, (_, i) => withTenant(db, A, (tx) => recordAudit(tx, A, { ...e1, entityId: String(i) }, now))))
     expect((await rows(A)).map((r) => Number(r.seq))).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
-    expect(await verifyChain(db, A)).toEqual({ ok: true })
+    expect(await verifyChain(db, A)).toMatchObject({ ok: true })
   })
   test("rolling back the caller's transaction leaves no audit row", async () => {
     await withTenant(db, A, async (tx) => {
@@ -104,7 +135,7 @@ describe("append-only", () => {
   test("another tenant's rows are invisible and cannot be written", async () => {
     expect(await withTenant(db, B, (tx) => tx.select().from(auditEvents))).toEqual([])
     const err = await withTenant(db, B, (tx) => recordAudit(tx, A, e1, now)).catch((e) => e)
-    expect(err).toBeInstanceOf(Error)
+    expect(cause(err)).toBe("42501")
   })
 })
 

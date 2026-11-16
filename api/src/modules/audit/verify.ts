@@ -14,7 +14,7 @@ const BATCH = 1000
  * row inside this tenant's chain (a hidden row would be a false "ok"), and it needs no owner credentials.
  * Limit: deleting the newest rows cannot be seen from the table alone (needs an external anchor).
  */
-export async function verifyChain(db: Db, tenantId: string): Promise<{ ok: true } | { ok: false; brokenAt: string }> {
+export async function verifyChain(db: Db, tenantId: string): Promise<{ ok: true; head: { seq: number; hash: string } | null } | { ok: false; brokenAt: string }> {
   return withTenant(db, tenantId, async (tx) => {
     let prev = GENESIS
     let expected = 1
@@ -25,9 +25,9 @@ export async function verifyChain(db: Db, tenantId: string): Promise<{ ok: true 
         .where(and(eq(auditEvents.tenantId, tenantId), gt(auditEvents.seq, expected - 1)))
         .orderBy(asc(auditEvents.seq))
         .limit(BATCH)
-      if (batch.length === 0) return { ok: true as const }
+      if (batch.length === 0) return { ok: true as const, head: expected === 1 ? null : { seq: expected - 1, hash: prev } }
       for (const r of batch) {
-        const good = r.seq === expected && r.prevHash === prev && r.hash === entryHash(prev, r)
+        const good = r.seq === expected && r.prevHash === prev && r.hash === entryHash(prev, r) && r.tenantId === tenantId
         if (!good) return { ok: false as const, brokenAt: r.id }
         prev = r.hash
         expected++

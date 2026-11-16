@@ -27,9 +27,11 @@ export async function recordAudit(tx: TenantTx, tenantId: string, e: AuditInput,
     .limit(1)
   const seq = (last?.seq ?? 0) + 1
   const prevHash = last?.hash ?? GENESIS
-  const before = e.before ?? null
-  const after = e.after ?? null
-  const hash = entryHash(prevHash, { seq, at: now, actorId: e.actorId, action: e.action, entity: e.entity, entityId: e.entityId, before, after })
+  // Normalise once (what jsonb will store) and hash + store exactly that, so Dates/undefined/toJSON cannot diverge.
+  const norm = (v: unknown): unknown => (v === undefined ? null : JSON.parse(JSON.stringify(v)) ?? null)
+  const before = norm(e.before)
+  const after = norm(e.after)
+  const hash = entryHash(prevHash, { tenantId, seq, at: now, actorId: e.actorId, action: e.action, entity: e.entity, entityId: e.entityId, before, after })
   await tx.insert(auditEvents).values({
     tenantId,
     seq,
