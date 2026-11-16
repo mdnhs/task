@@ -1,3 +1,4 @@
+import { validator } from "hono/validator"
 import { expect, test } from "vitest"
 import { call, testApp } from "../test/harness"
 import { Conflict } from "./core/errors"
@@ -35,4 +36,14 @@ test("GET /v1/openapi.json serves OpenAPI 3.1 with version 1", async () => {
   const j = (await (await call(testApp().app, "GET", "/v1/openapi.json")).json()) as { openapi: string; info: { version: string } }
   expect(j.openapi).toMatch(/^3\.1/)
   expect(j.info.version).toBe("1")
+})
+test("malformed JSON body is 400 problem+json, not 500", async () => {
+  const { app } = testApp()
+  app.post("/v1/_json", validator("json", (v) => v), (c) => c.json({ ok: true }))
+  const r = await call(app, "POST", "/v1/_json", { headers: { "content-type": "application/json" } })
+  const bad = await app.request("/v1/_json", { method: "POST", headers: { "content-type": "application/json" }, body: "{not json" })
+  expect(r.status).toBe(400)
+  expect(bad.status).toBe(400)
+  expect(bad.headers.get("content-type")).toMatch(/application\/problem\+json/)
+  expect(await bad.json()).toMatchObject({ status: 400, code: "bad_request", requestId: expect.any(String) })
 })

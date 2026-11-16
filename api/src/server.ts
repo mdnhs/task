@@ -3,17 +3,14 @@ import { serve } from "@hono/node-server"
 import { createApp } from "./app"
 import { makeDb } from "./db/client"
 import type { Deps } from "./deps"
+import { buildAuth } from "./modules/auth/auth"
 import { parseEnv, type Env } from "./env"
 
-// Real db/auth/mailer wiring arrives in T1.1.
+// Mailer is still a no-op until a real one lands.
 function makeDeps(env: Env): Deps {
-  return {
-    env,
-    db: makeDb(env.DATABASE_URL),
-    auth: undefined,
-    clock: { now: () => new Date() },
-    mailer: { send: async () => undefined },
-  }
+  const db = makeDb(env.DATABASE_URL)
+  const clock = { now: () => new Date() }
+  return { env, db, auth: buildAuth({ env, db, clock }), clock, mailer: { send: async () => undefined } }
 }
 
 export function start(env: Env = parseEnv(process.env)) {

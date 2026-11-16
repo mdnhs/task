@@ -15,6 +15,13 @@
       "when": 1794840664332,
       "tag": "0001_tenants",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1794843924333,
+      "tag": "0002_better_auth",
+      "breakpoints": true
     }
   ]
 }

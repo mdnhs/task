@@ -17,3 +17,18 @@ test("parseEnv rejects a non-EU DATA_REGION", () => {
 test("parseEnv rejects BETTER_AUTH_SECRET shorter than 32 chars", () => {
   expect(() => parseEnv({ ...base, BETTER_AUTH_SECRET: "short" })).toThrow(/BETTER_AUTH_SECRET/)
 })
+test("parseEnv treats empty-string OAuth vars as unset", () => {
+  const env = parseEnv({ ...base, GOOGLE_CLIENT_ID: "", GOOGLE_CLIENT_SECRET: "", MICROSOFT_CLIENT_ID: "", MICROSOFT_CLIENT_SECRET: "" })
+  expect(env.GOOGLE_CLIENT_ID).toBeUndefined()
+  expect(env.MICROSOFT_CLIENT_SECRET).toBeUndefined()
+})
+test("parseEnv keeps real OAuth values", () => {
+  expect(parseEnv({ ...base, GOOGLE_CLIENT_ID: "g" }).GOOGLE_CLIENT_ID).toBe("g")
+})
+test("parseEnv accepts PORT 1..65535 and rejects everything else", () => {
+  expect(parseEnv({ ...base, PORT: "8080" }).PORT).toBe(8080)
+  expect(parseEnv({ ...base, PORT: "65535" }).PORT).toBe(65535)
+  for (const bad of ["0", "-1", "65536", "80.5", "abc", ""]) {
+    expect(() => parseEnv({ ...base, PORT: bad }), `PORT=${bad}`).toThrow(/PORT/)
+  }
+})
