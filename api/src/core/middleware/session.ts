@@ -1,31 +1,42 @@
 import { eq } from "drizzle-orm"
 import type { MiddlewareHandler } from "hono"
 import type { AppEnv } from "../context"
+import type { Deps } from "../../deps"
 import { session as sessionTable } from "../../db/schema"
 import { Unauthorized } from "../errors"
 
 // NFR-04 default; a tenant's own value (c.var.tenant, from T1.3) takes precedence.
 export const DEFAULT_SESSION_IDLE_HOURS = 12
 
-export const requireSession: MiddlewareHandler<AppEnv> = async (c, next) => {
-  const { auth, db, clock } = c.get("deps")
-  const found = await auth.api.getSession({ headers: c.req.raw.headers })
-  if (!found) throw Unauthorized("unauthenticated")
+/**
+ * The single idle-timeout implementation. Resolves the Better Auth session for these headers.
+ * Returns null when there is no valid session. Throws session_expired (after deleting the
+ * session row, so replays are plain unauthenticated) when idle past `idleHours`.
+ * Otherwise stamps lastSeenAt = deps.clock.now() and returns the session.
+ */
+export async function authenticateSession(deps: Deps, headers: Headers, idleHours = DEFAULT_SESSION_IDLE_HOURS) {
+  const { auth, db, clock } = deps
+  const found = await auth.api.getSession({ headers })
+  if (!found) return null
 
   const now = clock.now()
-  const idleMs = (c.get("tenant")?.sessionIdleHours ?? DEFAULT_SESSION_IDLE_HOURS) * 3_600_000
   const lastSeenAt = new Date(found.session.lastSeenAt ?? found.session.createdAt)
-  if (now.getTime() - lastSeenAt.getTime() > idleMs) {
-    // Revoke, so a replay of the same cookie is plain unauthenticated.
+  if (now.getTime() - lastSeenAt.getTime() > idleHours * 3_600_000) {
     await db.delete(sessionTable).where(eq(sessionTable.id, found.session.id))
     throw Unauthorized("session_expired")
   }
   await db.update(sessionTable).set({ lastSeenAt: now }).where(eq(sessionTable.id, found.session.id))
+  return { ...found, now }
+}
+
+export const requireSession: MiddlewareHandler<AppEnv> = async (c, next) => {
+  const found = await authenticateSession(c.get("deps"), c.req.raw.headers, c.get("tenant")?.sessionIdleHours)
+  if (!found) throw Unauthorized("unauthenticated")
 
   c.set("session", {
     id: found.session.id,
     userId: found.user.id,
-    lastSeenAt: now,
+    lastSeenAt: found.now,
     // A 2FA user only gets a session after the second factor, so presence of 2FA means it was passed.
     mfaPassed: Boolean(found.user.twoFactorEnabled),
   })

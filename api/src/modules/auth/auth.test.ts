@@ -60,6 +60,28 @@ test("session idle longer than the default 12h is 401 session_expired and the se
   expect(again.status).toBe(401)
   expect(((await again.json()) as Code).code).toBe("unauthenticated")
 })
+test("idle cookie is also rejected on Better Auth's own endpoints, and the session is revoked", async () => {
+  const { app, clock, cookie } = await signedIn()
+  const hdr = { origin: testEnv.APP_URL }
+  expect((await call(app, "GET", "/api/auth/get-session", { cookie })).status).toBe(200)
+  const before = await ownerQuery("select id from session")
+  clock.advance({ hours: 12, minutes: 1 })
+  const g = await call(app, "GET", "/api/auth/get-session", { cookie })
+  expect(g.status).toBe(401)
+  expect(((await g.json()) as Code).code).toBe("session_expired")
+  expect(await ownerQuery("select id from session")).toHaveLength(before.length - 1)
+  const { cookie: other } = await signIn(app, EMAIL, PW)
+  clock.advance({ hours: 12, minutes: 1 })
+  const r = await call(app, "POST", "/api/auth/revoke-other-sessions", { cookie: other, body: {}, headers: hdr })
+  expect(r.status).toBe(401)
+  expect(((await r.json()) as Code).code).toBe("session_expired")
+})
+test("a fresh cookie works on get-session; sign-in without a session is untouched", async () => {
+  const { app, cookie } = await signedIn()
+  const g = await call(app, "GET", "/api/auth/get-session", { cookie })
+  expect(g.status).toBe(200)
+  expect(((await g.json()) as { user: { email: string } }).user.email).toBe(EMAIL)
+})
 test("activity inside the window keeps the session alive", async () => {
   const { app, clock, cookie } = await signedIn()
   clock.advance({ hours: 11 })
