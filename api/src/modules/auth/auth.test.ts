@@ -3,6 +3,7 @@ import { call, fakeMailer, resetDb, testApp, testEnv } from "../../../test/harne
 import { ownerQuery } from "../../../test/db"
 import { signIn, signUp } from "../../../test/factories"
 import { buildAuth } from "./auth"
+import { mapAuthError } from "./routes"
 
 type Code = { code: string }
 const EMAIL = "a@x.ie"
@@ -184,4 +185,19 @@ test("testApp({ mailer }) returns and uses the mailer it was given", async () =>
   expect(t.mailer).toBe(mine)
   await signUp(t.app, EMAIL, PW)
   expect(mine.sent.length).toBe(1)
+})
+test("mapAuthError keeps every Set-Cookie (separately) and other headers alongside the problem body", async () => {
+  const h = new Headers({ "content-type": "application/json", "content-length": "20", "x-retry-after": "7", "x-custom": "1" })
+  h.append("set-cookie", "better-auth.session_token=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax")
+  h.append("set-cookie", "better-auth.session_data=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax")
+  const out = await mapAuthError(new Response(JSON.stringify({ code: "UNAUTHORIZED", message: "no" }), { status: 401, headers: h }), "rid-1")
+  expect(out.status).toBe(401)
+  expect(out.headers.get("content-type")).toMatch(/problem\+json/)
+  expect(await out.json()).toMatchObject({ status: 401, code: "unauthorized", requestId: "rid-1" })
+  expect(out.headers.getSetCookie()).toEqual([
+    "better-auth.session_token=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax",
+    "better-auth.session_data=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax",
+  ])
+  expect(out.headers.get("x-retry-after")).toBe("7")
+  expect(out.headers.get("x-custom")).toBe("1")
 })
