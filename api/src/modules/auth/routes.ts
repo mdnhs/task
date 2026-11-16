@@ -1,9 +1,8 @@
 import { Hono } from "hono"
 import type { AppEnv } from "../../core/context"
 import { problem, statusCode, statusTitle } from "../../core/errors"
-import { authenticateSession, requireSession } from "../../core/middleware/session"
+import { authenticateSession } from "../../core/middleware/session"
 import { strictestIdleHours } from "../../core/session-policy"
-import { listUserTenants } from "../tenants"
 
 /** Better Auth error response -> problem+json, keeping its headers (notably Set-Cookie that clears the session). */
 export async function mapAuthError(res: Response, requestId: string): Promise<Response> {
@@ -61,9 +60,4 @@ authRoutes.on(["GET", "POST"], "/api/auth/*", async (c) => {
   // e.g. invalid_email_or_password, email_not_verified) becomes `code`; its free-text message is dropped.
   if (res.status >= 400) return mapAuthError(res, c.get("requestId"))
   return res
-})
-
-authRoutes.get("/v1/me", requireSession, async (c) => {
-  const user = c.get("user")!
-  return c.json({ user: { id: user.id, email: user.email }, tenants: await listUserTenants(c.get("deps").db, user.id) })
 })

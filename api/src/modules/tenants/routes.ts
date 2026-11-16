@@ -2,6 +2,7 @@ import { createRoute, z } from "@hono/zod-openapi"
 import { newRouter } from "../../core/router"
 import { requireSession } from "../../core/middleware/session"
 import { requireTenant } from "../../core/middleware/tenant"
+import { listUserTenants } from "./me"
 import { createTenant } from "./service"
 
 const validTimezone = (v: string) => {
@@ -47,7 +48,18 @@ const meTenantRoute = createRoute({
   responses: { 200: { description: "Tenant and member context of the caller", content: { "application/json": { schema: z.any() } } } },
 })
 
+const meRoute = createRoute({
+  method: "get",
+  path: "/v1/me",
+  middleware: [requireSession] as const,
+  responses: { 200: { description: "The caller and their active tenants", content: { "application/json": { schema: z.object({ user: z.object({ id: z.string(), email: z.string() }), tenants: z.array(z.object({ slug: z.string(), name: z.string(), roleKey: z.string() })) }) } } } },
+})
+
 export const tenantRoutes = newRouter()
+  .openapi(meRoute, async (c) => {
+    const user = c.get("user")!
+    return c.json({ user: { id: user.id, email: user.email }, tenants: await listUserTenants(c.get("deps").db, user.id) }, 200)
+  })
   .openapi(createTenantRoute, async (c) => {
     const res = await createTenant(c.get("deps"), c.get("user")!.id, c.req.valid("json"))
     return c.json(res, 201)

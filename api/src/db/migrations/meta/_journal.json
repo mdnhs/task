@@ -71,6 +71,13 @@
       "when": 1794849715399,
       "tag": "0009_device_enrolment",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1794850314655,
+      "tag": "0010_own_row_policies_no_tenant_context",
+      "breakpoints": true
     }
   ]
 }

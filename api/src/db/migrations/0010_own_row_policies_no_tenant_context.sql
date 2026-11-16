@@ -1,0 +1,2 @@
+ALTER POLICY "own_memberships_read" ON "memberships" TO public USING (user_id = nullif(current_setting('app.user_id', true), '') and nullif(current_setting('app.tenant_id', true), '') is null);--> statement-breakpoint
+ALTER POLICY "own_membership_role_read" ON "roles" TO public USING (nullif(current_setting('app.tenant_id', true), '') is null and exists (select 1 from memberships m where m.role_id = roles.id and m.user_id = nullif(current_setting('app.user_id', true), '')));

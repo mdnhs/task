@@ -24,7 +24,10 @@ const tenantMatch = sql`tenant_id = nullif(current_setting('app.tenant_id', true
 const tenantPolicy = () => pgPolicy("tenant_isolation", { as: "permissive", for: "all", using: tenantMatch, withCheck: tenantMatch })
 // app.user_id is set (transaction-local) by withUser() from the authenticated session. It lets a user read
 // their OWN memberships (and the roles those point at) across tenants, for /v1/me and the idle-timeout lookup.
-const userMatch = sql`user_id = nullif(current_setting('app.user_id', true), '')`
+// Both own-row policies also require NO tenant context (app.tenant_id unset): inside a tenant-scoped transaction
+// they must not widen visibility to the user's other tenants (policies are OR'ed). Found by the T1.8 walker.
+const noTenantContext = sql`nullif(current_setting('app.tenant_id', true), '') is null`
+const userMatch = sql`user_id = nullif(current_setting('app.user_id', true), '') and ${noTenantContext}`
 
 export const roles = pgTable(
   "roles",
@@ -46,7 +49,7 @@ export const roles = pgTable(
     pgPolicy("own_membership_role_read", {
       as: "permissive",
       for: "select",
-      using: sql`exists (select 1 from memberships m where m.role_id = roles.id and m.user_id = nullif(current_setting('app.user_id', true), ''))`,
+      using: sql`${noTenantContext} and exists (select 1 from memberships m where m.role_id = roles.id and m.user_id = nullif(current_setting('app.user_id', true), ''))`,
     }),
   ],
 ).enableRLS()
