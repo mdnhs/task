@@ -7,7 +7,7 @@ import { entitlementsFor, seatsUsed } from "./service"
 const EntitlementsDto = z
   .object({
     planId: z.string(),
-    status: z.enum(["trialing", "active", "past_due", "canceled", "incomplete"]),
+    status: z.enum(["trialing", "active", "past_due", "canceled", "incomplete", "unpaid", "paused"]),
     modules: z.array(z.string()).openapi({ description: "Product module ids the tenant may use (plan plus overrides)" }),
     seats: z.number().int(),
     seatsUsed: z.number().int(),

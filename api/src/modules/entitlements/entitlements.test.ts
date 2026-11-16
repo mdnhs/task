@@ -3,7 +3,7 @@ import { ownerQuery, ownerTenantQuery } from "../../../test/db"
 import { call, resetDb, testApp } from "../../../test/harness"
 import { makeMember, makeTenant, roleIdOf, signIn, signUp } from "../../../test/factories"
 import { resetSubscribers } from "../../core/events"
-import { changeSubscription, clearModuleOverride, setModuleOverride } from "."
+import { changeSubscription, clearModuleOverride, entitlementsFor, invalidateEntitlements, setModuleOverride } from "."
 
 type Json = Record<string, any> // eslint-disable-line @typescript-eslint/no-explicit-any
 const DAY = 86_400_000
@@ -195,4 +195,34 @@ test("subscriptions and module_overrides are tenant-isolated (RLS)", async () =>
   await ownerTenantQuery(b.tenant.id, `insert into module_overrides (tenant_id, module, mode, reason, set_by, set_at) values ($1, 'M2', 'revoke', 'x', 'p', now())`, [b.tenant.id])
   expect((await ownerTenantQuery(a.tenant.id, "select tenant_id from subscriptions")).map((r) => r.tenant_id)).toEqual([a.tenant.id])
   expect(await ownerTenantQuery(a.tenant.id, "select 1 from module_overrides")).toEqual([])
+})
+
+test("unpaid and paused are blocked like canceled (402 on writes, GETs open)", async () => {
+  for (const status of ["unpaid", "paused"] as const) {
+    const w = await world({ status })
+    expect((await post(w, "/v1/_probe/write")).status, status).toBe(402)
+    expect(await code(await post(w, "/v1/_probe/write")), status).toBe("billing_required")
+    expect((await get(w, "/v1/entitlements")).status).toBe(200)
+    expect(((await (await get(w, "/v1/entitlements")).json()) as Json).billingState).toBe("blocked")
+  }
+})
+
+test("a load that started before an invalidate cannot repopulate the cache with stale state (generation counter)", async () => {
+  const w = await world({ planId: "starter", seats: 10 })
+  // Proxy the db so that the entitlement load finishes, then an invalidate lands before the loader caches its result.
+  const db = new Proxy(w.deps.db, {
+    get(target, prop, recv) {
+      if (prop !== "transaction") return Reflect.get(target, prop, recv)
+      return async (...args: unknown[]) => {
+        const r = await (target.transaction as (...a: unknown[]) => Promise<unknown>)(...args)
+        invalidateEntitlements(w.tenant.id) // a change committed + invalidated while this (old) load was in flight
+        return r
+      }
+    },
+  })
+  const raced = await entitlementsFor({ ...w.deps, db }, w.tenant.id)
+  expect(raced.planId).toBe("starter") // the loader saw the old state...
+  await ownerTenantQuery(w.tenant.id, "update subscriptions set plan_id = 'business', seats = 40")
+  // ...but it must not have been cached: the next read (same clock instant) sees the new plan.
+  expect((await entitlementsFor(w.deps, w.tenant.id)).planId).toBe("business")
 })

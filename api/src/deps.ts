@@ -7,6 +7,7 @@ import type { Queue } from "./core/queue/queue"
 import type { OAuthClient } from "./core/oauth/oauth"
 import type { Env } from "./env"
 import type { Auth } from "./modules/auth/auth"
+import type { BillingProvider } from "./modules/billing/provider"
 
 export type { Db }
 
@@ -17,4 +18,4 @@ export type Mailer = {
   invalidate?(): void
 }
 export type { Auth }
-export type Deps = { env: Env; db: Db; auth: Auth; clock: Clock; mailer: Mailer; logger: Logger; queue: Queue; push: PushSender; storage: Storage; scanner: MalwareScanner; oauth: OAuthClient }
+export type Deps = { env: Env; db: Db; auth: Auth; clock: Clock; mailer: Mailer; logger: Logger; queue: Queue; push: PushSender; storage: Storage; scanner: MalwareScanner; oauth: OAuthClient; billing: BillingProvider }

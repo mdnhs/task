@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm"
-import { boolean, check, integer, jsonb, pgPolicy, pgTable, primaryKey, text, timestamp, uuid } from "drizzle-orm/pg-core"
+import { bigint, boolean, check, index, integer, jsonb, pgPolicy, pgTable, primaryKey, text, timestamp, uuid } from "drizzle-orm/pg-core"
 import { tenants } from "./tenants"
 
 // Standard RLS template (R8); FORCE is appended by hand in the migration.
@@ -21,7 +21,8 @@ export const plans = pgTable("plans", {
   active: boolean("active").notNull().default(true),
 })
 
-export const SUBSCRIPTION_STATUSES = ["trialing", "active", "past_due", "canceled", "incomplete"] as const
+// unpaid / paused (T3.3, Stripe): both are blocked states like canceled (enforceBilling answers 402 on writes).
+export const SUBSCRIPTION_STATUSES = ["trialing", "active", "past_due", "canceled", "incomplete", "unpaid", "paused"] as const
 export type SubscriptionStatus = (typeof SUBSCRIPTION_STATUSES)[number]
 
 /** One subscription per tenant. */
@@ -56,4 +57,34 @@ export const moduleOverrides = pgTable(
     setAt: timestamp("set_at", { withTimezone: true }).notNull(),
   },
   (t) => [primaryKey({ columns: [t.tenantId, t.module] }), check("module_overrides_mode_check", sql`${t.mode} IN ('grant','revoke')`), tenantPolicy()],
+).enableRLS()
+
+export const INVOICE_STATUSES = ["paid", "open", "failed"] as const
+export type InvoiceStatus = (typeof INVOICE_STATUSES)[number]
+
+/**
+ * Provider invoices mirrored per tenant (T3.3). Money is integer minor units + the ISO currency the provider reported
+ * (never assumed). event_at is the `created` of the newest provider event applied (out-of-order guard).
+ */
+export const invoices = pgTable(
+  "invoices",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    tenantId: uuid("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    providerInvoiceId: text("provider_invoice_id").notNull().unique(),
+    amountMinor: bigint("amount_minor", { mode: "number" }).notNull(),
+    currency: text("currency").notNull(),
+    status: text("status").$type<InvoiceStatus>().notNull(),
+    hostedUrl: text("hosted_url"),
+    periodStart: timestamp("period_start", { withTimezone: true }).notNull(),
+    periodEnd: timestamp("period_end", { withTimezone: true }).notNull(),
+    eventAt: timestamp("event_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+  },
+  (t) => [
+    check("invoices_status_check", sql`${t.status} IN ('paid','open','failed')`),
+    check("invoices_amount_check", sql`${t.amountMinor} >= 0`),
+    index("invoices_tenant_created_idx").on(t.tenantId, t.createdAt, t.id),
+    tenantPolicy(),
+  ],
 ).enableRLS()

@@ -8,6 +8,7 @@ import { fakePush, type FakePush } from "../src/core/push/fake-push"
 import { fakeScanner } from "../src/core/scan/fake-scanner"
 import { makeStorage } from "../src/modules/platform-storage"
 import { fakeQueue, type FakeQueue } from "../src/core/queue/fake-queue"
+import { fakeBilling, type FakeBillingProvider } from "../src/modules/billing"
 import { fakeOAuth, type FakeOAuth } from "../src/core/oauth/fake-oauth"
 import { fakeClock, fakeMailer, type FakeClock, type FakeMailer } from "./fakes"
 
@@ -39,7 +40,7 @@ export const testEnv: Deps["env"] = {
 // Lets helpers (factories.ts) find an app's fake mailer from the app alone.
 export const mailerOf = new WeakMap<object, FakeMailer>()
 
-export function testApp(over: Partial<Deps> = {}): { app: AppType; deps: Deps; mailer: FakeMailer; clock: FakeClock; queue: FakeQueue; push: FakePush; oauth: FakeOAuth } {
+export function testApp(over: Partial<Deps> = {}): { app: AppType; deps: Deps; mailer: FakeMailer; clock: FakeClock; queue: FakeQueue; push: FakePush; oauth: FakeOAuth; billing: FakeBillingProvider } {
   const clock = fakeClock()
   const env = over.env ?? testEnv
   // Real (lazy-connecting) Testcontainers db when global setup provided one; inert fake otherwise.
@@ -50,12 +51,13 @@ export function testApp(over: Partial<Deps> = {}): { app: AppType; deps: Deps; m
   const queue = (over.queue ?? fakeQueue()) as FakeQueue
   const push = (over.push ?? fakePush()) as FakePush
   const oauth = (over.oauth ?? fakeOAuth()) as FakeOAuth
+  const billing = (over.billing ?? fakeBilling()) as FakeBillingProvider
   const storage = over.storage ?? makeStorage({ env, db })
   const scanner = over.scanner ?? fakeScanner() // auto: flags EICAR, everything else clean
-  const deps: Deps = { env, db, clock: usedClock, mailer, logger, queue, push, storage, scanner, oauth, auth: over.auth ?? buildAuth({ env, db, clock: usedClock, mailer, logger }) }
+  const deps: Deps = { env, db, clock: usedClock, mailer, logger, queue, push, storage, scanner, oauth, billing, auth: over.auth ?? buildAuth({ env, db, clock: usedClock, mailer, logger }) }
   const app = createApp(deps)
   mailerOf.set(app, mailer)
-  return { app, deps, mailer, clock: usedClock as FakeClock, queue, push, oauth }
+  return { app, deps, mailer, clock: usedClock as FakeClock, queue, push, oauth, billing }
 }
 
 export function call(

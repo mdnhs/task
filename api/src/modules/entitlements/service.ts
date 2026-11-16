@@ -52,7 +52,8 @@ function derive(raw: Raw, now: Date): Entitlement {
   const ent = resolveEntitlements(entitlementsData(), raw.planId, raw.overrides)
   const graceEndsAt = raw.trialEndsAt ? new Date(raw.trialEndsAt.getTime() + GRACE_DAYS * DAY_MS) : null
   let billingState: BillingState = "ok"
-  if (raw.status === "canceled" || raw.status === "incomplete") billingState = "blocked"
+  // canceled / incomplete / unpaid / paused: blocked (a past_due subscription stays open: writes continue during dunning).
+  if (raw.status === "canceled" || raw.status === "incomplete" || raw.status === "unpaid" || raw.status === "paused") billingState = "blocked"
   else if (raw.status === "trialing") {
     if (!raw.trialEndsAt || now >= raw.trialEndsAt) billingState = graceEndsAt && now < graceEndsAt ? "grace" : "blocked"
   }
@@ -67,8 +68,12 @@ export async function tenantEntitlements(db: Db, tenantId: string, now: Date): P
 // Per-tenant cache of the RAW state (time-dependent fields are derived at read time). In-process: invalidateEntitlements on any
 // change here; other processes converge within the TTL.
 const cache = new Map<string, { at: number; raw: Raw }>()
+// Per-tenant generation, bumped by every invalidate. A load that started before an invalidate must not write its (possibly
+// stale) result back into the cache, so entitlementsFor only caches when the generation is unchanged (T3.2 review, minor 1).
+const generation = new Map<string, number>()
 
 export function invalidateEntitlements(tenantId: string): void {
+  generation.set(tenantId, (generation.get(tenantId) ?? 0) + 1)
   cache.delete(tenantId)
 }
 
@@ -77,8 +82,9 @@ export async function entitlementsFor(deps: Deps, tenantId: string): Promise<Ent
   const now = deps.clock.now()
   const hit = cache.get(tenantId)
   if (hit && now.getTime() >= hit.at && now.getTime() - hit.at < ENTITLEMENT_TTL_MS) return derive(hit.raw, now)
+  const gen = generation.get(tenantId) ?? 0
   const raw = await withTenant(deps.db, tenantId, (tx) => loadRaw(tx, tenantId))
-  cache.set(tenantId, { at: now.getTime(), raw })
+  if ((generation.get(tenantId) ?? 0) === gen) cache.set(tenantId, { at: now.getTime(), raw })
   return derive(raw, now)
 }
 
@@ -97,10 +103,41 @@ export async function assertSeatAvailable(tx: TenantTx, tenantId: string): Promi
   if ((await seatsUsed(tx, tenantId)) >= raw.seats) throw Conflict("seat_limit")
 }
 
-export type SubscriptionPatch = Partial<{ planId: string; status: SubscriptionStatus; seats: number; trialEndsAt: Date | null; currentPeriodEnd: Date | null; cancelAtPeriodEnd: boolean }>
+export type SubscriptionPatch = Partial<{
+  planId: string; status: SubscriptionStatus; seats: number; trialEndsAt: Date | null; currentPeriodEnd: Date | null; cancelAtPeriodEnd: boolean
+  provider: string | null; providerCustomerId: string | null; providerSubscriptionId: string | null; updatedFromEventAt: Date | null
+}>
+type SubscriptionRow = typeof subscriptions.$inferSelect
 const snap = (s: { planId: string; status: string; seats: number; trialEndsAt: Date | null; currentPeriodEnd: Date | null; cancelAtPeriodEnd: boolean }) => ({
   planId: s.planId, status: s.status, seats: s.seats, trialEndsAt: s.trialEndsAt, currentPeriodEnd: s.currentPeriodEnd, cancelAtPeriodEnd: s.cancelAtPeriodEnd,
 })
+
+/**
+ * Transaction-scoped core of changeSubscription (the provider webhook applies an event and records it in ONE tx). `patch` may
+ * be a function of the locked "before" row; returning null skips the change (nothing audited or published). The caller
+ * MUST call invalidateEntitlements(tenantId) AFTER the tx commits. Returns whether a change was written.
+ */
+export async function changeSubscriptionTx(
+  tx: TenantTx, tenantId: string, actorId: string, patch: SubscriptionPatch | ((before: SubscriptionRow) => SubscriptionPatch | null), now: Date,
+): Promise<boolean> {
+  const [before] = await tx.select().from(subscriptions).where(eq(subscriptions.tenantId, tenantId)).for("update")
+  if (!before) throw new AppError(404, "subscription_not_found", "Not Found")
+  const p = typeof patch === "function" ? patch(before) : patch
+  if (!p) return false
+  if (p.planId !== undefined && !(await tx.select({ id: plans.id }).from(plans).where(eq(plans.id, p.planId))).length) {
+    throw new AppError(422, "unknown_plan", "Unprocessable Entity")
+  }
+  const [after] = await tx.update(subscriptions).set(p).where(eq(subscriptions.tenantId, tenantId)).returning()
+  await recordAudit(tx, tenantId, { action: "subscription.changed", entity: "subscription", entityId: tenantId, actorId, before: snap(before), after: snap(after) }, now)
+  if (before.planId !== after.planId || before.status !== after.status) {
+    await publish(
+      tx,
+      { tenantId, type: "billing.subscription_changed", payload: { from: { planId: before.planId, status: before.status }, to: { planId: after.planId, status: after.status } }, actorId },
+      now,
+    )
+  }
+  return true
+}
 
 /**
  * Changes a tenant's subscription (platform console / provider webhooks call this). Audited with before/after in the same tx;
@@ -108,22 +145,7 @@ const snap = (s: { planId: string; status: string; seats: number; trialEndsAt: D
  */
 export async function changeSubscription(deps: Deps, tenantId: string, actorId: string, patch: SubscriptionPatch): Promise<void> {
   const now = deps.clock.now()
-  await withTenant(deps.db, tenantId, async (tx) => {
-    const [before] = await tx.select().from(subscriptions).where(eq(subscriptions.tenantId, tenantId)).for("update")
-    if (!before) throw new AppError(404, "subscription_not_found", "Not Found")
-    if (patch.planId !== undefined && !(await tx.select({ id: plans.id }).from(plans).where(eq(plans.id, patch.planId))).length) {
-      throw new AppError(422, "unknown_plan", "Unprocessable Entity")
-    }
-    const [after] = await tx.update(subscriptions).set(patch).where(eq(subscriptions.tenantId, tenantId)).returning()
-    await recordAudit(tx, tenantId, { action: "subscription.changed", entity: "subscription", entityId: tenantId, actorId, before: snap(before), after: snap(after) }, now)
-    if (before.planId !== after.planId || before.status !== after.status) {
-      await publish(
-        tx,
-        { tenantId, type: "billing.subscription_changed", payload: { from: { planId: before.planId, status: before.status }, to: { planId: after.planId, status: after.status } }, actorId },
-        now,
-      )
-    }
-  })
+  await withTenant(deps.db, tenantId, (tx) => changeSubscriptionTx(tx, tenantId, actorId, patch, now))
   invalidateEntitlements(tenantId)
 }
 

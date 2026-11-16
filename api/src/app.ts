@@ -7,6 +7,7 @@ import { errorInfo } from "./core/safe-error"
 import { requestId } from "./core/middleware/request-id"
 import { auditRoutes } from "./modules/audit"
 import { deviceRoutes, probeRoutes } from "./modules/devices"
+import { billingRoutes, billingSettingsRoutes, billingWebhookRoutes } from "./modules/billing"
 import { entitlementProbeRoutes, entitlementRoutes } from "./modules/entitlements"
 import { fileRoutes } from "./modules/files"
 import { gdprRoutes } from "./modules/gdpr"
@@ -75,7 +76,10 @@ export function createApp(deps: Deps) {
   app.route("/", platformAuditRoutes)
   app.route("/", emailSettingsRoutes)
   app.route("/", storageSettingsRoutes)
+  app.route("/", billingSettingsRoutes)
   app.route("/", entitlementRoutes)
+  app.route("/", billingRoutes)
+  app.route("/", billingWebhookRoutes) // outside /v1: raw body, authenticated by the provider signature
   if (deps.env.NODE_ENV === "test") app.route("/", entitlementProbeRoutes) // test-only (M1A probe, write probe)
   if (deps.env.NODE_ENV === "test") app.route("/", probeRoutes) // test-only; never registered elsewhere, not in the OpenAPI doc
 

@@ -9,6 +9,7 @@ import { makeMailer } from "./modules/platform-email"
 import { makeLoggingPush } from "./core/push"
 import { clamdFromEnv } from "./core/scan/clamd-scanner"
 import { unconfiguredScanner } from "./core/scan/scanner"
+import { makeBilling } from "./modules/billing"
 import { makeStorage } from "./modules/platform-storage"
 import { makeOAuthClient } from "./core/oauth/google-oauth"
 import { makeBullQueue } from "./core/queue/bull-queue"
@@ -19,7 +20,7 @@ export function makeDeps(env: Env): Deps {
   const clock = { now: () => new Date() }
   const logger = pino({ level: "info" })
   const mailer = makeMailer({ env, db, logger })
-  return { env, db, auth: buildAuth({ env, db, clock, mailer, logger }), clock, mailer, logger, queue: makeBullQueue(env.REDIS_URL), push: makeLoggingPush(logger), storage: makeStorage({ env, db }), scanner: clamdFromEnv(env) ?? unconfiguredScanner(), oauth: makeOAuthClient(env) }
+  return { env, db, auth: buildAuth({ env, db, clock, mailer, logger }), clock, mailer, logger, queue: makeBullQueue(env.REDIS_URL), push: makeLoggingPush(logger), storage: makeStorage({ env, db }), scanner: clamdFromEnv(env) ?? unconfiguredScanner(), oauth: makeOAuthClient(env), billing: makeBilling({ env, db }) }
 }
 
 export function start(env: Env = parseEnv(process.env)) {

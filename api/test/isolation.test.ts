@@ -249,7 +249,7 @@ describe("AC-M0-01 cross-tenant isolation walker", () => {
 })
 
 describe("every /v1 route is registered through OpenAPI (no hidden routes)", () => {
-  const EXCLUDED = (p: string) => p.startsWith("/api/auth") || p === "/healthz" || p === "/readyz" || p === "/v1/openapi.json" || p.startsWith("/v1/_probe/")
+  const EXCLUDED = (p: string) => p.startsWith("/api/auth") || p === "/healthz" || p === "/readyz" || p === "/v1/openapi.json" || p.startsWith("/v1/_probe/") || p.startsWith("/webhooks/billing/") // ruling C5: raw-body, signature-authenticated provider webhooks
   test("app.routes minus the documented exclusions equals the OpenAPI paths", () => {
     const app = t.app
     const registered = new Set<string>()
@@ -260,7 +260,7 @@ describe("every /v1 route is registered through OpenAPI (no hidden routes)", () 
     const documented = new Set<string>()
     for (const [path, item] of Object.entries(doc.paths)) for (const m of METHODS) if (item[m]) documented.add(`${m.toUpperCase()} ${path}`)
     expect(registered.size).toBeGreaterThan(20)
-    for (const k of ["GET /v1/platform/staff", "POST /v1/platform/staff", "PATCH /v1/platform/staff/{userId}", "GET /v1/platform/audit", "GET /v1/platform/audit/export", "GET /v1/platform/settings/email", "PUT /v1/platform/settings/email", "POST /v1/platform/settings/email/test", "GET /v1/platform/settings/storage", "PUT /v1/platform/settings/storage", "POST /v1/platform/settings/storage/test"]) {
+    for (const k of ["GET /v1/platform/staff", "POST /v1/platform/staff", "PATCH /v1/platform/staff/{userId}", "GET /v1/platform/audit", "GET /v1/platform/audit/export", "GET /v1/platform/settings/email", "PUT /v1/platform/settings/email", "POST /v1/platform/settings/email/test", "GET /v1/platform/settings/storage", "PUT /v1/platform/settings/storage", "POST /v1/platform/settings/storage/test", "GET /v1/platform/settings/billing", "PUT /v1/platform/settings/billing", "GET /v1/billing/subscription", "GET /v1/billing/invoices", "POST /v1/billing/checkout", "POST /v1/billing/portal", "POST /v1/billing/cancel", "POST /v1/billing/resume", "PUT /v1/billing/seats"]) {
       expect(registered.has(k), `${k} registered`).toBe(true)
       expect(documented.has(k), `${k} in OpenAPI`).toBe(true)
     }
@@ -270,6 +270,8 @@ describe("every /v1 route is registered through OpenAPI (no hidden routes)", () 
   test("the exclusions are real and nothing else under /v1 is hidden", () => {
     const paths = t.app.routes.filter((r) => r.method !== "ALL").map((r) => r.path)
     expect(paths.some((p) => p.startsWith("/v1/_probe/"))).toBe(true)
+    expect(paths).toContain("/webhooks/billing/stripe")
+    expect(paths.filter((p) => !p.startsWith("/v1/") && !p.startsWith("/api/auth") && !["/healthz", "/readyz"].includes(p))).toEqual(["/webhooks/billing/stripe"])
     expect(paths.filter((p) => p.startsWith("/v1/") && !p.startsWith("/v1/_probe/") && p !== "/v1/openapi.json").length).toBeGreaterThan(20)
   })
 })

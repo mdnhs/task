@@ -48,6 +48,9 @@ const schema = z.object({
   S3_ACCESS_KEY_ID: optional,
   S3_SECRET_ACCESS_KEY: optional,
   S3_FORCE_PATH_STYLE: z.preprocess(unsetIfEmpty, z.enum(["true", "false"]).default("false").transform((v) => v === "true")),
+  // Payment provider BOOTSTRAP fallback (the platform admin's stored billing settings win). Unconfigured: billing routes and the webhook answer 503.
+  STRIPE_SECRET_KEY: optional,
+  STRIPE_WEBHOOK_SECRET: optional,
   // Malware scanner (clamd INSTREAM over TCP).
   CLAMD_HOST: optional,
   CLAMD_PORT: z.preprocess(unsetIfEmpty, z.coerce.number().int().min(1).max(65535).default(3310)),

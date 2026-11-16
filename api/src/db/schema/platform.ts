@@ -1,6 +1,7 @@
-import { bigint, check, index, jsonb, pgTable, smallint, text, timestamp, uuid } from "drizzle-orm/pg-core"
+import { bigint, check, index, jsonb, pgTable, primaryKey, smallint, text, timestamp, uuid } from "drizzle-orm/pg-core"
 import { sql } from "drizzle-orm"
 import { user } from "./auth"
+import { tenants } from "./tenants"
 
 // Platform-level (not per tenant): no tenant_id, so no RLS. Singleton row, managed by the platform super admin.
 // app_user gets SELECT/INSERT/UPDATE only (DELETE is revoked in the migration).
@@ -74,4 +75,52 @@ export const platformAuditEvents = pgTable(
     hash: text("hash").notNull(),
   },
   (t) => [index("platform_audit_events_entity_idx").on(t.entity, t.at)],
+)
+
+// Platform-level singleton (no tenant_id, no RLS), same pattern as platform_email_settings: payment-provider credentials
+// configured by the platform super admin. Both secrets are sealed (AAD platform.billing.stripe.secret_key / .webhook_secret);
+// only last4 is ever shown. price_map is plan id -> provider price id. app_user: SELECT/INSERT/UPDATE (DELETE revoked).
+export const platformBillingSettings = pgTable(
+  "platform_billing_settings",
+  {
+    id: smallint("id").primaryKey().default(1),
+    provider: text("provider").notNull().default("stripe"),
+    secretKeyCiphertext: text("secret_key_ciphertext").notNull(),
+    secretKeyLast4: text("secret_key_last4").notNull(),
+    webhookSecretCiphertext: text("webhook_secret_ciphertext").notNull(),
+    webhookSecretLast4: text("webhook_secret_last4").notNull(),
+    publishableKey: text("publishable_key"),
+    priceMap: jsonb("price_map").$type<Record<string, string>>().notNull().default({}),
+    updatedBy: text("updated_by"),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  () => [check("platform_billing_settings_singleton", sql`id = 1`), check("platform_billing_settings_provider", sql`provider = 'stripe'`)],
+)
+
+// Idempotency ledger for provider webhooks (no RLS: the tenant is only known after the customer lookup). The webhook
+// inserts the row and applies the event in ONE transaction, so a row exists iff the event took effect (or was ignored).
+// target_tenant_id (not named tenant_id on purpose: it is not an RLS key) is the tenant the event resolved to, if any.
+export const billingEvents = pgTable(
+  "billing_events",
+  {
+    provider: text("provider").notNull(),
+    providerEventId: text("provider_event_id").notNull(),
+    receivedAt: timestamp("received_at", { withTimezone: true }).notNull(),
+    kind: text("kind").notNull(),
+    targetTenantId: uuid("target_tenant_id"),
+    processedAt: timestamp("processed_at", { withTimezone: true }),
+  },
+  (t) => [primaryKey({ columns: [t.provider, t.providerEventId] })],
+)
+
+// provider customer -> tenant (platform-level lookup so the webhook can resolve a tenant without a tenant context; the
+// subscriptions table is RLS-forced). Written when a customer is created for a tenant; subscriptions.provider_customer_id mirrors it.
+export const billingCustomers = pgTable(
+  "billing_customers",
+  {
+    provider: text("provider").notNull(),
+    customerId: text("customer_id").notNull(),
+    targetTenantId: uuid("target_tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+  },
+  (t) => [primaryKey({ columns: [t.provider, t.customerId] })],
 )
