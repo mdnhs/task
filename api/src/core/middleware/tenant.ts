@@ -9,8 +9,9 @@ import { establishSession } from "./session"
 
 /**
  * Resolves the tenant from X-Tenant and the caller's membership of it. Self-contained (it authenticates):
- * the tenant's own session_idle_hours must be known BEFORE the idle check, and the tenant is found by slug
- * (header only), so the order is: header -> tenant row -> session (idle check with the tenant's hours) -> membership.
+ * the idle check (R23) uses the user's STRICTEST session_idle_hours across all active memberships, never the
+ * target tenant's, so it cannot be dodged by switching tenants and cannot reveal a foreign tenant's policy.
+ * Order: header -> session (strictest idle) -> 404 if tenant missing/inactive -> membership.
  *
  * Responses never distinguish "no such tenant" from "not a member" (both 404), and an unauthenticated caller
  * gets 401 for any slug, so slugs cannot be probed without a session.
@@ -21,7 +22,7 @@ export const requireTenant: MiddlewareHandler<AppEnv> = async (c, next) => {
   const deps = c.get("deps")
 
   const [tenant] = await deps.db.select().from(tenants).where(eq(tenants.slug, slug)) // `tenants` has no RLS
-  await establishSession(c, tenant ? tenant.sessionIdleHours : (userId) => strictestIdleHours(deps.db, userId))
+  await establishSession(c, (userId) => strictestIdleHours(deps.db, userId)) // R23: never the target tenant's hours
   if (!tenant || tenant.status !== "active") throw NotFound()
 
   const userId = c.get("session")!.userId

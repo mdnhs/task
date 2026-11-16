@@ -52,7 +52,7 @@ export async function establishSession(c: Context<AppEnv>, idle: IdleHours) {
 // Idempotent: requireTenant already authenticated with the tenant's own idle hours, so it is not re-run (or re-stamped).
 export const requireSession: MiddlewareHandler<AppEnv> = async (c, next) => {
   if (!c.get("session")) {
-    await establishSession(c, c.get("tenant")?.sessionIdleHours ?? ((userId) => strictestIdleHours(c.get("deps").db, userId)))
+    await establishSession(c, (userId) => strictestIdleHours(c.get("deps").db, userId))
   }
   await next()
 }
