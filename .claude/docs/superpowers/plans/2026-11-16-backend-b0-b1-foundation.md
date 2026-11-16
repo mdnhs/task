@@ -244,8 +244,8 @@ test("GET /v1/openapi.json serves OpenAPI 3.1 with version 1", async () => {
 
 ```sql
 ALTER TABLE <t> ENABLE ROW LEVEL SECURITY; ALTER TABLE <t> FORCE ROW LEVEL SECURITY;
-CREATE POLICY tenant_isolation ON <t> USING (tenant_id = current_setting('app.tenant_id', true)::uuid)
-  WITH CHECK (tenant_id = current_setting('app.tenant_id', true)::uuid);
+CREATE POLICY tenant_isolation ON <t> USING (tenant_id = nullif(current_setting('app.tenant_id', true), '')::uuid)
+  WITH CHECK (tenant_id = nullif(current_setting('app.tenant_id', true), '')::uuid);
 ```
 
 - [ ] **Step 1: Write the failing tests**
