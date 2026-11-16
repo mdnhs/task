@@ -7,15 +7,21 @@ import type { DomainEvent, EventType, Subscriber } from "./types"
  * Domain-event bus: transactional outbox + relay (relay.ts).
  *
  * Contract for subscribers (ruling B2):
- *  - A subscriber is invoked as `(event, { tx, deps })` at-least-once by the relay, but its effects happen exactly once:
- *    the `event_deliveries` row (ON CONFLICT DO NOTHING) and the handler's DB writes share `ctx.tx` (a savepoint of the
- *    relay's per-tenant transaction). If the handler throws, the savepoint rolls back, delivery row included, and the
- *    event is retried on the next relay pass. A second relay of an already-delivered (event, subscriber) skips the handler.
+ *  - A subscriber is invoked as `(event, { tx, deps, enqueue })` at-least-once by the relay, but its effects happen
+ *    exactly once: the `event_deliveries` row (ON CONFLICT DO NOTHING) and the handler's DB writes share `ctx.tx` (a
+ *    savepoint of the relay's per-tenant transaction). If the handler throws, the savepoint rolls back, delivery row
+ *    included, and the event is retried with exponential backoff (dead after 10 attempts, see relay.ts).
+ *    A second relay of an already-delivered (event, subscriber) skips the handler.
  *  - Do DB effects through `ctx.tx` ONLY (never `deps.db`), so they commit or roll back with the delivery row.
- *  - External side effects (mail, push, HTTP) must NOT run inside the handler: enqueue them with `deps.queue.add(...)`.
- *    Jobs run after commit, so a rolled-back delivery can never leak a mail. Use a deterministic `jobId`
- *    (e.g. `${event.id}:${name}`) so a retried delivery cannot enqueue duplicates.
+ *  - External side effects (mail, push, HTTP) must NOT run in the handler and must NOT call `deps.queue.add` directly:
+ *    use `ctx.enqueue(name, data)`. Intents are buffered, discarded if the delivery rolls back, and flushed to
+ *    `deps.queue` only AFTER the tenant tx commits, with a stable jobId so retries do not duplicate jobs.
+ *    (If the flush itself fails after commit the job is lost and an error is logged; there is no redelivery.)
  *  - Subscriber names are unique across the registry; the name is part of the delivery key.
+ *
+ * Lock-order rule for publishers: inside a request tx call recordAudit FIRST and publish LAST (publish takes the
+ * relay-hint row lock, which the relay also takes; keeping it last keeps that lock held for the shortest time and
+ * avoids lock-order inversions with the per-tenant audit advisory lock).
  */
 type Registered = { type: EventType | "*"; name: string; handler: Subscriber }
 const registry: Registered[] = []

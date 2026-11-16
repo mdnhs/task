@@ -5,7 +5,7 @@ import { call, resetDb, testApp } from "../../../test/harness"
 import { makeMember, makeTenant, roleIdOf, signIn, signUp } from "../../../test/factories"
 import { withTenant } from "../../db/tenant-tx"
 import { domainEvents, eventDeliveries } from "../../db/schema"
-import { publish, relayOnce, resetSubscribers, subscribe } from "."
+import { MAX_ATTEMPTS, publish, relayOnce, resetSubscribers, subscribe } from "."
 
 beforeEach(async () => {
   await resetDb()
@@ -85,6 +85,9 @@ test("a failing subscriber does not block others and is retried on the next rela
   expect(await count(w.A, "domain_events", "type = 'file.scanned'")).toBe(0) // failed handler's effects rolled back
   expect(await count(w.A, "event_deliveries")).toBe(1) // only "good"
   fail = false
+  expect(await relayOnce(w.deps)).toBe(0) // backing off: not due yet
+  expect(flaky).toHaveBeenCalledTimes(1)
+  w.clock.advance({ minutes: 1 })
   expect(await relayOnce(w.deps)).toBe(1)
   expect(flaky).toHaveBeenCalledTimes(2)
   expect(good).toHaveBeenCalledTimes(1) // not re-run
@@ -179,4 +182,105 @@ test("changing a member's role publishes member.role_changed", async () => {
   const ev = await ownerTenantQuery(tenant.id, "select type, payload from domain_events")
   expect(ev).toHaveLength(1)
   expect(ev[0]).toMatchObject({ type: "member.role_changed", payload: { userId: emp.userId, toRoleKey: "manager", fromRoleKey: "employee" } })
+})
+
+// ---- fix round 1 ----
+test("handler enqueues then throws: nothing reaches the queue", async () => {
+  const w = await world()
+  subscribe("member.joined", "mail", async (_e, ctx) => {
+    ctx.enqueue("mail.send", { to: "x" })
+    throw new Error("boom")
+  })
+  await emit(w, w.A)
+  await relayOnce(w.deps)
+  expect(w.queue.jobs).toEqual([])
+})
+
+test("enqueue before a failing relayed_at update/commit: nothing reaches the queue, no delivery persisted", async () => {
+  const w = await world()
+  subscribe("member.joined", "mail", async (_e, ctx) => ctx.enqueue("mail.send", { to: "x" }))
+  await emit(w, w.A)
+  await ownerQuery(`create function fail_relay() returns trigger language plpgsql as $$ begin if new.relayed_at is not null then raise exception 'sim'; end if; return new; end $$`)
+  await ownerQuery("create trigger fail_relay before update on domain_events for each row execute function fail_relay()")
+  try {
+    expect(await relayOnce(w.deps)).toBe(0)
+  } finally {
+    await ownerQuery("drop trigger fail_relay on domain_events")
+    await ownerQuery("drop function fail_relay()")
+  }
+  expect(w.queue.jobs).toEqual([])
+  expect(await count(w.A, "event_deliveries")).toBe(0)
+})
+
+test("one tenant's relay failure does not skip other tenants", async () => {
+  const w = await world()
+  subscribe("*", "s", async () => {})
+  await emit(w, w.A)
+  await emit(w, w.B)
+  await ownerQuery(`create function fail_a() returns trigger language plpgsql as $$ begin if new.tenant_id = '${w.A}' and new.relayed_at is not null then raise exception 'sim'; end if; return new; end $$`)
+  await ownerQuery("create trigger fail_a before update on domain_events for each row execute function fail_a()")
+  try {
+    expect(await relayOnce(w.deps)).toBe(1)
+  } finally {
+    await ownerQuery("drop trigger fail_a on domain_events")
+    await ownerQuery("drop function fail_a()")
+  }
+  expect(await count(w.B, "domain_events", "relayed_at is not null")).toBe(1)
+  expect(await count(w.A, "domain_events", "relayed_at is null")).toBe(1)
+})
+
+test("successful delivery enqueues exactly one job after commit; re-relay enqueues none", async () => {
+  const w = await world()
+  subscribe("member.joined", "mail", async (e, ctx) => ctx.enqueue("mail.send", { id: e.id }))
+  const id = await emit(w, w.A)
+  expect(await relayOnce(w.deps)).toBe(1)
+  expect(w.queue.jobs).toHaveLength(1)
+  expect(w.queue.jobs[0]).toMatchObject({ name: "mail.send", opts: { jobId: `${id}:mail:mail.send` } })
+  await ownerTenantQuery(w.A, "update domain_events set relayed_at = null where id = $1", [id])
+  await ownerQuery("insert into event_relay_hints (tenant) values ($1) on conflict do nothing", [w.A])
+  await relayOnce(w.deps)
+  expect(w.queue.jobs).toHaveLength(1)
+})
+
+test("a permanently failing subscriber backs off, dies after MAX_ATTEMPTS, and newer events still deliver", async () => {
+  const w = await world()
+  const good = vi.fn(async () => {})
+  subscribe("member.joined", "bad", async () => { throw new Error("secret-pii@x.ie") })
+  subscribe("invite.created", "good", good)
+  const badId = await emit(w, w.A, "member.joined")
+  const stamps: number[] = []
+  for (let i = 1; i <= MAX_ATTEMPTS; i++) {
+    await relayOnce(w.deps)
+    const [f] = await ownerTenantQuery(w.A, "select attempts, next_attempt_at, dead_at, last_error_code from event_delivery_failures where event_id = $1", [badId])
+    expect(f.attempts).toBe(i)
+    stamps.push(new Date(f.next_attempt_at as string).getTime() - w.deps.clock.now().getTime())
+    if (i === 1) {
+      // newer event for the same tenant is delivered while the first backs off
+      await emit(w, w.A, "invite.created")
+      expect(await relayOnce(w.deps)).toBe(1)
+      expect(good).toHaveBeenCalledTimes(1)
+    }
+    if (i < MAX_ATTEMPTS) {
+      expect(await relayOnce(w.deps)).toBe(0) // not due yet
+      w.clock.advance({ hours: 2 })
+    }
+  }
+  expect(stamps[1]).toBeGreaterThan(stamps[0])
+  expect(stamps[2]).toBeGreaterThan(stamps[1])
+  const [dead] = await ownerTenantQuery(w.A, "select attempts, dead_at, last_error_code from event_delivery_failures where event_id = $1", [badId])
+  expect(dead.dead_at).not.toBeNull()
+  expect(dead.attempts).toBe(MAX_ATTEMPTS)
+  expect(await count(w.A, "domain_events", "id = '" + badId + "' and relayed_at is not null")).toBe(1) // dead = done
+  expect(await ownerQuery("select * from event_relay_hints")).toEqual([])
+})
+
+test("relay logs never contain the error message", async () => {
+  const lines: string[] = []
+  const w0 = testApp({ logger: { error: (o: unknown) => lines.push(JSON.stringify(o)), info() {}, warn() {}, debug() {} } as never })
+  const a = await makeTenant(w0.deps, { slug: "acme" })
+  subscribe("*", "bad", async () => { throw new Error("secret-pii@x.ie") })
+  await withTenant(w0.deps.db, a.id, (tx) => publish(tx, { tenantId: a.id, type: "member.joined", payload: {}, actorId: null }, w0.deps.clock.now()))
+  await relayOnce(w0.deps)
+  expect(lines.length).toBeGreaterThan(0)
+  expect(lines.join()).not.toMatch(/secret-pii/)
 })

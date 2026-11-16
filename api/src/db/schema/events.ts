@@ -1,4 +1,4 @@
-import { index, jsonb, pgPolicy, pgTable, primaryKey, text, timestamp, uuid } from "drizzle-orm/pg-core"
+import { index, integer, jsonb, pgPolicy, pgTable, primaryKey, text, timestamp, uuid } from "drizzle-orm/pg-core"
 import { sql } from "drizzle-orm"
 import { tenants } from "./tenants"
 
@@ -42,3 +42,22 @@ export const eventDeliveries = pgTable(
 // tenants have pending events without a tenant context. The column is `tenant` (not `tenant_id`) on purpose; the
 // structural RLS guard keys on `tenant_id`.
 export const eventRelayHints = pgTable("event_relay_hints", { tenant: uuid("tenant").primaryKey() })
+
+// Failure tracking per (event, subscriber): exponential backoff, dead after MAX_ATTEMPTS (relay.ts). A delivery that
+// fails rolls back its savepoint, so this row is written by the relay outside that savepoint.
+export const eventDeliveryFailures = pgTable(
+  "event_delivery_failures",
+  {
+    tenantId: uuid("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    eventId: uuid("event_id").notNull().references(() => domainEvents.id, { onDelete: "cascade" }),
+    subscriber: text("subscriber").notNull(),
+    attempts: integer("attempts").notNull(),
+    nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }).notNull(),
+    lastErrorCode: text("last_error_code").notNull(),
+    deadAt: timestamp("dead_at", { withTimezone: true }),
+  },
+  (t) => [
+    primaryKey({ columns: [t.eventId, t.subscriber] }),
+    pgPolicy("tenant_isolation", { as: "permissive", for: "all", using: tenantMatch, withCheck: tenantMatch }),
+  ],
+).enableRLS()

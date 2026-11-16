@@ -14,7 +14,7 @@ export function makeBullQueue(redisUrl: string, name: string = QUEUE_NAME): Queu
   return {
     raw,
     add: async (jobName, data, opts) => {
-      await raw.add(jobName, data ?? {}, { delay: opts?.delayMs, jobId: opts?.jobId, removeOnComplete: true, removeOnFail: 1000 })
+      await raw.add(jobName, data ?? {}, { delay: opts?.delayMs, jobId: opts?.jobId, removeOnComplete: { age: 86400 }, removeOnFail: { age: 7 * 86400 } })
     },
     close: async () => {
       await raw.close()

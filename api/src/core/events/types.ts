@@ -14,5 +14,14 @@ export type DomainEvent = {
   actorId: string | null
 }
 
-export type SubscriberCtx = { tx: TenantTx; deps: Deps }
+export type EnqueueOpts = { delayMs?: number; key?: string }
+export type SubscriberCtx = {
+  tx: TenantTx
+  deps: Deps
+  /**
+   * Buffers a background job. It reaches deps.queue only after the relay's tenant tx COMMITS, and is dropped if this
+   * delivery rolls back. jobId is `${eventId}:${subscriber}:${name}[:${key}]` so retries cannot enqueue duplicates.
+   */
+  enqueue(name: string, data: unknown, opts?: EnqueueOpts): void
+}
 export type Subscriber = (e: DomainEvent, ctx: SubscriberCtx) => Promise<void>
