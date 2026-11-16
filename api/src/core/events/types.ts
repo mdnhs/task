@@ -20,7 +20,7 @@ export type SubscriberCtx = {
   deps: Deps
   /**
    * Buffers a background job. It reaches deps.queue only after the relay's tenant tx COMMITS, and is dropped if this
-   * delivery rolls back. jobId is `${eventId}:${subscriber}:${name}[:${key}]` so retries cannot enqueue duplicates.
+   * delivery rolls back. jobId is a sha256 hex of (eventId, subscriber, name, key) so retries cannot enqueue duplicates.
    */
   enqueue(name: string, data: unknown, opts?: EnqueueOpts): void
 }

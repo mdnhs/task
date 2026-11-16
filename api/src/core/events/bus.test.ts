@@ -5,6 +5,7 @@ import { call, resetDb, testApp } from "../../../test/harness"
 import { makeMember, makeTenant, roleIdOf, signIn, signUp } from "../../../test/factories"
 import { withTenant } from "../../db/tenant-tx"
 import { domainEvents, eventDeliveries } from "../../db/schema"
+import { eventJobId } from "./relay"
 import { MAX_ATTEMPTS, publish, relayOnce, resetSubscribers, subscribe } from "."
 
 beforeEach(async () => {
@@ -235,7 +236,7 @@ test("successful delivery enqueues exactly one job after commit; re-relay enqueu
   const id = await emit(w, w.A)
   expect(await relayOnce(w.deps)).toBe(1)
   expect(w.queue.jobs).toHaveLength(1)
-  expect(w.queue.jobs[0]).toMatchObject({ name: "mail.send", opts: { jobId: `${id}:mail:mail.send` } })
+  expect(w.queue.jobs[0]).toMatchObject({ name: "mail.send", opts: { jobId: eventJobId(id, "mail", "mail.send") } })
   await ownerTenantQuery(w.A, "update domain_events set relayed_at = null where id = $1", [id])
   await ownerQuery("insert into event_relay_hints (tenant) values ($1) on conflict do nothing", [w.A])
   await relayOnce(w.deps)
@@ -283,4 +284,14 @@ test("relay logs never contain the error message", async () => {
   await relayOnce(w0.deps)
   expect(lines.length).toBeGreaterThan(0)
   expect(lines.join()).not.toMatch(/secret-pii/)
+})
+
+test("invalid subscriber/job names are rejected early", async () => {
+  expect(() => subscribe("*", "bad:name", async () => {})).toThrow(/Invalid subscriber/)
+  const w = await world()
+  subscribe("member.joined", "ok", async (_e, ctx) => ctx.enqueue("a:b", {}))
+  await emit(w, w.A)
+  await relayOnce(w.deps)
+  expect(w.queue.jobs).toEqual([]) // enqueue threw in-process, delivery failed, nothing queued
+  expect(await count(w.A, "event_delivery_failures")).toBe(1)
 })

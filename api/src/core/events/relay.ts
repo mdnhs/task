@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto"
 import { and, asc, eq, isNull, notExists, sql } from "drizzle-orm"
 import type { Deps } from "../../deps"
 import { withTenant, type TenantTx } from "../../db/tenant-tx"
@@ -8,6 +9,13 @@ import type { DomainEvent, EnqueueOpts, EventType } from "./types"
 const DEFAULT_BATCH = 100
 export const MAX_ATTEMPTS = 10
 const MAX_BACKOFF_S = 3600
+
+export const SAFE_NAME = /^[A-Za-z0-9._-]+$/
+
+/** Stable, BullMQ-safe job id (hex only; BullMQ rejects ':' in custom ids). Hash of the parts, so no separator can collide. */
+export function eventJobId(eventId: string, subscriber: string, name: string, key?: string): string {
+  return createHash("sha256").update(JSON.stringify([eventId, subscriber, name, key ?? ""])).digest("hex")
+}
 
 type JobIntent = { name: string; data: unknown; opts: { delayMs?: number; jobId: string } }
 
@@ -85,11 +93,10 @@ async function relayTenant(deps: Deps, tenantId: string, batch: number): Promise
         const prior = failures.get(sub.name)
         if (prior?.deadAt) continue // dead counts as done
         const buffered: JobIntent[] = []
-        const enqueue = (name: string, data: unknown, o?: EnqueueOpts) =>
-          void buffered.push({
-            name, data,
-            opts: { delayMs: o?.delayMs, jobId: `${event.id}:${sub.name}:${name}${o?.key ? `:${o.key}` : ""}` },
-          })
+        const enqueue = (name: string, data: unknown, o?: EnqueueOpts) => {
+          if (!SAFE_NAME.test(name) || (o?.key !== undefined && !SAFE_NAME.test(o.key))) throw new Error("Invalid job name or key (allowed: A-Z a-z 0-9 . _ -)")
+          buffered.push({ name, data, opts: { delayMs: o?.delayMs, jobId: eventJobId(event.id, sub.name, name, o?.key) } })
+        }
         try {
           await tx.transaction(async (sp) => {
             const claimed = await sp

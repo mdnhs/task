@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm"
 import { domainEvents, eventRelayHints } from "../../db/schema"
 import type { TenantTx } from "../../db/tenant-tx"
+import { SAFE_NAME } from "./relay"
 import type { DomainEvent, EventType, Subscriber } from "./types"
 
 /**
@@ -15,7 +16,7 @@ import type { DomainEvent, EventType, Subscriber } from "./types"
  *  - Do DB effects through `ctx.tx` ONLY (never `deps.db`), so they commit or roll back with the delivery row.
  *  - External side effects (mail, push, HTTP) must NOT run in the handler and must NOT call `deps.queue.add` directly:
  *    use `ctx.enqueue(name, data)`. Intents are buffered, discarded if the delivery rolls back, and flushed to
- *    `deps.queue` only AFTER the tenant tx commits, with a stable jobId so retries do not duplicate jobs.
+ *    `deps.queue` only AFTER the tenant tx commits, with a stable hex jobId (names/keys must match [A-Za-z0-9._-]+) so retries do not duplicate jobs.
  *    (If the flush itself fails after commit the job is lost and an error is logged; there is no redelivery.)
  *  - Subscriber names are unique across the registry; the name is part of the delivery key.
  *
@@ -27,6 +28,7 @@ type Registered = { type: EventType | "*"; name: string; handler: Subscriber }
 const registry: Registered[] = []
 
 export function subscribe(type: EventType | "*", name: string, handler: Subscriber): void {
+  if (!SAFE_NAME.test(name)) throw new Error(`Invalid subscriber name: ${name} (allowed: A-Z a-z 0-9 . _ -)`)
   if (registry.some((r) => r.name === name)) throw new Error(`Duplicate event subscriber name: ${name}`)
   registry.push({ type, name, handler })
 }

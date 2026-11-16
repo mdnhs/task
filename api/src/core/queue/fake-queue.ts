@@ -13,6 +13,7 @@ export function fakeQueue(): FakeQueue {
   return {
     jobs,
     add: async (name, data, opts) => {
+      if (opts?.jobId?.includes(":")) throw new Error("Custom Id cannot contain :") // same rule as BullMQ
       if (opts?.jobId && jobs.some((j) => j.opts?.jobId === opts.jobId)) return
       jobs.push({ name, data, opts })
     },
