@@ -2,7 +2,7 @@ import { Readable } from "node:stream"
 import { CopyObjectCommand, DeleteObjectCommand, GetObjectCommand, HeadObjectCommand, PutObjectCommand, S3Client, S3ServiceException } from "@aws-sdk/client-s3"
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner"
 import { AppError } from "../errors"
-import { PreconditionFailedError, type Storage } from "./storage"
+import { ObjectMissingError, PreconditionFailedError, type Storage } from "./storage"
 
 export type S3Config = { endpoint?: string; region: string; bucket: string; accessKeyId: string; secretAccessKey: string; forcePathStyle: boolean }
 /** Where the adapter gets its configuration; null = storage is not configured (every call answers 503). */
@@ -74,6 +74,7 @@ export function makeS3Storage(source: StorageConfigSource, o: { now?: () => numb
         await client.send(new CopyObjectCommand({ Bucket: cfg.bucket, Key: to, CopySource: `${cfg.bucket}/${from.split("/").map(encodeURIComponent).join("/")}`, CopySourceIfMatch: p?.ifMatchEtag }))
       } catch (e) {
         if (e instanceof S3ServiceException && (e.$metadata.httpStatusCode === 412 || e.name === "PreconditionFailed")) throw new PreconditionFailedError()
+        if (isMissing(e)) throw new ObjectMissingError()
         throw e
       }
     },

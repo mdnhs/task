@@ -2,7 +2,7 @@ import { createHash } from "node:crypto"
 import { PassThrough, type Readable } from "node:stream"
 import { and, eq } from "drizzle-orm"
 import { AppError, Conflict, NotFound } from "../../core/errors"
-import { fileKey, PreconditionFailedError, stagingKey, type PresignedPut } from "../../core/storage/storage"
+import { fileKey, ObjectMissingError, PreconditionFailedError, stagingKey, type PresignedPut } from "../../core/storage/storage"
 import { files, type FileStatus } from "../../db/schema"
 import { withTenant, type TenantTx } from "../../db/tenant-tx"
 import type { Deps } from "../../deps"
@@ -79,43 +79,41 @@ export async function createUpload(deps: Deps, tenantId: string, actor: Actor, i
 
 /**
  * Confirms the browser's upload. Uploads land on the STAGING key (`u/<tenant>/<id>`, the only key a presigned PUT
- * names). Here the staging object must have the intent's size and content type (422 upload_mismatch) and exist (409
- * upload_missing); it is then copied server-side (pinned to the ETag just verified) to the final key
- * `t/<tenant>/<id>`, which no client policy can write, and a `file.scan` job for the FINAL object plus a
- * `file.delete-object` job for the staging object are queued after commit. Status stays `pending` until the scan.
- * Idempotent: once `uploaded_at` is set a repeat call changes nothing (only a still-pending file gets another scan job);
- * if a crash left the copy done but uploaded_at unset, the existing final object is verified and adopted.
+ * names). Everything happens inside ONE tx under the file row's `FOR UPDATE` lock, so the final key is written at most
+ * once: HEAD staging (size == declared, <= FILE_MAX_BYTES, type == declared, else the staging object is deleted and 422
+ * upload_mismatch; missing -> 409 upload_missing), server-side CopyObject to `t/<tenant>/<id>` pinned to the ETag just
+ * read (a swap gives 409 upload_changed), then `uploaded_at` is set and `file.uploaded` published. A concurrent
+ * `complete` blocks on the row lock, then sees `uploaded_at` set and returns the idempotent result WITHOUT copying; a
+ * later re-PUT to the old URL only touches staging. (Holding the row lock for one HEAD + one CopyObject is accepted.)
+ * After commit: `file.scan` (final object) and `file.delete-object {staging:true}` jobs. Status stays `pending` until
+ * the scan. A repeat call on a still-pending file only queues another scan job. If a crash left the copy done but
+ * `uploaded_at` unset, the next call re-copies from staging (nothing was scanned yet) or, when staging is gone, verifies
+ * and adopts the existing final object.
  */
 export async function completeUpload(deps: Deps, tenantId: string, actor: Actor, id: string): Promise<FileDto> {
-  const pre = await withTenant(deps.db, tenantId, (tx) => liveFile(tx, tenantId, id))
   const staging = stagingKey(tenantId, id)
-  let verified = false
-  if (!pre.uploadedAt && pre.status === "pending") {
-    // storage round trips happen outside any DB transaction
-    const head = await deps.storage.head(staging)
-    const src = head ?? (await deps.storage.head(pre.key)) // recovery: copied earlier, tx never committed
-    if (!src) throw Conflict("upload_missing")
-    if (src.size !== pre.sizeBytes || src.size > deps.env.FILE_MAX_BYTES || src.contentType !== pre.mime) {
-      await deps.storage.delete(staging) // a wrong object is never kept; the client must start a new upload
-      throw new AppError(422, "upload_mismatch", "Unprocessable Entity")
-    }
-    if (head) {
-      try {
-        await deps.storage.copy(staging, pre.key, { ifMatchEtag: head.etag })
-      } catch (e) {
-        if (e instanceof PreconditionFailedError) throw Conflict("upload_changed")
-        throw e
-      }
-    }
-    verified = true
-  }
   return withTenantAfterCommit(deps, tenantId, async (tx, enqueue) => {
     await lockActor(tx, tenantId, actor.userId, "files", "write")
     const row = await liveFile(tx, tenantId, id, true)
     if (row.status !== "pending") return dto(row) // already scanned: nothing to do
     let cur = row
     if (!row.uploadedAt) {
-      if (!verified) throw Conflict("upload_missing")
+      const head = await deps.storage.head(staging)
+      const src = head ?? (await deps.storage.head(row.key)) // recovery: copied earlier, tx never committed
+      if (!src) throw Conflict("upload_missing")
+      if (src.size !== row.sizeBytes || src.size > deps.env.FILE_MAX_BYTES || src.contentType !== row.mime) {
+        if (head) await deps.storage.delete(staging) // a wrong object is never kept; the client must start a new upload
+        throw new AppError(422, "upload_mismatch", "Unprocessable Entity")
+      }
+      if (head) {
+        try {
+          await deps.storage.copy(staging, row.key, { ifMatchEtag: head.etag })
+        } catch (e) {
+          if (e instanceof PreconditionFailedError) throw Conflict("upload_changed")
+          if (e instanceof ObjectMissingError) throw Conflict("upload_missing")
+          throw e
+        }
+      }
       const now = deps.clock.now()
       ;[cur] = await tx.update(files).set({ uploadedAt: now }).where(and(eq(files.id, id), eq(files.tenantId, tenantId))).returning()
       await publish(tx, { tenantId, type: "file.uploaded", payload: { fileId: id, mime: row.mime, sizeBytes: row.sizeBytes }, actorId: actor.userId }, now)

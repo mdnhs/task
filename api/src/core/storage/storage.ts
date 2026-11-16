@@ -39,11 +39,18 @@ export function fileKey(tenantId: string, fileId: string): string {
 }
 
 /**
- * The upload (staging) key: the ONLY key a presigned POST ever names. Never served and never scanned; `complete` copies
+ * The upload (staging) key: the ONLY key a presigned PUT ever names. Never served and never scanned; `complete` copies
  * the verified object to fileKey(), a key no client-usable policy contains.
  */
 export function stagingKey(tenantId: string, fileId: string): string {
   return `u/${tenantId}/${fileId}`
+}
+
+export class ObjectMissingError extends Error {
+  constructor() {
+    super("storage object missing")
+    this.name = "ObjectMissingError"
+  }
 }
 
 export class PreconditionFailedError extends Error {

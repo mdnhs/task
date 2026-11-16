@@ -491,3 +491,53 @@ test("fakeScanner: auto mode flags EICAR, configured results win", async () => {
   f.result = { clean: false, signature: "Test-Sig" }
   expect(await f.scan(Readable.from([Buffer.from("fine")]))).toEqual({ clean: false, signature: "Test-Sig" })
 })
+
+test("two concurrent completes with the staging object replaced between them: the final key is written once, with the first upload's bytes", async () => {
+  const real = (await world()).deps.storage
+  let copiesToFinal = 0
+  let release!: () => void
+  const gate = new Promise<void>((r) => (release = r))
+  let copied!: () => void
+  const afterCopy = new Promise<void>((r) => (copied = r))
+  const storage = {
+    ...real,
+    copy: async (from: string, to: string, o?: { ifMatchEtag?: string }) => {
+      if (to.startsWith("t/")) copiesToFinal++
+      await real.copy(from, to, o)
+      if (copiesToFinal === 1) {
+        copied()
+        await gate // call A has copied E1 but has not committed yet
+      }
+    },
+  }
+  const w = await world({ storage })
+  const s = await stage(w, "first upload!!!") // 15 bytes (E1)
+  const a = complete(w, s.id)
+  await afterCopy
+  expect((await put(s.upload, "second upload!!")).status).toBe(200) // E2, same length, still-valid URL
+  const b = complete(w, s.id) // blocks on the row lock held by A
+  await new Promise((r) => setTimeout(r, 300))
+  release()
+  expect((await a).status).toBe(200)
+  expect((await b).status).toBe(200)
+  expect(copiesToFinal).toBe(1)
+  await drain(w)
+  expect((await rowOf(w, s.id)).status).toBe("clean")
+  const dl = await download(w, s.id)
+  expect(dl.status).toBe(302)
+  expect(await (await fetch(dl.headers.get("location")!)).text()).toBe("first upload!!!")
+})
+
+test("complete when the staging object vanishes between HEAD and copy is 409 upload_missing, not 500", async () => {
+  const real = (await world()).deps.storage
+  const storage = { ...real, copy: async () => { await real.delete(stagingKey(tenantIdHolder.id, fileIdHolder.id)); return real.copy(stagingKey(tenantIdHolder.id, fileIdHolder.id), "t/x/y") } }
+  const w = await world({ storage })
+  tenantIdHolder.id = w.tenant.id
+  const s = await stage(w, "hello pdf")
+  fileIdHolder.id = s.id
+  const c = await complete(w, s.id)
+  expect(c.status).toBe(409)
+  expect(((await c.json()) as Json).code).toBe("upload_missing")
+})
+const tenantIdHolder = { id: "" }
+const fileIdHolder = { id: "" }
