@@ -1,7 +1,10 @@
 import { readFileSync } from "node:fs"
 import { beforeEach, describe, expect, test, vi } from "vitest"
 import { call, resetDb, testApp } from "../../../test/harness"
-import { ownerTenantQuery } from "../../../test/db"
+import { eq } from "drizzle-orm"
+import { ownerQuery, ownerTenantQuery } from "../../../test/db"
+import { memberships } from "../../db/schema"
+import { withTenant } from "../../db/tenant-tx"
 import { makeMember, makeTenant, roleIdOf, signIn } from "../../../test/factories"
 import { requireTenant } from "../../core/middleware/tenant"
 import { requirePermission } from "../../core/middleware/permission"
@@ -24,11 +27,14 @@ async function world() {
   }
   const owner = await who("owner")
   const admin = await who("admin")
+  // custom actor: settings write but no audit access (admin minus audit)
+  await ownerTenantQuery(tenant.id, "insert into roles (tenant_id, key, label, home, access) select tenant_id, 'limited', 'Limited', home, access || '{\"audit\":\"none\"}'::jsonb from roles where key='admin'")
+  const limited = await who("limited")
   const req = (method: string, path: string, as: { cookie: string } | null, body?: unknown, slug = "acme") =>
     call(t.app, method, path, { cookie: as?.cookie, tenant: slug, body })
   const accessOf = async (id: string) => (await ownerTenantQuery(tenant.id, "select access from roles where id=$1", [id]))[0]?.access as Record<string, string>
   const lastAudit = async () => (await ownerTenantQuery(tenant.id, "select * from audit_events order by seq desc limit 1"))[0] as Json
-  return { ...t, tenant, who, owner, admin, req, accessOf, lastAudit, roleId: (k: string) => roleIdOf(t.deps, tenant.id, k) }
+  return { ...t, tenant, who, owner, admin, limited, req, accessOf, lastAudit, roleId: (k: string) => roleIdOf(t.deps, tenant.id, k) }
 }
 
 describe("templates and guard", () => {
@@ -122,7 +128,7 @@ describe("roles", () => {
   test("GET /v1/roles lists the tenant's roles; needs settings read", async () => {
     const w = await world()
     const r = await w.req("GET", "/v1/roles", w.owner)
-    expect(((await r.json()) as Json[]).length).toBe(rolesJson.length)
+    expect(((await r.json()) as Json[]).length).toBe(rolesJson.length + 1) // + the custom "limited" role from world()
     expect((await w.req("GET", "/v1/roles", await w.who("employee"))).status).toBe(403)
   })
 
@@ -151,43 +157,51 @@ describe("roles", () => {
   })
 })
 
-describe("no escalation", () => {
-  test("admin cannot hand out a role above its own access; owner can", async () => {
+describe("no escalation (R24: administrative modules only)", () => {
+  test("operational access does not count: admin can assign manager; a role-editor without audit access cannot", async () => {
     const w = await world()
     const emp = await w.who("employee")
-    // manager has tasks:write, admin only tasks:read
-    expect((await w.req("PATCH", `/v1/members/${emp.userId}`, w.admin, { roleId: await w.roleId("manager") })).status).toBe(403)
-    expect(((await (await w.req("PATCH", `/v1/members/${emp.userId}`, w.admin, { roleId: await w.roleId("manager") })).json()) as Json).code).toBe("role_escalation")
-    const ok = await w.req("PATCH", `/v1/members/${emp.userId}`, w.owner, { roleId: await w.roleId("manager") })
-    expect(ok.status).toBe(200)
-    expect(await ok.json()).toMatchObject({ userId: emp.userId, roleKey: "manager" })
+    const mgr = await w.roleId("manager") // tasks:write, audit:write
+    expect((await w.req("PATCH", `/v1/members/${emp.userId}`, w.admin, { roleId: mgr })).status).toBe(200)
+    const emp2 = await w.who("employee")
+    const r = await w.req("PATCH", `/v1/members/${emp2.userId}`, w.limited, { roleId: mgr }) // audit:write > limited's none
+    expect(r.status).toBe(403)
+    expect(((await r.json()) as Json).code).toBe("role_escalation")
     expect(await w.lastAudit()).toMatchObject({ action: "member.role_changed", entity_id: emp.userId, before: { roleKey: "employee" }, after: { roleKey: "manager" } })
   })
 
-  test("admin may move members between roles within its own access, but not touch a member who outranks it", async () => {
-    const w = await world()
-    const loc = await w.who("location-supervisor")
-    expect((await w.req("PATCH", `/v1/members/${loc.userId}`, w.admin, { roleId: await w.roleId("auditor") })).status).toBe(403) // auditor payroll:read > admin none
-    expect((await w.req("PATCH", `/v1/members/${loc.userId}`, w.admin, { roleId: await w.roleId("roster-manager") })).status).toBe(200)
-    const hr = await w.who("hr") // hr's current files:write exceeds admin's files:read
-    expect((await w.req("PATCH", `/v1/members/${hr.userId}`, w.admin, { roleId: await w.roleId("roster-manager") })).status).toBe(403)
-  })
-
-  test("admin cannot create an owner and cannot change an owner's role", async () => {
+  test("only an owner assigns, or takes away, the owner role", async () => {
     const w = await world()
     const emp = await w.who("employee")
     expect((await w.req("PATCH", `/v1/members/${emp.userId}`, w.admin, { roleId: await w.roleId("owner") })).status).toBe(403)
     const second = await w.who("owner")
     expect((await w.req("PATCH", `/v1/members/${second.userId}`, w.admin, { roleId: await w.roleId("employee") })).status).toBe(403)
+    expect((await w.req("PATCH", `/v1/members/${emp.userId}`, w.owner, { roleId: await w.roleId("owner") })).status).toBe(200)
   })
 
-  test("a role's access cannot be raised above the editor's own", async () => {
+  test("a non-owner cannot raise an administrative module of a role above their own; operational modules are free", async () => {
     const w = await world()
-    const c = (await (await w.req("POST", `/v1/roles/${await w.roleId("employee")}/clone`, w.admin, { label: "Crew" })).json()) as Json
-    const up = await w.req("PATCH", `/v1/roles/${c.id}`, w.admin, { access: { payroll: "write" } }) // admin has payroll none
+    const c = (await (await w.req("POST", `/v1/roles/${await w.roleId("employee")}/clone`, w.limited, { label: "Crew" })).json()) as Json
+    const up = await w.req("PATCH", `/v1/roles/${c.id}`, w.limited, { access: { audit: "write" } })
     expect(up.status).toBe(403)
     expect(((await up.json()) as Json).code).toBe("role_escalation")
-    expect((await w.req("PATCH", `/v1/roles/${c.id}`, w.owner, { access: { payroll: "write" } })).status).toBe(200)
+    expect((await w.req("PATCH", `/v1/roles/${c.id}`, w.limited, { access: { audit: "none", payroll: "write" } })).status).toBe(200)
+    expect((await w.req("PATCH", `/v1/roles/${c.id}`, w.owner, { access: { audit: "write" } })).status).toBe(200)
+  })
+
+  test("fieldRules edits need settings write and no further check", async () => {
+    const w = await world()
+    const c = (await (await w.req("POST", `/v1/roles/${await w.roleId("employee")}/clone`, w.limited, { label: "Crew" })).json()) as Json
+    expect((await w.req("PATCH", `/v1/roles/${c.id}`, w.limited, { fieldRules: { member: ["payRate"] } })).status).toBe(200)
+    expect((await w.req("PATCH", `/v1/roles/${c.id}`, await w.who("auditor"), { fieldRules: {} })).status).toBe(403)
+  })
+
+  test("the owner template cannot be cloned (409 owner_not_clonable), not even by an owner", async () => {
+    const w = await world()
+    const r = await w.req("POST", `/v1/roles/${await w.roleId("owner")}/clone`, w.owner, { label: "Boss" })
+    expect(r.status).toBe(409)
+    expect(r.headers.get("content-type")).toContain("application/problem+json")
+    expect(((await r.json()) as Json).code).toBe("owner_not_clonable")
   })
 
   test("PATCH member for an unknown or foreign user is 404", async () => {
@@ -197,6 +211,39 @@ describe("no escalation", () => {
     const role = await w.roleId("employee")
     expect((await w.req("PATCH", `/v1/members/${foreign.userId}`, w.owner, { roleId: role })).status).toBe(404)
     expect((await w.req("PATCH", `/v1/members/nobody`, w.owner, { roleId: role })).status).toBe(404)
+  })
+})
+
+describe("actor re-check inside the mutation tx (R25)", () => {
+  test("an actor demoted by a concurrent tx is rejected, even though the request's guard saw the old role", async () => {
+    const w = await world()
+    const emp = await w.who("employee")
+    const target = await w.roleId("manager")
+    const employeeRole = await w.roleId("employee")
+    let release!: () => void
+    const gate = new Promise<void>((r) => (release = r))
+    let locked!: () => void
+    const held = new Promise<void>((r) => (locked = r))
+    // concurrent tx demotes the acting admin and stays open (holds the row lock)
+    const demote = withTenant(w.deps.db, w.tenant.id, async (tx) => {
+      await tx.update(memberships).set({ roleId: employeeRole }).where(eq(memberships.userId, w.admin.userId))
+      locked()
+      await gate
+    })
+    await held
+    const pending = w.req("PATCH", `/v1/members/${emp.userId}`, w.admin, { roleId: target }) // guard reads the committed (admin) role
+    for (let i = 0; i < 100; i++) {
+      const waiting = await ownerQuery("select 1 from pg_locks where not granted and locktype in ('transactionid','tuple')")
+      if (waiting.length) break
+      await new Promise((r) => setTimeout(r, 50))
+    }
+    release()
+    await demote
+    const r = await pending
+    expect(r.status).toBe(403)
+    expect(((await r.json()) as Json).code).toBe("forbidden")
+    const row = (await ownerTenantQuery(w.tenant.id, "select r.key from memberships m join roles r on r.id=m.role_id where m.user_id=$1", [emp.userId]))[0]
+    expect(row.key).toBe("employee")
   })
 })
 

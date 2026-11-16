@@ -9,8 +9,7 @@ beforeEach(resetDb)
 async function world() {
   const t = testApp()
   const tenant = await makeTenant(t.deps, { slug: "acme" })
-  // The inviter is an owner: invites may not exceed the inviter's own access (no escalation), and only owners hold every module.
-  const admin = await makeMember(t.deps, tenant.id, "owner")
+  const admin = await makeMember(t.deps, tenant.id, "admin")
   const { cookie: adminCookie } = await signIn(t.app, admin.email, admin.password)
   const employeeRole = await roleIdOf(t.deps, tenant.id, "employee")
   return { ...t, tenant, admin, adminCookie, employeeRole }
@@ -186,18 +185,28 @@ test("inviting someone who is already a member is 409", async () => {
   expect(((await r.json()) as Json).code).toBe("already_member")
 })
 
-test("an inviter cannot invite with a role above their own access (403 role_escalation)", async () => {
+test("admin can invite an employee (operational access does not count as escalation)", async () => {
   const w = await world()
-  const adm = await makeMember(w.deps, w.tenant.id, "admin") // tasks:read; employee has tasks:write, manager too
-  const { cookie } = await signIn(w.app, adm.email, adm.password)
+  expect((await invite(w, "e@x.ie")).status).toBe(201) // employee has tasks:write, admin only tasks:read
+  expect((await invite(w, "m@x.ie", await roleIdOf(w.deps, w.tenant.id, "manager"))).status).toBe(201)
+})
+
+test("an inviter cannot hand out administrative access above their own (403 role_escalation); owner is never invitable", async () => {
+  const w = await world()
+  // custom actor: may manage settings but holds no audit access
+  await ownerTenantQuery(
+    w.tenant.id,
+    "insert into roles (tenant_id, key, label, home, access) select tenant_id, 'limited', 'Limited', home, access || '{\"audit\":\"none\"}'::jsonb from roles where key='admin'",
+  )
+  const lim = await makeMember(w.deps, w.tenant.id, "limited")
+  const { cookie } = await signIn(w.app, lim.email, lim.password)
   const as = (roleId: string, email: string) => call(w.app, "POST", "/v1/invites", { cookie, tenant: "acme", body: { email, roleId } })
-  const r = await as(w.employeeRole, "e@x.ie")
+  const r = await as(await roleIdOf(w.deps, w.tenant.id, "manager"), "m@x.ie") // manager audit:write > none
   expect(r.status).toBe(403)
   expect(((await r.json()) as Json).code).toBe("role_escalation")
-  expect((await as(await roleIdOf(w.deps, w.tenant.id, "manager"), "m@x.ie")).status).toBe(403)
-  expect((await as(await roleIdOf(w.deps, w.tenant.id, "owner"), "o@x.ie")).status).toBe(422) // never invitable
-  expect((await as(await roleIdOf(w.deps, w.tenant.id, "admin"), "a@x.ie")).status).toBe(201) // equal access is allowed
-  expect(await ownerTenantQuery(w.tenant.id, "select 1 from invites where email in ('e@x.ie','m@x.ie')")).toEqual([])
+  expect((await as(w.employeeRole, "e@x.ie")).status).toBe(201)
+  expect((await as(await roleIdOf(w.deps, w.tenant.id, "owner"), "o@x.ie")).status).toBe(422)
+  expect(await ownerTenantQuery(w.tenant.id, "select 1 from invites where email='m@x.ie'")).toEqual([])
 })
 
 test("two different invites for the same user accepted at once: one 200, the other 409 (never 500)", async () => {

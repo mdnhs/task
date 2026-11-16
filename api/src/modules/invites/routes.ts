@@ -10,7 +10,7 @@ import { sanitizeMailError } from "../../core/mail/sanitize"
 import { invites, memberships, roles, tenants, tenantSettings, user } from "../../db/schema"
 import { withTenant } from "../../db/tenant-tx"
 import { recordAudit } from "../audit"
-import { assertNoEscalation } from "../rbac"
+import { assertNoEscalation, lockActor } from "../rbac"
 import { DEFAULT_INVITE_TTL_DAYS, onboardingDefaults } from "../tenants"
 
 const DAY_MS = 86_400_000
@@ -60,10 +60,11 @@ export const inviteRoutes = newRouter()
     const token = mintToken(tenant.id)
 
     const out = await withTenant(deps.db, tenant.id, async (tx) => {
+      const me = await lockActor(tx, tenant.id, actorId, "settings", "write") // R25: re-checked inside the tx
       const [role] = await tx.select({ id: roles.id, key: roles.key, access: roles.access }).from(roles).where(eq(roles.id, roleId)) // RLS: own tenant only
       if (!role) throw NotFound("role_not_found")
       if (!onboardingDefaults().inviteRoles.includes(role.key)) throw new AppError(422, "role_not_invitable", "Unprocessable Entity")
-      assertNoEscalation(c.get("role")!, role.access) // an inviter cannot hand out more than they hold
+      assertNoEscalation(me, role.access) // an inviter cannot hand out more administrative access than they hold
 
       const [existing] = await tx
         .select({ id: user.id })

@@ -1,4 +1,5 @@
 import { and, eq, like, sql } from "drizzle-orm"
+import { can, type Access, type Module } from "@opsdesk/domain/permissions"
 import { AppError, Conflict, Forbidden, NotFound } from "../../core/errors"
 import type { ResolvedRole } from "../../core/context"
 import { memberships, roles } from "../../db/schema"
@@ -7,7 +8,7 @@ import { recordAudit } from "../audit"
 import { exceeds } from "./access"
 
 export type RoleRow = typeof roles.$inferSelect
-type Actor = { userId: string; role: ResolvedRole }
+type Actor = { userId: string }
 
 export const toRoleDto = (r: RoleRow) => ({
   id: r.id,
@@ -23,7 +24,29 @@ export const toRoleDto = (r: RoleRow) => ({
 
 const snapshot = (r: Pick<RoleRow, "label" | "access" | "fieldRules">) => ({ label: r.label, access: r.access, fieldRules: r.fieldRules })
 
-/** Throws 403 role_escalation if `target` grants more than the actor's own access on any module. */
+/**
+ * R25: re-reads the actor's membership + role INSIDE the mutation tx with FOR SHARE and re-checks the permission there,
+ * so a concurrent demotion (which takes the row lock) either commits first and is seen, or waits for us. The request-level
+ * cache in requirePermission stays for reads; mutations never trust it.
+ */
+export async function lockActor(tx: TenantTx, tenantId: string, userId: string, module: Module, need: "read" | "write"): Promise<ResolvedRole> {
+  const [row] = await tx
+    .select({ role: roles, status: memberships.status })
+    .from(memberships)
+    .innerJoin(roles, eq(roles.id, memberships.roleId))
+    .where(and(eq(memberships.tenantId, tenantId), eq(memberships.userId, userId)))
+    .for("share", { of: [memberships, roles] })
+  if (!row || row.status !== "active") throw Forbidden("forbidden")
+  const role: ResolvedRole = {
+    id: row.role.id, key: row.role.key, label: row.role.label, description: row.role.description,
+    home: row.role.home === "staff" ? "staff" : "manager",
+    access: row.role.access as Record<Module, Access>, fieldRules: row.role.fieldRules,
+  }
+  if (!can(role, module, need)) throw Forbidden("forbidden")
+  return role
+}
+
+/** Throws 403 role_escalation if `target` grants more than the actor's own access on any administrative module (R24). */
 export function assertNoEscalation(actor: ResolvedRole, target: Record<string, string>): void {
   if (exceeds(actor.access, target).length > 0) throw Forbidden("role_escalation")
 }
@@ -41,7 +64,9 @@ export async function listRoles(tx: TenantTx, tenantId: string): Promise<RoleRow
 const slug = (label: string) => label.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40) || "role"
 
 export async function cloneRole(tx: TenantTx, tenantId: string, actor: Actor, sourceId: string, label: string, now: Date): Promise<RoleRow> {
+  await lockActor(tx, tenantId, actor.userId, "settings", "write")
   const src = await roleIn(tx, tenantId, sourceId)
+  if (src.key === "owner") throw Conflict("owner_not_clonable")
   const base = slug(label)
   const taken = new Set(
     (await tx.select({ key: roles.key }).from(roles).where(and(eq(roles.tenantId, tenantId), like(roles.key, `${base}%`)))).map((r) => r.key),
@@ -67,11 +92,12 @@ export async function updateRole(
   tx: TenantTx, tenantId: string, actor: Actor, id: string,
   patch: { label?: string; access?: Record<string, string>; fieldRules?: Record<string, string[]> }, now: Date,
 ): Promise<RoleRow> {
+  const me = await lockActor(tx, tenantId, actor.userId, "settings", "write")
   const [cur] = await tx.select().from(roles).where(and(eq(roles.id, id), eq(roles.tenantId, tenantId))).for("update")
   if (!cur) throw NotFound("role_not_found")
   if (cur.isTemplate) throw Conflict("template_locked")
+  if (patch.access) assertNoEscalation(me, patch.access) // only the modules being set; others are unchanged
   const access = patch.access ? { ...cur.access, ...patch.access } : cur.access
-  assertNoEscalation(actor.role, access)
   const next = { label: patch.label ?? cur.label, access, fieldRules: patch.fieldRules ?? cur.fieldRules }
   const [row] = await tx.update(roles).set(next).where(eq(roles.id, id)).returning()
   await recordAudit(
@@ -88,6 +114,7 @@ export async function changeMemberRole(
   // One member-role change at a time per tenant: with row locks alone, two owners demoting each other lock each other's
   // row first and then deadlock on the owner count. The FOR UPDATE locks below stay as defence in depth.
   await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${"member-roles:" + tenantId}))`)
+  const me = await lockActor(tx, tenantId, actor.userId, "settings", "write")
   const target = await roleIn(tx, tenantId, roleId)
   // Order matters for the 404/403 split: the new role must exist in this tenant before anything about the member is revealed.
   const [m] = await tx
@@ -98,10 +125,10 @@ export async function changeMemberRole(
   if (!m) throw NotFound("member_not_found")
   const cur = await roleIn(tx, tenantId, m.roleId)
 
-  // No-escalation, both ways: nobody hands out a role above their own, nor changes a member who currently outranks them.
-  assertNoEscalation(actor.role, target.access)
-  assertNoEscalation(actor.role, cur.access)
-  if (target.key === "owner" && actor.role.key !== "owner") throw Forbidden("role_escalation") // only owners create owners
+  // R24: administrative-module escalation both ways, and the owner role is only given or taken by an owner.
+  assertNoEscalation(me, target.access)
+  assertNoEscalation(me, cur.access)
+  if ((target.key === "owner" || cur.key === "owner") && me.key !== "owner") throw Forbidden("role_escalation")
 
   if (cur.key === "owner" && target.key !== "owner") {
     // Lock every active owner row (stable order) so two concurrent demotions cannot both pass the count.

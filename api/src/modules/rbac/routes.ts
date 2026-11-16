@@ -48,21 +48,21 @@ export const rbacRoutes = newRouter()
   .openapi(cloneRoute, async (c) => {
     const deps = c.get("deps")
     const t = c.get("tenant")!
-    const actor = { userId: c.get("member")!.userId, role: c.get("role")! }
+    const actor = { userId: c.get("member")!.userId }
     const row = await withTenant(deps.db, t.id, (tx) => cloneRole(tx, t.id, actor, c.req.valid("param").id, c.req.valid("json").label, deps.clock.now()))
     return c.json(toRoleDto(row), 201)
   })
   .openapi(patchRoute, async (c) => {
     const deps = c.get("deps")
     const t = c.get("tenant")!
-    const actor = { userId: c.get("member")!.userId, role: c.get("role")! }
+    const actor = { userId: c.get("member")!.userId }
     const row = await withTenant(deps.db, t.id, (tx) => updateRole(tx, t.id, actor, c.req.valid("param").id, c.req.valid("json") as never, deps.clock.now()))
     return c.json(toRoleDto(row), 200)
   })
   .openapi(memberRoute, async (c) => {
     const deps = c.get("deps")
     const t = c.get("tenant")!
-    const actor = { userId: c.get("member")!.userId, role: c.get("role")! }
+    const actor = { userId: c.get("member")!.userId }
     const out = await withTenant(deps.db, t.id, (tx) => changeMemberRole(tx, t.id, actor, c.req.valid("param").userId, c.req.valid("json").roleId, deps.clock.now()))
     return c.json(out, 200)
   })
