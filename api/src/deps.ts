@@ -1,5 +1,6 @@
 import type { Logger } from "pino"
 import type { Db } from "./db/client"
+import type { Queue } from "./core/queue/queue"
 import type { Env } from "./env"
 import type { Auth } from "./modules/auth/auth"
 
@@ -12,4 +13,4 @@ export type Mailer = {
   invalidate?(): void
 }
 export type { Auth }
-export type Deps = { env: Env; db: Db; auth: Auth; clock: Clock; mailer: Mailer; logger: Logger }
+export type Deps = { env: Env; db: Db; auth: Auth; clock: Clock; mailer: Mailer; logger: Logger; queue: Queue }

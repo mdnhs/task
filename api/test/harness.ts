@@ -3,6 +3,7 @@ import { createApp, type AppType } from "../src/app"
 import type { Deps } from "../src/deps"
 import { buildAuth } from "../src/modules/auth/auth"
 import { hasTestDb, testDb } from "./db"
+import { fakeQueue, type FakeQueue } from "../src/core/queue/fake-queue"
 import { fakeClock, fakeMailer, type FakeClock, type FakeMailer } from "./fakes"
 
 export { fakeClock, fakeMailer }
@@ -24,7 +25,7 @@ export const testEnv: Deps["env"] = {
 // Lets helpers (factories.ts) find an app's fake mailer from the app alone.
 export const mailerOf = new WeakMap<object, FakeMailer>()
 
-export function testApp(over: Partial<Deps> = {}): { app: AppType; deps: Deps; mailer: FakeMailer; clock: FakeClock } {
+export function testApp(over: Partial<Deps> = {}): { app: AppType; deps: Deps; mailer: FakeMailer; clock: FakeClock; queue: FakeQueue } {
   const clock = fakeClock()
   const env = over.env ?? testEnv
   // Real (lazy-connecting) Testcontainers db when global setup provided one; inert fake otherwise.
@@ -32,10 +33,11 @@ export function testApp(over: Partial<Deps> = {}): { app: AppType; deps: Deps; m
   const usedClock = over.clock ?? clock
   const logger = over.logger ?? pino({ level: "silent" })
   const mailer = (over.mailer ?? fakeMailer()) as FakeMailer // the one actually used
-  const deps: Deps = { env, db, clock: usedClock, mailer, logger, auth: over.auth ?? buildAuth({ env, db, clock: usedClock, mailer, logger }) }
+  const queue = (over.queue ?? fakeQueue()) as FakeQueue
+  const deps: Deps = { env, db, clock: usedClock, mailer, logger, queue, auth: over.auth ?? buildAuth({ env, db, clock: usedClock, mailer, logger }) }
   const app = createApp(deps)
   mailerOf.set(app, mailer)
-  return { app, deps, mailer, clock: usedClock as FakeClock }
+  return { app, deps, mailer, clock: usedClock as FakeClock, queue }
 }
 
 export function call(

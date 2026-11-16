@@ -1,9 +1,11 @@
 import { readFileSync } from "node:fs"
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from "@testcontainers/postgresql"
+import { GenericContainer, Wait, type StartedTestContainer } from "testcontainers"
 import pg from "pg"
 import { runMigrations } from "../src/db/migrate"
 
 let container: StartedPostgreSqlContainer | undefined
+let redis: StartedTestContainer | undefined
 
 const OWNER_PW = "owner_test_pw"
 const USER_PW = "user_test_pw"
@@ -35,10 +37,17 @@ export async function setup(): Promise<void> {
   await owner.query(PROBE_SQL)
   await owner.end()
 
+  redis = await new GenericContainer("redis:7")
+    .withExposedPorts(6379)
+    .withWaitStrategy(Wait.forLogMessage("Ready to accept connections"))
+    .start()
+  process.env.REDIS_URL = `redis://${redis.getHost()}:${redis.getMappedPort(6379)}`
+
   process.env.TEST_DATABASE_URL = url("app_user", USER_PW)
   process.env.TEST_DATABASE_OWNER_URL = ownerUrl
 }
 
 export async function teardown(): Promise<void> {
+  await redis?.stop()
   await container?.stop()
 }

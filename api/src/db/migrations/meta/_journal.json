@@ -78,6 +78,13 @@
       "when": 1794850314655,
       "tag": "0010_own_row_policies_no_tenant_context",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1794854969687,
+      "tag": "0011_events",
+      "breakpoints": true
     }
   ]
 }

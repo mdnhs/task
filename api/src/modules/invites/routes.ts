@@ -9,6 +9,7 @@ import { newRouter } from "../../core/router"
 import { sanitizeMailError } from "../../core/mail/sanitize"
 import { invites, memberships, roles, tenants, tenantSettings, user } from "../../db/schema"
 import { withTenant } from "../../db/tenant-tx"
+import { publish } from "../../core/events"
 import { recordAudit } from "../audit"
 import { assertNoEscalation, lockActor } from "../rbac"
 import { DEFAULT_INVITE_TTL_DAYS, onboardingDefaults } from "../tenants"
@@ -91,6 +92,7 @@ export const inviteRoutes = newRouter()
         { action: "invite.created", entity: "invite", entityId: inv.id, actorId, before: null, after: { email, roleKey: role.key, expiresAt } },
         now,
       )
+      await publish(tx, { tenantId: tenant.id, type: "invite.created", payload: { inviteId: inv.id, email, roleKey: role.key }, actorId }, now)
       return { id: inv.id, expiresAt }
     })
 
@@ -146,6 +148,7 @@ export const inviteRoutes = newRouter()
         { action: "member.joined", entity: "membership", entityId: me.id, actorId: me.id, before: null, after: { userId: me.id, roleKey: role?.key ?? null, inviteId: inv.id } },
         now,
       )
+      await publish(tx, { tenantId, type: "member.joined", payload: { userId: me.id, roleKey: role?.key ?? null, inviteId: inv.id }, actorId: me.id }, now)
       const [t] = await tx.select({ slug: tenants.slug }).from(tenants).where(eq(tenants.id, tenantId))
       return t.slug
     })

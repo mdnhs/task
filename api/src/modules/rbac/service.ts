@@ -4,6 +4,7 @@ import { AppError, Conflict, Forbidden, NotFound } from "../../core/errors"
 import type { ResolvedRole } from "../../core/context"
 import { memberships, roles } from "../../db/schema"
 import type { TenantTx } from "../../db/tenant-tx"
+import { publish } from "../../core/events"
 import { recordAudit } from "../audit"
 import { exceeds } from "./access"
 
@@ -162,6 +163,11 @@ export async function changeMemberRole(
       before: { roleId: cur.id, roleKey: cur.key, access: cur.access },
       after: { roleId: target.id, roleKey: target.key, access: target.access },
     },
+    now,
+  )
+  await publish(
+    tx,
+    { tenantId, type: "member.role_changed", payload: { userId, fromRoleKey: cur.key, toRoleKey: target.key }, actorId: actor.userId },
     now,
   )
   return { userId, roleId: target.id, roleKey: target.key }

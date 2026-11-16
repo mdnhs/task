@@ -26,4 +26,7 @@ WORKDIR /app/api
 EXPOSE 8080
 # The code is TypeScript with extensionless imports and @opsdesk/domain ships .ts source,
 # so it runs under tsx (a production dependency of api) with no separate compile step.
+# Default process: the HTTP API. The same image runs the background worker (BullMQ jobs + the 1 s events.relay job)
+# with a command override, e.g. docker-compose / Dokploy:  command: ["../node_modules/.bin/tsx", "src/worker.ts"]
+# The worker handles SIGTERM gracefully (drains the current job, closes Redis and Postgres).
 CMD ["../node_modules/.bin/tsx", "src/server.ts"]

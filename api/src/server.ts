@@ -6,14 +6,15 @@ import { makeDb } from "./db/client"
 import type { Deps } from "./deps"
 import { buildAuth } from "./modules/auth/auth"
 import { makeMailer } from "./modules/platform-email"
+import { makeBullQueue } from "./core/queue/bull-queue"
 import { parseEnv, type Env } from "./env"
 
-function makeDeps(env: Env): Deps {
+export function makeDeps(env: Env): Deps {
   const db = makeDb(env.DATABASE_URL)
   const clock = { now: () => new Date() }
   const logger = pino({ level: "info" })
   const mailer = makeMailer({ env, db, logger })
-  return { env, db, auth: buildAuth({ env, db, clock, mailer, logger }), clock, mailer, logger }
+  return { env, db, auth: buildAuth({ env, db, clock, mailer, logger }), clock, mailer, logger, queue: makeBullQueue(env.REDIS_URL) }
 }
 
 export function start(env: Env = parseEnv(process.env)) {
