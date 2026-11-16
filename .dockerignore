@@ -8,7 +8,8 @@
 coverage
 *.md
 !README.md
-.env*
+**/.env*
+!**/.env.example
 npm-debug.log*
 .DS_Store
 Dockerfile

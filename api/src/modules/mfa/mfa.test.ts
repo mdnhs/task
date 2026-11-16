@@ -196,6 +196,22 @@ test("R27: allowed paths still work on an unpassed session, and the same calls s
   expect((await post("two-factor/verify-totp", { code: await totpCode(e.secret) })).status).toBe(200)
   expect((await post("two-factor/generate-backup-codes", { password: m.password })).status).toBe(200)
 })
+test("R27: /revoke-session is 403 mfa_required from an unpassed session; the target survives, and it works after verify-totp", async () => {
+  const w = await world()
+  const m = await w.who("manager")
+  const stale = (await signIn(w.app, m.email, m.password)).cookie
+  await signIn(w.app, m.email, m.password) // a second session: the revoke target
+  const e = await enrollTotp(w.deps, m.email, m.password)
+  const [{ token }] = await ownerQuery("select token from session order by created_at desc limit 1")
+  const post = (path: string, body: unknown) => call(w.app, "POST", `/api/auth/${path}`, { cookie: stale, body, headers: ORIGIN })
+  const r = await post("revoke-session", { token })
+  expect([r.status, await codeOf(r)]).toEqual([403, "mfa_required"])
+  expect(r.headers.get("content-type")).toContain("application/problem+json")
+  expect(await ownerQuery("select 1 from session where token = $1", [token])).toHaveLength(1)
+  expect((await post("two-factor/verify-totp", { code: await totpCode(e.secret) })).status).toBe(200)
+  expect((await post("revoke-session", { token })).status).toBe(200)
+  expect(await ownerQuery("select 1 from session where token = $1", [token])).toHaveLength(0)
+})
 test("R27: a user without 2FA can still enrol via /two-factor/enable", async () => {
   const w = await world()
   const m = await w.who("manager")

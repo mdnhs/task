@@ -38,6 +38,7 @@ export const MFA_PROTECTED_AUTH_PATHS: readonly string[] = [
   "/unlink-account",
   "/delete-user",
   "/revoke-sessions",
+  "/revoke-session",
   "/revoke-other-sessions",
   "/update-user",
 ]

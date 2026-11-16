@@ -7,7 +7,7 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 COPY api/package.json api/package.json
 COPY packages/domain/package.json packages/domain/package.json
-RUN npm ci --omit=dev --include-workspace-root=false -w api -w packages/domain
+RUN npm ci --omit=dev --ignore-scripts --include-workspace-root=false -w api -w packages/domain
 
 FROM node:22-alpine AS run
 WORKDIR /app
