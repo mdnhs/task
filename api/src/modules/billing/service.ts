@@ -77,13 +77,26 @@ export async function startCheckout(deps: Deps, tenant: { id: string; name: stri
   // One subscription per tenant: a tenant that already pays changes plan or card in the portal, never by a second checkout.
   if (sub.providerSubscriptionId && LIVE.has(sub.status) && sub.status !== "incomplete") throw Conflict("already_subscribed")
   const customerId = await ensureCustomer(deps, tenant.id, tenant.name, actor)
+  // The webhook may not have arrived yet (so providerSubscriptionId is still unset): ask the provider whether the customer already pays.
+  const live = await viaProvider(deps, "listActiveSubscriptions", () => deps.billing.listActiveSubscriptions(customerId))
+  if (live.length > 0) throw Conflict("subscription_exists")
+  // A previous checkout that was never completed is closed first: two open sessions could both be paid.
+  if (sub.checkoutSessionId) {
+    const previous = sub.checkoutSessionId
+    try {
+      await deps.billing.expireCheckoutSession(previous)
+    } catch (err) {
+      deps.logger.warn({ op: "expireCheckoutSession", ...errorInfo(err) }, "could not expire the previous checkout session") // already completed/expired: fine
+    }
+  }
   const now = deps.clock.now()
   // A trial that is still running carries over into the paid subscription (no double trial, no early charge).
   const trialDays = sub.status === "trialing" && sub.trialEndsAt && sub.trialEndsAt > now ? Math.ceil((sub.trialEndsAt.getTime() - now.getTime()) / DAY_MS) : undefined
   const base = `${deps.env.APP_URL}/settings/billing`
-  const { url } = await viaProvider(deps, "createCheckout", () =>
+  const { url, sessionId } = await viaProvider(deps, "createCheckout", () =>
     deps.billing.createCheckout({ customerId, priceId, seats: input.seats, successUrl: `${base}?status=success`, cancelUrl: `${base}?status=cancelled`, trialDays }),
   )
+  await changeSubscription(deps, tenant.id, actor.userId, { checkoutSessionId: sessionId })
   return { url }
 }
 

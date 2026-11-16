@@ -105,7 +105,7 @@ export async function assertSeatAvailable(tx: TenantTx, tenantId: string): Promi
 
 export type SubscriptionPatch = Partial<{
   planId: string; status: SubscriptionStatus; seats: number; trialEndsAt: Date | null; currentPeriodEnd: Date | null; cancelAtPeriodEnd: boolean
-  provider: string | null; providerCustomerId: string | null; providerSubscriptionId: string | null; updatedFromEventAt: Date | null
+  provider: string | null; providerCustomerId: string | null; providerSubscriptionId: string | null; checkoutSessionId: string | null; updatedFromEventAt: Date | null
 }>
 type SubscriptionRow = typeof subscriptions.$inferSelect
 const snap = (s: { planId: string; status: string; seats: number; trialEndsAt: Date | null; currentPeriodEnd: Date | null; cancelAtPeriodEnd: boolean }) => ({

@@ -1,14 +1,15 @@
 import { beforeEach, expect, test, vi } from "vitest"
 
 const m = vi.hoisted(() => ({
-  customersCreate: vi.fn(), sessionsCreate: vi.fn(), portalCreate: vi.fn(), subUpdate: vi.fn(), subRetrieve: vi.fn(), constructEvent: vi.fn(), ctor: vi.fn(),
+  customersCreate: vi.fn(), sessionsCreate: vi.fn(), sessionsExpire: vi.fn(), subList: vi.fn(), invRetrieve: vi.fn(), portalCreate: vi.fn(), subUpdate: vi.fn(), subRetrieve: vi.fn(), constructEvent: vi.fn(), ctor: vi.fn(),
 }))
 vi.mock("stripe", () => ({
   default: class {
     customers = { create: m.customersCreate }
-    checkout = { sessions: { create: m.sessionsCreate } }
+    checkout = { sessions: { create: m.sessionsCreate, expire: m.sessionsExpire } }
+    invoices = { retrieve: m.invRetrieve }
     billingPortal = { sessions: { create: m.portalCreate } }
-    subscriptions = { update: m.subUpdate, retrieve: m.subRetrieve }
+    subscriptions = { update: m.subUpdate, retrieve: m.subRetrieve, list: m.subList }
     webhooks = { constructEvent: m.constructEvent }
     constructor(key: string, opts: unknown) {
       m.ctor(key, opts)
@@ -108,4 +109,32 @@ test("mapStripeEvent: invoices keep integer minor units, uppercase the provider 
   expect(mapStripeEvent(inv("invoice.paid", { amount_paid: 12.5 }))).toMatchObject({ kind: "ignored" }) // never a float
   expect(mapStripeEvent(inv("invoice.paid", { currency: undefined }))).toMatchObject({ kind: "ignored" }) // never an assumed currency
   expect(mapStripeEvent(inv("charge.refunded"))).toEqual({ kind: "ignored", providerEventId: "evt_2", type: "charge.refunded" })
+})
+
+test("retrieveSubscription maps the current provider state; unreadable -> throws", async () => {
+  const p = mk()
+  m.subRetrieve.mockResolvedValue(sub().data.object)
+  expect(await p.retrieveSubscription("sub_1")).toMatchObject({ subscriptionId: "sub_1", customerId: "cus_1", status: "active", seats: 4, priceId: "price_1" })
+  expect(m.subRetrieve).toHaveBeenCalledWith("sub_1")
+  m.subRetrieve.mockResolvedValue({ id: "sub_1" })
+  await expect(p.retrieveSubscription("sub_1")).rejects.toThrow()
+})
+
+test("retrieveInvoice: paid -> amount_paid, otherwise amount_due, integer minor units", async () => {
+  const p = mk()
+  m.invRetrieve.mockResolvedValue({ status: "paid", customer: "cus_1", amount_paid: 14900, amount_due: 0, currency: "eur" })
+  expect(await p.retrieveInvoice("in_1")).toEqual({ invoiceId: "in_1", customerId: "cus_1", paid: true, amountMinor: 14900, currency: "EUR" })
+  m.invRetrieve.mockResolvedValue({ status: "open", customer: "cus_1", amount_paid: 0, amount_due: 500, currency: "usd" })
+  expect(await p.retrieveInvoice("in_1")).toMatchObject({ paid: false, amountMinor: 500, currency: "USD" })
+  m.invRetrieve.mockResolvedValue({ status: "open", customer: "cus_1", amount_due: 5.5, currency: "usd" })
+  await expect(p.retrieveInvoice("in_1")).rejects.toThrow()
+})
+
+test("listActiveSubscriptions drops canceled / incomplete_expired; expireCheckoutSession calls Stripe", async () => {
+  const p = mk()
+  m.subList.mockResolvedValue({ data: [{ id: "a", status: "active" }, { id: "b", status: "canceled" }, { id: "c", status: "incomplete_expired" }, { id: "d", status: "past_due" }] })
+  expect(await p.listActiveSubscriptions("cus_1")).toEqual([{ id: "a", status: "active" }, { id: "d", status: "past_due" }])
+  expect(m.subList).toHaveBeenCalledWith({ customer: "cus_1", status: "all", limit: 20 })
+  await p.expireCheckoutSession("cs_1")
+  expect(m.sessionsExpire).toHaveBeenCalledWith("cs_1")
 })

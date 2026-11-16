@@ -39,6 +39,8 @@ export const subscriptions = pgTable(
     provider: text("provider"),
     providerCustomerId: text("provider_customer_id"),
     providerSubscriptionId: text("provider_subscription_id"),
+    /** The open provider checkout session (expired before a new one is created, so a repeat checkout cannot double-subscribe). */
+    checkoutSessionId: text("checkout_session_id"),
     /** `created` of the newest provider event applied (out-of-order guard, T3.3). */
     updatedFromEventAt: timestamp("updated_from_event_at", { withTimezone: true }),
   },

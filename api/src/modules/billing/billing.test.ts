@@ -6,6 +6,7 @@ import { platformAuditEntries } from "../../../test/platform-audit"
 import { buildKeyring, open } from "../../core/crypto/secret-box"
 import { resetSubscribers } from "../../core/events"
 import { sendNotification } from "../notifications"
+import { testDb } from "../../../test/db"
 import { FAKE_SIGNATURE, setBillingSettings, BILLING_SECRET_AAD, BILLING_WEBHOOK_AAD, StripeBillingProvider, type BillingEvent } from "."
 
 type Json = Record<string, any> // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -420,4 +421,130 @@ test("unconfigured: billing writes and the webhook answer 503 billing_not_config
   const hook = await t.app.request("/webhooks/billing/stripe", { method: "POST", headers: { "stripe-signature": "t=1,v1=x" }, body: "{}" })
   expect([hook.status, await code(hook)]).toEqual([503, "billing_not_configured"])
   expect((await call(t.app, "GET", "/v1/billing/subscription", { cookie, tenant: tenant.slug })).status).toBe(200) // reads need no provider
+})
+
+// ---------------------------------------------------------------- fix round 1
+
+const snapshot = (o: Record<string, unknown> = {}) => ({ subscriptionId: "sub_A", customerId: "cus_A", status: "active" as const, priceId: PRICES.business, seats: 40, currentPeriodEnd: at(30), cancelAtPeriodEnd: false, trialEnd: null, ...o })
+
+test("I1: same-second incomplete -> active pair ends ACTIVE in either delivery order (provider state settles the tie)", async () => {
+  for (const order of ["created-first", "updated-first"] as const) {
+    await resetDb()
+    const w = await world({ planId: "business", status: "active" })
+    await link(w)
+    w.billing.subscriptions.set("sub_A", snapshot())
+    const created = subEvent({ providerEventId: `evt_c_${order}`, createdAt: at(1), status: "incomplete" })
+    const updated = subEvent({ providerEventId: `evt_u_${order}`, createdAt: at(1), status: "active" })
+    for (const e of order === "created-first" ? [created, updated] : [updated, created]) expect((await wh(w, e)).status).toBe(200)
+    expect((await subRow(w)).status, order).toBe("active")
+    expect((await owner(w, "POST", "/v1/_probe/write")).status, order).toBe(200)
+    expect(w.billing.calls.filter((c) => c.method === "retrieveSubscription"), order).toHaveLength(1) // only the tied event asked
+  }
+})
+
+test("I1: a strictly older event is still ignored (no provider call); a failed retrieve is a 5xx and the retry succeeds", async () => {
+  const w = await world()
+  await link(w)
+  await wh(w, subEvent({ createdAt: at(2), status: "active" }))
+  await wh(w, subEvent({ createdAt: at(1), status: "past_due" }))
+  expect((await subRow(w)).status).toBe("active")
+  expect(w.billing.calls.filter((c) => c.method === "retrieveSubscription")).toHaveLength(0)
+  const tie = subEvent({ providerEventId: "evt_tie", createdAt: at(2), status: "past_due" })
+  w.billing.subscriptions.set("sub_A", snapshot({ status: "unpaid" }))
+  w.billing.failNext("retrieveSubscription")
+  expect((await wh(w, tie)).status).toBe(500)
+  expect(await ownerQuery("select 1 from billing_events where provider_event_id = 'evt_tie'")).toEqual([]) // nothing recorded: Stripe retries
+  expect((await wh(w, tie)).status).toBe(200)
+  expect((await subRow(w)).status).toBe("unpaid") // the provider's current state, not the event's
+})
+
+test("I1: a same-second invoice tie (failed then paid) is settled by the provider's invoice state", async () => {
+  const w = await world()
+  await link(w)
+  await wh(w, invEvent({ kind: "invoice.payment_failed", invoiceId: "in_t", providerEventId: "evt_t1", createdAt: at(1) }))
+  expect((await invoicesOf(w))[0].status).toBe("failed")
+  w.billing.invoices.set("in_t", { invoiceId: "in_t", customerId: "cus_A", paid: true, amountMinor: 14900, currency: "EUR" })
+  await wh(w, invEvent({ invoiceId: "in_t", providerEventId: "evt_t2", createdAt: at(1) }))
+  expect((await invoicesOf(w))[0].status).toBe("paid")
+  expect(w.billing.calls.filter((c) => c.method === "retrieveInvoice")).toHaveLength(1)
+})
+
+test("I2: a second checkout while the provider reports a live subscription is 409 subscription_exists (no session created)", async () => {
+  const w = await world()
+  w.billing.active.set(`cus_fake_${w.tenant.id.slice(0, 8)}`, [{ id: "sub_live", status: "active" }])
+  const r = await owner(w, "POST", "/v1/billing/checkout", { planId: "business", seats: 5 })
+  expect([r.status, await code(r)]).toEqual([409, "subscription_exists"])
+  expect(w.billing.calls.filter((c) => c.method === "createCheckout")).toHaveLength(0)
+})
+
+test("I2: a second checkout expires the previous open session and remembers the new one", async () => {
+  const w = await world()
+  const first = (await (await owner(w, "POST", "/v1/billing/checkout", { planId: "business", seats: 5 })).json()) as Json
+  void first
+  const s1 = (await subRow(w)).checkout_session_id as string
+  expect(s1).toMatch(/^cs_fake_/)
+  expect(w.billing.calls.filter((c) => c.method === "expireCheckoutSession")).toHaveLength(0)
+  expect((await owner(w, "POST", "/v1/billing/checkout", { planId: "business", seats: 5 })).status).toBe(200)
+  expect(w.billing.last("expireCheckoutSession")).toEqual({ sessionId: s1 })
+  const s2 = (await subRow(w)).checkout_session_id as string
+  expect(s2).not.toBe(s1)
+  // an expire that fails (session already completed/expired) never blocks a new checkout
+  w.billing.failNext("expireCheckoutSession")
+  expect((await owner(w, "POST", "/v1/billing/checkout", { planId: "business", seats: 5 })).status).toBe(200)
+})
+
+test("I2: a webhook for subscription Y while X is live leaves the row on X (ignored.foreign_subscription, 200); after X is canceled Y is adopted", async () => {
+  const w = await world()
+  await link(w, "cus_A", "sub_X")
+  const r = await wh(w, subEvent({ providerEventId: "evt_y1", subscriptionId: "sub_Y", seats: 99, createdAt: at(1) }))
+  expect(r.status).toBe(200)
+  expect(await subRow(w)).toMatchObject({ provider_subscription_id: "sub_X", seats: 40, status: "active" })
+  expect(await ownerQuery("select kind from billing_events where provider_event_id = 'evt_y1'")).toEqual([{ kind: "ignored.foreign_subscription" }])
+  await ownerTenantQuery(w.tenant.id, "update subscriptions set status = 'canceled'")
+  expect((await wh(w, subEvent({ providerEventId: "evt_y2", subscriptionId: "sub_Y", seats: 99, createdAt: at(2) }))).status).toBe(200)
+  expect(await subRow(w)).toMatchObject({ provider_subscription_id: "sub_Y", seats: 99, status: "active", checkout_session_id: null })
+})
+
+test("M1: webhook bodies over 256 KB are 413 problem+json before any parsing", async () => {
+  const w = await world()
+  const r = await wh(w, { kind: "ignored", providerEventId: "evt_big", type: "x", pad: "x".repeat(300_000) })
+  expect([r.status, await code(r)]).toEqual([413, "payload_too_large"])
+  expect(r.headers.get("content-type")).toMatch(/problem\+json/)
+  expect(await ownerQuery("select 1 from billing_events")).toEqual([])
+})
+
+test("M2: ledger dedupe: the same event id delivered twice adds no audit row, no event, no notification and answers 200", async () => {
+  const w = await world()
+  await link(w)
+  const ev = subEvent({ providerEventId: "evt_dedupe", createdAt: at(1), status: "past_due" })
+  const fail = invEvent({ kind: "invoice.payment_failed", invoiceId: "in_d", providerEventId: "evt_dedupe_i", createdAt: at(1) })
+  expect((await wh(w, ev)).status).toBe(200)
+  expect((await wh(w, fail)).status).toBe(200)
+  const count = async () => ({
+    audit: (await ownerTenantQuery(w.tenant.id, "select 1 from audit_events")).length,
+    events: (await ownerTenantQuery(w.tenant.id, "select 1 from domain_events")).length,
+    notes: (await billingNotes(w)).length,
+    ledger: (await ownerQuery("select 1 from billing_events")).length,
+  })
+  const before = await count()
+  expect(before.notes).toBe(1)
+  expect((await wh(w, ev)).status).toBe(200)
+  expect((await wh(w, fail)).status).toBe(200)
+  expect(await count()).toEqual(before)
+  // the in-tx ON CONFLICT guard also holds when the fast path is bypassed (a concurrent first delivery)
+  const rs = await Promise.all([wh(w, ev), wh(w, ev)])
+  expect(rs.map((r) => r.status)).toEqual([200, 200])
+  expect(await count()).toEqual(before)
+})
+
+test("M3: billing_customers is append-only for app_user (no UPDATE, no DELETE); inserts still work", async () => {
+  const w = await world()
+  await link(w)
+  const db = testDb()
+  await expect(db.$client.query("update billing_customers set customer_id = 'x'")).rejects.toMatchObject({ code: "42501" })
+  await expect(db.$client.query("delete from billing_customers")).rejects.toMatchObject({ code: "42501" })
+  await expect(db.$client.query("truncate billing_customers")).rejects.toMatchObject({ code: "42501" })
+  expect((await ownerQuery("select 1 from billing_customers")).length).toBe(1)
+  await db.$client.query("insert into billing_customers (provider, customer_id, target_tenant_id) values ('fake', 'cus_new', $1)", [w.tenant.id])
+  expect((await ownerQuery("select 1 from billing_customers")).length).toBe(2)
 })

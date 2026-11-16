@@ -1,7 +1,7 @@
 import Stripe from "stripe"
 import { AppError } from "../../core/errors"
 import type { SubscriptionStatus } from "../../db/schema"
-import { InvalidSignatureError, type BillingEvent, type BillingProvider } from "./provider"
+import { InvalidSignatureError, type BillingEvent, type BillingProvider, type InvoiceSnapshot, type SubscriptionSnapshot } from "./provider"
 
 export type StripeConfig = { secretKey: string; webhookSecret: string }
 export type StripeConfigSource = { get(): Promise<StripeConfig | null>; invalidate?(): void }
@@ -34,6 +34,24 @@ type InvObj = {
   lines?: { data?: { period?: { start?: unknown; end?: unknown } }[] }
 }
 
+/** Stripe subscription object -> our snapshot, or null when it lacks a field we need or has an unknown status. */
+export function mapStripeSubscription(obj: unknown): SubscriptionSnapshot | null {
+  const s = obj as SubObj
+  const item = s.items?.data?.[0]
+  const subscriptionId = idOf(s.id)
+  const customerId = idOf(s.customer)
+  const status = mapStripeStatus(s.status)
+  const priceId = typeof item?.price?.id === "string" ? item.price.id : null
+  // Stripe moved the period end onto the item (2025+ API versions); older versions have it on the subscription.
+  const periodEnd = date(item?.current_period_end ?? s.current_period_end)
+  if (!subscriptionId || !customerId || !status || !priceId || !periodEnd) return null
+  const qty = item?.quantity
+  return {
+    subscriptionId, customerId, status, priceId, seats: typeof qty === "number" && Number.isInteger(qty) && qty >= 0 ? qty : 1,
+    currentPeriodEnd: periodEnd, cancelAtPeriodEnd: s.cancel_at_period_end === true, trialEnd: date(s.trial_end),
+  }
+}
+
 /**
  * Maps a VERIFIED Stripe event to a BillingEvent. Anything we do not act on, or that lacks a field we need, becomes
  * { kind: "ignored" } (recorded, answered 200): a malformed event must never turn into a retry storm or a bad write.
@@ -42,21 +60,8 @@ export function mapStripeEvent(evt: { id: string; type: string; created: number;
   const base = { providerEventId: evt.id, createdAt: new Date(evt.created * 1000) }
   const ignored: BillingEvent = { kind: "ignored", providerEventId: evt.id, type: evt.type }
   if (evt.type === "customer.subscription.created" || evt.type === "customer.subscription.updated" || evt.type === "customer.subscription.deleted") {
-    const s = evt.data.object as SubObj
-    const item = s.items?.data?.[0]
-    const subscriptionId = idOf(s.id)
-    const customerId = idOf(s.customer)
-    const status = mapStripeStatus(s.status)
-    const priceId = typeof item?.price?.id === "string" ? item.price.id : null
-    // Stripe moved the period end onto the item (2025+ API versions); older versions have it on the subscription.
-    const periodEnd = date(item?.current_period_end ?? s.current_period_end)
-    if (!subscriptionId || !customerId || !status || !priceId || !periodEnd) return ignored
-    const qty = item?.quantity
-    return {
-      kind: "subscription.updated", ...base, subscriptionId, customerId, status, priceId,
-      seats: typeof qty === "number" && Number.isInteger(qty) && qty >= 0 ? qty : 1,
-      currentPeriodEnd: periodEnd, cancelAtPeriodEnd: s.cancel_at_period_end === true, trialEnd: date(s.trial_end),
-    }
+    const snap = mapStripeSubscription(evt.data.object)
+    return snap ? { kind: "subscription.updated", ...base, ...snap } : ignored
   }
   if (evt.type === "invoice.paid" || evt.type === "invoice.payment_failed") {
     const i = evt.data.object as InvObj
@@ -139,6 +144,30 @@ export class StripeBillingProvider implements BillingProvider {
     const item = sub.items.data[0]
     if (!item) throw new Error("subscription_no_item")
     await stripe.subscriptions.update(i.subscriptionId, { items: [{ id: item.id, quantity: i.seats }], proration_behavior: "create_prorations" })
+  }
+
+  async retrieveSubscription(subscriptionId: string): Promise<SubscriptionSnapshot> {
+    const snap = mapStripeSubscription(await (await this.stripe()).subscriptions.retrieve(subscriptionId))
+    if (!snap) throw new Error("subscription_unreadable")
+    return snap
+  }
+
+  async retrieveInvoice(invoiceId: string): Promise<InvoiceSnapshot> {
+    const i = (await (await this.stripe()).invoices.retrieve(invoiceId)) as unknown as InvObj & { status?: unknown }
+    const paid = i.status === "paid"
+    const amountMinor = paid ? i.amount_paid : i.amount_due
+    const customerId = idOf(i.customer)
+    if (!customerId || typeof amountMinor !== "number" || !Number.isSafeInteger(amountMinor) || typeof i.currency !== "string") throw new Error("invoice_unreadable")
+    return { invoiceId, customerId, paid, amountMinor, currency: i.currency.toUpperCase() }
+  }
+
+  async listActiveSubscriptions(customerId: string) {
+    const l = await (await this.stripe()).subscriptions.list({ customer: customerId, status: "all", limit: 20 })
+    return l.data.filter((s) => s.status !== "canceled" && s.status !== "incomplete_expired").map((s) => ({ id: s.id, status: s.status as string }))
+  }
+
+  async expireCheckoutSession(sessionId: string) {
+    await (await this.stripe()).checkout.sessions.expire(sessionId)
   }
 
   async parseWebhook(rawBody: string, signature: string): Promise<BillingEvent> {

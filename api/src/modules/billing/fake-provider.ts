@@ -1,4 +1,4 @@
-import { InvalidSignatureError, type BillingEvent, type BillingProvider } from "./provider"
+import { InvalidSignatureError, type BillingEvent, type BillingProvider, type InvoiceSnapshot, type SubscriptionSnapshot } from "./provider"
 
 /** The only signature the fake accepts. */
 export const FAKE_SIGNATURE = "fake-valid-signature"
@@ -9,6 +9,10 @@ export type FakeBillingProvider = BillingProvider & {
   last(method: string): unknown
   /** Makes the next call to `method` reject (provider outage). */
   failNext(method: string): void
+  /** What retrieveSubscription / retrieveInvoice / listActiveSubscriptions report (unset: retrieve throws, list is empty). */
+  subscriptions: Map<string, SubscriptionSnapshot>
+  invoices: Map<string, InvoiceSnapshot>
+  active: Map<string, { id: string; status: string }[]>
 }
 
 const DATE_FIELDS = ["createdAt", "currentPeriodEnd", "trialEnd", "periodStart", "periodEnd"]
@@ -17,6 +21,9 @@ const DATE_FIELDS = ["createdAt", "currentPeriodEnd", "trialEnd", "periodStart",
 export function fakeBilling(): FakeBillingProvider {
   const calls: Call[] = []
   const failing = new Set<string>()
+  const subscriptions = new Map<string, SubscriptionSnapshot>()
+  const invoices = new Map<string, InvoiceSnapshot>()
+  const active = new Map<string, { id: string; status: string }[]>()
   const rec = async <T>(method: string, input: unknown, out: T): Promise<T> => {
     calls.push({ method, input })
     if (failing.delete(method)) throw new Error("provider_down")
@@ -24,7 +31,7 @@ export function fakeBilling(): FakeBillingProvider {
   }
   return {
     id: "fake",
-    calls,
+    calls, subscriptions, invoices, active,
     last: (method) => [...calls].reverse().find((c) => c.method === method)?.input,
     failNext: (method) => void failing.add(method),
     ensureCustomer: (i) => rec("ensureCustomer", i, { customerId: `cus_fake_${i.tenantId.slice(0, 8)}` }),
@@ -33,6 +40,18 @@ export function fakeBilling(): FakeBillingProvider {
     cancelAtPeriodEnd: (i) => rec("cancelAtPeriodEnd", i, undefined),
     resume: (i) => rec("resume", i, undefined),
     updateSeats: (i) => rec("updateSeats", i, undefined),
+    retrieveSubscription: async (id) => {
+      const s = await rec("retrieveSubscription", { id }, subscriptions.get(id))
+      if (!s) throw new Error("not_found")
+      return s
+    },
+    retrieveInvoice: async (id) => {
+      const i = await rec("retrieveInvoice", { id }, invoices.get(id))
+      if (!i) throw new Error("not_found")
+      return i
+    },
+    listActiveSubscriptions: (customerId) => rec("listActiveSubscriptions", { customerId }, active.get(customerId) ?? []),
+    expireCheckoutSession: (sessionId) => rec("expireCheckoutSession", { sessionId }, undefined),
     parseWebhook: async (raw, signature) => {
       if (signature !== FAKE_SIGNATURE) throw new InvalidSignatureError()
       let o: Record<string, unknown>
