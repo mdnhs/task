@@ -1,6 +1,10 @@
+import type { Role } from "@opsdesk/domain/permissions"
 import type { Deps } from "../deps"
 
-// role/device types arrive with @opsdesk/domain (T1.x); kept loose until then.
+/** The caller's role in the current tenant, loaded once per request by requirePermission. */
+export type ResolvedRole = Role & { key: string; fieldRules: Record<string, string[]> }
+
+// device type arrives with T1.6; kept loose until then.
 export type AppEnv = {
   Variables: {
     deps: Deps
@@ -9,7 +13,7 @@ export type AppEnv = {
     user?: { id: string; email: string }
     tenant?: { id: string; slug: string; timezone: string; currency: string; locale: string; sessionIdleHours: number }
     member?: { userId: string; roleId: string; roleKey: string }
-    role?: unknown
+    role?: ResolvedRole
     device?: unknown
   }
 }

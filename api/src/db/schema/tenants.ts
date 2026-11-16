@@ -33,7 +33,7 @@ export const roles = pgTable(
     description: text("description").notNull().default(""),
     home: text("home").notNull(),
     access: jsonb("access").$type<Record<string, string>>().notNull(),
-    fieldRules: jsonb("field_rules").$type<Record<string, unknown>>().notNull().default({}),
+    fieldRules: jsonb("field_rules").$type<Record<string, string[]>>().notNull().default({}),
     isTemplate: boolean("is_template").notNull().default(false),
     clonedFrom: uuid("cloned_from"),
   },

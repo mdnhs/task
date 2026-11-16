@@ -2,6 +2,7 @@ import { createHash, randomBytes } from "node:crypto"
 import { createRoute, z } from "@hono/zod-openapi"
 import { and, eq } from "drizzle-orm"
 import { AppError, Conflict, Forbidden, NotFound } from "../../core/errors"
+import { requirePermission } from "../../core/middleware/permission"
 import { requireSession } from "../../core/middleware/session"
 import { requireTenant } from "../../core/middleware/tenant"
 import { newRouter } from "../../core/router"
@@ -9,9 +10,12 @@ import { sanitizeMailError } from "../../core/mail/sanitize"
 import { invites, memberships, roles, tenants, tenantSettings, user } from "../../db/schema"
 import { withTenant } from "../../db/tenant-tx"
 import { recordAudit } from "../audit"
+import { assertNoEscalation } from "../rbac"
 import { DEFAULT_INVITE_TTL_DAYS, onboardingDefaults } from "../tenants"
 
 const DAY_MS = 86_400_000
+// drizzle wraps pg errors: the code lives on .cause (R9)
+const isPgError = (err: unknown, code: string) => (err as { cause?: { code?: string } })?.cause?.code === code || (err as { code?: string })?.code === code
 const sha256 = (s: string) => createHash("sha256").update(s).digest("hex")
 
 // Token = tenant id (32 hex, not secret: it lets accept find the tenant under RLS) + 32 random bytes (base64url).
@@ -28,7 +32,7 @@ const AcceptInvite = z.object({ token: z.string().min(1).max(256) }).openapi({ e
 const createInviteRoute = createRoute({
   method: "post",
   path: "/v1/invites",
-  middleware: [requireTenant] as const,
+  middleware: [requireTenant, requirePermission("settings", "write")] as const,
   request: { body: { content: { "application/json": { schema: CreateInvite } }, required: true } },
   responses: {
     201: {
@@ -56,16 +60,10 @@ export const inviteRoutes = newRouter()
     const token = mintToken(tenant.id)
 
     const out = await withTenant(deps.db, tenant.id, async (tx) => {
-      // Interim guard until T1.4's requirePermission: managing settings (roles.access.settings = write).
-      const [me] = await tx
-        .select({ access: roles.access })
-        .from(roles)
-        .where(eq(roles.id, c.get("member")!.roleId))
-      if (me?.access.settings !== "write") throw Forbidden("forbidden")
-
-      const [role] = await tx.select({ id: roles.id, key: roles.key }).from(roles).where(eq(roles.id, roleId)) // RLS: own tenant only
+      const [role] = await tx.select({ id: roles.id, key: roles.key, access: roles.access }).from(roles).where(eq(roles.id, roleId)) // RLS: own tenant only
       if (!role) throw NotFound("role_not_found")
       if (!onboardingDefaults().inviteRoles.includes(role.key)) throw new AppError(422, "role_not_invitable", "Unprocessable Entity")
+      assertNoEscalation(c.get("role")!, role.access) // an inviter cannot hand out more than they hold
 
       const [existing] = await tx
         .select({ id: user.id })
@@ -130,7 +128,13 @@ export const inviteRoutes = newRouter()
         .where(and(eq(memberships.tenantId, tenantId), eq(memberships.userId, me.id)))
       if (already) throw Conflict("already_member")
 
-      await tx.insert(memberships).values({ tenantId, userId: me.id, roleId: inv.roleId, joinedAt: now })
+      try {
+        // A savepoint keeps the tx usable; two different invites for the same user can both pass the check above.
+        await tx.transaction((sp) => sp.insert(memberships).values({ tenantId, userId: me.id, roleId: inv.roleId, joinedAt: now }))
+      } catch (err) {
+        if (isPgError(err, "23505")) throw Conflict("already_member")
+        throw err
+      }
       await tx.update(invites).set({ acceptedAt: now }).where(eq(invites.id, inv.id))
       // Holding the invite link proves the invited address (checked equal to the signed-in user's above).
       await tx.update(user).set({ emailVerified: true }).where(eq(user.id, me.id))

@@ -33,8 +33,8 @@ export async function authenticateSession(deps: Deps, headers: Headers, idle: Id
 }
 
 /**
- * Authenticates and fills c.var.session / c.var.user. `idle` is the tenant's hours on tenant routes,
- * or a lookup of the user's strictest hours when no tenant is in play.
+ * Authenticates and fills c.var.session / c.var.user. `idle` is always the user's STRICTEST session_idle_hours across
+ * their memberships (R23), on tenant routes and tenant-less routes alike; never the target tenant's own hours.
  */
 export async function establishSession(c: Context<AppEnv>, idle: IdleHours) {
   const found = await authenticateSession(c.get("deps"), c.req.raw.headers, idle)
@@ -49,7 +49,7 @@ export async function establishSession(c: Context<AppEnv>, idle: IdleHours) {
   c.set("user", { id: found.user.id, email: found.user.email })
 }
 
-// Idempotent: requireTenant already authenticated with the tenant's own idle hours, so it is not re-run (or re-stamped).
+// Idempotent: requireTenant already authenticated (with the strictest hours across memberships, R23), so it is not re-run (or re-stamped).
 export const requireSession: MiddlewareHandler<AppEnv> = async (c, next) => {
   if (!c.get("session")) {
     await establishSession(c, (userId) => strictestIdleHours(c.get("deps").db, userId))

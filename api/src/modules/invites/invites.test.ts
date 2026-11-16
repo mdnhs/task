@@ -9,7 +9,8 @@ beforeEach(resetDb)
 async function world() {
   const t = testApp()
   const tenant = await makeTenant(t.deps, { slug: "acme" })
-  const admin = await makeMember(t.deps, tenant.id, "admin")
+  // The inviter is an owner: invites may not exceed the inviter's own access (no escalation), and only owners hold every module.
+  const admin = await makeMember(t.deps, tenant.id, "owner")
   const { cookie: adminCookie } = await signIn(t.app, admin.email, admin.password)
   const employeeRole = await roleIdOf(t.deps, tenant.id, "employee")
   return { ...t, tenant, admin, adminCookie, employeeRole }
@@ -183,4 +184,32 @@ test("inviting someone who is already a member is 409", async () => {
   const r = await invite(w, m.email)
   expect(r.status).toBe(409)
   expect(((await r.json()) as Json).code).toBe("already_member")
+})
+
+test("an inviter cannot invite with a role above their own access (403 role_escalation)", async () => {
+  const w = await world()
+  const adm = await makeMember(w.deps, w.tenant.id, "admin") // tasks:read; employee has tasks:write, manager too
+  const { cookie } = await signIn(w.app, adm.email, adm.password)
+  const as = (roleId: string, email: string) => call(w.app, "POST", "/v1/invites", { cookie, tenant: "acme", body: { email, roleId } })
+  const r = await as(w.employeeRole, "e@x.ie")
+  expect(r.status).toBe(403)
+  expect(((await r.json()) as Json).code).toBe("role_escalation")
+  expect((await as(await roleIdOf(w.deps, w.tenant.id, "manager"), "m@x.ie")).status).toBe(403)
+  expect((await as(await roleIdOf(w.deps, w.tenant.id, "owner"), "o@x.ie")).status).toBe(422) // never invitable
+  expect((await as(await roleIdOf(w.deps, w.tenant.id, "admin"), "a@x.ie")).status).toBe(201) // equal access is allowed
+  expect(await ownerTenantQuery(w.tenant.id, "select 1 from invites where email in ('e@x.ie','m@x.ie')")).toEqual([])
+})
+
+test("two different invites for the same user accepted at once: one 200, the other 409 (never 500)", async () => {
+  const w = await world()
+  await invite(w, "new@x.ie")
+  const t1 = tokenFrom(w.mailer.last())
+  await invite(w, "new@x.ie", await roleIdOf(w.deps, w.tenant.id, "supervisor"))
+  const t2 = tokenFrom(w.mailer.last())
+  const cookie = await newcomer(w)
+  const rs = await Promise.all([t1, t2].map((token) => call(w.app, "POST", "/v1/invites/accept", { cookie, body: { token } })))
+  expect(rs.map((r) => r.status).sort()).toEqual([200, 409])
+  const bad = rs.find((r) => r.status === 409)!
+  expect(((await bad.json()) as Json).code).toBe("already_member")
+  expect((await ownerTenantQuery(w.tenant.id, "select 1 from memberships m join \"user\" u on u.id=m.user_id where u.email='new@x.ie'")).length).toBe(1)
 })
