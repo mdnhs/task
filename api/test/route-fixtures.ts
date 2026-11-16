@@ -1,7 +1,9 @@
 import type { AppType } from "../src/app"
 import type { Deps } from "../src/deps"
+import { ownerTenantQuery } from "./db"
 import { call } from "./harness"
 import { makeMember, roleIdOf, signIn } from "./factories"
+import { notify, withTenantAfterCommit } from "../src/modules/notifications"
 
 /**
  * Fixtures for the cross-tenant walker (isolation.test.ts, AC-M0-01).
@@ -19,7 +21,7 @@ import { makeMember, roleIdOf, signIn } from "./factories"
 export type Fixture = { kind: "id" | "static"; value: string }
 export type TenantFixtures = Record<string, Record<string, Fixture>>
 
-type Resource = "role" | "member" | "team" | "device" | "feature"
+type Resource = "role" | "member" | "team" | "device" | "feature" | "notification" | "pushToken"
 
 /** path template -> param -> which resource that param names on that route. */
 export const ROUTE_PARAMS: Record<string, Record<string, Resource>> = {
@@ -33,6 +35,8 @@ export const ROUTE_PARAMS: Record<string, Record<string, Resource>> = {
   "/v1/devices/{id}/bind": { id: "device" },
   "/v1/devices/{id}/enrolment-code": { id: "device" },
   "/v1/device-policies/{feature}": { feature: "feature" },
+  "/v1/notifications/{id}/read": { id: "notification" },
+  "/v1/me/push-tokens/{id}": { id: "pushToken" },
 }
 
 export type Actor = { userId: string; cookie: string; slug: string }
@@ -64,7 +68,12 @@ export async function fixtureIds(t: { app: AppType; deps: Deps }, tenant: { id: 
   }
   const team = await post("/v1/teams", { name: `Team ${uniq}`, kind: "team" })
   const device = await post("/v1/devices", { userId: deviceUser.userId, type: "pc", owner: "company", label: `Device ${uniq}`, trusted: true })
-  const resources = { role: await roleIdOf(t.deps, tenant.id, "employee"), member: staff.userId, team: team.id, device: device.id }
+  // the owner's own notification and push token (the walker acts as the owner of A; ids of B's owner must 404)
+  await withTenantAfterCommit(t.deps, tenant.id, (tx, enqueue) => notify(tx, tenant.id, { userId: owner.userId, kind: "system", title: `Notice ${uniq}`, body: "b" }, t.deps, enqueue))
+  const [notif] = await ownerTenantQuery(tenant.id, "select id from notifications where title = $1", [`Notice ${uniq}`])
+  const tokRes = await call(t.app, "POST", "/v1/me/push-tokens", { cookie: owner.cookie, tenant: tenant.slug, body: { token: `fcm-${uniq}-xxxxxxxx`, platform: "android" } })
+  if (tokRes.status !== 201) throw new Error(`fixture push token failed: ${tokRes.status}`)
+  const resources = { role: await roleIdOf(t.deps, tenant.id, "employee"), member: staff.userId, team: team.id, device: device.id, notification: String(notif.id), pushToken: ((await tokRes.json()) as { id: string }).id }
   const fixtures: TenantFixtures = {}
   for (const [path, params] of Object.entries(ROUTE_PARAMS)) {
     fixtures[path] = {}

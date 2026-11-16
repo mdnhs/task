@@ -92,6 +92,13 @@
       "when": 1794855507927,
       "tag": "0012_event_delivery_failures",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1794856022510,
+      "tag": "0013_notifications",
+      "breakpoints": true
     }
   ]
 }

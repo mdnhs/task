@@ -2,12 +2,14 @@ import { pathToFileURL } from "node:url"
 import { relayOnce } from "./core/events"
 import { makeBullQueue, startWorker } from "./core/queue/bull-queue"
 import { registerJob } from "./core/queue/queue"
+import { registerNotifications } from "./modules/notifications"
 import { parseEnv, type Env } from "./env"
 import { makeDeps } from "./server"
 
 /** Background worker process: BullMQ job handlers plus the 1 s `events.relay` repeatable job. */
 export async function startWorkerProcess(env: Env = parseEnv(process.env)) {
   const deps = makeDeps(env)
+  registerNotifications() // notification.send job + member.joined subscriber
   registerJob("events.relay", async (_data, d) => {
     await relayOnce(d)
   })

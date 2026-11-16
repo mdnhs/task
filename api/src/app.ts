@@ -7,6 +7,7 @@ import { requestId } from "./core/middleware/request-id"
 import { auditRoutes } from "./modules/audit"
 import { deviceRoutes, probeRoutes } from "./modules/devices"
 import { mfaRoutes } from "./modules/mfa"
+import { notificationRoutes } from "./modules/notifications"
 import { rbacRoutes } from "./modules/rbac"
 import { authRoutes } from "./modules/auth/routes"
 import { inviteRoutes } from "./modules/invites"
@@ -53,6 +54,7 @@ export function createApp(deps: Deps) {
   app.route("/", mfaRoutes)
   app.route("/", auditRoutes)
   app.route("/", deviceRoutes)
+  app.route("/", notificationRoutes)
   if (deps.env.NODE_ENV === "test") app.route("/", probeRoutes) // test-only; never registered elsewhere, not in the OpenAPI doc
 
   app.doc31("/v1/openapi.json", { openapi: "3.1.0", info: { title: "OpsDesk API", version: "1" } })

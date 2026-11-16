@@ -60,6 +60,9 @@ const SPECS: Record<string, Spec> = {
   "POST /v1/devices/{id}/enrolment-code": { actor: "owner", expect: "device_not_found" },
   // actor is the allocated user of the device in BOTH tenants, with a live code issued for that exact device
   "POST /v1/devices/{id}/bind": { actor: "dual", expect: "device_not_found", body: issueCode },
+  // the acting owner of A owns the A fixtures; B's ids belong to B's owner (own-notification rule + RLS)
+  "POST /v1/notifications/{id}/read": { actor: "owner", expect: "notification_not_found" },
+  "DELETE /v1/me/push-tokens/{id}": { actor: "owner", expect: "push_token_not_found" },
 }
 
 let t: ReturnType<typeof testApp>
@@ -86,7 +89,7 @@ const substitute = (path: string, params: Record<string, string>) => path.replac
 
 async function hashes(tenantId: string): Promise<Record<string, string>> {
   const out: Record<string, string> = {}
-  for (const tbl of ["roles", "memberships", "teams", "team_members", "reporting_lines", "devices", "device_policies", "invites", "audit_events", "tenant_settings"]) {
+  for (const tbl of ["roles", "memberships", "teams", "team_members", "reporting_lines", "devices", "device_policies", "invites", "audit_events", "tenant_settings", "notifications", "notification_preferences", "push_tokens", "notification_deliveries"]) {
     const [r] = await ownerTenantQuery(tenantId, `select count(*)::text || ':' || coalesce(md5(string_agg(to_jsonb(x)::text, ',' order by to_jsonb(x)::text)), '') as h from ${tbl} x`)
     out[tbl] = String(r.h)
   }
