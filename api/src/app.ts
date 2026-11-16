@@ -1,15 +1,16 @@
-import { OpenAPIHono } from "@hono/zod-openapi"
 import { sql } from "drizzle-orm"
 import { HTTPException } from "hono/http-exception"
 import type { Deps } from "./deps"
-import type { AppEnv } from "./core/context"
+import { newRouter } from "./core/router"
 import { AppError, problem, statusCode, statusTitle } from "./core/errors"
 import { requestId } from "./core/middleware/request-id"
 import { authRoutes } from "./modules/auth/routes"
+import { inviteRoutes } from "./modules/invites"
+import { tenantRoutes } from "./modules/tenants"
 
 export function createApp(deps: Deps) {
   const { logger } = deps
-  const app = new OpenAPIHono<AppEnv>()
+  const app = newRouter()
 
   app.use("*", async (c, next) => {
     c.set("deps", deps)
@@ -40,6 +41,8 @@ export function createApp(deps: Deps) {
   })
 
   app.route("/", authRoutes)
+  app.route("/", tenantRoutes)
+  app.route("/", inviteRoutes)
 
   app.doc31("/v1/openapi.json", { openapi: "3.1.0", info: { title: "OpsDesk API", version: "1" } })
 

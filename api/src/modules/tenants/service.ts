@@ -1,0 +1,59 @@
+import { eq, sql } from "drizzle-orm"
+import { memberships, tenants, tenantSettings } from "../../db/schema"
+import type { Deps } from "../../deps"
+import { Conflict } from "../../core/errors"
+import { recordAudit } from "../audit"
+import { onboardingDefaults } from "./defaults"
+import { seedRoleTemplates } from "./seed"
+
+export const DEFAULT_INVITE_TTL_DAYS = 7
+
+export type NewTenant = { name: string; slug: string; timezone?: string; currency?: string; locale?: string }
+
+/** Creates the tenant, its role templates, the caller's owner membership, default settings and the audit entry in ONE transaction. */
+export async function createTenant(deps: Deps, userId: string, input: NewTenant): Promise<{ id: string; slug: string }> {
+  const d = onboardingDefaults()
+  try {
+    return await deps.db.transaction(async (tx) => {
+      const [t] = await tx
+        .insert(tenants)
+        .values({
+          slug: input.slug,
+          name: input.name,
+          timezone: input.timezone ?? d.timezone,
+          locale: input.locale ?? d.locale,
+          // currency: the column default (EUR, R7) unless given
+          ...(input.currency ? { currency: input.currency } : {}),
+        })
+        .returning()
+      await tx.execute(sql`select set_config('app.tenant_id', ${t.id}, true)`)
+      const roleIds = await seedRoleTemplates(tx, t.id)
+      const now = deps.clock.now()
+      await tx.insert(memberships).values({ tenantId: t.id, userId, roleId: roleIds.get("owner")!, joinedAt: now })
+      await tx.insert(tenantSettings).values({ tenantId: t.id, key: "invite_ttl_days", value: DEFAULT_INVITE_TTL_DAYS })
+      await recordAudit(
+        tx,
+        t.id,
+        {
+          action: "tenant.created",
+          entity: "tenant",
+          entityId: t.id,
+          actorId: userId,
+          before: null,
+          after: { slug: t.slug, name: t.name, timezone: t.timezone, currency: t.currency, locale: t.locale },
+        },
+        now,
+      )
+      return { id: t.id, slug: t.slug }
+    })
+  } catch (err) {
+    // drizzle wraps the pg error (R9): the SQLSTATE is on .cause
+    if ((err as { cause?: { code?: string } }).cause?.code === "23505") throw Conflict("slug_taken")
+    throw err
+  }
+}
+
+export async function tenantName(deps: Deps, tenantId: string): Promise<{ name: string; slug: string }> {
+  const [t] = await deps.db.select({ name: tenants.name, slug: tenants.slug }).from(tenants).where(eq(tenants.id, tenantId))
+  return t
+}

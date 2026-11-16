@@ -16,3 +16,14 @@ export function withTenant<T>(db: Db, tenantId: string, fn: (tx: TenantTx) => Pr
     return fn(tx)
   })
 }
+
+/**
+ * Runs fn in a transaction where `app.user_id` is the authenticated user. This only unlocks the
+ * narrow "read my own memberships (and the roles they point at)" policies; it grants no tenant data.
+ */
+export function withUser<T>(db: Db, userId: string, fn: (tx: TenantTx) => Promise<T>): Promise<T> {
+  return db.transaction(async (tx) => {
+    await tx.execute(sql`select set_config('app.user_id', ${userId}, true)`)
+    return fn(tx)
+  })
+}

@@ -18,6 +18,9 @@ COPY --from=deps --chown=opsdesk:nodejs /app/node_modules ./node_modules
 COPY --chown=opsdesk:nodejs package.json ./
 COPY --chown=opsdesk:nodejs api ./api
 COPY --chown=opsdesk:nodejs packages/domain ./packages/domain
+# Tenant defaults and role templates are data (FR-M0-20), read at runtime from /app/public/data.
+COPY --chown=opsdesk:nodejs public/data/auth/onboarding-defaults.json ./public/data/auth/onboarding-defaults.json
+COPY --chown=opsdesk:nodejs public/data/shell/roles.json ./public/data/shell/roles.json
 USER opsdesk
 WORKDIR /app/api
 EXPOSE 8080

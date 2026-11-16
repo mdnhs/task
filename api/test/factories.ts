@@ -51,3 +51,61 @@ export async function signIn(app: AppType, email: string, password: string): Pro
   if (!cookie) throw new Error("sign-in set no cookie")
   return { cookie }
 }
+
+// ---- tenancy factories (T1.3) ----
+import { and, eq } from "drizzle-orm"
+import type { Deps } from "../src/deps"
+import { memberships, roles, tenants, user } from "../src/db/schema"
+import { withTenant } from "../src/db/tenant-tx"
+import { seedRoleTemplates } from "../src/modules/tenants"
+
+let seq = 0
+const uniq = () => `${Date.now().toString(36)}${(seq++).toString(36)}`
+
+/** Inserts a tenant (no RLS on `tenants`) and seeds its role templates. */
+export async function makeTenant(
+  deps: Deps,
+  over: Partial<{ slug: string; name: string; sessionIdleHours: number }> = {},
+): Promise<{ id: string; slug: string }> {
+  const slug = over.slug ?? `t-${uniq()}`
+  const [row] = await deps.db
+    .insert(tenants)
+    .values({ slug, name: over.name ?? slug, ...(over.sessionIdleHours ? { sessionIdleHours: over.sessionIdleHours } : {}) })
+    .returning({ id: tenants.id, slug: tenants.slug })
+  await withTenant(deps.db, row.id, (tx) => seedRoleTemplates(tx, row.id))
+  return row
+}
+
+/** A verified Better Auth user (real password hash, via auth.api) with an active membership in `tenantId`. */
+export async function makeMember(
+  deps: Deps,
+  tenantId: string,
+  roleKey: string,
+  over: { email?: string } = {},
+): Promise<{ userId: string; email: string; password: string }> {
+  const email = over.email ?? `m-${uniq()}@x.ie`
+  const password = "Passw0rd!long"
+  const existing = await deps.db.select({ id: user.id }).from(user).where(eq(user.email, email))
+  let userId = existing[0]?.id
+  if (!userId) {
+    const created = await deps.auth.api.signUpEmail({ body: { email, password, name: "Test Member" } })
+    userId = created.user.id
+    await deps.db.update(user).set({ emailVerified: true }).where(eq(user.id, userId))
+  }
+  const uid = userId
+  await withTenant(deps.db, tenantId, async (tx) => {
+    const [role] = await tx.select({ id: roles.id }).from(roles).where(and(eq(roles.tenantId, tenantId), eq(roles.key, roleKey)))
+    if (!role) throw new Error(`no role ${roleKey} in tenant`)
+    await tx.insert(memberships).values({ tenantId, userId: uid, roleId: role.id, joinedAt: deps.clock.now() })
+  })
+  return { userId: uid, email, password }
+}
+
+/** Role id by key inside a tenant. */
+export function roleIdOf(deps: Deps, tenantId: string, key: string): Promise<string> {
+  return withTenant(deps.db, tenantId, async (tx) => {
+    const [r] = await tx.select({ id: roles.id }).from(roles).where(and(eq(roles.tenantId, tenantId), eq(roles.key, key)))
+    if (!r) throw new Error(`no role ${key}`)
+    return r.id
+  })
+}
