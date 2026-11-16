@@ -46,7 +46,9 @@ test("secret-box rejects a truncated auth tag and a wrong-length IV", () => {
 })
 test("secret-box opens v1 ciphertexts (no AAD) and a rotated keyring opens old-kid v2", () => {
   const v1 = sealV1("legacy", ring.current.key)
-  expect(open(v1, ring, AAD)).toBe("legacy")
+  expect(() => open(v1, ring, AAD)).toThrow(/v1/)
+  expect(() => open(v1, ring, AAD, { allowV1: false })).toThrow(/v1/)
+  expect(open(v1, ring, AAD, { allowV1: true })).toBe("legacy")
   expect(isCurrent(v1, ring)).toBe(false)
 
   const old = seal("old-secret", ring, AAD)
@@ -55,7 +57,7 @@ test("secret-box opens v1 ciphertexts (no AAD) and a rotated keyring opens old-k
   expect(isCurrent(old, rotated)).toBe(false)
   expect(isCurrent(seal("n", rotated, AAD), rotated)).toBe(true)
   // v1 written under a now-previous key still opens
-  expect(open(v1, rotated, AAD)).toBe("legacy")
+  expect(open(v1, rotated, AAD, { allowV1: true })).toBe("legacy")
   // an unknown kid is refused
   expect(() => open(old, { current: { id: "k9", key: randomBytes(32) } }, AAD)).toThrow(/key id/i)
 })
@@ -68,5 +70,6 @@ test("buildKeyring: SECRETS_KEY is k1; SECRETS_KEYS + SECRETS_KEY_ID selects cur
   expect(multi.current.id).toBe("k2")
   expect(multi.previous?.map((k) => k.id)).toEqual(["k1"])
   expect(() => buildKeyring({})).toThrow(/SECRETS_KEY/)
+  expect(() => buildKeyring({ SECRETS_KEYS: JSON.stringify({ k1: a.toString("base64") }), SECRETS_KEY_ID: "constructor" })).toThrow(/SECRETS_KEY_ID/)
   expect(() => buildKeyring({ SECRETS_KEYS: JSON.stringify({ k1: a.toString("base64") }), SECRETS_KEY_ID: "zz" })).toThrow(/SECRETS_KEY_ID/)
 })

@@ -36,7 +36,7 @@ const schema = z.object({
   if (e.SECRETS_KEYS) {
     try {
       const map = parseKeyMap(e.SECRETS_KEYS)
-      if (!e.SECRETS_KEY_ID || !(e.SECRETS_KEY_ID in map)) {
+      if (!e.SECRETS_KEY_ID || !Object.hasOwn(map, e.SECRETS_KEY_ID)) {
         ctx.addIssue({ code: "custom", path: ["SECRETS_KEY_ID"], message: "must name a key in SECRETS_KEYS" })
       }
     } catch (err) {

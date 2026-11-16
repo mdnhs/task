@@ -57,4 +57,5 @@ test("SECRETS_KEYS keyring: every key 32 bytes, SECRETS_KEY_ID must exist, satis
   expect(() => parseEnv({ ...base, SECRETS_KEYS: JSON.stringify({ k1: k(16) }), SECRETS_KEY_ID: "k1" })).toThrow(/SECRETS_KEYS/)
   expect(() => parseEnv({ ...base, SECRETS_KEYS: "{nope", SECRETS_KEY_ID: "k1" })).toThrow(/SECRETS_KEYS/)
   expect(() => parseEnv({ ...base, SECRETS_KEY_ID: "k1" })).toThrow(/SECRETS_KEY_ID/)
+  expect(() => parseEnv({ ...base, SECRETS_KEYS: keys, SECRETS_KEY_ID: "constructor" })).toThrow(/SECRETS_KEY_ID/)
 })

@@ -81,7 +81,7 @@ export async function loadMailConfig(db: Db, env: KeyringEnv): Promise<{ apiKey:
   const [r] = await db.select().from(t).where(eq(t.id, 1))
   if (!r) return null
   const ring = secretsKeyring(env)
-  const apiKey = open(r.apiKeyCiphertext, ring, EMAIL_KEY_AAD)
+  const apiKey = open(r.apiKeyCiphertext, ring, EMAIL_KEY_AAD, { allowV1: true }) // v1 rows predate AAD; re-sealed below
   if (!isCurrent(r.apiKeyCiphertext, ring)) {
     // Lazy migration (v1 -> v2, or an old key id -> the current one): one compare-and-set UPDATE, deliberately not audited
     // and not touching updated_at/updated_by, since nothing the admin configured has changed.

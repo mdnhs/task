@@ -44,8 +44,8 @@ function decrypt(key: Buffer, iv: string, tag: string, ct: string, aad?: string)
   return Buffer.concat([decipher.update(Buffer.from(ct, "base64")), decipher.final()]).toString("utf8")
 }
 
-/** Throws on a wrong key/AAD, tampered data, an unknown key id or an unknown version. */
-export function open(sealed: string, ring: Keyring, aad: string): string {
+/** Throws on a wrong key/AAD, a v1 value unless opts.allowV1, tampered data, an unknown key id or an unknown version. */
+export function open(sealed: string, ring: Keyring, aad: string, opts: { allowV1?: boolean } = {}): string {
   const parts = sealed.split(":")
   const version = parts[0]
   if (version === "v2") {
@@ -56,6 +56,8 @@ export function open(sealed: string, ring: Keyring, aad: string): string {
     return decrypt(entry.key, iv, tag, ct, aad)
   }
   if (version === "v1") {
+    // v1 has no AAD, so a v1 value could be swapped between columns: callers that still hold v1 rows opt in explicitly.
+    if (!opts.allowV1) throw new Error("v1 secret-box values are not accepted here")
     if (parts.length !== 4) throw new Error("malformed sealed value")
     const [, iv, tag, ct] = parts
     // v1 carries no key id and no AAD: try each key. Only used until the row is re-sealed.
@@ -103,7 +105,7 @@ export function buildKeyring(env: KeyringEnv): Keyring {
   if (env.SECRETS_KEYS) {
     const map = parseKeyMap(env.SECRETS_KEYS)
     const id = env.SECRETS_KEY_ID
-    if (!id || !(id in map)) throw new Error("SECRETS_KEY_ID must name a key in SECRETS_KEYS")
+    if (!id || !Object.hasOwn(map, id)) throw new Error("SECRETS_KEY_ID must name a key in SECRETS_KEYS")
     const entry = (k: string): KeyEntry => ({ id: k, key: Buffer.from(map[k], "base64") })
     return { current: entry(id), previous: Object.keys(map).filter((k) => k !== id).map(entry) }
   }
