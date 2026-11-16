@@ -34,7 +34,8 @@ export async function recordPlatformAudit(tx: PlatformTx, e: PlatformAuditInput,
   const norm = (v: unknown): unknown => (v === undefined ? null : JSON.parse(JSON.stringify(v)) ?? null)
   const before = norm(e.before)
   const after = norm(e.after)
-  const targetTenantId = e.targetTenantId ?? null
+  // A uuid column stores (and returns) lowercase: hash the lowercase form, or an uppercase input would read back as tampering.
+  const targetTenantId = e.targetTenantId?.toLowerCase() ?? null
   const hash = platformEntryHash(prevHash, { seq, at: now, actorId: e.actorId, action: e.action, entity: e.entity, entityId: e.entityId, targetTenantId, before, after })
   await tx.insert(platformAuditEvents).values({ seq, at: now, actorId: e.actorId, action: e.action, entity: e.entity, entityId: e.entityId, targetTenantId, before, after, prevHash, hash })
 }

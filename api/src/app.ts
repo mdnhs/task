@@ -20,6 +20,7 @@ import { emailSettingsRoutes } from "./modules/platform-email"
 import { storageSettingsRoutes } from "./modules/platform-storage"
 import { platformAuditRoutes } from "./modules/platform-audit"
 import { platformStaffRoutes } from "./modules/platform-staff"
+import { platformConsoleRoutes } from "./modules/platform-console"
 import { rbacRoutes } from "./modules/rbac"
 import { authRoutes } from "./modules/auth/routes"
 import { inviteRoutes } from "./modules/invites"
@@ -74,6 +75,7 @@ export function createApp(deps: Deps) {
   app.route("/", gdprRoutes)
   app.route("/", platformStaffRoutes)
   app.route("/", platformAuditRoutes)
+  app.route("/", platformConsoleRoutes)
   app.route("/", emailSettingsRoutes)
   app.route("/", storageSettingsRoutes)
   app.route("/", billingSettingsRoutes)

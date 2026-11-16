@@ -1,0 +1,5 @@
+export { platformConsoleRoutes } from "./routes"
+export { suspendTenant, reactivateTenant, extendTrial, setTenantModules } from "./lifecycle"
+export { platformMetrics } from "./metrics"
+export { listTenants, tenantDetail } from "./tenants"
+export { listPlatformDataRequests } from "./data-requests"
