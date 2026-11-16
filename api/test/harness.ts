@@ -17,24 +17,25 @@ export const testEnv: Deps["env"] = {
   BETTER_AUTH_SECRET: "test-secret-test-secret-test-secret-1234",
   APP_URL: "http://localhost:3000",
   DATA_REGION: "eu-west-1",
+  // Fixed test-only key (32 bytes of 0x07), never a real secret.
+  SECRETS_KEY: Buffer.alloc(32, 7).toString("base64"),
 }
 
 // Lets helpers (factories.ts) find an app's fake mailer from the app alone.
 export const mailerOf = new WeakMap<object, FakeMailer>()
 
 export function testApp(over: Partial<Deps> = {}): { app: AppType; deps: Deps; mailer: FakeMailer; clock: FakeClock } {
-  const mailer = fakeMailer()
   const clock = fakeClock()
   const env = over.env ?? testEnv
   // Real (lazy-connecting) Testcontainers db when global setup provided one; inert fake otherwise.
   const db = over.db ?? (hasTestDb() ? testDb() : ({ execute: async () => undefined } as never))
   const usedClock = over.clock ?? clock
   const logger = over.logger ?? pino({ level: "silent" })
-  const usedMailer = over.mailer ?? mailer
-  const deps: Deps = { env, db, auth: buildAuth({ env, db, clock: usedClock, mailer: usedMailer, logger }), clock: usedClock, mailer: usedMailer, logger, ...over }
+  const mailer = (over.mailer ?? fakeMailer()) as FakeMailer // the one actually used
+  const deps: Deps = { env, db, clock: usedClock, mailer, logger, auth: over.auth ?? buildAuth({ env, db, clock: usedClock, mailer, logger }) }
   const app = createApp(deps)
-  mailerOf.set(app, usedMailer as FakeMailer)
-  return { app, deps, mailer, clock }
+  mailerOf.set(app, mailer)
+  return { app, deps, mailer, clock: usedClock as FakeClock }
 }
 
 export function call(

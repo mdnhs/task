@@ -32,3 +32,18 @@ test("parseEnv accepts PORT 1..65535 and rejects everything else", () => {
     expect(() => parseEnv({ ...base, PORT: bad }), `PORT=${bad}`).toThrow(/PORT/)
   }
 })
+const key32 = Buffer.alloc(32, 7).toString("base64")
+test("SECRETS_KEY must be base64 of exactly 32 bytes, and is required in production", () => {
+  expect(parseEnv({ ...base, SECRETS_KEY: key32 }).SECRETS_KEY).toBe(key32)
+  expect(() => parseEnv({ ...base, SECRETS_KEY: Buffer.alloc(16).toString("base64") })).toThrow(/SECRETS_KEY/)
+  expect(() => parseEnv({ ...base, SECRETS_KEY: "not base64 !!" })).toThrow(/SECRETS_KEY/)
+  expect(parseEnv({ ...base, NODE_ENV: "development" }).SECRETS_KEY).toBeUndefined()
+  expect(() => parseEnv({ ...base, NODE_ENV: "production" })).toThrow(/SECRETS_KEY/)
+  expect(parseEnv({ ...base, NODE_ENV: "production", SECRETS_KEY: key32 }).NODE_ENV).toBe("production")
+})
+test("RESEND_API_KEY and MAIL_FROM: empty string is unset", () => {
+  const env = parseEnv({ ...base, RESEND_API_KEY: "", MAIL_FROM: "" })
+  expect(env.RESEND_API_KEY).toBeUndefined()
+  expect(env.MAIL_FROM).toBeUndefined()
+  expect(parseEnv({ ...base, RESEND_API_KEY: "re_x", MAIL_FROM: "a@x.ie" }).MAIL_FROM).toBe("a@x.ie")
+})

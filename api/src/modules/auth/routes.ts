@@ -1,6 +1,6 @@
 import { Hono } from "hono"
 import type { AppEnv } from "../../core/context"
-import { problem } from "../../core/errors"
+import { problem, statusCode, statusTitle } from "../../core/errors"
 import { authenticateSession, requireSession } from "../../core/middleware/session"
 
 export const authRoutes = new Hono<AppEnv>()
@@ -13,12 +13,17 @@ authRoutes.on(["GET", "POST"], "/api/auth/*", async (c) => {
   const deps = c.get("deps")
   await authenticateSession(deps, c.req.raw.headers)
   const res = await deps.auth.handler(c.req.raw)
-  // Map Better Auth's unverified-email refusal into our problem+json shape.
-  if (res.status === 403 && res.headers.get("content-type")?.includes("json")) {
-    const body = (await res.clone().json().catch(() => null)) as { code?: string } | null
-    if (body?.code === "EMAIL_NOT_VERIFIED") {
-      return problem(403, "email_not_verified", "Forbidden", c.get("requestId"))
-    }
+  // One place maps every Better Auth error to our problem+json shape. Its own error code (lower-cased,
+  // e.g. invalid_email_or_password, email_not_verified) becomes `code`; its free-text message is dropped.
+  if (res.status >= 400) {
+    const body = res.headers.get("content-type")?.includes("json")
+      ? ((await res.clone().json().catch(() => null)) as { code?: unknown } | null)
+      : null
+    const code = typeof body?.code === "string" && body.code ? body.code.toLowerCase() : statusCode(res.status)
+    const out = problem(res.status, code, statusTitle(res.status), c.get("requestId"))
+    const retry = res.headers.get("x-retry-after")
+    if (retry) out.headers.set("x-retry-after", retry)
+    return out
   }
   return res
 })

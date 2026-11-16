@@ -5,14 +5,14 @@ import { createApp } from "./app"
 import { makeDb } from "./db/client"
 import type { Deps } from "./deps"
 import { buildAuth } from "./modules/auth/auth"
+import { makeMailer } from "./modules/platform-email"
 import { parseEnv, type Env } from "./env"
 
-// Mailer is still a no-op until a real one lands.
 function makeDeps(env: Env): Deps {
   const db = makeDb(env.DATABASE_URL)
   const clock = { now: () => new Date() }
   const logger = pino({ level: "info" })
-  const mailer = { send: async () => undefined }
+  const mailer = makeMailer({ env, db, logger })
   return { env, db, auth: buildAuth({ env, db, clock, mailer, logger }), clock, mailer, logger }
 }
 

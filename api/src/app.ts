@@ -3,18 +3,9 @@ import { sql } from "drizzle-orm"
 import { HTTPException } from "hono/http-exception"
 import type { Deps } from "./deps"
 import type { AppEnv } from "./core/context"
-import { AppError, problem } from "./core/errors"
+import { AppError, problem, statusCode, statusTitle } from "./core/errors"
 import { requestId } from "./core/middleware/request-id"
 import { authRoutes } from "./modules/auth/routes"
-
-const HTTP_CODES: Record<number, string> = {
-  400: "bad_request", 401: "unauthenticated", 403: "forbidden", 404: "not_found", 405: "method_not_allowed",
-  413: "payload_too_large", 415: "unsupported_media_type", 429: "too_many_requests",
-}
-const STATUS_TITLES: Record<number, string> = {
-  400: "Bad Request", 401: "Unauthorized", 403: "Forbidden", 404: "Not Found", 405: "Method Not Allowed",
-  413: "Payload Too Large", 415: "Unsupported Media Type", 429: "Too Many Requests",
-}
 
 export function createApp(deps: Deps) {
   const { logger } = deps
@@ -30,7 +21,7 @@ export function createApp(deps: Deps) {
     const rid = c.get("requestId") ?? crypto.randomUUID()
     if (err instanceof AppError) return problem(err.status, err.code, err.title, rid)
     if (err instanceof HTTPException) {
-      return problem(err.status, HTTP_CODES[err.status] ?? "http_error", STATUS_TITLES[err.status] ?? "Error", rid)
+      return problem(err.status, statusCode(err.status), statusTitle(err.status), rid)
     }
     logger.error({ err, requestId: rid }, "unhandled error")
     return problem(500, "internal", "Internal Server Error", rid)

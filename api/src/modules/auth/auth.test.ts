@@ -1,5 +1,5 @@
 import { beforeEach, expect, test } from "vitest"
-import { call, resetDb, testApp, testEnv } from "../../../test/harness"
+import { call, fakeMailer, resetDb, testApp, testEnv } from "../../../test/harness"
 import { ownerQuery } from "../../../test/db"
 import { signIn, signUp } from "../../../test/factories"
 import { buildAuth } from "./auth"
@@ -162,4 +162,26 @@ test("social providers are registered only when their env vars are set", () => {
   expect(Object.keys(auth({ GOOGLE_CLIENT_ID: "", GOOGLE_CLIENT_SECRET: "" }).options.socialProviders ?? {})).toEqual([])
   expect(Object.keys(auth({ GOOGLE_CLIENT_ID: "g" }).options.socialProviders ?? {})).toEqual([])
   expect(Object.keys(auth({}).options.socialProviders ?? {})).toEqual([])
+})
+test("wrong password is 401 problem+json invalid_email_or_password", async () => {
+  const { app } = testApp()
+  await signUp(app, EMAIL, PW)
+  const r = await call(app, "POST", "/api/auth/sign-in/email", { body: { email: EMAIL, password: "Wr0ng-password!!" }, headers: { origin: testEnv.APP_URL } })
+  expect(r.status).toBe(401)
+  expect(r.headers.get("content-type")).toMatch(/application\/problem\+json/)
+  expect(await r.json()).toMatchObject({ type: "about:blank", title: "Unauthorized", status: 401, code: "invalid_email_or_password", requestId: expect.any(String) })
+})
+test("CSRF/origin 403 on /api/auth is problem+json", async () => {
+  const { app, cookie } = await signedIn()
+  const r = await call(app, "POST", "/api/auth/sign-out", { cookie, body: {}, headers: { origin: "https://evil.example" } })
+  expect(r.status).toBe(403)
+  expect(r.headers.get("content-type")).toMatch(/application\/problem\+json/)
+  expect(await r.json()).toMatchObject({ status: 403, code: expect.any(String), requestId: expect.any(String) })
+})
+test("testApp({ mailer }) returns and uses the mailer it was given", async () => {
+  const mine = fakeMailer()
+  const t = testApp({ mailer: mine })
+  expect(t.mailer).toBe(mine)
+  await signUp(t.app, EMAIL, PW)
+  expect(mine.sent.length).toBe(1)
 })

@@ -4,6 +4,7 @@ import { twoFactor } from "better-auth/plugins/two-factor"
 import type { Db } from "../../db/client"
 import * as schema from "../../db/schema"
 import type { Logger } from "pino"
+import { sanitizeMailError } from "../../core/mail/sanitize"
 import type { Clock, Mailer } from "../../deps"
 import type { Env } from "../../env"
 
@@ -49,8 +50,8 @@ export function buildAuth({ env, db, clock, mailer, logger }: AuthDeps, opts: Au
             text: `Confirm your email address to finish signing up:\n\n${env.APP_URL}/verify-email?token=${token}\n\nThe link expires in 24 hours.`,
           })
           .catch((err) => {
-            // Never log the token, link or body: only who it was for (by id) and the error.
-            logger.error({ err, userId: user.id }, "verification email send failed")
+            // Never log the token, link or body: only who it was for (by id) and a sanitized error.
+            logger.error({ error: sanitizeMailError(err), userId: user.id }, "verification email send failed")
           })
       },
     },
