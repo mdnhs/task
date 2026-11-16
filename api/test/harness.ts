@@ -18,6 +18,9 @@ export const testEnv: Deps["env"] = {
   DATA_REGION: "eu-west-1",
 }
 
+// Lets helpers (factories.ts) find an app's fake mailer from the app alone.
+export const mailerOf = new WeakMap<object, FakeMailer>()
+
 export function testApp(over: Partial<Deps> = {}): { app: AppType; deps: Deps; mailer: FakeMailer; clock: FakeClock } {
   const mailer = fakeMailer()
   const clock = fakeClock()
@@ -25,8 +28,11 @@ export function testApp(over: Partial<Deps> = {}): { app: AppType; deps: Deps; m
   // Real (lazy-connecting) Testcontainers db when global setup provided one; inert fake otherwise.
   const db = over.db ?? (hasTestDb() ? testDb() : ({ execute: async () => undefined } as never))
   const usedClock = over.clock ?? clock
-  const deps: Deps = { env, db, auth: buildAuth({ env, db, clock: usedClock }), clock: usedClock, mailer, ...over }
-  return { app: createApp(deps), deps, mailer, clock }
+  const usedMailer = over.mailer ?? mailer
+  const deps: Deps = { env, db, auth: buildAuth({ env, db, clock: usedClock, mailer: usedMailer }), clock: usedClock, mailer: usedMailer, ...over }
+  const app = createApp(deps)
+  mailerOf.set(app, usedMailer as FakeMailer)
+  return { app, deps, mailer, clock }
 }
 
 export function call(

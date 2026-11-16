@@ -3,19 +3,21 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle"
 import { twoFactor } from "better-auth/plugins/two-factor"
 import type { Db } from "../../db/client"
 import * as schema from "../../db/schema"
-import type { Clock } from "../../deps"
+import type { Clock, Mailer } from "../../deps"
 import type { Env } from "../../env"
 
 const DAY = 24 * 60 * 60
 
-type AuthDeps = { env: Env; db: Db; clock: Clock }
+type AuthDeps = { env: Env; db: Db; clock: Clock; mailer: Mailer }
+// Verification links live 24 hours (NFR/T1.1b). The override exists only so a test can expire one quickly.
+type AuthOpts = { verificationTtlSeconds?: number }
 
 /**
  * Better Auth instance. Our own idle check (requireSession) governs session lifetime:
  * Better Auth's absolute `expiresIn` is 30 days with a daily rolling refresh, so it never
  * fires first. It uses real time internally, which is why the idle clock is ours (deps.clock).
  */
-export function buildAuth({ env, db, clock }: AuthDeps) {
+export function buildAuth({ env, db, clock, mailer }: AuthDeps, opts: AuthOpts = {}) {
   const socialProviders: Record<string, { clientId: string; clientSecret: string }> = {}
   // Both id and secret must be non-empty; empty strings never register a provider.
   if (env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET) {
@@ -31,7 +33,23 @@ export function buildAuth({ env, db, clock }: AuthDeps) {
     secret: env.BETTER_AUTH_SECRET,
     trustedOrigins: [env.APP_URL],
     database: drizzleAdapter(db, { provider: "pg", schema }),
-    emailAndPassword: { enabled: true },
+    emailAndPassword: { enabled: true, requireEmailVerification: true },
+    emailVerification: {
+      sendOnSignUp: true,
+      // Explicit sign-in after verifying; verification alone never creates a session.
+      autoSignInAfterVerification: false,
+      expiresIn: opts.verificationTtlSeconds ?? 86400,
+      // Not awaited (Better Auth's advice: avoids a timing side channel on whether a mail was sent).
+      sendVerificationEmail: async ({ user, token }) => {
+        void mailer
+          .send({
+            to: user.email,
+            subject: "Verify your email",
+            text: `Confirm your email address to finish signing up:\n\n${env.APP_URL}/verify-email?token=${token}\n\nThe link expires in 24 hours.`,
+          })
+          .catch(() => undefined)
+      },
+    },
     socialProviders,
     plugins: [twoFactor({ issuer: "OpsDesk" })],
     session: {

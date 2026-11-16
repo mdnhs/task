@@ -1,5 +1,6 @@
 import { Hono } from "hono"
 import type { AppEnv } from "../../core/context"
+import { problem } from "../../core/errors"
 import { authenticateSession, requireSession } from "../../core/middleware/session"
 
 export const authRoutes = new Hono<AppEnv>()
@@ -11,7 +12,15 @@ export const authRoutes = new Hono<AppEnv>()
 authRoutes.on(["GET", "POST"], "/api/auth/*", async (c) => {
   const deps = c.get("deps")
   await authenticateSession(deps, c.req.raw.headers)
-  return deps.auth.handler(c.req.raw)
+  const res = await deps.auth.handler(c.req.raw)
+  // Map Better Auth's unverified-email refusal into our problem+json shape.
+  if (res.status === 403 && res.headers.get("content-type")?.includes("json")) {
+    const body = (await res.clone().json().catch(() => null)) as { code?: string } | null
+    if (body?.code === "EMAIL_NOT_VERIFIED") {
+      return problem(403, "email_not_verified", "Forbidden", c.get("requestId"))
+    }
+  }
+  return res
 })
 
 // tenants is filled in by T1.3 (memberships).

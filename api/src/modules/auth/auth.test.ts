@@ -72,15 +72,46 @@ test("idle cookie is also rejected on Better Auth's own endpoints, and the sessi
   expect(await ownerQuery("select id from session")).toHaveLength(before.length - 1)
   const { cookie: other } = await signIn(app, EMAIL, PW)
   clock.advance({ hours: 12, minutes: 1 })
+  const rowsBefore = await ownerQuery("select id from session")
   const r = await call(app, "POST", "/api/auth/revoke-other-sessions", { cookie: other, body: {}, headers: hdr })
   expect(r.status).toBe(401)
+  expect(await ownerQuery("select id from session")).toHaveLength(rowsBefore.length - 1)
   expect(((await r.json()) as Code).code).toBe("session_expired")
 })
-test("a fresh cookie works on get-session; sign-in without a session is untouched", async () => {
+test("a fresh cookie works on get-session", async () => {
   const { app, cookie } = await signedIn()
   const g = await call(app, "GET", "/api/auth/get-session", { cookie })
   expect(g.status).toBe(200)
   expect(((await g.json()) as { user: { email: string } }).user.email).toBe(EMAIL)
+})
+const lastSeen = async () =>
+  new Map((await ownerQuery("select id, last_seen_at from session")).map((r) => [r.id as string, String(r.last_seen_at)]))
+test("sign-in with a garbage session cookie succeeds and the wrapper stamps no existing session", async () => {
+  const { app, clock } = testApp()
+  await signUp(app, EMAIL, PW)
+  await signIn(app, EMAIL, PW)
+  const before = await lastSeen()
+  clock.advance({ hours: 1 })
+  const r = await call(app, "POST", "/api/auth/sign-in/email", {
+    body: { email: EMAIL, password: PW },
+    headers: { origin: testEnv.APP_URL },
+    cookie: "better-auth.session_token=garbage.garbage",
+  })
+  expect(r.status).toBe(200)
+  const after = await lastSeen()
+  for (const [id, seen] of before) expect(after.get(id)).toBe(seen)
+})
+test("a request that ends in 401 does not change any lastSeenAt", async () => {
+  const { app, clock, cookie } = await signedIn()
+  await signIn(app, EMAIL, PW) // a second, unrelated session
+  clock.advance({ hours: 12, minutes: 1 })
+  const before = await lastSeen()
+  expect((await call(app, "GET", "/v1/me", { cookie })).status).toBe(401)
+  expect((await call(app, "GET", "/v1/me")).status).toBe(401)
+  expect((await call(app, "GET", "/v1/me", { cookie: "better-auth.session_token=nope.nope" })).status).toBe(401)
+  const after = await lastSeen()
+  for (const [id, seen] of after) expect(before.get(id)).toBe(seen) // only the idle one was deleted; no stamps
+  expect(after.size).toBe(before.size - 1)
 })
 test("activity inside the window keeps the session alive", async () => {
   const { app, clock, cookie } = await signedIn()

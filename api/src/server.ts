@@ -10,7 +10,8 @@ import { parseEnv, type Env } from "./env"
 function makeDeps(env: Env): Deps {
   const db = makeDb(env.DATABASE_URL)
   const clock = { now: () => new Date() }
-  return { env, db, auth: buildAuth({ env, db, clock }), clock, mailer: { send: async () => undefined } }
+  const mailer = { send: async () => undefined }
+  return { env, db, auth: buildAuth({ env, db, clock, mailer }), clock, mailer }
 }
 
 export function start(env: Env = parseEnv(process.env)) {

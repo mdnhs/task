@@ -37,8 +37,8 @@ export const requireSession: MiddlewareHandler<AppEnv> = async (c, next) => {
     id: found.session.id,
     userId: found.user.id,
     lastSeenAt: found.now,
-    // A 2FA user only gets a session after the second factor, so presence of 2FA means it was passed.
-    mfaPassed: Boolean(found.user.twoFactorEnabled),
+    // Fail closed until T1.5 records the per-session second-factor flag. Nothing reads this yet.
+    mfaPassed: false,
   })
   c.set("user", { id: found.user.id, email: found.user.email })
   await next()
