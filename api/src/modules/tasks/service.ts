@@ -23,7 +23,7 @@ import { instantOfWall, wallOf } from "./time"
 /** The two fields the lifecycle rules read, typed (archivedAt is a wall string there, only its presence matters). */
 const lifecycleOf = (r: TaskRow) => ({ status: r.status as TaskStatus, archivedAt: r.archivedAt?.toISOString() })
 export const unprocessable = (code: string) => new AppError(422, code, "Unprocessable Entity")
-const OPEN_STATUSES: TaskStatus[] = ["not_started", "in_progress", "blocked", "submitted", "changes_requested"]
+export const OPEN_STATUSES: TaskStatus[] = ["not_started", "in_progress", "blocked", "submitted", "changes_requested"]
 
 // ---------- validation helpers ----------
 

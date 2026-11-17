@@ -39,6 +39,9 @@ export const SUPPORT_DENIED_ROUTES: readonly DenyRule[] = [
   // F21: a shift report is free-text staff narrative about work (and its attachments are personal files): not support material. The id routes are denied by shape (the
   // route template `/v1/shift-reports/:id...` or a uuid segment); `/v1/shift-reports/current` and lists that carry no free text stay readable.
   { pattern: /^\/v1\/shift-reports\/(:[a-z]+|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(\/|$)/, why: "shift report content and attachments (free text, personal files)" },
+  // F21: Today and the staff dashboard are one person's briefing (their own tasks, comments and report state): not support material. The dashboard, team tasks and attention (no free text of reports) stay readable.
+  { prefix: "/v1/today", why: "a person's Today briefing" },
+  { prefix: "/v1/dashboard/staff", why: "a person's own home: tasks, evidence and comments" },
   { prefix: "/v1/report-exports", why: "shift-report exports hold other people's report data (status and download; also matched by EXPORT_OR_DOWNLOAD)" },
   EXPORT_OR_DOWNLOAD,
   { prefix: "/v1/integrations", why: "integrations: OAuth tokens and connection status" },

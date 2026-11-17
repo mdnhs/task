@@ -13,7 +13,7 @@ export { submitReport } from "./submit"
 export { reviewReport } from "./review"
 export { DEADLINE_JOB, runDeadlineJob } from "./alerts"
 export { EXPORT_JOB, EXPORT_SWEEP_JOB, exportFileId, runExportJob, runExportSweep } from "./exports"
-export { inboxPage, buildInboxQuery } from "./inbox"
+export { inboxPage, buildInboxQuery, inboxRange, virtualRows, type InboxFilter } from "./inbox"
 export { reportTemplateFor, templatesInScope, loadTemplate } from "./template"
 export type { ReportDto, ReportItemDto } from "./dto"
 

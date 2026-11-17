@@ -32,6 +32,7 @@ import { projectRoutes } from "./modules/projects"
 import { templateRoutes } from "./modules/task-templates"
 import { shiftRoutes } from "./modules/shifts"
 import { shiftReportRoutes } from "./modules/shift-reports"
+import { bustReadModels, readModelRoutes } from "./modules/read-models"
 import { teamRoutes } from "./modules/teams"
 import { tenantRoutes } from "./modules/tenants"
 
@@ -44,6 +45,14 @@ export function createApp(deps: Deps) {
     await next()
   })
   app.use("*", requestId)
+  // F18: a write that succeeded through THIS instance drops that tenant's read-model cache (a read model is derived from tasks, shifts, reports and settings; other instances catch up within the 30 s TTL).
+  // Conservative on purpose: any successful non-GET request of a tenant busts it, the tenant is the one the request resolved.
+  app.use("/v1/*", async (c, next) => {
+    await next()
+    const m = c.req.method
+    const tenant = c.get("tenant")
+    if (tenant && m !== "GET" && m !== "HEAD" && m !== "OPTIONS" && c.res.status < 400) bustReadModels(tenant.id)
+  })
 
   app.onError((err, c) => {
     const rid = c.get("requestId") ?? crypto.randomUUID()
@@ -89,6 +98,7 @@ export function createApp(deps: Deps) {
   app.route("/", templateRoutes)
   app.route("/", shiftRoutes)
   app.route("/", shiftReportRoutes)
+  app.route("/", readModelRoutes)
   app.route("/", mfaRoutes)
   app.route("/", auditRoutes)
   app.route("/", deviceRoutes)

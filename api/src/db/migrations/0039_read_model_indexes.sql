@@ -1,0 +1,2 @@
+CREATE INDEX "tasks_closed_idx" ON "tasks" USING btree ("tenant_id","completed_at" DESC NULLS LAST) WHERE "tasks"."archived_at" is null and "tasks"."completed_at" is not null;--> statement-breakpoint
+CREATE INDEX "shift_reports_awaiting_idx" ON "shift_reports" USING btree ("tenant_id","shift_date" DESC NULLS LAST,"id") WHERE "shift_reports"."status" = 'submitted';

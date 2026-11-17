@@ -93,6 +93,8 @@ export const tasks = pgTable(
     index("tasks_milestone_idx").on(t.tenantId, t.milestoneId).where(sql`${t.milestoneId} is not null`),
     index("tasks_live_due_idx").on(t.tenantId, t.dueAt, t.id).where(sql`${t.archivedAt} is null`),
     index("tasks_live_status_due_idx").on(t.tenantId, t.status, t.dueAt, t.id).where(sql`${t.archivedAt} is null`),
+    // T5.6: tasks closed per tenant-local day (the dashboard's 7-day window, newest first by scanning backwards).
+    index("tasks_closed_idx").on(t.tenantId, t.completedAt.desc()).where(sql`${t.archivedAt} is null and ${t.completedAt} is not null`),
     // T4.5: the archive list and the retention job (archived rows only, newest first by scanning backwards), and the batch a restore brings back.
     index("tasks_archived_idx").on(t.tenantId, t.archivedAt, t.id).where(sql`${t.archivedAt} is not null`),
     index("tasks_archive_batch_idx").on(t.tenantId, t.archiveBatchId).where(sql`${t.archiveBatchId} is not null`),

@@ -58,6 +58,8 @@ export const shiftReports = pgTable(
     index("shift_reports_inbox_idx").on(t.tenantId, t.shiftDate.desc(), t.id),
     index("shift_reports_user_idx").on(t.tenantId, t.userId, t.shiftDate.desc()),
     index("shift_reports_open_idx").on(t.tenantId, t.dueAt).where(sql`${t.status} in ('draft','returned')`),
+    // T5.6: submitted reports waiting for a review decision (the dashboard's deadline card), newest shift first; a small partial index.
+    index("shift_reports_awaiting_idx").on(t.tenantId, t.shiftDate.desc(), t.id).where(sql`${t.status} = 'submitted'`),
     tenantPolicy(),
   ],
 ).enableRLS()
