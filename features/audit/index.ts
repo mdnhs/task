@@ -1,4 +1,5 @@
 export { AuditView } from "./components/audit-view"
 export { AuditSkeleton } from "./components/skeletons"
-export { getAuditEvents } from "./api"
+export { actorNames, getAuditEvents } from "./api"
+export { actionInfo, AUDIT_ACTIONS } from "./actions-catalogue"
 export type * from "./types"

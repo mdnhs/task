@@ -20,8 +20,9 @@ import { apiBrowser } from "@/lib/api/browser"
 import { disableTotp, requestPasswordReset, revokeOtherSessions } from "@/lib/auth-client"
 import { paginate } from "@/lib/paginate"
 import { ACTIVITY_PAGE_SIZE } from "../constants"
-import type { SecurityData } from "../types"
+import type { OwnDevice, SecurityData } from "../types"
 import { disableTotpFlow } from "../totp-flow"
+import { ThisDevice } from "./this-device"
 import { TotpSetup } from "./totp-setup"
 
 // Security (FR-AUTH-04/05/06): verified password reset, MFA (Better Auth), active sessions (GET/DELETE /v1/me/sessions, no tokens, no locations).
@@ -32,6 +33,8 @@ export function SecurityPanel({
   today,
   tzLabel,
   mfaRequired = false,
+  device,
+  ownDevices,
 }: {
   data: SecurityData
   email: string
@@ -39,6 +42,10 @@ export function SecurityPanel({
   tzLabel: string
   /** The workspace requires two-step verification for this person (FR-M0-04): it cannot be switched off. */
   mfaRequired?: boolean
+  /** The device this browser is, as the API resolved it (the shell chip's source). */
+  device: { label: string; registered: boolean }
+  /** Devices allocated to this person (for "Enter code"). */
+  ownDevices: OwnDevice[]
 }) {
   const router = useRouter()
   const [removed, setRemoved] = useState<Set<string>>(new Set())
@@ -127,6 +134,8 @@ export function SecurityPanel({
           </span>
         </label>
       </section>
+
+      <ThisDevice label={device.label} registered={device.registered} devices={ownDevices} />
 
       <section className="card set-card" aria-labelledby="acc-sess-h">
         <div className="card-head">

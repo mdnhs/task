@@ -74,6 +74,10 @@ export function makeAuthClient(o: AuthClientOptions) {
     async resetPassword(token: string, newPassword: string): Promise<void> {
       await send("POST", "/reset-password", Ok, { token, newPassword })
     },
+    /** The signed-in user's display name (Better Auth update-user; the only profile field the API lets a member change). */
+    async updateName(name: string): Promise<void> {
+      await send("POST", "/update-user", Ok, { name })
+    },
     async verifyTotp(code: string, opt: { trustDevice?: boolean } = {}): Promise<void> {
       await send("POST", "/two-factor/verify-totp", Ok, { code, ...(opt.trustDevice !== undefined ? { trustDevice: opt.trustDevice } : {}) })
     },
@@ -100,4 +104,4 @@ export type AuthClient = ReturnType<typeof makeAuthClient>
 
 /** The browser's client: same-origin /api/auth through the BFF. */
 const browserAuth = makeAuthClient({ baseUrl: "/api/auth" })
-export const { signInEmail, signInSocial, signUpEmail, verifyEmail, resendVerification, requestPasswordReset, resetPassword, verifyTotp, verifyBackupCode, enableTotp, disableTotp, getTotpUri, generateBackupCodes, signOut, revokeOtherSessions } = browserAuth
+export const { signInEmail, signInSocial, signUpEmail, verifyEmail, resendVerification, requestPasswordReset, resetPassword, verifyTotp, verifyBackupCode, enableTotp, disableTotp, getTotpUri, generateBackupCodes, signOut, revokeOtherSessions, updateName } = browserAuth

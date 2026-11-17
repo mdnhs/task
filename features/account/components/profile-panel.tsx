@@ -6,7 +6,8 @@ import { z } from "zod"
 
 import { Field } from "@/components/field"
 import { Input } from "@/components/ui/input"
-import { nameStore } from "../store"
+import { useApiAction } from "@/hooks/use-api-action"
+import { updateName } from "@/lib/auth-client"
 import type { ProfileData } from "../types"
 
 // Profile (own account): the display name is the only editable field. Email, role, department and timezone come from the session / org.
@@ -17,7 +18,7 @@ export function ProfilePanel({
   initials,
   role,
   tzLabel,
-  scopeKey,
+  department,
 }: {
   data: ProfileData
   name: string
@@ -25,9 +26,11 @@ export function ProfilePanel({
   initials: string
   role: string
   tzLabel: string
-  scopeKey: string
+  /** The department team the person belongs to ("" when none). */
+  department: string
 }) {
-  const [saved, setSaved] = nameStore.useStore(name, scopeKey)
+  const run = useApiAction()
+  const saved = name
   const [value, setValue] = useState(saved)
   const [error, setError] = useState<string>()
   const schema = z.object({
@@ -35,7 +38,7 @@ export function ProfilePanel({
   })
   const dirty = value.trim() !== saved
 
-  function save(e: React.FormEvent) {
+  async function save(e: React.FormEvent) {
     e.preventDefault()
     const parsed = schema.safeParse({ name: value })
     if (!parsed.success) {
@@ -43,9 +46,12 @@ export function ProfilePanel({
       return
     }
     setError(undefined)
-    setValue(parsed.data.name)
-    setSaved(() => parsed.data.name)
-    toast.success("Profile saved", { description: `Display name is now ${parsed.data.name}` })
+    // Better Auth's update-user (the one profile field a member may change); the page then re-reads the session, so the new name is the server's.
+    const r = await run("profile-name", () => updateName(parsed.data.name))
+    if (r.ok) {
+      setValue(parsed.data.name)
+      toast.success("Profile saved", { description: `Display name is now ${parsed.data.name}` })
+    }
   }
 
   return (
@@ -85,7 +91,7 @@ export function ProfilePanel({
             <Input id="acc-role" value={role} readOnly />
           </Field>
           <Field label="Department" htmlFor="acc-dept">
-            <Input id="acc-dept" value={data.department} readOnly />
+            <Input id="acc-dept" value={department || "All departments"} readOnly />
           </Field>
         </div>
         <div className="od-row2">

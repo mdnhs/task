@@ -2,12 +2,13 @@
 
 import { toast } from "sonner"
 
-import { saveMfaPolicy } from "@/app/actions/security"
+import { useApiAction } from "@/hooks/use-api-action"
+import { apiBrowser } from "@/lib/api/browser"
 import { FilterSeg } from "@/components/filter-bar"
 import { Switch } from "@/components/ui/switch"
 import { describeMfaPolicy } from "@/lib/mfa"
 import type { MfaPolicy } from "@/lib/mfa"
-import { mfaPolicyStore } from "../store"
+import { makeSettingsClient } from "../client"
 
 // Short FilterSeg labels; the card's subtitle spells the rule out.
 const MODES: { value: MfaPolicy["mode"]; label: string }[] = [
@@ -17,14 +18,14 @@ const MODES: { value: MfaPolicy["mode"]; label: string }[] = [
 ]
 
 // Require two-step verification (FR-M0-04): everyone or chosen roles. A person it applies to who has not set it up sees the setup gate on every page.
-export function MfaPolicyCard({ policy, roles, canWrite, scopeKey }: { policy: MfaPolicy; roles: { id: string; label: string }[]; canWrite: boolean; scopeKey: string }) {
-  const [stored, setStored] = mfaPolicyStore.useStore(policy, scopeKey)
+export function MfaPolicyCard({ policy, roles, canWrite }: { policy: MfaPolicy; roles: { id: string; label: string }[]; canWrite: boolean }) {
+  const run = useApiAction()
+  const client = makeSettingsClient(apiBrowser, { go: (u) => window.location.assign(u) })
+  const stored = policy
 
   async function save(next: MfaPolicy) {
-    const r = await saveMfaPolicy(next)
-    if (!r.ok) return toast.error("Could not save the rule")
-    setStored(() => next)
-    toast.success("Two-step rule saved", { description: describeMfaPolicy(next, Object.fromEntries(roles.map((x) => [x.id, x.label]))) })
+    const r = await run("mfa-policy", () => client.setMfaPolicy(next))
+    if (r.ok) toast.success("Two-step rule saved", { description: describeMfaPolicy(next, Object.fromEntries(roles.map((x) => [x.id, x.label]))) })
   }
 
   return (

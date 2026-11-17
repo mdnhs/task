@@ -4,7 +4,6 @@ import { useState } from "react"
 import { toast } from "sonner"
 import { z } from "zod"
 
-import { saveDevices } from "@/app/actions/security"
 import { ConfirmDialog } from "@/components/confirm-dialog"
 import { DataPagination } from "@/components/data-pagination"
 import { EmptyState } from "@/components/empty-state"
@@ -16,11 +15,13 @@ import { Dialog, DialogClose, DialogContent, DialogDescription, DialogHeader, Di
 import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
 import { When } from "@/components/when"
+import { useApiAction } from "@/hooks/use-api-action"
+import { apiBrowser } from "@/lib/api/browser"
 import { DEVICE_OWNERS, DEVICE_TYPES } from "@/lib/devices"
 import type { Device, DeviceOwner, DeviceType } from "@/lib/devices"
 import { paginate } from "@/lib/paginate"
+import { makeSettingsClient } from "../client"
 import { DEVICES_PAGE_SIZE } from "../constants"
-import { devicesStore } from "../store"
 
 export type DeviceUser = { id: string; name: string }
 
@@ -31,20 +32,22 @@ const schema = z.object({
 })
 
 // Device register (CR-02, CR-06, FR-M0-08): one entry per allocated device. Only a trusted company PC counts for Drive.
-export function DevicesPanel({ devices, users, today, tzLabel, canWrite, scopeKey }: { devices: Device[]; users: DeviceUser[]; today: string; tzLabel: string; canWrite: boolean; scopeKey: string }) {
-  const [stored, setStored] = devicesStore.useStore(devices, scopeKey)
+export function DevicesPanel({ devices, users, today, tzLabel, canWrite }: { devices: Device[]; users: DeviceUser[]; today: string; tzLabel: string; canWrite: boolean }) {
+  const run = useApiAction()
+  const client = makeSettingsClient(apiBrowser, { go: (u) => window.location.assign(u) })
   const [page, setPage] = useState(1)
   const [adding, setAdding] = useState(0)
   const [confirm, setConfirm] = useState<Device | null>(null)
+  // The one-time enrolment code lives only in this state, only while the dialog is open: never stored, logged or put in a URL.
+  const [code, setCode] = useState<{ label: string; code: string; expiresAt: string } | null>(null)
+  const stored = devices
   const name = (id: string) => users.find((u) => u.id === id)?.name ?? "Unknown user"
   const rows = [...stored].sort((a, b) => name(a.userId).localeCompare(name(b.userId)) || a.label.localeCompare(b.label))
   const paged = paginate(rows, page, DEVICES_PAGE_SIZE)
 
-  async function commit(next: Device[], done: string, description?: string) {
-    const r = await saveDevices(next)
-    if (!r.ok) return toast.error("Could not save the device register")
-    setStored(() => next)
-    toast.success(done, { description })
+  async function issue(d: Device) {
+    const r = await run(`code:${d.id}`, () => client.enrolmentCode(d.id))
+    if (r.ok) setCode({ label: d.label, code: r.value.code, expiresAt: r.value.expiresAt })
   }
 
   return (
@@ -78,12 +81,15 @@ export function DevicesPanel({ devices, users, today, tzLabel, canWrite, scopeKe
                   checked={d.trusted}
                   disabled={!canWrite}
                   aria-label={`Trusted: ${d.label}`}
-                  onCheckedChange={(on) => commit(stored.map((x) => (x.id === d.id ? { ...x, trusted: on } : x)), on ? "Device marked trusted" : "Device no longer trusted", d.label)}
+                  onCheckedChange={(on) => void run(`trust:${d.id}`, () => client.setTrusted(d.id, on)).then((r) => r.ok && toast.success(on ? "Device marked trusted" : "Device no longer trusted", { description: d.label }))}
                 />
                 <span>Trusted</span>
               </label>
               {canWrite && (
-                <button type="button" className="btn btn-outline set-sm" onClick={() => setConfirm(d)} aria-label={`Remove ${d.label}`}>Remove</button>
+                <span className="set-actions">
+                  <button type="button" className="btn btn-outline set-sm" onClick={() => void issue(d)} aria-label={`Enrolment code for ${d.label}`}>Enrolment code</button>
+                  <button type="button" className="btn btn-outline set-sm" onClick={() => setConfirm(d)} aria-label={`Remove ${d.label}`}>Remove</button>
+                </span>
               )}
             </li>
           ))}
@@ -97,7 +103,11 @@ export function DevicesPanel({ devices, users, today, tzLabel, canWrite, scopeKe
           key={adding}
           users={users}
           onClose={() => setAdding(0)}
-          onAdd={(d) => commit([...stored, { ...d, id: `dev-${Date.now().toString(36)}`, lastSeen: null }], "Device added", d.label)}
+          onAdd={async (d) => {
+            const r = await run("device:new", () => client.registerDevice(d))
+            if (r.ok) toast.success("Device added", { description: d.label })
+            return r.ok
+          }}
         />
       )}
       <ConfirmDialog
@@ -107,8 +117,20 @@ export function DevicesPanel({ devices, users, today, tzLabel, canWrite, scopeKe
         text="It stops counting as a registered device. Features limited to trusted company PCs are no longer available on it."
         confirmLabel="Remove"
         destructive
-        onConfirm={() => confirm && commit(stored.filter((x) => x.id !== confirm.id), "Device removed", confirm.label)}
+        onConfirm={() => confirm && void run(`remove:${confirm.id}`, () => client.removeDevice(confirm.id)).then((r) => r.ok && toast.success("Device removed", { description: confirm.label }))}
       />
+      <Dialog open={!!code} onOpenChange={(o) => !o && setCode(null)}>
+        <DialogContent className="od-dialog od-form-dialog" showCloseButton={false}>
+          <DialogHeader>
+            <DialogTitle>Enrolment code</DialogTitle>
+            <DialogDescription>Give this code to the person {code ? `using ${code.label}` : ""}. It works once, expires in 15 minutes, and any current setup of the device is cleared. It is not shown again.</DialogDescription>
+          </DialogHeader>
+          <p className="num" style={{ fontSize: 22, letterSpacing: 2, fontWeight: 700 }} aria-live="polite">{code?.code}</p>
+          <div className="od-form-foot">
+            <DialogClose render={<button type="button" className="btn btn-primary" />}>Done</DialogClose>
+          </div>
+        </DialogContent>
+      </Dialog>
     </section>
   )
 }
@@ -116,7 +138,7 @@ export function DevicesPanel({ devices, users, today, tzLabel, canWrite, scopeKe
 // Short FilterSeg labels; the register rows keep the full DEVICE_TYPES labels.
 const SHORT_TYPE: Record<DeviceType, string> = { pc: "PC", android: "Android", browser: "Browser" }
 
-function AddDeviceDialog({ users, onClose, onAdd }: { users: DeviceUser[]; onClose(): void; onAdd(d: Omit<Device, "id" | "lastSeen">): void }) {
+function AddDeviceDialog({ users, onClose, onAdd }: { users: DeviceUser[]; onClose(): void; onAdd(d: Omit<Device, "id" | "lastSeen">): Promise<boolean> }) {
   const [text, setText] = useState("")
   const [userId, setUserId] = useState("")
   const [type, setType] = useState<DeviceType>("pc")
@@ -124,7 +146,7 @@ function AddDeviceDialog({ users, onClose, onAdd }: { users: DeviceUser[]; onClo
   const [trusted, setTrusted] = useState(true)
   const [errors, setErrors] = useState<{ label?: string; userId?: string }>({})
 
-  function submit(e: React.FormEvent) {
+  async function submit(e: React.FormEvent) {
     e.preventDefault()
     const r = schema.safeParse({ label: text, userId })
     if (!r.success) {
@@ -132,8 +154,7 @@ function AddDeviceDialog({ users, onClose, onAdd }: { users: DeviceUser[]; onClo
       for (const i of r.error.issues) next[i.path[0] as keyof typeof errors] ??= i.message
       return setErrors(next)
     }
-    onAdd({ label: r.data.label, userId: r.data.userId, type, owner, trusted })
-    onClose()
+    if (await onAdd({ label: r.data.label, userId: r.data.userId, type, owner, trusted })) onClose()
   }
 
   return (

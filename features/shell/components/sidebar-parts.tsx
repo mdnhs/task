@@ -3,23 +3,16 @@
 import Link from "next/link"
 
 import { Icon } from "@/components/icons"
-import { useTenantLogo } from "@/hooks/use-branding"
 
 // Static sidebar pieces, shared by AppShell and AppShellSkeleton so the skeleton matches exactly.
 
-// The mark is a fixed 38px box. A saved tenant logo (FR-SAAS-11) sits contain-fit on a neutral chip; without one, the brand icon shows.
-// `href` is the home of the area (the platform console passes /platform; it never shows a tenant logo).
-export function Logo({ tenantId, href = "/", onNavigate }: { tenantId?: string; href?: string; onNavigate?: () => void }) {
-  const [logo] = useTenantLogo(tenantId)
+// The mark is a fixed 38px box with the brand icon. A tenant logo can be uploaded (Settings, Branding), but /v1/me/tenant carries no logo for staff yet, so the shell shows the
+// brand icon (B7 follow-up: expose the logo to every member). `tenantId` is accepted for callers and unused.
+export function Logo({ href = "/", onNavigate }: { tenantId?: string; href?: string; onNavigate?: () => void }) {
   return (
     <Link href={href} className="logo" aria-label={href === "/" ? "OpsDesk, go to dashboard" : "OpsDesk, go to overview"} onClick={onNavigate}>
-      <span className={logo ? "logo-mark has-logo" : "logo-mark"}>
-        {logo ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={logo} alt="" />
-        ) : (
-          <Icon name="brand" />
-        )}
+      <span className="logo-mark">
+        <Icon name="brand" />
       </span>
       <span className="lbl">OpsDesk</span>
     </Link>

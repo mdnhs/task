@@ -14,8 +14,10 @@ export type AccountCounts = {
   activity: number
   events: number
   channels: number
-  /** The notification table's real labels (ghost text; the stacked rows on phones show them). */
+  /** The notification table's labels (ghost text; the stacked rows on phones show them). Static: the kinds are the API's fixed set. */
   prefs?: { channels: { id: string; label: string }[]; events: { id: string; label: string; hint: string }[] }
+  /** The member has no bound device and at least one allocated to them: the "Enter code" button shows. Defaults to false (the typical case has none to show). */
+  enterCode?: boolean
   security?: { mfaHint: string; sessions: DeviceSession[]; activity: { text: string; at: string }[]; today: string; tzLabel: string }
 }
 const whenText = (iso: string, today: string, tzLabel: string) => {
@@ -86,6 +88,10 @@ function Security({ counts }: { counts: AccountCounts }) {
             </span>
           )}
         </div>
+      </section>
+      {/* "This device": h2 + the device label line, and "Enter code" (38px small button) only when this browser is unregistered and has an allocated device. Intended height, T6.9 measures. */}
+      <section className="card set-card">
+        <CardHead title={100} sub={150} button={counts.enterCode ? 120 : undefined} />
       </section>
       <section className="card set-card">
         <CardHead title={130} sub={90} button={206} />
@@ -182,13 +188,11 @@ function Notifications({ counts }: { counts: AccountCounts }) {
         </div>
       </section>
       <section className="card set-card">
-        <CardHead title={120} sub={190} />
+        <CardHead title={110} sub={210} />
         <div className="od-form set-form">
-          {/* "Remind me" label + FilterSeg (4 lead times) */}
-          <div className="od-field">
-            <Sk w={70} h={11} lh={18.1} />
-            <Sk w={243} h={48} r="pill" style={{ maxWidth: "100%" }} />
-          </div>
+          {/* From / Until time pickers (one row of two fields) and the foot button */}
+          <div className="od-row2"><FieldSk label={36} /><FieldSk label={40} /></div>
+          <div className="od-form-foot"><Sk w={158} h={48} r={14} /></div>
         </div>
       </section>
       <section className="card set-card">

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Building2, CalendarClock, ShieldCheck } from "lucide-react"
+import { Building2, CalendarClock } from "lucide-react"
 import { toast } from "sonner"
 import { z } from "zod"
 
@@ -11,49 +11,32 @@ import { FilterSelect } from "@/components/filter-bar"
 import { FormSection } from "@/components/form-section"
 import { TimePicker, formatTime } from "@/components/time-picker"
 import { Input } from "@/components/ui/input"
-import type { OrganisationData } from "../types"
+import { useApiAction } from "@/hooks/use-api-action"
+import { apiBrowser } from "@/lib/api/browser"
+import { fieldErrorOf, organisationPatch } from "../adapters"
+import { makeSettingsClient } from "../client"
+import type { Organisation, OrganisationData } from "../types"
 
 const schema = z.object({
   name: z.string().trim().min(2, "Enter the company name").max(80, "Keep the name under 80 characters"),
-  deadline: z.string().regex(/^\d{2}:\d{2}$/, "Choose the report deadline"),
+  reportDeadline: z.string().regex(/^\d{2}:\d{2}$/, "Choose the report deadline"),
 })
 
-// Organisation tab: company, timezone, report deadline, weekend rule and session timeout (FR-AUTH-07).
-// Name, slug, timezone and deadline are the tenant's own values, passed in by the route.
-export function OrganisationForm({
-  data,
-  name,
-  slug,
-  timezone,
-  tzLabel,
-  deadline,
-  canWrite,
-}: {
-  data: OrganisationData
-  name: string
-  slug: string
-  timezone: string
-  tzLabel: string
-  deadline: string
-  canWrite: boolean
-}) {
-  const [form, setForm] = useState({ name, timezone, deadline, weekendRule: data.weekendRule, sessionTimeout: data.sessionTimeout })
-  const [errors, setErrors] = useState<{ name?: string; deadline?: string }>({})
+// Organisation tab (GET/PATCH /v1/settings/organisation): company name, timezone and the daily report deadline. Only what changed is sent. Weekend rules and the session
+// timeout have no backend (the API does not store them), so they are not offered. Name, slug, timezone and deadline are the tenant's own values.
+export function OrganisationForm({ options, org, tzLabel, canWrite }: { options: OrganisationData; org: Organisation; tzLabel: string; canWrite: boolean }) {
+  const run = useApiAction()
+  const client = makeSettingsClient(apiBrowser, { go: (u) => window.location.assign(u) })
+  const [form, setForm] = useState({ name: org.name, timezone: org.timezone, reportDeadline: org.reportDeadline })
+  const [errors, setErrors] = useState<{ name?: string; timezone?: string; reportDeadline?: string }>({})
   const set = <K extends keyof typeof form>(k: K, v: (typeof form)[K]) => {
     setForm((f) => ({ ...f, [k]: v }))
     setErrors((e) => ({ ...e, [k]: undefined }))
   }
+  // the tenant's current zone is always a choice, even when it is not in the short list
+  const zones = options.timezones.some((o) => o.value === org.timezone) ? options.timezones : [{ value: org.timezone, label: org.timezone }, ...options.timezones]
 
-  // Read-only roles see the value as plain text, not a select that opens.
-  const pick = (id: string, label: string, key: "timezone" | "sessionTimeout", options: OrganisationData["timezones"]) =>
-    canWrite ? (
-      <FilterSelect label={label} value={form[key]} options={options} onChange={(v) => set(key, v)} />
-    ) : (
-      <Input id={id} readOnly value={options.find((o) => o.value === form[key])?.label ?? form[key]} />
-    )
-
-  function save(e: React.FormEvent) {
-    e.preventDefault()
+  async function save() {
     const parsed = schema.safeParse(form)
     if (!parsed.success) {
       const next: typeof errors = {}
@@ -62,9 +45,24 @@ export function OrganisationForm({
         if (!next[k]) next[k] = i.message
       }
       setErrors(next)
-      return
+      return false
     }
-    toast.success("Organisation settings saved", { description: `Report deadline ${formatTime(form.deadline)} ${tzLabel}` })
+    const patch = organisationPatch(org, form)
+    if (Object.keys(patch).length === 0) {
+      toast("Nothing to save")
+      return true
+    }
+    // A refused field shows under that field (handled); any other refusal is the runner's toast (mapped copy plus a Ref).
+    const r = await run("organisation", () => client.saveOrganisation(patch), {
+      handled: (e) => {
+        const f = fieldErrorOf(e)
+        if (!f || (f.field !== "name" && f.field !== "timezone" && f.field !== "reportDeadline")) return false
+        setErrors({ [f.field]: f.message })
+        return true
+      },
+    })
+    if (r.ok) toast.success("Organisation settings saved", { description: `Report deadline ${formatTime(form.reportDeadline)} ${tzLabel}` })
+    return r.ok
   }
 
   return (
@@ -75,47 +73,36 @@ export function OrganisationForm({
           <div className="sub">Company details and the daily report rules</div>
         </div>
       </div>
-      <form className="od-form set-form" onSubmit={save} noValidate>
+      <form className="od-form set-form" onSubmit={(e) => { e.preventDefault(); document.getElementById("org-save")?.click() }} noValidate>
         <div className="od-form-cols">
           <div className="od-form-col">
             <FormSection icon={Building2} title="Company">
               <Field label="Company name" htmlFor="set-name" error={errors.name} required>
                 <Input id="set-name" value={form.name} readOnly={!canWrite} onChange={(e) => set("name", e.target.value)} />
               </Field>
-              <Field label="Subdomain" htmlFor="set-slug">
-                <Input id="set-slug" value={`${slug}.${data.domain}`} readOnly />
-              </Field>
-            </FormSection>
-            <FormSection icon={ShieldCheck} title="Security">
-              <Field label="Session timeout" htmlFor="set-timeout" hint="Idle time before sign-out">
-                {pick("set-timeout", "Session timeout", "sessionTimeout", data.sessionTimeouts)}
+              <Field label="Workspace ID" htmlFor="set-slug">
+                <Input id="set-slug" value={org.slug} readOnly />
               </Field>
             </FormSection>
           </div>
           <div className="od-form-col">
             <FormSection icon={CalendarClock} title="Daily report">
-              <Field label="Timezone" htmlFor="set-tz">
-                {pick("set-tz", "Timezone", "timezone", data.timezones)}
+              <Field label="Timezone" htmlFor="set-tz" error={errors.timezone}>
+                {canWrite ? (
+                  <FilterSelect label="Timezone" value={form.timezone} options={zones} onChange={(v) => set("timezone", v)} />
+                ) : (
+                  <Input id="set-tz" readOnly value={zones.find((o) => o.value === form.timezone)?.label ?? form.timezone} />
+                )}
               </Field>
-              <Field label="Report deadline" htmlFor="set-deadline" error={errors.deadline}>
-                <TimePicker value={form.deadline} onChange={(v) => set("deadline", v)} disabled={!canWrite} label="Report deadline" step={5} />
+              <Field label="Report deadline" htmlFor="set-deadline" error={errors.reportDeadline}>
+                <TimePicker value={form.reportDeadline} onChange={(v) => set("reportDeadline", v)} disabled={!canWrite} label="Report deadline" step={5} />
               </Field>
-              <div className="od-field">
-                <span className="fs-label" id="set-weekend-l">Weekend and holiday rule</span>
-                <div className="er-types" role="group" aria-labelledby="set-weekend-l">
-                  {data.weekendRules.map((r) => (
-                    <button key={r.value} type="button" className="rp-day" aria-pressed={form.weekendRule === r.value} disabled={!canWrite} onClick={() => set("weekendRule", r.value)}>
-                      {r.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
             </FormSection>
           </div>
         </div>
         {canWrite && (
           <div className="od-form-foot">
-            <ActionButton type="submit" className="btn btn-primary">Save changes</ActionButton>
+            <ActionButton id="org-save" type="button" className="btn btn-primary" onAction={save}>Save changes</ActionButton>
           </div>
         )}
       </form>

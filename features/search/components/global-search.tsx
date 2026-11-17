@@ -8,6 +8,7 @@ import { AnimatePresence, animate, motion } from "motion/react"
 import { Icon } from "@/components/icons"
 import { RollNumber } from "@/components/roll-number"
 import { Sk, SkGroup } from "@/components/sk"
+import { apiBrowser } from "@/lib/api/browser"
 import { DUR, EASE, layoutTransition, listItem } from "@/lib/motion"
 import { cn } from "@/lib/utils"
 
@@ -21,11 +22,13 @@ import {
   highlight,
   humanStatus,
   removeLastFilter,
+  applyFilters,
   searchItems,
 } from "../match"
 import { pushRecent, readRecents, recentsKey, removeRecent, writeRecents } from "../recents"
 import { isFilterShortcut, isMacPlatform, isNewTabEnter, isSlashShortcut, isToggleShortcut, shortcutLabel } from "../shortcuts"
 import type { FilterKey, SearchConfig, SearchFilters, SearchItem } from "../types"
+import { makeSearcher } from "../adapters"
 import { searchIndex } from "../actions"
 import { isInsideSearch } from "../containment"
 import { FiltersForm } from "./filters-form"
@@ -164,7 +167,22 @@ export function GlobalSearch({
   const nFilters = countFilters(filters)
   const chips = filterChips(filters)
   const options = React.useMemo(() => filterOptions(items), [items])
-  const results = React.useMemo(() => searchItems(items, q, filters), [items, q, filters])
+  // Data hits from the API as the user types (150 ms debounce, 2+ characters, the previous request aborted). They are ranked by the API, so they skip the local
+  // scorer; a facet filter drops them (the API has no facets yet). The platform console keeps its own local index.
+  const [apiItems, setApiItems] = React.useState<SearchItem[]>(NO_ITEMS)
+  const searcher = React.useMemo(() => (scope === "app" ? makeSearcher({ api: apiBrowser }) : null), [scope])
+  React.useEffect(() => {
+    if (!searcher) return
+    let live = true
+    void searcher.search(q).then((hits) => {
+      if (live && hits) setApiItems(hits)
+    })
+    return () => {
+      live = false
+    }
+  }, [searcher, q])
+  React.useEffect(() => () => searcher?.cancel(), [searcher])
+  const results = React.useMemo(() => [...searchItems(items, q, filters), ...applyFilters(searcher && q.trim().length >= 2 ? apiItems : NO_ITEMS, filters)], [items, q, filters, apiItems, searcher])
   const groups = React.useMemo(() => groupResults(results), [results])
   const searching = q.trim() !== "" || nFilters > 0
 

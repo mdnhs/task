@@ -20,25 +20,27 @@ export const isTab = (id: string): id is SettingsTabId => SETTINGS_TABS.some((t)
 
 type Option = { value: string; label: string }
 
-export type OrganisationData = {
-  timezones: Option[]
-  weekendRule: string
-  weekendRules: Option[]
-  sessionTimeouts: Option[]
-  sessionTimeout: string
-  domain: string
-}
+/** The organisation form's static choices (the timezone list). The tenant's own values come from GET /v1/settings/organisation. */
+export type OrganisationData = { timezones: Option[] }
+/** GET /v1/settings/organisation, mapped. The slug is shown, never edited. */
+export type Organisation = { name: string; slug: string; timezone: string; currency: string; locale: string; reportDeadline: string; reportDueAfterMinutes: number }
+/** GET /v1/settings/branding, mapped (the colour as the API stores it, a clean file id or null). */
+export type Branding = { primaryColor: string | null; logoFileId: string | null }
 
-export type Department = { id: string; name: string; active: boolean; sites: string[]; teams: string[]; reportOwner: string }
+/** A department is a team of kind "department" (GET /v1/teams?kind=department): name and member count. Sites, report owners and deactivation have no backend. */
+export type Department = { id: string; name: string; members: number }
 
-export type UserStatus = "active" | "deactivated"
-export type SettingsUser = { id: string; name: string; email: string; role: string; dept: string; status: UserStatus; lastActive: string }
-export type Invite = { id: string; email: string; role: string; dept: string; sentAt: string; expiresAt: string }
+/** A member of the workspace (GET /v1/people). `id` is the user id and `role` the role KEY. There is no deactivated state: the API has no such member route. */
+export type SettingsUser = { id: string; name: string; email: string; role: string; dept: string }
+/** A pending invite (GET /v1/invites): no token, ever. Times are the tenant's wall clock. */
+export type Invite = { id: string; email: string; role: string; createdAt: string; expiresAt: string; invitedBy: string }
 export type RoleOption = { id: string; label: string }
 
+/** One role of the matrix: `id` is the role KEY (what the rest of the app calls Role.id), `uuid` is what the write routes take. */
+export type MatrixRole = { id: string; uuid: string; label: string; access: Record<Module, Access>; locked: boolean }
 export type MatrixData = {
   modules: { id: Module; label: string }[]
-  roles: { id: string; label: string; access: Record<Module, Access> }[]
+  roles: MatrixRole[]
 }
 
 export type TemplateField = { id: string; label: string; required: boolean }
@@ -51,17 +53,23 @@ export type NotificationsData = TenantNotify
 export type DeliveryRow = { id: string; at: string; event: string; recipient: string; channel: string; status: DeliveryStatus; reason: string | null }
 
 export type IntegrationStatus = "connected" | "not_connected" | "error"
+/** Google Drive is the only integration the API has (GET /v1/integrations); the others have no backend and are not listed. */
 export type Integration = {
   id: string
   name: string
   icon: string
   description: string
   status: IntegrationStatus
+  account: string | null
   lastEvent: string
   lastEventAt: string | null
   policy: string
 }
 
 export type BrandingData = { presets: string[] }
-/** Support access rows live in lib/support-access.ts (shared with the platform console). */
-export type PrivacyData = { grantHours: number }
+
+/** A data request (GET /v1/data-requests): who it is about, what kind, where it is and when it is due (the tenant's wall clock). */
+export type DataRequestStatus = "pending" | "running" | "completed" | "failed" | "rejected"
+export type DataRequestRow = { id: string; subject: string; subjectId: string; kind: "export" | "erase" | "correct"; status: DataRequestStatus; overdue: boolean; createdAt: string; dueAt: string; completedAt: string | null; resultFileId: string | null }
+/** A support access grant on the tenant side (GET /v1/settings/support-grants). */
+export type SupportGrant = { id: string; who: string; reason: string; status: "active" | "expired" | "revoked"; startsAt: string; expiresAt: string; revokedAt: string | null }

@@ -6,6 +6,7 @@ import { reportScope } from "@/lib/permissions"
 import { reportState, scopeReports } from "@/lib/shift-report"
 import { getShiftReportData } from "@/lib/shift-reports-data"
 import type { Module, Role } from "@/lib/types"
+import { mockSearchEnabled } from "./adapters"
 
 import { buildIndex, filterActionsForRole, filterIndexForRole, filterPopularForRole, type RawSources } from "./build"
 import type { QuickAction, SearchConfig, SearchItem } from "./types"
@@ -53,6 +54,14 @@ async function getSources(role: Role, session: { entitlements: TenantEntitlement
 
 /** The role-filtered index plus quick actions and popular searches. Call on the server only. */
 export async function getSearchData(role: Role, session: { entitlements: TenantEntitlements }): Promise<{ items: SearchItem[]; config: SearchConfig }> {
+  // MOCK: no backend until B8 to B11. The mock-backed kinds are indexed only on a demo deployment (ENABLE_MOCK_MODULES=1); data hits come from the API as the user types.
+  if (!mockSearchEnabled(process.env)) {
+    const [popular, actions] = await Promise.all([
+      getData<{ popular: { term: string; module: Module }[] }>("search/popular.json"),
+      getData<{ actions: QuickAction[] }>("search/actions.json"),
+    ])
+    return { items: [], config: { popular: filterPopularForRole(popular.popular, role), actions: filterActionsForRole(actions.actions, role) } }
+  }
   const [src, popular, actions] = await Promise.all([
     getSources(role, session),
     getData<{ popular: { term: string; module: Module }[] }>("search/popular.json"),

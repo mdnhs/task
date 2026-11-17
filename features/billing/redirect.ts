@@ -7,7 +7,8 @@ export const PROVIDER_REDIRECT_HOSTS: readonly string[] = ["checkout.stripe.com"
 /** A same-origin path: starts with one slash, not `//` or `/\`, and has no whitespace, backslash or control character. */
 const isSamePath = (u: string): boolean => /^\/(?![/\\])[^\s\\\u0000-\u001f]*$/.test(u)
 
-export function isAllowedRedirect(url: unknown): url is string {
+/** `hosts` defaults to the payment provider's; another provider flow (Google consent) passes its own constant. */
+export function isAllowedRedirect(url: unknown, hosts: readonly string[] = PROVIDER_REDIRECT_HOSTS): url is string {
   if (typeof url !== "string" || url === "") return false
   if (isSamePath(url)) return true
   if (/[\s\\\u0000-\u001f]/.test(url)) return false
@@ -17,5 +18,5 @@ export function isAllowedRedirect(url: unknown): url is string {
   } catch {
     return false
   }
-  return u.protocol === "https:" && u.username === "" && u.password === "" && u.port === "" && PROVIDER_REDIRECT_HOSTS.includes(u.hostname)
+  return u.protocol === "https:" && u.username === "" && u.password === "" && u.port === "" && hosts.includes(u.hostname)
 }

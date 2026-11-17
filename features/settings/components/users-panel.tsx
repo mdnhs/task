@@ -15,19 +15,14 @@ import { StatusPill } from "@/components/status-pill"
 import { When } from "@/components/when"
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
+import { useApiAction } from "@/hooks/use-api-action"
 import { useDept } from "@/hooks/use-dept"
+import { apiBrowser } from "@/lib/api/browser"
 import { daysBetween } from "@/lib/dates"
 import { paginate } from "@/lib/paginate"
+import { makeSettingsClient } from "../client"
 import { INVITES_PAGE_SIZE, INVITE_DAYS, USERS_PAGE_SIZE } from "../constants"
-import { invitesStore, usersStore } from "../store"
-import type { Invite, RoleOption, SettingsUser } from "../types"
-
-const addDays = (iso: string, n: number) => {
-  const [y, m, d, h = 0, mi = 0] = iso.split(/[-T:]/).map((x) => parseInt(x, 10))
-  const t = new Date(Date.UTC(y, m - 1, d + n, h, mi))
-  const p = (x: number) => String(x).padStart(2, "0")
-  return `${t.getUTCFullYear()}-${p(t.getUTCMonth() + 1)}-${p(t.getUTCDate())}T${p(t.getUTCHours())}:${p(t.getUTCMinutes())}:00`
-}
+import type { Invite, MatrixRole, SettingsUser } from "../types"
 
 const inviteSchema = z.object({
   email: z.string().trim().email("Enter a valid email address"),
@@ -37,32 +32,30 @@ const inviteSchema = z.object({
 type Props = {
   users: SettingsUser[]
   invites: Invite[]
-  roles: RoleOption[]
-  departments: string[]
+  roles: MatrixRole[]
   today: string
   tzLabel: string
-  /** Seat limit of the tenant's plan (FR-SAAS-06). */
+  /** Seat cap of the tenant's plan and the seats in use (GET /v1/entitlements, FR-SAAS-06). */
   seatLimit: number
+  seatsUsed: number
   planName: string
   canWrite: boolean
-  scopeKey: string
 }
 
-export function UsersPanel({ users, invites, roles, departments, today, tzLabel, seatLimit, planName, canWrite, scopeKey }: Props) {
-  const [stored, setStored] = usersStore.useStore(users, scopeKey)
-  const [storedInvites, setInvites] = invitesStore.useStore(invites, scopeKey)
+// Users and invites (GET /v1/people, GET/POST/DELETE /v1/invites, PATCH /v1/members/{id}). A role change or invite the API refuses (403 role_escalation, 422
+// role_not_invitable, 409 seat_limit...) is one toast with the mapped copy and the screen reverts to the server's record. There is no deactivate route, so none is offered.
+export function UsersPanel({ users, invites, roles, today, tzLabel, seatLimit, seatsUsed, planName, canWrite }: Props) {
+  const run = useApiAction()
+  const client = makeSettingsClient(apiBrowser, { go: (u) => window.location.assign(u) })
   const dept = useDept()
   const [q, setQ] = useState("")
   const [role, setRole] = useState("all")
-  const [status, setStatus] = useState("all")
   const [page, setPage] = useState(1)
   const [invPage, setInvPage] = useState(1)
   const [inviting, setInviting] = useState(0)
-  const [confirmUser, setConfirmUser] = useState<SettingsUser | null>(null)
   const [confirmInvite, setConfirmInvite] = useState<Invite | null>(null)
 
-  const roleLabel = (id: string) => roles.find((r) => r.id === id)?.label ?? id
-  const seatsUsed = stored.filter((u) => u.status === "active").length
+  const roleLabel = (key: string) => roles.find((r) => r.id === key)?.label ?? key
   const full = seatsUsed >= seatLimit
 
   // Any filter, search or department change goes back to page 1.
@@ -80,26 +73,18 @@ export function UsersPanel({ users, invites, roles, departments, today, tzLabel,
 
   const rows = useMemo(() => {
     const s = q.trim().toLowerCase()
-    return stored.filter(
-      (u) =>
-        (dept === "all" || !u.dept || u.dept === dept) &&
-        (role === "all" || u.role === role) &&
-        (status === "all" || u.status === status) &&
-        (!s || u.name.toLowerCase().includes(s) || u.email.toLowerCase().includes(s)),
-    )
-  }, [stored, dept, role, status, q])
-  const invRows = useMemo(() => storedInvites.filter((i) => dept === "all" || !i.dept || i.dept === dept), [storedInvites, dept])
+    return users.filter((u) => (dept === "all" || !u.dept || u.dept === dept) && (role === "all" || u.role === role) && (!s || u.name.toLowerCase().includes(s) || u.email.toLowerCase().includes(s)))
+  }, [users, dept, role, q])
   const paged = paginate(rows, page, USERS_PAGE_SIZE)
-  const pagedInv = paginate(invRows, invPage, INVITES_PAGE_SIZE)
-  const filtered = q || role !== "all" || status !== "all" || dept !== "all"
+  const pagedInv = paginate(invites, invPage, INVITES_PAGE_SIZE)
+  const filtered = q || role !== "all" || dept !== "all"
 
-  const toggle = (u: SettingsUser, next: SettingsUser["status"]) => {
-    setStored((p) => p.map((x) => (x.id === u.id ? { ...x, status: next } : x)))
-    toast.success(next === "active" ? "User reactivated" : "User deactivated", { description: u.name })
-  }
-  const invite = (v: { email: string; role: string; dept: string }) => {
-    setInvites((p) => [{ id: `inv-${Date.now().toString(36)}`, ...v, sentAt: today, expiresAt: addDays(today, INVITE_DAYS) }, ...p])
-    toast.success("Invite sent", { description: v.email })
+  const changeRole = (u: SettingsUser, next: string) =>
+    run(`role:${u.id}`, () => client.changeRole(u.id, next, roles)).then((r) => r.ok && toast.success("Role updated", { description: `${u.name}: ${roleLabel(next)}` }))
+  const invite = async (v: { email: string; role: string }) => {
+    const r = await run("invite", () => client.invite(v.email, v.role, roles))
+    if (r.ok) toast.success("Invite sent", { description: v.email })
+    return r.ok
   }
 
   return (
@@ -120,19 +105,18 @@ export function UsersPanel({ users, invites, roles, departments, today, tzLabel,
         {full && (
           <p className="set-notice" role="status">
             <Icon name="lock" />
-            <span>All {seatLimit} seats on the {planName} plan are in use. <Link href="/settings/billing">Change plan</Link> or deactivate a user to invite or reactivate someone.</span>
+            <span>All {seatLimit} seats on the {planName} plan are in use. <Link href="/settings/billing">Change plan</Link> to invite more people.</span>
           </p>
         )}
         <FilterBar>
           <FilterSelect label="Role" value={role} onChange={reset(setRole)} options={[{ value: "all", label: "All roles" }, ...roles.map((r) => ({ value: r.id, label: r.label }))]} />
-          <FilterSelect label="Status" value={status} onChange={reset(setStatus)} options={[{ value: "all", label: "All statuses" }, { value: "active", label: "Active" }, { value: "deactivated", label: "Deactivated" }]} />
           <FilterSearch value={q} onChange={reset(setQ)} placeholder="Search name or email" />
         </FilterBar>
         {paged.rows.length > 0 ? (
           <div className="table-wrap">
             <table className="rtable set-table">
               <thead>
-                <tr><th>User</th><th>Role</th><th>Department</th><th>Status</th><th>Last active</th>{canWrite && <th>Actions</th>}</tr>
+                <tr><th>User</th><th>Role</th><th>Department</th></tr>
               </thead>
               <tbody>
                 {paged.rows.map((u) => (
@@ -141,19 +125,16 @@ export function UsersPanel({ users, invites, roles, departments, today, tzLabel,
                       <div className="tt">{u.name}</div>
                       <div className="tm">{u.email}</div>
                     </td>
-                    <td data-label="Role">{roleLabel(u.role)}</td>
+                    <td data-label="Role">
+                      {canWrite ? (
+                        <div className="od-filters set-access">
+                          <FilterSelect label={`Role of ${u.name}`} value={u.role} options={roles.map((r) => ({ value: r.id, label: r.label }))} onChange={(v) => void changeRole(u, v)} />
+                        </div>
+                      ) : (
+                        roleLabel(u.role)
+                      )}
+                    </td>
                     <td data-label="Department">{u.dept ? <span className="dep-tag">{u.dept}</span> : <span className="tm">All departments</span>}</td>
-                    <td data-label="Status"><StatusPill status={u.status === "active" ? { tone: "ok", label: "Active" } : { tone: "mute", label: "Deactivated" }} /></td>
-                    <td data-label="Last active" className="num"><When iso={u.lastActive} today={today} tzLabel={tzLabel} /></td>
-                    {canWrite && (
-                      <td data-label="Actions">
-                        {u.status === "active" ? (
-                          <button type="button" className="btn btn-outline set-sm" onClick={() => setConfirmUser(u)}>Deactivate</button>
-                        ) : (
-                          <button type="button" className="btn btn-outline set-sm" disabled={full} onClick={() => toggle(u, "active")}>Reactivate</button>
-                        )}
-                      </td>
-                    )}
                   </tr>
                 ))}
               </tbody>
@@ -169,14 +150,14 @@ export function UsersPanel({ users, invites, roles, departments, today, tzLabel,
         <div className="card-head">
           <div>
             <h2 id="set-inv-h">Pending invites</h2>
-            <div className="sub">{invRows.length} waiting · invites expire after {INVITE_DAYS} days</div>
+            <div className="sub">{invites.length} waiting · invites expire after {INVITE_DAYS} days</div>
           </div>
         </div>
         {pagedInv.rows.length > 0 ? (
           <div className="table-wrap">
             <table className="rtable set-table">
               <thead>
-                <tr><th>Email</th><th>Role</th><th>Department</th><th>Expires</th>{canWrite && <th>Actions</th>}</tr>
+                <tr><th>Email</th><th>Role</th><th>Expires</th>{canWrite && <th>Actions</th>}</tr>
               </thead>
               <tbody>
                 {pagedInv.rows.map((i) => {
@@ -185,7 +166,6 @@ export function UsersPanel({ users, invites, roles, departments, today, tzLabel,
                     <tr key={i.id}>
                       <td data-label="Email"><div className="tt">{i.email}</div></td>
                       <td data-label="Role">{roleLabel(i.role)}</td>
-                      <td data-label="Department">{i.dept ? <span className="dep-tag">{i.dept}</span> : <span className="tm">All departments</span>}</td>
                       <td data-label="Expires" className="num">
                         <When iso={i.expiresAt} today={today} tzLabel={tzLabel} mode="date" /> {expired && <StatusPill status={{ tone: "bad", label: "Expired" }} />}
                       </td>
@@ -195,10 +175,7 @@ export function UsersPanel({ users, invites, roles, departments, today, tzLabel,
                             <button
                               type="button"
                               className="btn btn-outline set-sm"
-                              onClick={() => {
-                                setInvites((p) => p.map((x) => (x.id === i.id ? { ...x, sentAt: today, expiresAt: addDays(today, INVITE_DAYS) } : x)))
-                                toast.success("Invite resent", { description: i.email })
-                              }}
+                              onClick={() => void run(`resend:${i.id}`, () => client.resendInvite(i.id)).then((r) => r.ok && toast.success("Invite resent", { description: i.email }))}
                             >
                               Resend
                             </button>
@@ -218,16 +195,7 @@ export function UsersPanel({ users, invites, roles, departments, today, tzLabel,
         <DataPagination page={pagedInv.page} pageCount={pagedInv.pageCount} total={pagedInv.total} from={pagedInv.from} to={pagedInv.to} label="Invites pages" onPageChange={setInvPage} />
       </section>
 
-      {inviting > 0 && <InviteDialog key={inviting} roles={roles} departments={departments} onClose={() => setInviting(0)} onInvite={invite} />}
-      <ConfirmDialog
-        open={!!confirmUser}
-        onOpenChange={(o) => !o && setConfirmUser(null)}
-        title={`Deactivate ${confirmUser?.name ?? "user"}?`}
-        text="They are signed out and lose access immediately. Their history is kept, and a seat is freed."
-        confirmLabel="Deactivate"
-        destructive
-        onConfirm={() => confirmUser && toggle(confirmUser, "deactivated")}
-      />
+      {inviting > 0 && <InviteDialog key={inviting} roles={roles} onClose={() => setInviting(0)} onInvite={invite} />}
       <ConfirmDialog
         open={!!confirmInvite}
         onOpenChange={(o) => !o && setConfirmInvite(null)}
@@ -237,22 +205,21 @@ export function UsersPanel({ users, invites, roles, departments, today, tzLabel,
         destructive
         onConfirm={() => {
           if (!confirmInvite) return
-          setInvites((p) => p.filter((x) => x.id !== confirmInvite.id))
-          toast.success("Invite revoked", { description: confirmInvite.email })
+          const i = confirmInvite
+          void run(`revoke:${i.id}`, () => client.revokeInvite(i.id)).then((r) => r.ok && toast.success("Invite revoked", { description: i.email }))
         }}
       />
     </>
   )
 }
 
-// Invite dialog (FR-SAAS-05): email, role and department.
-function InviteDialog({ roles, departments, onClose, onInvite }: { roles: RoleOption[]; departments: string[]; onClose(): void; onInvite(v: { email: string; role: string; dept: string }): void }) {
+// Invite dialog (FR-SAAS-05): email and role. The API only offers the roles an invite may carry (an owner role is refused, 422 role_not_invitable).
+function InviteDialog({ roles, onClose, onInvite }: { roles: MatrixRole[]; onClose(): void; onInvite(v: { email: string; role: string }): Promise<boolean> }) {
   const [email, setEmail] = useState("")
   const [role, setRole] = useState("")
-  const [dept, setDept] = useState("all")
   const [errors, setErrors] = useState<{ email?: string; role?: string }>({})
 
-  function submit(e: React.FormEvent) {
+  async function submit(e: React.FormEvent) {
     e.preventDefault()
     const parsed = inviteSchema.safeParse({ email, role })
     if (!parsed.success) {
@@ -264,8 +231,7 @@ function InviteDialog({ roles, departments, onClose, onInvite }: { roles: RoleOp
       setErrors(next)
       return
     }
-    onInvite({ email: parsed.data.email, role: parsed.data.role, dept: dept === "all" ? "" : dept })
-    onClose()
+    if (await onInvite({ email: parsed.data.email, role: parsed.data.role })) onClose()
   }
 
   return (
@@ -279,14 +245,9 @@ function InviteDialog({ roles, departments, onClose, onInvite }: { roles: RoleOp
           <Field label="Email" htmlFor="inv-email" error={errors.email} required>
             <Input id="inv-email" type="email" placeholder="e.g. name@company.com" value={email} onChange={(e) => { setEmail(e.target.value); setErrors((x) => ({ ...x, email: undefined })) }} />
           </Field>
-          <div className="od-row2">
-            <Field label="Role" htmlFor="inv-role" error={errors.role} required>
-              <FilterSelect label="Role" value={role} onChange={(v) => { setRole(v); setErrors((x) => ({ ...x, role: undefined })) }} options={[{ value: "", label: "Choose a role" }, ...roles.map((r) => ({ value: r.id, label: r.label }))]} />
-            </Field>
-            <Field label="Department" htmlFor="inv-dept">
-              <FilterSelect label="Department" value={dept} onChange={setDept} options={[{ value: "all", label: "All departments" }, ...departments.map((d) => ({ value: d, label: d }))]} />
-            </Field>
-          </div>
+          <Field label="Role" htmlFor="inv-role" error={errors.role} required>
+            <FilterSelect label="Role" value={role} onChange={(v) => { setRole(v); setErrors((x) => ({ ...x, role: undefined })) }} options={[{ value: "", label: "Choose a role" }, ...roles.filter((r) => r.id !== "owner").map((r) => ({ value: r.id, label: r.label }))]} />
+          </Field>
           <div className="od-form-foot">
             <DialogClose render={<button type="button" className="btn btn-outline" />}>Cancel</DialogClose>
             <button type="submit" className="btn btn-primary">Send invite</button>

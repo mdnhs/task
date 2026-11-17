@@ -1,12 +1,23 @@
-import { AuditView, getAuditEvents } from "@/features/audit"
-import { AccessRestricted, getUser } from "@/features/shell"
-import { getMockOrg } from "@/lib/org"
+import { AuditView, actorNames, getAuditEvents } from "@/features/audit"
+import { AccessRestricted, apiFailureView } from "@/features/shell"
+import { getOrg } from "@/lib/org"
 import { can } from "@/lib/permissions"
-import { getSession } from "@/lib/session"
+import { requireMfaOk } from "@/lib/session"
 
 export default async function Page() {
-  const [session, org, user] = await Promise.all([getSession(), getMockOrg(), getUser()])
+  // This page calls the API (audit:read): it gates itself on the second factor first.
+  const session = await requireMfaOk()
   if (!can(session.role, "audit")) return <AccessRestricted moduleLabel="Audit Log" />
-  const events = await getAuditEvents()
-  return <AuditView events={events} today={org.today} tzLabel={org.tzLabel} user={{ name: user.name, role: user.role }} scopeKey={session.tenant.id} />
+  const org = await getOrg()
+  let events
+  let names
+  try {
+    names = await actorNames()
+    events = await getAuditEvents(org.timezone, names)
+  } catch (e) {
+    const gate = apiFailureView(e, "Audit Log")
+    if (gate) return gate
+    throw e
+  }
+  return <AuditView events={events} today={org.today} tzLabel={org.tzLabel} timezone={org.timezone} names={names} />
 }

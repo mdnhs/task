@@ -33,7 +33,7 @@ export async function getBilling(): Promise<BillingData | null> {
 }
 
 /** Seat cap (FR-SAAS-06): the tenant's own cap from /v1/entitlements (open to every member) and the name of its plan from the static table. */
-export async function getSeatLimit(): Promise<{ limit: number; planName: string }> {
+export async function getSeatLimit(): Promise<{ limit: number; used: number; planName: string }> {
   const [ent, plans] = await Promise.all([(await apiServer()).get("/v1/entitlements"), getPlans()])
-  return { limit: ent.seats, planName: plans.find((p) => p.id === ent.planId)?.name ?? ent.planId }
+  return { limit: ent.seats, used: ent.seatsUsed, planName: plans.find((p) => p.id === ent.planId)?.name ?? ent.planId }
 }

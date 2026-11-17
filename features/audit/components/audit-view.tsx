@@ -1,7 +1,6 @@
 "use client"
 
 import { Fragment, useMemo, useState } from "react"
-import { toast } from "sonner"
 
 import { DataPagination, PagedBody } from "@/components/data-pagination"
 import { DatePicker } from "@/components/date-picker"
@@ -11,44 +10,59 @@ import { Icon } from "@/components/icons"
 import { PageHead } from "@/components/page-head"
 import { StatusPill } from "@/components/status-pill"
 import { When } from "@/components/when"
+import { apiBrowser } from "@/lib/api/browser"
+import { userMessage } from "@/lib/api/problem"
 import { paginate } from "@/lib/paginate"
-import { AUDIT_PAGE_SIZE, EMPTY_FILTERS, exportEvent, filterEvents, toCsv } from "../filters"
-import { auditStore } from "../store"
-import { ACTION } from "../types"
-import type { AuditAction, AuditEvent, AuditFilters } from "../types"
+import { actionInfo } from "../actions-catalogue"
+import { AUDIT_LIMIT, exportUrl, loadAudit } from "../adapters"
+import { AUDIT_PAGE_SIZE, EMPTY_FILTERS, filterEvents } from "../filters"
+import type { AuditEvent, AuditFilters } from "../types"
 
 const uniq = (xs: string[]) => [...new Set(xs)].sort((a, b) => a.localeCompare(b))
 
+// The log is the API's newest 1,000 entries. Record type and dates are the API's own query (a change re-reads it); actor, action and text filter the loaded page.
+// The CSV is the API's download (streamed through the BFF, audited by the API), never built here.
 export function AuditView({
   events: seed,
   today,
   tzLabel,
-  user,
-  scopeKey,
+  timezone,
+  names,
 }: {
   events: AuditEvent[]
   today: string
   tzLabel: string
-  /** Who is signed in: recorded as the actor of an export. */
-  user: { name: string; role: string }
-  /** Tenant id: the store re-seeds when the company changes, so one tenant's events never show in another (FR-SAAS-02). */
-  scopeKey: string
+  timezone: string
+  /** Actor id -> display name for events loaded after the first page (the page's own lookup, as plain data). */
+  names: Record<string, string>
 }) {
-  const [events, setEvents] = auditStore.useStore(seed, scopeKey)
+  const [events, setEvents] = useState(seed)
   const [filters, setFilters] = useState<AuditFilters>(EMPTY_FILTERS)
   const [page, setPage] = useState(1)
   const [open, setOpen] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const set = <K extends keyof AuditFilters>(k: K, v: AuditFilters[K]) => {
-    setFilters((f) => ({ ...f, [k]: v }))
+    const next = { ...filters, [k]: v }
+    setFilters(next)
     setPage(1)
     setOpen(null)
+    // record type and dates are the API's filters: re-read the log for them
+    if (k === "recordType" || k === "from" || k === "to") {
+      setBusy(true)
+      setError(null)
+      loadAudit(apiBrowser, next, timezone, (id) => names[id] ?? id)
+        .then(setEvents)
+        .catch((e: unknown) => setError(userMessage(e).text))
+        .finally(() => setBusy(false))
+    }
   }
 
   const actors = useMemo(() => [{ value: "all", label: "All actors" }, ...uniq(events.map((e) => e.actor)).map((a) => ({ value: a, label: a }))], [events])
   const actions = useMemo(
     () => [
       { value: "all", label: "All actions" },
-      ...(Object.keys(ACTION) as AuditAction[]).filter((a) => events.some((e) => e.action === a)).map((a) => ({ value: a, label: ACTION[a].label })),
+      ...uniq(events.map((e) => e.action)).map((a) => ({ value: a, label: actionInfo(a).label })),
     ],
     [events],
   )
@@ -56,20 +70,7 @@ export function AuditView({
 
   const rows = useMemo(() => filterEvents(events, filters), [events, filters])
   const pg = paginate(rows, page, AUDIT_PAGE_SIZE)
-  const failed = events.filter((e) => e.action === "failed_sign_in").length
-
-  function exportCsv() {
-    const filename = `audit-log-${today.slice(0, 10)}.csv`
-    const url = URL.createObjectURL(new Blob([toCsv(rows)], { type: "text/csv" }))
-    const a = document.createElement("a")
-    a.href = url
-    a.download = filename
-    a.click()
-    URL.revokeObjectURL(url)
-    const at = `${today.slice(0, 10)}T${today.slice(11, 16)}:00`
-    setEvents((all) => [exportEvent(all, { actor: user.name, role: user.role }, at, rows.length, filename), ...all])
-    toast.success("Export logged")
-  }
+  const flagged = events.filter((e) => e.sensitive).length
 
   return (
     <>
@@ -77,16 +78,16 @@ export function AuditView({
         title="Audit Log"
         subtitle="Who did what, when and from where"
         actions={
-          <button type="button" className="btn btn-outline" onClick={exportCsv}>
+          <a className="btn btn-outline" href={exportUrl(filters, timezone)} download>
             Export CSV
-          </button>
+          </a>
         }
       />
       <div className="card au-card">
         <p className="au-note">
           <Icon name="lock" />
           <span>
-            Audit records can&apos;t be edited or deleted. {failed} failed sign-in attempts and other sensitive actions are flagged.
+            Audit records can&apos;t be edited or deleted. {flagged} sensitive actions are flagged.{events.length >= AUDIT_LIMIT ? ` Showing the latest ${AUDIT_LIMIT.toLocaleString("en")}: narrow the dates or export the CSV for the rest.` : ""}
           </span>
         </p>
         <FilterBar>
@@ -97,11 +98,13 @@ export function AuditView({
           <DatePicker value={filters.to} onChange={(v) => set("to", v)} today={today} min={filters.from || undefined} label="To date" placeholder="To" />
           <FilterSearch value={filters.q} onChange={(v) => set("q", v)} placeholder="Search events" />
         </FilterBar>
-        {rows.length === 0 ? (
+        {error ? (
+          <EmptyState icon="history" title="Couldn't load the log" text={error} />
+        ) : rows.length === 0 ? (
           <EmptyState icon="history" title="No events match" text="Try a different actor, action or date range." />
         ) : (
           <>
-            <div className="table-wrap">
+            <div className="table-wrap" aria-busy={busy}>
               <table className="rtable au-table">
                 <thead>
                   <tr><th>Time</th><th>Actor</th><th>Action</th><th>Record</th><th>Details</th></tr>
@@ -118,10 +121,9 @@ export function AuditView({
                           </td>
                           <td data-label="Actor">
                             <div className="tt">{e.actor}</div>
-                            <div className="tm">{e.actorRole}</div>
                           </td>
                           <td data-label="Action">
-                            <StatusPill status={ACTION[e.action]} />
+                            <StatusPill status={actionInfo(e.action)} />
                             {e.sensitive && <span className="au-flag">Sensitive</span>}
                           </td>
                           <td data-label="Record">
@@ -146,8 +148,6 @@ export function AuditView({
                             <td colSpan={5}>
                               <dl className="au-meta">
                                 <div><dt>Event</dt><dd className="num">{e.id}</dd></div>
-                                <div><dt>IP address</dt><dd className="num">{e.ip}</dd></div>
-                                <div><dt>Device</dt><dd>{e.device}</dd></div>
                                 {Object.entries(e.meta).map(([k, v]) => (
                                   <div key={k}><dt>{k}</dt><dd>{v}</dd></div>
                                 ))}

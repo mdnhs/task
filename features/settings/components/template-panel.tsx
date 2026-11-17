@@ -6,8 +6,11 @@ import { toast } from "sonner"
 import { FilterSeg } from "@/components/filter-bar"
 import { useDept } from "@/hooks/use-dept"
 import { Switch } from "@/components/ui/switch"
-import { templateStore } from "../store"
+import { createStore } from "@/lib/store"
 import type { TemplateData } from "../types"
+
+// MOCK: no backend until T6.7 (the report template editor). Shown only on a demo deployment (I16); persistence is this tab only.
+const templateStore = createStore<TemplateData["departments"]>()
 
 // Shift report template (FR-M1-25, was FR-ORG-04): per team, which sections are enabled and which fields are required.
 // The end-of-shift report (lib/shift-report.ts templateFor) reads the same settings/template.json seed.

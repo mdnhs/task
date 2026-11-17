@@ -77,3 +77,19 @@ describe("T6.4 a write that still gets 402 shows the banner and rolls back", () 
     expect(await run("same", async () => "again")).toEqual({ ok: true, value: "again" }) // free again afterwards
   })
 })
+
+describe("T6.5 a refusal the caller shows itself (a form field) is not toasted", () => {
+  test("handled() returning true skips the toast but still rolls back and refreshes; false keeps the toast", async () => {
+    const notify = vi.fn()
+    const refresh = vi.fn()
+    const run = makeActionRunner({ notify, refresh })
+    const rollback = vi.fn()
+    const r1 = await run("a", async () => { throw new ApiError(422, "invalid_color", "r1") }, { rollback, handled: () => true })
+    expect(r1.ok).toBe(false)
+    expect(notify).not.toHaveBeenCalled()
+    expect(rollback).toHaveBeenCalledTimes(1)
+    expect(refresh).toHaveBeenCalledTimes(1)
+    await run("b", async () => { throw new ApiError(500, "boom", "r2") }, { handled: () => false })
+    expect(notify).toHaveBeenCalledTimes(1)
+  })
+})

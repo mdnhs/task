@@ -1,18 +1,18 @@
-import { AccountLoading, getNotificationPrefs } from "@/features/account"
+import { AccountLoading } from "@/features/account"
+import { PREF_CHANNELS, PREF_KINDS } from "@/features/account/adapters"
 
-// The skeleton never calls the API (B6 I9): the Security tab shows the typical case, the current session plus one other and two sign-ins.
-// The profile and notification tabs still read their mock files for exact row counts.
-export default async function Loading() {
-  const prefs = await getNotificationPrefs()
+// Static (B6 I9): never reads the session or the API. The Security tab shows the typical case (the current session plus one other, two sign-ins, no "Enter code");
+// the notification table is the API's fixed set of kinds and channels.
+export default function Loading() {
   return (
     <AccountLoading
       counts={{
         sessions: 2,
         others: 1,
         activity: 2,
-        events: prefs.events.length,
-        channels: prefs.channels.length,
-        prefs: { channels: prefs.channels, events: prefs.events },
+        events: PREF_KINDS.length,
+        channels: PREF_CHANNELS.length,
+        prefs: { channels: PREF_CHANNELS, events: PREF_KINDS.map((k) => ({ id: k.kind, label: k.label, hint: k.hint })) },
       }}
     />
   )

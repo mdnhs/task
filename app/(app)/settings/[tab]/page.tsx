@@ -5,18 +5,17 @@ import { notFound } from "next/navigation"
 import { BillingView, getBilling, getEntitlements, getPlans, getSeatLimit, moduleRows, planCards } from "@/features/billing"
 import {
   BrandingPanel, DepartmentsPanel, DevicePolicyCard, DevicesPanel, IntegrationsPanel, MfaPolicyCard, NotificationsPanel, OrganisationForm, PrivacyPanel, RolesMatrix, SETTINGS_TABS,
-  SettingsLayout, TemplatePanel, UsersPanel, getBranding, getDeliveryLog, getDepartments, getIntegrations, getNotificationSettings, getOrganisation,
-  getPrivacy, getRolesMatrix, getTemplate, getUsersAndInvites, isTab,
+  SettingsLayout, TemplatePanel, UsersPanel, getBrandingPresets, getDeliveryLog, getNames, getNotificationSettings, getOrganisationOptions, getTemplate, isTab, loadBranding,
+  loadDepartments, loadDevices, loadIntegrations, loadInvites, loadMatrix, loadMfaPolicy, loadMyExports, loadOrganisation, loadPolicies, loadRequests, loadUsers, nameOfFrom, readable, serverApi,
 } from "@/features/settings"
 import type { SettingsTabId } from "@/features/settings"
-import { AccessRestricted, getUser } from "@/features/shell"
-import { getDeviceRegister } from "@/lib/device-session"
-import { getTenantRoles } from "@/lib/roles-data"
+import { AccessRestricted } from "@/features/shell"
+import { hasModule } from "@/lib/entitlements"
+import { mockEnabled } from "@/lib/mock-registry"
 import { getOrg } from "@/lib/org"
 import { can } from "@/lib/permissions"
 import { canWrite, requireMfaOk } from "@/lib/session"
 import { canWhileBlocked } from "@/lib/billing-state"
-import { getSupportAccess } from "@/lib/support-data"
 
 export const dynamicParams = false
 
@@ -30,73 +29,80 @@ export async function generateMetadata({ params }: { params: Promise<{ tab: stri
   return { title: t ? `${t.label} · Settings · OpsDesk` : "Settings · OpsDesk" }
 }
 
-export default async function Page({ params }: { params: Promise<{ tab: string }> }) {
+export default async function Page({ params, searchParams }: { params: Promise<{ tab: string }>; searchParams: Promise<{ status?: string }> }) {
   const { tab } = await params
   if (!isTab(tab)) notFound()
   // This page calls the API (billing, entitlements, the company clock): it gates itself on the second factor first (the API refuses tenant reads until then).
   const session = await requireMfaOk()
   const org = await getOrg()
   if (!can(session.role, "settings")) return <AccessRestricted moduleLabel="Settings" />
+  const { status } = await searchParams
+  const flash: { status: "connected" | "error" } | undefined = tab === "integrations" && (status === "connected" || status === "error") ? { status } : undefined
 
   const write = canWrite(session, "settings")
-  const scopeKey = session.tenant.id
   const { tenant } = session
+  const api = await serverApi()
+  const owner = session.role.id === "owner"
+  const admin = owner || session.role.id === "admin"
+  const names = await getNames()
+  const nameOf = nameOfFrom(names)
 
+  // A tab this member may not read (403) or whose module is not in the plan answers null and is left out: permission-hidden, never an error page.
   async function body(tab: SettingsTabId) {
     switch (tab) {
-      case "organisation":
-        return <OrganisationForm data={await getOrganisation()} name={tenant.name} slug={tenant.slug} timezone={org.timezone} tzLabel={org.tzLabel} deadline={org.deadline} canWrite={write} />
+      case "organisation": {
+        const [o, options] = await Promise.all([readable(() => loadOrganisation(api)), getOrganisationOptions()])
+        return o && <OrganisationForm options={options} org={o} tzLabel={org.tzLabel} canWrite={write} />
+      }
       case "departments": {
-        const [departments, { users }] = await Promise.all([getDepartments(), getUsersAndInvites()])
-        return <DepartmentsPanel departments={departments} owners={users.filter((u) => u.status === "active").map((u) => u.name)} canWrite={write} scopeKey={scopeKey} />
+        const d = await readable(() => loadDepartments(api))
+        return d && <DepartmentsPanel departments={d} canWrite={write} />
       }
       case "users": {
-        const [{ users, invites }, seats] = await Promise.all([getUsersAndInvites(), getSeatLimit()])
-        return (
-          <UsersPanel
-            users={users}
-            invites={invites}
-            roles={(await getTenantRoles()).map((r) => ({ id: r.id, label: r.label }))}
-            departments={org.departments}
-            today={org.today}
-            tzLabel={org.tzLabel}
-            seatLimit={seats.limit}
-            planName={seats.planName}
-            canWrite={write}
-            scopeKey={scopeKey}
-          />
-        )
+        const [users, roles, invites, seats] = await Promise.all([
+          readable(() => loadUsers(api)), readable(() => loadMatrix(api)), readable(() => loadInvites(api, org.timezone)), getSeatLimit(),
+        ])
+        if (!users || !roles) return null
+        return <UsersPanel users={users} invites={invites ?? []} roles={roles.roles} today={org.today} tzLabel={org.tzLabel} seatLimit={seats.limit} seatsUsed={seats.used} planName={seats.planName} canWrite={write} />
       }
       case "roles": {
-        const [matrix, reg] = await Promise.all([getRolesMatrix(), getDeviceRegister(session)])
+        const [matrix, policy] = await Promise.all([readable(() => loadMatrix(api)), readable(() => loadMfaPolicy(api))])
+        if (!matrix) return null
         return (
           <>
-            <RolesMatrix data={matrix} canWrite={write} scopeKey={scopeKey} />
-            <MfaPolicyCard policy={reg.mfaPolicy} roles={(await getTenantRoles()).map((r) => ({ id: r.id, label: r.label }))} canWrite={write} scopeKey={scopeKey} />
+            <RolesMatrix data={matrix} canWrite={write} />
+            {policy && <MfaPolicyCard policy={policy} roles={matrix.roles.map((r) => ({ id: r.id, label: r.label }))} canWrite={write} />}
           </>
         )
       }
+      // MOCK: no backend until T6.7 (the report template editor) and B9 (tenant-default notification settings and the delivery log): demo deployments only (I16).
       case "template":
-        return <TemplatePanel data={await getTemplate()} canWrite={write} scopeKey={scopeKey} />
+        return mockEnabled() ? <TemplatePanel data={await getTemplate()} canWrite={write} scopeKey={tenant.id} /> : null
       case "notifications":
-        return <NotificationsPanel data={await getNotificationSettings()} deadline={org.deadline} tzLabel={org.tzLabel} today={org.today} timezone={org.timezone} log={await getDeliveryLog()} canWrite={write} scopeKey={scopeKey} />
+        return mockEnabled() ? <NotificationsPanel data={await getNotificationSettings()} deadline={org.deadline} tzLabel={org.tzLabel} today={org.today} timezone={org.timezone} log={await getDeliveryLog()} canWrite={write} scopeKey={tenant.id} /> : null
       case "integrations": {
-        const [integrations, reg] = await Promise.all([getIntegrations(), getDeviceRegister(session)])
+        const [integrations, policies] = await Promise.all([readable(() => loadIntegrations(api, org.timezone)), readable(() => loadPolicies(api))])
+        if (!integrations) return null
         return (
           <>
-            <IntegrationsPanel integrations={integrations} today={org.today} tzLabel={org.tzLabel} canWrite={write} scopeKey={scopeKey} />
-            <DevicePolicyCard policies={reg.policies} canWrite={write} scopeKey={scopeKey} />
+            <IntegrationsPanel integrations={integrations} flash={flash} today={org.today} tzLabel={org.tzLabel} canWrite={write} />
+            {policies && <DevicePolicyCard policies={policies} canWrite={write} />}
           </>
         )
       }
       case "devices": {
-        const [reg, { users }] = await Promise.all([getDeviceRegister(session), getUsersAndInvites()])
-        return <DevicesPanel devices={reg.devices} users={users.filter((u) => u.status === "active").map((u) => ({ id: u.id, name: u.name }))} today={org.today} tzLabel={org.tzLabel} canWrite={write} scopeKey={scopeKey} />
+        const [devices, users] = await Promise.all([readable(() => loadDevices(api, org.timezone)), readable(() => loadUsers(api))])
+        if (!devices || !users) return null
+        return <DevicesPanel devices={devices} users={users.map((u) => ({ id: u.id, name: u.name }))} today={org.today} tzLabel={org.tzLabel} canWrite={write} />
       }
-      case "branding":
-        return <BrandingPanel tenantId={tenant.id} name={tenant.name} color={tenant.brand} appearance={tenant.appearance ?? DEFAULT_APPEARANCE} presets={(await getBranding()).presets} canWrite={write} />
+      case "branding": {
+        const [o, b, presets] = await Promise.all([readable(() => loadOrganisation(api)), readable(() => loadBranding(api)), getBrandingPresets()])
+        if (!o || !b) return null
+        const canUpload = hasModule(session.entitlements, "files") && canWrite(session, "files")
+        return <BrandingPanel name={o.name} color={b.primaryColor ?? tenant.brand} logoFileId={b.logoFileId} presets={presets.presets} canWrite={write} canUpload={canUpload} />
+      }
       case "billing": {
-        // Owner only: anyone else gets null (the tab is not offered). Not canWrite: a blocked (read-only) company's owner must still reach billing to pay.
+        // Owner or admin only: anyone else gets null (the tab is not offered). Not canWrite: a blocked (read-only) company's owner must still reach billing to pay.
         const [b, plans, ent] = await Promise.all([getBilling(), getPlans(), getEntitlements()])
         if (!b) return null
         return (
@@ -114,28 +120,27 @@ export default async function Page({ params }: { params: Promise<{ tab: string }
           />
         )
       }
-      case "privacy":
-      {
-        // Only this tenant's rows reach the client; the platform console seeds the rest.
-        const [data, rows, user] = await Promise.all([getPrivacy(), getSupportAccess(), getUser()])
+      case "privacy": {
+        const [mine, requests, users] = await Promise.all([
+          readable(() => loadMyExports(api, org.timezone, nameOf)), admin ? readable(() => loadRequests(api, org.timezone, nameOf)) : Promise.resolve(null), admin ? readable(() => loadUsers(api)) : Promise.resolve(null),
+        ])
         return (
           <PrivacyPanel
-            data={data}
-            requests={rows.filter((r) => r.tenantId === tenant.id)}
-            tenantId={tenant.id}
-            actor={user.name}
-            companyName={tenant.name}
+            mine={mine ?? []}
+            requests={requests ?? []}
+            people={(users ?? []).map((u) => ({ id: u.id, name: u.name }))}
             today={org.today}
             tzLabel={org.tzLabel}
-            // FR-SET-08 / FR-SAAS-15: support grants, full export and deletion are Tenant Owner only; others see the list read-only.
+            // FR-SET-08 / FR-SAAS-15: opening a data request is Tenant Owner only; an admin reads the list.
             canWrite={canWhileBlocked(session, "export")}
+            canRequests={requests !== null}
           />
         )
       }
     }
   }
 
-  // All panels render up front so the client switches tabs in place (small seed data; no per-tab round-trip).
+  // All panels render up front so the client switches tabs in place (small data; no per-tab round-trip).
   const rendered = await Promise.all(SETTINGS_TABS.map(async (t) => [t.id, await body(t.id)] as const))
   const panels = Object.fromEntries(rendered.filter(([, node]) => node != null)) as Partial<Record<SettingsTabId, React.ReactNode>>
   if (!panels[tab]) notFound()

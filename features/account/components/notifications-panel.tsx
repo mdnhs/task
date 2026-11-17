@@ -3,18 +3,22 @@
 import { useEffect, useState } from "react"
 import { toast } from "sonner"
 
-import { FilterSeg } from "@/components/filter-bar"
+import { Field } from "@/components/field"
+import { TimePicker } from "@/components/time-picker"
 import { Switch } from "@/components/ui/switch"
+import { useApiAction } from "@/hooks/use-api-action"
+import { apiBrowser } from "@/lib/api/browser"
 import { readAuto, readReady, writeAuto, writeReady } from "@/lib/today-prefs"
-import { prefsStore } from "../store"
-import type { NotificationPrefsData } from "../types"
+import { PREF_CHANNELS, prefsBody, type PrefsChange } from "../adapters"
+import { makeAccountClient } from "../client"
+import type { PrefChannel, PrefsView } from "../types"
 
-// "15 minutes before" → "15 min" for the FilterSeg (the toast keeps the full label).
-const shortLead = (label: string) => label.replace(/ before$/, "").replace(/ minutes?$/, " min").replace(/ hours?$/, " h")
-
-// Personal notification preferences: channel x event switches plus the daily-report reminder lead time.
-export function AccountNotificationsPanel({ data, scopeKey, todayUser }: { data: NotificationPrefsData; scopeKey: string; todayUser: string }) {
-  const [state, setState] = prefsStore.useStore({ prefs: data.prefs, lead: data.lead }, scopeKey)
+// Personal notification preferences (GET/PUT /v1/me/notification-preferences): a channel matrix per kind, plus quiet hours. Each switch is one write; the page then
+// re-reads the server's matrix, so a refused change reverts by construction. `security` always keeps in-app and email (the API refuses to turn them off).
+export function AccountNotificationsPanel({ data, todayUser }: { data: PrefsView; todayUser: string }) {
+  const run = useApiAction()
+  const account = makeAccountClient(apiBrowser)
+  const [quiet, setQuiet] = useState(data.quiet ?? { start: "22:00", end: "07:00" })
   // Today card choices (FR-M1-78) live in this browser (localStorage); read after mount so the server and first client render agree.
   const [auto, setAuto] = useState(true)
   const [ready, setReady] = useState(false)
@@ -24,6 +28,10 @@ export function AccountNotificationsPanel({ data, scopeKey, todayUser }: { data:
     setReady(readReady(todayUser))
     /* eslint-enable react-hooks/set-state-in-effect */
   }, [todayUser])
+
+  const save = (change: PrefsChange, ok: string, description?: string) =>
+    run("prefs", () => account.savePrefs(prefsBody(data, change))).then((r) => r.ok && toast.success(ok, description ? { description } : undefined))
+  const same = quiet.start === quiet.end
 
   return (
     <>
@@ -39,25 +47,23 @@ export function AccountNotificationsPanel({ data, scopeKey, todayUser }: { data:
             <thead>
               <tr>
                 <th>Event</th>
-                {data.channels.map((c) => <th key={c.id}>{c.label}</th>)}
+                {PREF_CHANNELS.map((c) => <th key={c.id}>{c.label}</th>)}
               </tr>
             </thead>
             <tbody>
-              {data.events.map((e) => (
-                <tr key={e.id}>
+              {data.rows.map((e) => (
+                <tr key={e.kind}>
                   <td data-label="Event">
                     <span className="tt">{e.label}</span>
                     <span className="tm acc-hint">{e.hint}</span>
                   </td>
-                  {data.channels.map((c) => (
+                  {PREF_CHANNELS.map((c) => (
                     <td key={c.id} data-label={c.label}>
                       <Switch
-                        checked={!!state.prefs[e.id]?.[c.id]}
+                        checked={e[c.id as PrefChannel]}
+                        disabled={e.locked && c.id !== "push"}
                         aria-label={`${e.label} by ${c.label}`}
-                        onCheckedChange={(on) => {
-                          setState((p) => ({ ...p, prefs: { ...p.prefs, [e.id]: { ...p.prefs[e.id], [c.id]: on } } }))
-                          toast.success(`${e.label}: ${c.label} ${on ? "on" : "off"}`)
-                        }}
+                        onCheckedChange={(on) => void save({ kind: e.kind, channel: c.id, on }, `${e.label}: ${c.label} ${on ? "on" : "off"}`)}
                       />
                     </td>
                   ))}
@@ -68,27 +74,27 @@ export function AccountNotificationsPanel({ data, scopeKey, todayUser }: { data:
         </div>
       </section>
 
-      <section className="card set-card" aria-labelledby="acc-lead-h">
+      <section className="card set-card" aria-labelledby="acc-quiet-h">
         <div className="card-head">
           <div>
-            <h2 id="acc-lead-h">Daily reminder</h2>
-            <div className="sub">Before the daily report deadline</div>
+            <h2 id="acc-quiet-h">Quiet hours</h2>
+            <div className="sub">{data.quiet ? `No emails or pushes ${data.quiet.start} to ${data.quiet.end}` : "Off. Emails and pushes can arrive any time"}</div>
           </div>
         </div>
-        <div className="od-form set-form">
-          <div className="od-field set-seg-field">
-            <span className="fs-label">Remind me</span>
-            <FilterSeg
-              label="Remind me"
-              value={state.lead}
-              options={data.leadOptions.map((o) => ({ value: o.value, label: <span className="num">{shortLead(o.label)}</span> }))}
-              onChange={(v) => {
-                setState((p) => ({ ...p, lead: v }))
-                toast.success("Reminder time updated", { description: data.leadOptions.find((o) => o.value === v)?.label })
-              }}
-            />
+        <form className="od-form set-form" noValidate onSubmit={(e) => { e.preventDefault(); if (!same) void save({ quiet }, "Quiet hours saved", `${quiet.start} to ${quiet.end}`) }}>
+          <div className="od-row2">
+            <Field label="From" htmlFor="acc-quiet-from">
+              <TimePicker value={quiet.start} onChange={(v) => setQuiet((q) => ({ ...q, start: v }))} label="Quiet hours from" step={15} />
+            </Field>
+            <Field label="Until" htmlFor="acc-quiet-to" error={same ? "Pick two different times." : undefined}>
+              <TimePicker value={quiet.end} onChange={(v) => setQuiet((q) => ({ ...q, end: v }))} label="Quiet hours until" step={15} />
+            </Field>
           </div>
-        </div>
+          <div className="od-form-foot">
+            {data.quiet && <button type="button" className="btn btn-outline" onClick={() => void save({ quiet: null }, "Quiet hours off")}>Turn off</button>}
+            <button type="submit" className="btn btn-primary" disabled={same}>Save quiet hours</button>
+          </div>
+        </form>
       </section>
 
       <section className="card set-card" aria-labelledby="acc-today-h">

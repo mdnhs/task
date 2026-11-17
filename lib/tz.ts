@@ -21,3 +21,33 @@ export function zoneLabel(tz: string, at: Date): string {
     return tz
   }
 }
+
+/**
+ * The UTC instant of a wall-clock time in a zone ("YYYY-MM-DDTHH:mm:ss"). Two passes through the zone's offset, so a day with a DST change is right at both ends.
+ * In the repeated hour of a fall-back the first instant wins; a time that does not exist (spring-forward gap) lands just after the gap.
+ */
+function instantOfWall(wall: string, tz: string): Date {
+  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})$/.exec(wall)
+  if (!m) throw new Error("instantOfWall: not a wall time")
+  const asUtc = Date.UTC(+m[1]!, +m[2]! - 1, +m[3]!, +m[4]!, +m[5]!, +m[6]!)
+  let t = asUtc
+  for (let i = 0; i < 3; i++) {
+    const seen = wallInTz(new Date(t), tz) // throws for an unknown zone
+    const sm = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})$/.exec(seen)!
+    const seenUtc = Date.UTC(+sm[1]!, +sm[2]! - 1, +sm[3]!, +sm[4]!, +sm[5]!, +sm[6]!)
+    const diff = asUtc - seenUtc
+    if (diff === 0) break
+    t += diff
+  }
+  return new Date(t)
+}
+
+/** A tenant calendar day ("YYYY-MM-DD") as the UTC instants of its first and last millisecond. */
+export function dayBoundsInTz(day: string, tz: string): { from: string; to: string } {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) throw new Error("dayBoundsInTz: not a day")
+  const from = instantOfWall(`${day}T00:00:00`, tz)
+  // the end: the instant just before the next local midnight (a 23 or 25 hour day is handled by the zone, not by +24 h)
+  const next = new Date(Date.UTC(+day.slice(0, 4), +day.slice(5, 7) - 1, +day.slice(8, 10) + 1))
+  const nextDay = `${next.getUTCFullYear()}-${String(next.getUTCMonth() + 1).padStart(2, "0")}-${String(next.getUTCDate()).padStart(2, "0")}`
+  return { from: from.toISOString(), to: new Date(instantOfWall(`${nextDay}T00:00:00`, tz).getTime() - 1).toISOString() }
+}

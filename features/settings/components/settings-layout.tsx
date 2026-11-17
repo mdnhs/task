@@ -45,7 +45,7 @@ export function SettingsLayout({
       <div className="set-layout">
         <nav className="set-tabs" aria-label="Settings sections">
           <StretchIndicator active={tab} axis="auto" className="set-tab-bg stretch-ind" />
-          {SETTINGS_TABS.map((t) => (
+          {SETTINGS_TABS.filter((t) => !!panels[t.id]).map((t) => (
             <Link
               key={t.id}
               href={`/settings/${t.id}`}

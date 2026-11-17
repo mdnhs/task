@@ -1,12 +1,6 @@
-import { AuditSkeleton, getAuditEvents } from "@/features/audit"
-import { PageSkeleton } from "@/features/shell"
-import { can } from "@/lib/permissions"
-import { getSkeletonSession } from "@/lib/skeleton-session"
+import { AuditSkeleton } from "@/features/audit"
 
-// Async so the skeleton uses the real row count (loading.tsx gets no params).
-export default async function Loading() {
-  const session = await getSkeletonSession()
-  if (!can(session.role, "audit")) return <PageSkeleton />
-  const events = await getAuditEvents()
-  return <AuditSkeleton rows={events.length} />
+// Static: the typical first page (the log is a full page of rows). Never reads the session or the API.
+export default function Loading() {
+  return <AuditSkeleton rows={60} />
 }

@@ -9,7 +9,6 @@ import { allowedCookiePairs, hasSessionCookie } from "@/lib/api/cookies"
 import { ApiError } from "@/lib/api/problem"
 import { apiServer } from "@/lib/api/server"
 import { isTenantSlug } from "@/lib/api/tenant"
-import { parseAppearance, type Appearance } from "@/lib/appearance"
 import { makeAuthClient } from "@/lib/auth-client"
 import { safeNext } from "@/lib/safe-next"
 import { EXPIRED_PATH, canWrite, getSession } from "@/lib/session"
@@ -56,20 +55,6 @@ export async function afterSignIn(next?: string): Promise<void> {
   if (!first) return redirect(me.platformRole ? "/platform" : "/onboarding")
   await writeTenantSlug(first.slug)
   return redirect(safeNext(next))
-}
-
-// Mock persistence for tenant branding (FR-SAAS-11): a per-tenant cookie that getSession() merges over the API's brand, until the settings task moves it.
-export async function saveBranding(input: { name: string; color: string; appearance?: Appearance }) {
-  const session = await getSession()
-  if (!canWrite(session, "settings")) return { ok: false as const }
-  const name = input.name.trim().slice(0, 60)
-  const color = input.color.toLowerCase()
-  if (name.length < 2 || !/^#[0-9a-f]{6}$/.test(color)) return { ok: false as const }
-  const jar = await cookies()
-  const appearance = parseAppearance(input.appearance ?? session.tenant.appearance)
-  jar.set(`od-brand-${session.tenant.id}`, JSON.stringify({ name, color, appearance }), { path: "/", sameSite: "lax" })
-  revalidatePath("/", "layout")
-  return { ok: true as const }
 }
 
 // Ends the session on the API (Better Auth revokes it, so a stolen copy of the cookie dies too) and clears this browser's cookies. The cookies are cleared

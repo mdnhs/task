@@ -15,8 +15,11 @@ import { notifyClock } from "@/hooks/notify-clock"
 import { clockAt, nextReminder, reminderSchedule, type DeliveryStatus } from "@/lib/notify"
 import { paginate } from "@/lib/paginate"
 import { DELIVERY_PAGE_SIZE } from "../constants"
-import { notificationsStore } from "../store"
+import { createStore } from "@/lib/store"
 import type { DeliveryRow, NotificationsData } from "../types"
+
+// MOCK: no backend until B9 (tenant-default notification settings). Shown only on a demo deployment (I16); persistence is this tab only.
+const notificationsStore = createStore<NotificationsData>()
 
 const clock = (deadline: string, minutesBefore: number) => {
   const [h, m] = deadline.split(":").map((n) => parseInt(n, 10))

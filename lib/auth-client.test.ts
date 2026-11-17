@@ -66,3 +66,11 @@ describe("T6.3 the Better Auth wrappers: paths and bodies (pinned against the re
     }
   })
 })
+
+describe("T6.5 updateName", () => {
+  test("posts the new display name to /update-user (pinned against the real API in test/contract/settings.test.ts)", async () => {
+    const { c, last } = client()
+    await c.updateName("Ada Byrne")
+    expect(last()).toMatchObject({ url: "/api/auth/update-user", method: "POST", body: { name: "Ada Byrne" } })
+  })
+})

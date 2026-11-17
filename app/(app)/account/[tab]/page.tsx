@@ -3,7 +3,7 @@ import { notFound } from "next/navigation"
 
 import {
   ACCOUNT_TABS, AccountLayout, AccountNotificationsPanel, ProfilePanel, SecurityPanel,
-  getNotificationPrefs, getProfile, getSecurity, isTab,
+  getNotificationPrefs, getOwnDevices, getProfile, getSecurity, isTab,
 } from "@/features/account"
 import type { AccountTabId } from "@/features/account"
 import { getUser } from "@/features/shell"
@@ -32,14 +32,17 @@ export default async function Page({ params }: { params: Promise<{ tab: string }
   // This page calls the API (sessions): it gates itself on the second factor (a layout does not protect the page below it).
   const session = await requireMfaOk()
   const [org, user, profile, prefs] = await Promise.all([getOrg(), getUser(), getProfile(), getNotificationPrefs()])
-  const [mfa, security, people] = await Promise.all([getMfaState(session), getSecurity({ timezone: org.timezone, twoFactorEnabled: session.twoFactorEnabled }), getPeople()])
+  const [mfa, security, people, ownDevices] = await Promise.all([
+    getMfaState(session), getSecurity({ timezone: org.timezone, twoFactorEnabled: session.twoFactorEnabled }), getPeople().catch(() => []),
+    session.device.id === null ? getOwnDevices(session.user.id).catch(() => []) : Promise.resolve([]),
+  ])
   const role = session.role.label
-  const scopeKey = `${session.tenant.id}:${session.role.id}:${mfa.enrolled ? "mfa" : "nomfa"}`
+  const department = org.departments.find((d) => people.some((p) => p.id === session.user.id && p.dept === d)) ?? people.find((p) => p.id === session.user.id)?.dept ?? ""
 
   const panels: Record<AccountTabId, React.ReactNode> = {
-    profile: <ProfilePanel data={profile} name={user.name} email={user.email} initials={user.initials} role={role} tzLabel={org.tzLabel} scopeKey={scopeKey} />,
-    security: <SecurityPanel data={security} mfaRequired={mfa.required} email={user.email} today={org.today} tzLabel={org.tzLabel} />,
-    notifications: <AccountNotificationsPanel data={prefs} scopeKey={scopeKey} todayUser={todayUserId(session, people, user.name)} />,
+    profile: <ProfilePanel data={profile} name={user.name} email={user.email} initials={user.initials} role={role} tzLabel={org.tzLabel} department={department} />,
+    security: <SecurityPanel data={security} mfaRequired={mfa.required} email={user.email} today={org.today} tzLabel={org.tzLabel} device={{ label: session.device.label, registered: session.device.id !== null }} ownDevices={ownDevices} />,
+    notifications: <AccountNotificationsPanel data={prefs} todayUser={todayUserId(session, people, user.name)} />,
   }
 
   // All panels render up front so the client switches tabs in place.

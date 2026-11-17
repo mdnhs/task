@@ -2,25 +2,25 @@
 
 import { toast } from "sonner"
 
-import { saveDevicePolicies } from "@/app/actions/security"
+import { useApiAction } from "@/hooks/use-api-action"
+import { apiBrowser } from "@/lib/api/browser"
 import { FilterSeg } from "@/components/filter-bar"
 import { DEVICE_ALLOWS, DEVICE_FEATURES, allowFor, describePolicy } from "@/lib/devices"
 import type { DeviceAllow, DeviceFeature, DevicePolicy } from "@/lib/devices"
-import { devicePoliciesStore } from "../store"
+import { makeSettingsClient } from "../client"
 
 // Short FilterSeg labels; the row text spells the policy out.
 const SHORT: Record<DeviceAllow, string> = { "trusted-company-pc": "Trusted PCs", any: "Any device", none: "Nowhere" }
 
 // Device access policy (FR-M0-09, CR-02, CR-06): per feature, which devices may use it. Checked on the server for every request.
-export function DevicePolicyCard({ policies, canWrite, scopeKey }: { policies: DevicePolicy[]; canWrite: boolean; scopeKey: string }) {
-  const [stored, setStored] = devicePoliciesStore.useStore(policies, scopeKey)
+export function DevicePolicyCard({ policies, canWrite }: { policies: DevicePolicy[]; canWrite: boolean }) {
+  const run = useApiAction()
+  const client = makeSettingsClient(apiBrowser, { go: (u) => window.location.assign(u) })
+  const stored = policies
 
   async function change(feature: DeviceFeature, allow: DeviceAllow) {
-    const next = [...stored.filter((p) => p.feature !== feature), { feature, allow }]
-    const r = await saveDevicePolicies(next)
-    if (!r.ok) return toast.error("Could not save the policy")
-    setStored(() => next)
-    toast.success("Device policy saved", { description: describePolicy({ feature, allow }) })
+    const r = await run(`policy:${feature}`, () => client.setDevicePolicy(feature, allow))
+    if (r.ok) toast.success("Device policy saved", { description: describePolicy({ feature, allow }) })
   }
 
   return (

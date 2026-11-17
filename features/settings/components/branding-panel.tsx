@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import { ImageIcon, Palette, SlidersHorizontal } from "lucide-react"
+import { ImageIcon, Palette } from "lucide-react"
 import { toast } from "sonner"
 import { z } from "zod"
 
@@ -9,75 +9,70 @@ import { ActionButton } from "@/components/action-button"
 import { Field } from "@/components/field"
 import { FormSection } from "@/components/form-section"
 import { ColorPicker } from "@/components/ui/color-picker"
-import { Input } from "@/components/ui/input"
-import { saveBranding } from "@/app/actions/session"
-import { useTenantLogo } from "@/hooks/use-branding"
-import { APPEARANCE_OPTIONS, DEFAULT_APPEARANCE, appearanceCss, type Appearance } from "@/lib/appearance"
+import { useApiAction } from "@/hooks/use-api-action"
+import { apiBrowser } from "@/lib/api/browser"
 import { BRAND_STYLE_ID, brandCss } from "@/lib/brand"
-import { LOGO_ACCEPT, initialsOf, isLogoDataUrl, logoError } from "@/lib/branding"
-const schema = z.object({
-  name: z.string().trim().min(2, "Enter the display name").max(60, "Keep the name under 60 characters"),
-  color: z.string().regex(/^#[0-9a-fA-F]{6}$/, "Use a 6 digit hex colour, like #2f6f5e"),
-})
+import { LOGO_ACCEPT, initialsOf, logoError } from "@/lib/branding"
+import { fieldErrorOf } from "../adapters"
+import { makeSettingsClient } from "../client"
 
-// Branding (FR-SAAS-11): name, logo and brand colour with a live preview of the sidebar logo chip.
-export function BrandingPanel({ tenantId, name, color, appearance, presets, canWrite }: { tenantId: string; name: string; color: string; appearance: Appearance; presets: string[]; canWrite: boolean }) {
-  const [form, setForm] = useState({ name, color })
-  const [look, setLook] = useState<Appearance>(appearance)
-  const [savedLogo, saveLogo] = useTenantLogo(tenantId)
-  const [logo, setLogo] = useState<string>(savedLogo)
+const schema = z.object({ color: z.string().regex(/^#[0-9a-fA-F]{6}$/, "Use a 6 digit hex colour, like #2f6f5e") })
+
+// Branding (FR-SAAS-11, GET/PUT /v1/settings/branding): the brand colour, with a live preview of the sidebar chip, and the logo when the plan has the files module
+// (the upload goes straight to storage and must pass the malware scan). Starter companies cannot upload, so they get colour only and one line saying why.
+// The appearance presets and a separate display name have no backend (the company name is edited on the Organisation tab).
+export function BrandingPanel({ name, color, logoFileId, presets, canWrite, canUpload }: { name: string; color: string; logoFileId: string | null; presets: string[]; canWrite: boolean; canUpload: boolean }) {
+  const run = useApiAction()
+  const client = makeSettingsClient(apiBrowser, { go: (u) => window.location.assign(u) })
+  const [value, setValue] = useState(color)
+  const [logoId, setLogoId] = useState(logoFileId)
   const [over, setOver] = useState(false)
-  const [errors, setErrors] = useState<{ name?: string; color?: string; logo?: string }>({})
+  const [errors, setErrors] = useState<{ color?: string; logo?: string }>({})
   const file = useRef<HTMLInputElement>(null)
-  const valid = /^#[0-9a-fA-F]{6}$/.test(form.color)
-  const chip = valid ? form.color : color
-  const saved = useRef({ color, appearance })
+  const valid = /^#[0-9a-fA-F]{6}$/.test(value)
+  const chip = valid ? value : color
+  const saved = useRef(color)
 
-  // Live preview: the whole app takes the picked colour and appearance at once. Leaving without saving puts the saved look back.
+  // Live preview: the whole app takes the picked colour at once. Leaving without saving puts the saved colour back.
   useEffect(() => {
-    saved.current = { color, appearance }
-  }, [color, appearance])
+    saved.current = color
+  }, [color])
   useEffect(() => {
     const el = document.getElementById(BRAND_STYLE_ID)
-    if (el) el.textContent = brandCss(chip) + appearanceCss(look)
-  }, [chip, look])
+    if (el) el.textContent = brandCss(chip)
+  }, [chip])
   useEffect(() => () => {
     const el = document.getElementById(BRAND_STYLE_ID)
-    if (el) el.textContent = brandCss(saved.current.color) + appearanceCss(saved.current.appearance)
+    if (el) el.textContent = brandCss(saved.current)
   }, [])
-  const lookChanged = (Object.keys(look) as (keyof Appearance)[]).some((k) => look[k] !== appearance[k])
-  const lookDefault = (Object.keys(look) as (keyof Appearance)[]).every((k) => look[k] === DEFAULT_APPEARANCE[k])
 
-  function pick(f: File | undefined) {
-    if (!f || !canWrite) return
+  async function pick(f: File | undefined) {
+    if (!f || !canWrite || !canUpload) return
     const err = logoError(f)
     if (err) return setErrors((e) => ({ ...e, logo: err }))
-    const r = new FileReader()
-    r.onload = () => {
-      if (!isLogoDataUrl(r.result)) return setErrors((e) => ({ ...e, logo: "Use a PNG, JPG, SVG or WebP image" }))
-      setLogo(r.result)
+    const r = await run("logo", () => client.uploadLogo(f), { handled: (e) => (fieldErrorOf(e) ? (setErrors((x) => ({ ...x, logo: fieldErrorOf(e)!.message })), true) : false) })
+    if (r.ok) {
+      setLogoId(r.value)
       setErrors((e) => ({ ...e, logo: undefined }))
     }
-    r.onerror = () => setErrors((e) => ({ ...e, logo: "That file could not be read. Try another image." }))
-    r.readAsDataURL(f)
   }
 
-  // ActionButton drives the feedback: spinner while the server action runs, then a tick. `false` = not saved (no tick).
+  // ActionButton drives the feedback: spinner while the call runs, then a tick. `false` = not saved (no tick).
   async function save() {
-    const parsed = schema.safeParse(form)
+    const parsed = schema.safeParse({ color: value })
     if (!parsed.success) {
-      const next: typeof errors = {}
-      for (const i of parsed.error.issues) {
-        const k = i.path[0] as "name" | "color"
-        if (!next[k]) next[k] = i.message
-      }
-      setErrors(next)
+      setErrors({ color: parsed.error.issues[0]?.message })
       return false
     }
-    const r = await saveBranding({ ...parsed.data, appearance: look })
-    if (r.ok) saveLogo(tenantId, logo)
-    if (r.ok) toast.success("Branding saved", { description: parsed.data.name })
-    else toast.error("Branding not saved", { description: "Check the name and colour, then try again." })
+    const r = await run("branding", () => client.saveBranding({ color: parsed.data.color, logoFileId: logoId }), {
+      handled: (e) => {
+        const f = fieldErrorOf(e)
+        if (!f) return false
+        setErrors({ [f.field === "logo" ? "logo" : "color"]: f.message })
+        return true
+      },
+    })
+    if (r.ok) toast.success("Branding saved", { description: name })
     return r.ok
   }
 
@@ -91,88 +86,52 @@ export function BrandingPanel({ tenantId, name, color, appearance, presets, canW
       </div>
       <div className="set-brand">
         <form className="od-form set-form" noValidate onSubmit={(e) => { e.preventDefault(); document.getElementById("brand-save")?.click() }}>
-          <FormSection icon={ImageIcon} title="Name and logo">
-            <Field label="Display name" htmlFor="brand-name" error={errors.name} required>
-              <Input id="brand-name" value={form.name} readOnly={!canWrite} onChange={(e) => { setForm((f) => ({ ...f, name: e.target.value })); setErrors((x) => ({ ...x, name: undefined })) }} />
-            </Field>
-            <Field label="Logo" htmlFor="brand-logo" error={errors.logo} hint="PNG, JPG, SVG or WebP, up to 512 KB">
-              <span className="set-upload">
-                <input ref={file} id="brand-logo" type="file" accept={LOGO_ACCEPT} className="sr-only" tabIndex={-1} disabled={!canWrite} onChange={(e) => { pick(e.target.files?.[0]); e.target.value = "" }} />
-                <button
-                  type="button"
-                  className="set-drop"
-                  data-over={over ? "" : undefined}
-                  data-disabled={canWrite ? undefined : ""}
-                  disabled={!canWrite}
-                  onClick={() => file.current?.click()}
-                  onDragOver={(e) => { if (!canWrite) return; e.preventDefault(); setOver(true) }}
-                  onDragLeave={() => setOver(false)}
-                  onDrop={(e) => { e.preventDefault(); setOver(false); pick(e.dataTransfer.files?.[0]) }}
-                >
-                  <strong>{logo ? "Replace logo" : "Upload logo"}</strong>
-                  <span>Click or drop an image</span>
-                </button>
-                {logo && canWrite && <button type="button" className="btn btn-outline" onClick={() => setLogo("")}>Remove logo</button>}
-              </span>
-            </Field>
+          <FormSection icon={ImageIcon} title="Logo">
+            {canUpload ? (
+              <Field label="Logo" htmlFor="brand-logo" error={errors.logo} hint="PNG, JPG, SVG or WebP, up to 512 KB">
+                <span className="set-upload">
+                  <input ref={file} id="brand-logo" type="file" accept={LOGO_ACCEPT} className="sr-only" tabIndex={-1} disabled={!canWrite} onChange={(e) => { void pick(e.target.files?.[0]); e.target.value = "" }} />
+                  <button
+                    type="button"
+                    className="set-drop"
+                    data-over={over ? "" : undefined}
+                    data-disabled={canWrite ? undefined : ""}
+                    disabled={!canWrite}
+                    onClick={() => file.current?.click()}
+                    onDragOver={(e) => { if (!canWrite) return; e.preventDefault(); setOver(true) }}
+                    onDragLeave={() => setOver(false)}
+                    onDrop={(e) => { e.preventDefault(); setOver(false); void pick(e.dataTransfer.files?.[0]) }}
+                  >
+                    <strong>{logoId ? "Replace logo" : "Upload logo"}</strong>
+                    <span>Click or drop an image</span>
+                  </button>
+                  {logoId && canWrite && <button type="button" className="btn btn-outline" onClick={() => setLogoId(null)}>Remove logo</button>}
+                </span>
+              </Field>
+            ) : (
+              <p className="od-field-hint">Logo upload isn&apos;t in your plan. Colour only.</p>
+            )}
           </FormSection>
           <FormSection icon={Palette} title="Colour">
             <Field label="Brand colour" htmlFor="brand-color" error={errors.color} required>
-              <ColorPicker id="brand-color" aria-label="Brand colour" value={form.color} presets={presets} disabled={!canWrite} readOnly={!canWrite} invalid={!!errors.color} onValueChange={(hex) => { setForm((f) => ({ ...f, color: hex })); setErrors((x) => ({ ...x, color: undefined })) }} />
+              <ColorPicker id="brand-color" aria-label="Brand colour" value={value} presets={presets} disabled={!canWrite} readOnly={!canWrite} invalid={!!errors.color} onValueChange={(hex) => { setValue(hex); setErrors((x) => ({ ...x, color: undefined })) }} />
             </Field>
-          </FormSection>
-          <FormSection
-            icon={SlidersHorizontal}
-            title="Appearance"
-            action={!lookDefault && canWrite && <button type="button" className="fs-act" onClick={() => setLook(DEFAULT_APPEARANCE)}>Reset to default</button>}
-          >
-            <AppearancePicker value={look} disabled={!canWrite} onChange={setLook} />
           </FormSection>
           {canWrite && (
             <div className="od-form-foot">
-              {(chip.toLowerCase() !== color.toLowerCase() || logo !== savedLogo || lookChanged) && <span className="od-field-hint">Previewing. Save to keep these changes.</span>}
+              {(chip.toLowerCase() !== color.toLowerCase() || logoId !== logoFileId) && <span className="od-field-hint">Previewing. Save to keep these changes.</span>}
               <ActionButton id="brand-save" className="btn btn-primary" onAction={save}>Save branding</ActionButton>
             </div>
           )}
         </form>
         <div className="set-preview" aria-label="Sidebar preview">
           <div className="set-preview-bar">
-            <span className={logo ? "set-preview-chip has-logo" : "set-preview-chip"} style={{ background: chip }}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              {logo ? <img src={logo} alt="" /> : initialsOf(form.name)}
-            </span>
-            <span className="set-preview-name">{form.name.trim() || "Your company"}</span>
+            <span className="set-preview-chip" style={{ background: chip }}>{initialsOf(name)}</span>
+            <span className="set-preview-name">{name.trim() || "Your company"}</span>
           </div>
           <p className="od-field-hint">Live preview of the sidebar logo</p>
         </div>
       </div>
     </section>
-  )
-}
-
-const GROUPS = [
-  { key: "corners", label: "Corners" },
-  { key: "text", label: "Text size" },
-  { key: "spacing", label: "Spacing" },
-] as const
-
-// Workspace appearance presets (spec 2026-10-30-appearance-presets-design.md): one pill row per setting, native radios. The section heading holds Reset.
-function AppearancePicker({ value, disabled, onChange }: { value: Appearance; disabled: boolean; onChange: (a: Appearance) => void }) {
-  return (
-    <div className="set-appear">
-      {GROUPS.map((g) => (
-        <fieldset key={g.key} className="set-appear-row" disabled={disabled}>
-          <legend>{g.label}</legend>
-          <div className="set-appear-opts">
-            {APPEARANCE_OPTIONS[g.key].map((o) => (
-              <label key={o.value} className="set-opt">
-                <input type="radio" className="sr-only" name={`appear-${g.key}`} value={o.value} checked={value[g.key] === o.value} onChange={() => onChange({ ...value, [g.key]: o.value })} />
-                {o.label}
-              </label>
-            ))}
-          </div>
-        </fieldset>
-      ))}
-    </div>
   )
 }

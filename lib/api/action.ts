@@ -12,7 +12,7 @@ export type ActionResult<T> = { ok: true; value: T } | { ok: false; kind: ErrorK
 
 export function makeActionRunner(deps: ActionDeps) {
   const inFlight = new Set<string>()
-  return async function run<T>(key: string, request: () => Promise<T>, opts: { rollback?: () => void } = {}): Promise<ActionResult<T>> {
+  return async function run<T>(key: string, request: () => Promise<T>, opts: { rollback?: () => void; handled?: (e: unknown) => boolean } = {}): Promise<ActionResult<T>> {
     if (inFlight.has(key)) return { ok: false, kind: "in_flight" } // a double click sends nothing
     inFlight.add(key)
     try {
@@ -21,7 +21,8 @@ export function makeActionRunner(deps: ActionDeps) {
       return { ok: true, value }
     } catch (e) {
       opts.rollback?.()
-      deps.notify(userMessage(e))
+      // `handled`: the caller showed this refusal itself (for example under a form field), so no toast.
+      if (!opts.handled?.(e)) deps.notify(userMessage(e))
       deps.refresh()
       return { ok: false, kind: classifyApiError(e).kind }
     } finally {

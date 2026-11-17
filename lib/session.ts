@@ -7,7 +7,6 @@ import { cookies, headers } from "next/headers"
 import { redirect } from "next/navigation"
 import { apiServer } from "./api/server"
 import { hasSessionCookie } from "./api/cookies"
-import { parseAppearance } from "./appearance"
 import { DEFAULT_BRAND } from "./brand"
 import { getData } from "./data"
 import type { EntitlementsData } from "./entitlements"
@@ -48,7 +47,7 @@ export async function getSession(): Promise<Session> {
     case "no_tenant": return redirect(r.me.platformRole ? "/platform" : "/onboarding")
     case "ok":
       if (r.cookieStale) redirect(`${TENANT_REPAIR_PATH}?next=${encodeURIComponent(await landing())}`)
-      return withBranding(r.session, (await cookies()).get(`od-brand-${r.session.tenant.id}`)?.value)
+      return r.session
   }
 }
 
@@ -122,21 +121,6 @@ async function platformRole(): Promise<Role> {
   const role = roles.find((x) => x.platform)
   if (!role) throw new Error("the platform role is missing from shell/roles.json")
   return role
-}
-
-// Saved branding (see saveBranding, still a mock until the settings task) overrides the API's name, colour and appearance; a bad cookie is ignored.
-function withBranding(s: Session, raw: string | undefined): Session {
-  if (!raw) return s
-  const t = s.tenant
-  try {
-    const b = JSON.parse(raw) as { name?: string; color?: string; appearance?: unknown }
-    const name = b.name?.trim() || t.name
-    const initials = name === t.name ? t.initials : name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]!.toUpperCase()).join("")
-    const tenant = { ...t, name, initials, brand: /^#[0-9a-f]{6}$/i.test(b.color ?? "") ? b.color! : t.brand, ...(b.appearance ? { appearance: parseAppearance(b.appearance) } : {}) }
-    return { ...s, tenant, tenants: s.tenants.map((x) => (x.slug === t.slug ? tenant : x)) }
-  } catch {
-    return s
-  }
 }
 
 export { canWrite } from "./permissions"

@@ -2,13 +2,14 @@ import { PageHeadSkeleton } from "@/components/page-head"
 import {
   PagerSkeleton,
   needsPager,
+  pageRows,
 } from "@/components/pager-skeleton"
 import { Sk, SkGroup } from "@/components/sk"
 import {
   DEPARTMENTS_PAGE_SIZE,
   DELIVERY_PAGE_SIZE,
   DEVICES_PAGE_SIZE,
-  GRANTS_PAGE_SIZE,
+  REQUESTS_PAGE_SIZE,
   INVITES_PAGE_SIZE,
   USERS_PAGE_SIZE,
 } from "../constants"
@@ -38,7 +39,10 @@ export type SettingsCounts = {
   events: number
   intervals: number
   integrations: number
-  grants: number
+  devices: number
+  requests: number
+  /** The member may read the data-request list (owner or admin). Defaults to true. */
+  canRequests?: boolean
   /** Privacy actions (support grant, data export, deletion) are Tenant Owner only (FR-SET-08). Defaults to canWrite. */
   owner?: boolean
   /** Seed text, so the skeleton wraps like the loaded panels. Everything is optional: without it the blocks are plain bars. */
@@ -149,7 +153,8 @@ const ChipsSk = ({ label, chips }: { label: string; chips: string[] }) => (
   </div>
 )
 
-function Organisation({ rules }: { rules: string[] }) {
+// Organisation: two columns (Company: name, workspace ID; Daily report: timezone, deadline). Static. Intended heights from the real classes; T6.9 measures them.
+function Organisation() {
   return (
     <section className="card set-card">
       <CardHead title={120} sub={230} />
@@ -158,17 +163,13 @@ function Organisation({ rules }: { rules: string[] }) {
           <div className="od-form-col">
             <SecSk title="Company">
               <FieldSk label="Company name" hint={0} required />
-              <FieldSk label="Subdomain" hint={0} />
-            </SecSk>
-            <SecSk title="Security">
-              <FieldSk label="Session timeout" hint="Idle time before sign-out" />
+              <FieldSk label="Workspace ID" hint={0} />
             </SecSk>
           </div>
           <div className="od-form-col">
             <SecSk title="Daily report">
               <FieldSk label="Timezone" hint={0} />
               <FieldSk label="Report deadline" hint={0} />
-              <ChipsSk label="Weekend and holiday rule" chips={rules} />
             </SecSk>
           </div>
         </div>
@@ -178,126 +179,76 @@ function Organisation({ rules }: { rules: string[] }) {
   )
 }
 
-function Departments({
-  departments,
-  canWrite,
-  seed,
-}: {
-  departments: number
-  canWrite: boolean
-  seed: Department[]
-}) {
+function Departments({ departments, canWrite }: { departments: number; canWrite: boolean }) {
   return (
     <section className="card set-card">
-      <CardHead title={250} sub={110} button={canWrite ? 190 : 0} />
+      <CardHead title={120} sub={90} button={canWrite ? 190 : 0} />
       <ul className="set-list">
-        {seed.slice(0, DEPARTMENTS_PAGE_SIZE).map((d) => (
-          <li key={d.id} className="set-dep">
+        {Array.from({ length: pageRows(departments, DEPARTMENTS_PAGE_SIZE) }, (_, i) => (
+          <li key={i} className="set-dep">
             <div className="set-dep-main">
-              <span className="set-dep-top">
-                <span className="set-dep-name">{g(d.name)}</span>
-                <span className="st sk-ghost">{d.active ? "Active" : "Inactive"}</span>
-              </span>
-              <span className="set-dep-line">{g(<><b>Report owner:</b> {d.reportOwner}</>)}</span>
-              <span className="set-dep-line">{g(<><b>Sites:</b> {d.sites.join(", ") || "None"}</>)}</span>
-              <span className="set-dep-line">{g(<><b>Teams:</b> {d.teams.join(", ") || "None"}</>)}</span>
+              <span className="set-dep-top"><Sk w={110} h={14} lh={22} /></span>
+              <span className="set-dep-line"><Sk w={70} h={11} lh={20} /></span>
             </div>
             {canWrite && (
               <span className="set-actions">
-                <span className="btn btn-outline sk-ghost-btn">Edit</span>
-                <span className="btn btn-outline sk-ghost-btn">{d.active ? "Deactivate" : "Reactivate"}</span>
+                <Sk w={88} h={48} r={14} />
+                <Sk w={84} h={48} r={14} />
               </span>
             )}
           </li>
         ))}
       </ul>
-      {needsPager(departments, DEPARTMENTS_PAGE_SIZE) && (
-        <PagerSkeleton rows={departments} size={DEPARTMENTS_PAGE_SIZE} />
-      )}
+      {needsPager(departments, DEPARTMENTS_PAGE_SIZE) && <PagerSkeleton rows={departments} size={DEPARTMENTS_PAGE_SIZE} />}
     </section>
   )
 }
 
-function Users({
-  users,
-  invites,
-  canWrite,
-  data,
-}: {
-  users: number
-  invites: number
-  canWrite: boolean
-  data?: SettingsSkeletonData
-}) {
-  const today = data?.today ?? ""
-  const tz = data?.tzLabel ?? ""
-  const role = (id: string) => data?.roleLabels[id] ?? id
-  const dept = (d: string) => (d ? <span className="dep-tag sk-ghost">{d}</span> : <span className="tm">{g("All departments")}</span>)
-  const th = (...labels: string[]) => (
-    <thead>
-      <tr>{labels.map((l) => <th key={l}>{g(l)}</th>)}</tr>
-    </thead>
-  )
+// Users: role filter + search, table (User, Role select when the member can write, Department) and the pending invites table (Email, Role, Expires, Resend and Revoke).
+function Users({ users, invites, canWrite }: { users: number; invites: number; canWrite: boolean }) {
+  const head = (ws: number[]) => <thead><tr>{ws.map((w, i) => <th key={i}><Sk w={w} h={10} lh={15.94} /></th>)}</tr></thead>
   return (
     <>
       <section className="card set-card">
         <CardHead title={70} sub={190} button={canWrite ? 160 : 0} />
         <div className="od-filters">
           <Sk w={140} h={48} r="pill" />
-          <Sk w={140} h={48} r="pill" />
           <Sk h={48} r="pill" className="sk-fsearch" />
         </div>
         <div className="table-wrap">
           <table className="rtable set-table">
-            {th("User", "Role", "Department", "Status", "Last active", ...(canWrite ? ["Actions"] : []))}
+            {head([36, 36, 70])}
             <tbody>
-              {(data?.users ?? []).slice(0, USERS_PAGE_SIZE).map((u) => (
-                <tr key={u.id}>
-                  <td data-label="User"><div className="tt">{g(u.name)}</div><div className="tm">{g(u.email)}</div></td>
-                  <td data-label="Role">{g(role(u.role))}</td>
-                  <td data-label="Department">{dept(u.dept)}</td>
-                  <td data-label="Status"><span className="st sk-ghost">{u.status === "active" ? "Active" : "Deactivated"}</span></td>
-                  <td data-label="Last active" className="num">{g(when(u.lastActive, today, tz))}</td>
-                  {canWrite && <td data-label="Actions"><span className="btn btn-outline set-sm sk-ghost-btn">{u.status === "active" ? "Deactivate" : "Reactivate"}</span></td>}
+              {Array.from({ length: pageRows(users, USERS_PAGE_SIZE) }, (_, i) => (
+                <tr key={i}>
+                  <td data-label="User"><Sk w={120} h={13} lh={19} /><Sk w={160} h={10} lh={16} /></td>
+                  <td data-label="Role">{canWrite ? <div className="od-filters set-access"><Sk w={140} h={48} r="pill" /></div> : <Sk w={90} h={13} lh={19} />}</td>
+                  <td data-label="Department"><Sk w={80} h={13} lh={19} /></td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-        {needsPager(users, USERS_PAGE_SIZE) && (
-          <PagerSkeleton rows={users} size={USERS_PAGE_SIZE} />
-        )}
+        {needsPager(users, USERS_PAGE_SIZE) && <PagerSkeleton rows={users} size={USERS_PAGE_SIZE} />}
       </section>
       <section className="card set-card">
         <CardHead title={130} sub={240} />
         <div className="table-wrap">
           <table className="rtable set-table">
-            {th("Email", "Role", "Department", "Expires", ...(canWrite ? ["Actions"] : []))}
+            {head([36, 36, 50, ...(canWrite ? [54] : [])])}
             <tbody>
-              {(data?.invites ?? []).slice(0, INVITES_PAGE_SIZE).map((i) => (
-                <tr key={i.id}>
-                  <td data-label="Email"><div className="tt">{g(i.email)}</div></td>
-                  <td data-label="Role">{g(role(i.role))}</td>
-                  <td data-label="Department">{dept(i.dept)}</td>
-                  <td data-label="Expires" className="num">
-                    {g(when(i.expiresAt, today, tz, "date"))} {daysBetween(i.expiresAt, today) < 0 && <span className="st sk-ghost">Expired</span>}
-                  </td>
-                  {canWrite && (
-                    <td data-label="Actions">
-                      <span className="set-actions">
-                        <span className="btn btn-outline set-sm sk-ghost-btn">Resend</span>
-                        <span className="btn btn-outline set-sm sk-ghost-btn">Revoke</span>
-                      </span>
-                    </td>
-                  )}
+              {Array.from({ length: pageRows(invites, INVITES_PAGE_SIZE) }, (_, i) => (
+                <tr key={i}>
+                  <td data-label="Email"><Sk w={150} h={13} lh={19} /></td>
+                  <td data-label="Role"><Sk w={90} h={13} lh={19} /></td>
+                  <td data-label="Expires"><Sk w={90} h={13} lh={19} /></td>
+                  {canWrite && <td data-label="Actions"><span className="set-actions"><Sk w={81} h={38} r={12} /><Sk w={76} h={38} r={12} /></span></td>}
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-        {needsPager(invites, INVITES_PAGE_SIZE) && (
-          <PagerSkeleton rows={invites} size={INVITES_PAGE_SIZE} />
-        )}
+        {needsPager(invites, INVITES_PAGE_SIZE) && <PagerSkeleton rows={invites} size={INVITES_PAGE_SIZE} />}
       </section>
     </>
   )
@@ -305,8 +256,7 @@ function Users({
 
 // The Owner column is always a read-only level badge; the other roles get a select when the user can write, a badge otherwise.
 const LEVEL = { none: "None", read: "Read", write: "Write" } as const
-function Roles({ canWrite, matrix }: { canWrite: boolean; matrix?: MatrixData }) {
-  const roles = matrix?.roles ?? []
+function Roles({ canWrite, roles, modules }: { canWrite: boolean; roles: number; modules: number }) {
   return (
     <section className="card set-card">
       <CardHead title="Roles and permissions" sub="What each role can open and change, per module" />
@@ -318,22 +268,16 @@ function Roles({ canWrite, matrix }: { canWrite: boolean; matrix?: MatrixData })
         <table className="rtable set-matrix">
           <thead>
             <tr>
-              <th>{g("Module")}</th>
-              {roles.map((r) => <th key={r.id}>{g(r.label)}</th>)}
+              <th><Sk w={50} h={10} lh={15.94} /></th>
+              {Array.from({ length: roles }, (_, i) => <th key={i}><Sk w={70} h={10} lh={15.94} /></th>)}
             </tr>
           </thead>
           <tbody>
-            {(matrix?.modules ?? []).map((m) => (
-              <tr key={m.id}>
-                <td data-label="Module"><span className="tt">{g(m.label)}</span></td>
-                {roles.map((r) => (
-                  <td key={r.id} data-label={r.label}>
-                    {canWrite && r.id !== "owner" ? (
-                      <div className="od-filters set-access"><Sk w={96} h={48} r="pill" /></div>
-                    ) : (
-                      <span className="set-level sk-ghost">{LEVEL[r.access[m.id]]}</span>
-                    )}
-                  </td>
+            {Array.from({ length: modules }, (_, m) => (
+              <tr key={m}>
+                <td data-label="Module"><Sk w={100} h={13} lh={19} /></td>
+                {Array.from({ length: roles }, (_, r) => (
+                  <td key={r}>{canWrite && r > 0 ? <div className="od-filters set-access"><Sk w={96} h={48} r="pill" /></div> : <Sk w={44} h={26} r={8} />}</td>
                 ))}
               </tr>
             ))}
@@ -488,43 +432,22 @@ function Notifications({ canWrite, data, deadline, tzLabel, today, log }: { canW
   )
 }
 
-function Integrations({
-  canWrite,
-  seed,
-  today,
-  tzLabel,
-}: {
-  canWrite: boolean
-  seed: Integration[]
-  today: string
-  tzLabel: string
-}) {
-  const label = { connected: "Connected", not_connected: "Not connected", error: "Error" }
+// One card with Google Drive, the only integration the API has (not connected, the typical new company).
+function Integrations({ canWrite }: { canWrite: boolean }) {
   return (
     <section className="card set-card">
       <CardHead title={110} sub={120} />
       <ul className="set-int-grid">
-        {seed.map((i) => (
-          <li key={i.id} className="set-int">
-            <div className="set-int-top">
-              <Sk w={44} h={44} r="circle" />
-              <div className="set-int-name">
-                <h3>{g(i.name)}</h3>
-                <span className="st sk-ghost">{label[i.status]}</span>
-              </div>
-            </div>
-            <p className="set-int-desc">{g(i.description)}</p>
-            <p className="set-int-event">
-              {g(<><b>Last event:</b> {i.lastEvent}{i.lastEventAt && <> · {when(i.lastEventAt, today, tzLabel)}</>}</>)}
-            </p>
-            <p className="set-int-policy">{g(i.policy)}</p>
-            {canWrite && (
-              <div className="set-int-foot">
-                <span className={`btn ${i.status === "connected" ? "btn-outline" : "btn-primary"} sk-ghost-btn`}>{i.status === "connected" ? "Disconnect" : i.status === "error" ? "Reconnect" : "Connect"}</span>
-              </div>
-            )}
-          </li>
-        ))}
+        <li className="set-int">
+          <div className="set-int-top">
+            <Sk w={44} h={44} r="circle" />
+            <div className="set-int-name"><Sk w={100} h={16} lh={22} /><Sk w={96} h={29.4} r={8} /></div>
+          </div>
+          <Sk w={260} h={11} lh={20} />
+          <Sk w={190} h={11} lh={20} />
+          <Sk w={280} h={11} lh={20} />
+          {canWrite && <div className="set-int-foot"><Sk w={110} h={48} r={14} /></div>}
+        </li>
       </ul>
     </section>
   )
@@ -569,31 +492,25 @@ function MfaPolicySk({ canWrite, policy, roleLabels }: { canWrite: boolean; poli
 }
 
 // Mirrors DevicesPanel: head with the add button, then one row per device (switch + remove when the user can write).
-function Devices({ canWrite, data }: { canWrite: boolean; data?: SettingsSkeletonData }) {
-  const devices = data?.devices ?? []
-  const names = Object.fromEntries((data?.users ?? []).map((u) => [u.id, u.name]))
-  const rows = [...devices].sort((a, b) => (names[a.userId] ?? "Unknown user").localeCompare(names[b.userId] ?? "Unknown user") || a.label.localeCompare(b.label)).slice(0, DEVICES_PAGE_SIZE)
-  const trusted = devices.filter((d) => d.trusted && d.type === "pc" && d.owner === "company").length
+// Devices: head with the add button, then rows (icon, label and owner pill, trusted switch, Enrolment code and Remove when the member can write).
+function Devices({ canWrite, devices }: { canWrite: boolean; devices: number }) {
   return (
     <section className="card set-card">
-      <CardHead title="Registered devices" sub={`${devices.length} ${devices.length === 1 ? "device" : "devices"} · ${trusted} trusted company PCs`} button={canWrite ? 138 : undefined} />
+      <CardHead title="Registered devices" sub={90} button={canWrite ? 138 : undefined} />
       <ul className="set-list">
-        {rows.map((d) => (
-          <li key={d.id} className="dev-row">
+        {Array.from({ length: pageRows(devices, DEVICES_PAGE_SIZE) }, (_, i) => (
+          <li key={i} className="dev-row">
             <Sk w={40} h={40} r={12} />
             <div className="dev-main">
-              <span className="dev-top">
-                <b className="dev-name">{g(d.label)}</b>
-                <span className="st sk-ghost">{d.owner === "company" ? "Company" : "Personal"}</span>
-              </span>
-              <span className="tm">{g(`${names[d.userId] ?? "Unknown user"} · ${DEVICE_TYPES.find((t) => t.value === d.type)?.label}`)}{d.lastSeen && <> {g(<>· Last seen {when(d.lastSeen, data?.today ?? "", data?.tzLabel ?? "")}</>)}</>}</span>
+              <span className="dev-top"><Sk w={120} h={14} lh={22} /><Sk w={80} h={29.4} r={8} /></span>
+              <Sk w={220} h={10} lh={16} />
             </div>
             <label className="dev-trust"><Sk w={40} h={24} r="pill" />{g("Trusted")}</label>
-            {canWrite && <span className="btn btn-outline set-sm sk-ghost-btn">Remove</span>}
+            {canWrite && <span className="set-actions"><Sk w={140} h={38} r={12} /><Sk w={81} h={38} r={12} /></span>}
           </li>
         ))}
       </ul>
-      {needsPager(devices.length, DEVICES_PAGE_SIZE) && <PagerSkeleton rows={devices.length} size={DEVICES_PAGE_SIZE} />}
+      {needsPager(devices, DEVICES_PAGE_SIZE) && <PagerSkeleton rows={devices} size={DEVICES_PAGE_SIZE} />}
     </section>
   )
 }
@@ -615,28 +532,14 @@ function Branding({
       <CardHead title={90} sub={230} />
       <div className="set-brand">
         <div className="od-form set-form">
-          <SecSk title="Name and logo">
-            <FieldSk label={100} hint={0} />
-            <div className="od-field">
-              <Sk w={40} h={11} lh={18.1} />
-              <Sk h={76} r={20} />
-              <Sk w={190} h={10} lh={17.4} style={{ marginTop: 6 }} />
-            </div>
+          <SecSk title="Logo">
+            {/* starter plans get one hint line; plans with the files module get the upload drop zone (intended, T6.9 measures both) */}
+            <Sk w={230} h={10} lh={17.4} />
           </SecSk>
           <SecSk title="Colour">
             <div className="od-field">
               <Sk w={90} h={11} lh={18.1} />
               <Sk h={48} r={14} />
-            </div>
-          </SecSk>
-          <SecSk title="Appearance">
-            <div className="set-appear">
-              {APPEAR_PILLS.map((ws, i) => (
-                <div key={i} className="set-appear-row">
-                  <Sk w={LEGEND_W[i]} h={11} lh={18.8} />
-                  <div className="set-appear-opts">{ws.map((w, j) => <Sk key={j} w={w} h={48} r="pill" />)}</div>
-                </div>
-              ))}
             </div>
           </SecSk>
           {canWrite && <Foot w={138} />}
@@ -657,71 +560,47 @@ function Branding({
   )
 }
 
-function Privacy({ grants, canWrite, data }: { grants: number; canWrite: boolean; data?: SettingsSkeletonData }) {
-  const today = data?.today ?? ""
-  const tz = data?.tzLabel ?? ""
-  const rows = supportRows(data?.grants ?? [], today)
-  const waiting = rows.filter((r) => r.status === "requested").length
+// Privacy: "Your data" (export my data, support access link) and, for owners and admins, the data requests table (Person, Kind, Due, Status).
+function Privacy({ requests, canRequests, canWrite }: { requests: number; canRequests: boolean; canWrite: boolean }) {
   return (
     <>
       <section className="card set-card">
-        <CardHead title="Your data" sub="Export everything or ask for the workspace to be deleted" />
+        <CardHead title="Your data" sub="Ask for a copy of your own data" />
         <div className="set-data">
           <div>
-            <h3>{g("Export all data")}</h3>
-            <p>{g("Tasks, reports, files and people as a single archive, emailed when ready.")}</p>
+            <h3>{g("Export my data")}</h3>
+            <p>{g("Everything we hold about you, as one file.")}</p>
           </div>
-          {canWrite && <span className="btn btn-outline sk-ghost-btn">Export all data</span>}
+          <span className="btn btn-outline sk-ghost-btn">Export my data</span>
         </div>
-        {canWrite && (
-          <div className="set-data">
-            <div>
-              <h3>{g("Request deletion")}</h3>
-              <p>{g("Permanently deletes the workspace and all its data after a 30 day grace period.")}</p>
-            </div>
-            <span className="btn btn-danger sk-ghost-btn">Request deletion</span>
+        <div className="set-data">
+          <div>
+            <h3>{g("Support access")}</h3>
+            <p>{g("Who from OpsDesk support can see your workspace, and for how long.")}</p>
           </div>
-        )}
+          <span className="btn btn-outline sk-ghost-btn">View</span>
+        </div>
       </section>
-      <section className="card set-card">
-        <CardHead title="Support access" sub={`${rows.filter((r) => r.status === "granted").length} active${waiting ? ` · ${waiting} waiting for you` : ""} · support can only see your data while a grant is open`} button={canWrite ? 190 : 0} />
-        <div className="table-wrap">
-          <table className="rtable set-table">
-            <thead>
-              <tr>
-                {["Who", "Reason", "Requested", "Expires", "Status", ...(canWrite ? ["Actions"] : [])].map((l) => <th key={l}>{g(l)}</th>)}
-              </tr>
-            </thead>
-            <tbody>
-              {rows.slice(0, GRANTS_PAGE_SIZE).map(({ row: r, status }) => {
-                return (
-                  <tr key={r.id}>
-                    <td data-label="Who"><span className="tt">{g(r.requester)}</span></td>
-                    <td data-label="Reason">{g(r.reason)}</td>
-                    <td data-label="Requested" className="num">{g(when(r.requestedAt, today, tz))}</td>
-                    <td data-label="Expires" className="num">{g(r.expiresAt ? when(r.expiresAt, today, tz) : "Not granted")}</td>
-                    <td data-label="Status"><span className="st sk-ghost">{SUPPORT_STATUS[status].label}</span></td>
-                    {canWrite && (
-                      <td data-label="Actions">
-                        {status === "requested" && (
-                          <span className="set-actions">
-                            <span className="btn btn-primary set-sm sk-ghost-btn">Approve</span>
-                            <span className="btn btn-outline set-sm sk-ghost-btn">Decline</span>
-                          </span>
-                        )}
-                        {status === "granted" && <span className="btn btn-outline set-sm sk-ghost-btn">Revoke</span>}
-                      </td>
-                    )}
+      {canRequests && (
+        <section className="card set-card">
+          <CardHead title={120} sub={190} button={canWrite ? 130 : 0} />
+          <div className="table-wrap">
+            <table className="rtable set-table">
+              <thead><tr>{[40, 30, 30, 40].map((w, i) => <th key={i}><Sk w={w} h={10} lh={15.94} /></th>)}</tr></thead>
+              <tbody>
+                {Array.from({ length: pageRows(requests, REQUESTS_PAGE_SIZE) }, (_, i) => (
+                  <tr key={i}>
+                    <td data-label="Person"><Sk w={110} h={13} lh={19} /></td>
+                    <td data-label="Kind"><Sk w={60} h={13} lh={19} /></td>
+                    <td data-label="Due"><Sk w={90} h={13} lh={19} /></td>
+                    <td data-label="Status"><Sk w={70} h={29.4} r={8} /></td>
                   </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-        {needsPager(grants, GRANTS_PAGE_SIZE) && (
-          <PagerSkeleton rows={grants} size={GRANTS_PAGE_SIZE} />
-        )}
-      </section>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
     </>
   )
 }
@@ -739,24 +618,17 @@ export function SettingsBodySkeleton({
 }) {
   switch (tab) {
     case "organisation":
-      return <Organisation rules={counts.data?.weekendRules ?? []} />
+      return <Organisation />
     case "departments":
-      return (
-        <Departments departments={counts.departments} canWrite={canWrite} seed={counts.data?.departments ?? []} />
-      )
+      return <Departments departments={counts.departments} canWrite={canWrite} />
     case "users":
       return (
-        <Users
-          users={counts.users}
-          invites={counts.invites}
-          canWrite={canWrite}
-          data={counts.data}
-        />
+        <Users users={counts.users} invites={counts.invites} canWrite={canWrite} />
       )
     case "roles":
       return (
         <>
-          <Roles canWrite={canWrite} matrix={counts.data?.matrix} />
+          <Roles canWrite={canWrite} roles={counts.roles} modules={counts.modules} />
           <MfaPolicySk canWrite={canWrite} policy={counts.data?.mfaPolicy ?? { mode: "off", roles: [] }} roleLabels={counts.data?.roleLabels ?? {}} />
         </>
       )
@@ -771,18 +643,18 @@ export function SettingsBodySkeleton({
     case "integrations":
       return (
         <>
-          <Integrations canWrite={canWrite} seed={counts.data?.integrations ?? []} today={counts.data?.today ?? ""} tzLabel={counts.data?.tzLabel ?? ""} />
+          <Integrations canWrite={canWrite} />
           <DevicePolicies canWrite={canWrite} policies={counts.data?.devicePolicies ?? []} />
         </>
       )
     case "devices":
-      return <Devices canWrite={canWrite} data={counts.data} />
+      return <Devices canWrite={canWrite} devices={counts.devices} />
     case "branding":
       return <Branding canWrite={canWrite} nameLines={counts.brandNameLines} />
     case "billing":
       return <>{billing}</>
     case "privacy":
-      return <Privacy grants={counts.grants} canWrite={canWrite && (counts.owner ?? true)} data={counts.data} />
+      return <Privacy requests={counts.requests} canRequests={counts.canRequests ?? true} canWrite={canWrite && (counts.owner ?? true)} />
   }
 }
 
