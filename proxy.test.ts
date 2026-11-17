@@ -78,6 +78,19 @@ describe("proxy: Next server actions get an Origin check of their own (I6 layer 
     expect(proxy(next("/tasks", { headers: { "next-action": "x", origin: "https://evil.example" } })).status).toBe(200)
   })
 
+  test("M4: in production an unset or invalid APP_ORIGIN refuses every server action (fail closed, like the BFF), whatever Origin and Host say", () => {
+    vi.stubEnv("NODE_ENV", "production")
+    for (const value of ["", "   ", "not a url", "ftp://app.example.com"]) {
+      vi.stubEnv("APP_ORIGIN", value)
+      const same = next("/tasks", { method: "POST", headers: { "next-action": "a", origin: APP, host: "app.example.com" }, body: "[]" })
+      expect(proxy(same).status, `APP_ORIGIN=${JSON.stringify(value)}`).toBe(403)
+      const fwd = next("/sign-in", { method: "POST", headers: { "next-action": "a", origin: APP, "x-forwarded-host": "app.example.com" }, body: "[]" })
+      expect(proxy(fwd).status).toBe(403)
+    }
+    vi.stubEnv("APP_ORIGIN", APP)
+    expect(proxy(next("/tasks", { method: "POST", headers: { "next-action": "a", origin: APP }, body: "[]" })).status).toBe(200)
+  })
+
   test("with APP_ORIGIN unset (dev), the request's own Host is the reference", () => {
     vi.stubEnv("APP_ORIGIN", "")
     const same = next("/tasks", { method: "POST", headers: { "next-action": "a", origin: APP, host: "app.example.com" }, body: "[]" })

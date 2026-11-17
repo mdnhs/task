@@ -213,6 +213,29 @@ describe("path rules", () => {
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
+  test("M1: list-sessions is a 404 in every spelling: percent-encoded letters or digits, mixed case, trailing slash, double slash, any method", async () => {
+    const spellings = [
+      "/api/auth/list-%73essions", "/api/auth/list-%73essions/", "/api/auth/%6Cist-sessions", "/api/auth/%6cist-%73essions", "/api/auth/LIST-%53ESSIONS",
+      "/api/auth/List-Sessions", "/api/auth/LIST-SESSIONS/", "/api/auth//list-sessions", "/api/auth/list-sessions//", "/api/auth/list%2Dsessions", "/api/auth/list-sessions%2F",
+      "/api/auth/list-sessions%00", "/api/auth/%2e/list-sessions", "/api/auth/list-sessions/%2e", "/api/auth/%252e%252e/list-sessions", "/api/auth/list-sessions?x=%73",
+    ]
+    for (const p of spellings) {
+      for (const method of ["GET", "POST", "PUT", "PATCH", "DELETE"]) {
+        const r = method === "GET" ? req(p) : req(p, { method, headers: { origin: APP, "content-type": "application/json" }, body: "{}" })
+        const res = await forwardToApi(r, AUTH)
+        expect(res.status, `${method} ${p}`).toBe(404)
+      }
+    }
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  test("M1: a percent-encoded letter or digit anywhere in an /api/auth path is a 404 (no Better Auth endpoint needs one); the query keeps its encoding", async () => {
+    for (const p of ["/api/auth/sign-%69n/email", "/api/auth/two-factor/verify-t%6Ftp", "/api/auth/%76erify-email"]) expect((await forwardToApi(post(p), AUTH)).status, p).toBe(404)
+    expect(fetchMock).not.toHaveBeenCalled()
+    await forwardToApi(req("/api/auth/verify-email?token=a%2Bb%73"), AUTH)
+    expect(lastCall().url).toBe(`${API}/api/auth/verify-email?token=a%2Bb%73`)
+  })
+
   test("the real path is forwarded as is, query included, onto API_URL only", async () => {
     await forwardToApi(req("/api/auth/verify-email?token=abc%2Bdef&x=1"), AUTH)
     expect(lastCall().url).toBe(`${API}/api/auth/verify-email?token=abc%2Bdef&x=1`)

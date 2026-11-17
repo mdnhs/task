@@ -36,6 +36,9 @@ function pathAllowed(pathname: string, prefix: string): boolean {
   if (!pathname.startsWith(`${prefix}/`) || pathname.length === prefix.length + 1) return false
   if (pathname.includes("//") || /[\\\u0000-\u001f\u007f]/.test(pathname)) return false
   if (/%2f|%5c|%00/i.test(pathname)) return false
+  // Better Auth's endpoints are plain ASCII words: nothing there needs a percent escape (tokens travel in the query or the body). A path with one is
+  // an attempt to spell a denied route differently (M1: /api/auth/list-%73essions), so it is refused outright.
+  if (prefix === "/api/auth" && pathname.includes("%")) return false
   for (const seg of pathname.split("/")) {
     let decoded: string
     try {
@@ -46,6 +49,18 @@ function pathAllowed(pathname: string, prefix: string): boolean {
     if (decoded === "." || decoded === "..") return false
   }
   return true
+}
+
+/** The path the deny rules see: each segment decoded, lower-cased, empty segments and a trailing slash dropped. Undecodable paths are refused earlier. */
+function canonicalPath(pathname: string): string {
+  const segs = pathname.split("/").filter(Boolean).map((seg) => {
+    try {
+      return decodeURIComponent(seg).toLowerCase()
+    } catch {
+      return seg.toLowerCase()
+    }
+  })
+  return `/${segs.join("/")}`
 }
 
 class TooLarge extends Error {}
@@ -88,7 +103,9 @@ export async function forwardToApi(req: Request, o: BffOptions): Promise<Respons
     return refuse(400, "bad_request", "Bad Request")
   }
   const { pathname } = url
-  if (!pathAllowed(pathname, o.prefix) || ALWAYS_DENIED[o.prefix].some((re) => re.test(pathname)) || o.deny?.test(pathname)) return refuse(404, "not_found", "Not Found")
+  const canonical = canonicalPath(pathname)
+  const denied = (re: RegExp) => re.test(pathname) || re.test(canonical)
+  if (!pathAllowed(pathname, o.prefix) || ALWAYS_DENIED[o.prefix].some(denied) || (o.deny !== undefined && denied(o.deny))) return refuse(404, "not_found", "Not Found")
 
   let base: string
   try {

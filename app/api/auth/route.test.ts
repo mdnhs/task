@@ -36,6 +36,14 @@ describe("app/api/auth/[...path]/route.ts", () => {
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
+  test("M1: the route handler answers 404 for an encoded or mixed-case list-sessions and never reaches the API", async () => {
+    for (const p of ["/api/auth/list-%73essions", "/api/auth/LIST-SESSIONS/", "/api/auth/%6Cist-sessions"]) {
+      expect((await route.GET(new Request(`${APP}${p}`))).status, p).toBe(404)
+      expect((await route.POST(new Request(`${APP}${p}`, { method: "POST", headers: { origin: APP }, body: "{}" }))).status, p).toBe(404)
+    }
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
   test("a cross-origin sign-in POST is refused (login CSRF)", async () => {
     const res = await route.POST(new Request(`${APP}/api/auth/sign-in/email`, { method: "POST", headers: { origin: "https://evil.example", "content-type": "application/json" }, body: "{}" }))
     expect(res.status).toBe(403)

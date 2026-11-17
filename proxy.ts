@@ -17,8 +17,12 @@ export function proxy(request: NextRequest) {
   if (pathname === "/data" || pathname.startsWith("/data/")) return new NextResponse("Not found", { status: 404 })
 
   if (request.method === "POST" && request.headers.has("next-action")) {
+    const origin = appOrigin()
+    // Fail closed like the BFF: in production an unknown web origin refuses every server action (the Host header is client-controlled behind a lax edge).
+    // Only development and tests fall back to the request's own Host.
+    if (origin === null && process.env.NODE_ENV === "production") return new NextResponse("Forbidden", { status: 403 })
     const host = request.headers.get("x-forwarded-host") ?? request.headers.get("host")
-    if (violatesSameOrigin(request.headers, { origin: appOrigin(), host })) return new NextResponse("Forbidden", { status: 403 })
+    if (violatesSameOrigin(request.headers, { origin, host })) return new NextResponse("Forbidden", { status: 403 })
   }
 
   if (!PUBLIC_PAGE.test(pathname) && request.cookies.get("od-auth")?.value === "out") return NextResponse.redirect(new URL("/sign-in", request.url))
