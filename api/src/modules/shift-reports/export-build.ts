@@ -106,8 +106,15 @@ function xlsxSink(o: { tables: SinkTable[]; maxBytes: number; meta: SinkMeta }):
   }
 }
 
-/** Latin-1 text for the PDF's standard font: control characters out, anything the font has no glyph for becomes "?". */
-const pdfText = (s: string): string => exportText(s).replace(/[\t\r]/g, " ").replace(/[^\n -~ -ÿ]/g, "?")
+/** Typographic punctuation a phone keyboard types, mapped to its ASCII look-alike before the Latin-1 filter (the standard PDF font has no glyph for it). */
+const SMART: Record<string, string> = {
+  "\u2018": "'", "\u2019": "'", "\u201a": "'", "\u201b": "'", "\u201c": '"', "\u201d": '"', "\u201e": '"', "\u2010": "-", "\u2011": "-", "\u2012": "-", "\u2013": "-", "\u2014": "-", "\u2015": "-", "\u2212": "-",
+  "\u2026": "...", "\u00a0": " ", "\u202f": " ", "\u2007": " ", "\u2009": " ",
+}
+const SMART_RE = new RegExp(`[${Object.keys(SMART).join("")}]`, "g")
+
+/** Latin-1 text for the PDF's standard font: smart punctuation to ASCII, control characters out, anything the font has no glyph for becomes "?". The formula guard runs on the mapped text (an en dash lead is a minus). */
+export const pdfText = (s: string): string => exportText(s.replace(SMART_RE, (ch) => SMART[ch])).replace(/[\t\r]/g, " ").replace(/[^\n -~\u00a0-\u00ff]/g, "?")
 
 function pdfSink(o: { tables: SinkTable[]; maxBytes: number; meta: SinkMeta }): Sink {
   const data: string[][][] = o.tables.map(() => [])

@@ -37,6 +37,26 @@ describe("CSV formula injection (privacy: an export is opened in a spreadsheet)"
   })
 })
 
+describe("CSV guard: a formula lead hidden behind whitespace or a line break (T5.5 review M2)", () => {
+  it("a cell that starts with spaces, a newline, NBSP or a zero-width character and then = + - @ is neutralised and quoted in every sink's text rule", () => {
+    for (const lead of [" ", "  ", "\n", "\r\n", " \n ", "\u00a0", "\u200b", "\ufeff", "\u2028"]) {
+      for (const f of ["=", "+", "-", "@"]) {
+        const cell = `${lead}${f}1+1`
+        expect(exportText(cell), JSON.stringify(cell)).toBe(`'${cell}`)
+        expect(exportCsvCell(cell), JSON.stringify(cell)).toBe(`"'${cell.replace(/"/g, '""')}"`)
+      }
+    }
+    expect(exportCsvCell(" =1+1")).toBe(`"' =1+1"`)
+    expect(exportCsvCell("\n=1+1")).toBe(`"'\n=1+1"`)
+  })
+
+  it("ordinary text, dates, numbers and inner operators are unchanged", () => {
+    for (const ok of ["2026-10-25", "10:30", "Check fire exits", " leading space only", "a = b", "x+y", "12", "line one\nline two", "Dr -5 stock", "2026-10-25T07:00"]) expect(exportText(ok), ok).toBe(ok)
+    expect(exportCsvCell("2026-10-25")).toBe("2026-10-25")
+    expect(exportCsvCell("line one\nline two")).toBe('"line one\nline two"')
+  })
+})
+
 describe("file names hold no personal data", () => {
   it("range 'shift-reports-<from>-<to>-<scope>.<ext>', single 'shift-report-<8 hex of the report id>.<ext>'", () => {
     expect(exportFileName({ kind: "range", from: "2026-10-19", to: "2026-10-25", scope: "team" }, "csv")).toBe("shift-reports-2026-10-19-2026-10-25-team.csv")

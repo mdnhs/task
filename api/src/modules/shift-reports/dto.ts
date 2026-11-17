@@ -205,6 +205,6 @@ export const ExportBody = z
   .openapi({ example: { format: "xlsx", from: "2026-10-19", to: "2026-10-25", team: "5e1c0d52-8d3a-4b7e-9c41-2a5b7e90d3f8", status: "all" } })
 export const ExportCreated = z.object({ id: z.uuid() }).openapi({ example: { id: XID } })
 export const ExportOut = z
-  .object({ id: z.uuid(), status: z.enum(["queued", "running", "done", "failed"]), format: z.enum(EXPORT_FORMATS), rowCount: z.number().int().nullable(), expiresAt: z.string().nullable(), errorCode: z.string().nullable() })
+  .object({ id: z.uuid(), status: z.enum(["queued", "running", "done", "failed", "expired"]), format: z.enum(EXPORT_FORMATS), rowCount: z.number().int().nullable(), expiresAt: z.string().nullable(), errorCode: z.string().nullable() })
   .openapi({ example: { id: XID, status: "done", format: "xlsx", rowCount: 42, expiresAt: "2026-11-02T12:34:00.000Z", errorCode: null } })
 export type ExportDto = z.infer<typeof ExportOut>

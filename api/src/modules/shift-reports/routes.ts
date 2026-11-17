@@ -105,16 +105,16 @@ const downloadR = createRoute({
 const exportCreateR = createRoute({
   method: "post", path: "/v1/report-exports", middleware: guard("read"), request: { body: body(ExportBody) },
   responses: {
-    202: json(ExportCreated, "Queued: PDF, Excel or CSV of ONE report (`reportId`, in the caller's scope) or of a range (`from`/`to`, at most 92 days, default the last 7 days; `team`, `person`, `status` as in the inbox, rows equal the inbox rows), written to Files by a job and kept 7 days. A person only (never an API key). Every cap is checked first: 422 range_too_long | invalid_range | export_too_large (over 5000 reports or 50000 task rows) | pdf_too_large (over 500 reports) ; 404 report_not_found; 409 export_limit (3 active per requester); 403 human_required"),
+    202: json(ExportCreated, "Queued: PDF, Excel or CSV of ONE report (`reportId`, in the caller's scope) or of a range (`from`/`to`, at most 92 days, default the last 7 days; `team`, `person`, `status` as in the inbox, rows equal the inbox rows), written to Files by a job and kept 7 days. A person only: an API key gets 403 api_key_forbidden_route. Every cap is checked first: 422 range_too_long | invalid_range | export_too_large (over 5000 reports or 50000 task rows) | pdf_too_large (over 500 reports) ; 404 report_not_found; 409 export_limit (3 active per requester); 403 api_key_forbidden_route (an API key) | forbidden"),
   },
 })
 const exportGetR = createRoute({
   method: "get", path: "/v1/report-exports/{id}", middleware: guard("read"), request: { params: ExportIdParam },
-  responses: { 200: json(ExportOut, "The requester's export: queued | running | done | failed (`errorCode` when failed, `forbidden` when the requester's access was reduced before it ran), the report count and when the file expires. Anybody else, in the same tenant or another: 404 report_export_not_found") },
+  responses: { 200: json(ExportOut, "The requester's export: queued | running | done | failed | expired (done and the 7 days are over, derived; `errorCode` when failed, `forbidden` when the requester's access was reduced before it ran), the report count and when the file expires. Anybody else, in the same tenant or another: 404 report_export_not_found") },
 })
 const exportDownloadR = createRoute({
   method: "get", path: "/v1/report-exports/{id}/download", middleware: guard("read"), request: { params: ExportIdParam },
-  responses: { 302: { description: "Redirect to a 60 s presigned GET of the file. The requester only (404 report_export_not_found for anybody else, an API key or a support session is refused earlier); 409 export_not_ready; 404 once the 7 days are over" } },
+  responses: { 302: { description: "Redirect to a 60 s presigned GET of the file. The requester only, and only while their CURRENT report scope is at least as wide as the one the export was made with (404 report_export_not_found for anybody else or after a demotion; an API key gets 403 api_key_forbidden_route and a support session 403 support_forbidden_route); 409 export_not_ready; 404 once the 7 days are over" } },
 })
 
 export const shiftReportRoutes = newRouter()

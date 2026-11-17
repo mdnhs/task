@@ -18,7 +18,7 @@ import { registerNotifications } from "../notifications"
 import { registerSearchIndexers } from "../search"
 import { registerTasks } from "../tasks"
 import { registerWebhooks } from "../webhooks-out"
-import { makeSink } from "./export-build"
+import { makeSink, pdfText } from "./export-build"
 import { EXPORT_JOB, EXPORT_SWEEP_JOB, exportFileId } from "./exports"
 import { DAY, DRIVE, world, type Json, type Who, type W } from "./world"
 import { registerShiftReports } from "."
@@ -812,5 +812,85 @@ describe("DSR, isolation, database", () => {
       expect(src, f).not.toMatch(/new Date\(\)|Date\.now\(\)|\bnow\(\)\s*(,|\))?\s*`|sql`[^`]*\bnow\(\)/)
     }
     expect(readFileSync(join(__dirname, "../../worker.ts"), "utf8")).toContain("EXPORT_SWEEP_JOB")
+  })
+})
+
+describe("T5.5 review carry-ins", () => {
+  test("H3: the download re-checks the requester's CURRENT scope against filters.scope: an all-scope manager demoted to team scope gets 404 report_export_not_found for the earlier export (status stays readable); a same-or-wider scope still downloads", async () => {
+    const w = await world({ now: NOW })
+    await scenario(w)
+    const id = await requested(w, w.ops, { format: "csv", ...RANGE })
+    await runExport(w, id)
+    expect((await rowOf(w, id)).filters).toMatchObject({ scope: "all" })
+    expect((await w.req("GET", `/v1/report-exports/${id}/download`, w.ops)).status).toBe(302)
+    await w.q("update memberships set role_id = (select id from roles where tenant_id = $1 and key = 'manager') where tenant_id = $1 and user_id = $2", [w.tenant.id, w.ops.userId])
+    const dl = await w.req("GET", `/v1/report-exports/${id}/download`, w.ops)
+    expect([dl.status, await code(dl)]).toEqual([404, "report_export_not_found"])
+    expect((await w.req("GET", `/v1/report-exports/${id}`, w.ops)).status).toBe(200)
+    // widening is fine: a team-scope export of an own-scope... downloaded by a manager who is now all-scope
+    const mine = await requested(w, w.manager, { format: "csv", ...RANGE })
+    await runExport(w, mine)
+    expect((await rowOf(w, mine)).filters).toMatchObject({ scope: "team" })
+    await w.q("update memberships set role_id = (select id from roles where tenant_id = $1 and key = 'owner') where tenant_id = $1 and user_id = $2", [w.tenant.id, w.manager.userId])
+    expect((await w.req("GET", `/v1/report-exports/${mine}/download`, w.manager)).status).toBe(302)
+  })
+
+  test("M5: a team manager demoted to employee (own scope) is refused the team-scope export too", async () => {
+    const w = await world({ now: NOW })
+    await scenario(w)
+    const id = await requested(w, w.manager, { format: "csv", ...RANGE })
+    await runExport(w, id)
+    await w.q("update memberships set role_id = (select id from roles where tenant_id = $1 and key = 'employee') where tenant_id = $1 and user_id = $2", [w.tenant.id, w.manager.userId])
+    const dl = await w.req("GET", `/v1/report-exports/${id}/download`, w.manager)
+    expect(dl.status).toBe(404)
+  })
+
+  test("expired status: a done export past expiresAt reads status 'expired' (deps.clock), the download stays 404, and before the deadline it is still 'done'", async () => {
+    const w = await world({ now: NOW })
+    await scenario(w)
+    const id = await requested(w, w.ops, { format: "csv", ...RANGE })
+    await runExport(w, id)
+    expect((await w.json(await w.req("GET", `/v1/report-exports/${id}`, w.ops))).status).toBe("done")
+    w.clock.advance({ days: 7, minutes: -1 })
+    expect((await w.json(await w.req("GET", `/v1/report-exports/${id}`, w.ops))).status).toBe("done")
+    w.clock.advance({ minutes: 2 })
+    const st = await w.json(await w.req("GET", `/v1/report-exports/${id}`, w.ops))
+    expect(st).toMatchObject({ id, status: "expired", expiresAt: "2026-11-02T12:34:00.000Z" })
+    const dl = await w.req("GET", `/v1/report-exports/${id}/download`, w.ops)
+    expect([dl.status, await code(dl)]).toEqual([404, "report_export_not_found"])
+    // a failed one is never 'expired'
+    await w.q("update report_exports set status = 'failed', error_code = 'x' where id = $1", [id])
+    expect((await w.json(await w.req("GET", `/v1/report-exports/${id}`, w.ops))).status).toBe("failed")
+  })
+
+  test("OpenAPI: the export routes name api_key_forbidden_route (not human_required), and the status enum has 'expired'", async () => {
+    const w = await world({ now: NOW })
+    const doc = (await (await call(w.app, "GET", "/v1/openapi.json")).json()) as { paths: Record<string, Record<string, Json>> }
+    const create = JSON.stringify(doc.paths["/v1/report-exports"].post)
+    expect(create).toContain("api_key_forbidden_route")
+    expect(create).not.toContain("human_required")
+    const get = JSON.stringify(doc.paths["/v1/report-exports/{id}"].get)
+    expect(get).toContain("expired")
+  })
+
+  test("PDF smart punctuation: curly quotes, en and em dashes, ellipsis and NBSP become ASCII instead of '?'; real non-Latin-1 text still becomes '?'; a smart-punctuation formula lead is still neutralised", () => {
+    expect(pdfText("It\u2019s \u2018fine\u2019 \u201cquoted\u201d")).toBe("It's 'fine' \"quoted\"")
+    expect(pdfText("9\u201310 \u2014 done\u2026")).toBe("9-10 - done...")
+    expect(pdfText("a\u00a0b")).toBe("a b")
+    expect(pdfText("caf\u00e9 \u4e2d")).toBe("caf\u00e9 ?")
+    expect(pdfText("\u2013 1")).toBe("'- 1")
+    expect(pdfText("\u00a0=1+1")).toBe("' =1+1")
+    expect(pdfText(" =1+1")).toBe("' =1+1")
+  })
+
+  test("PDF smart punctuation end to end: a phone-typed summary reaches the PDF with ASCII quotes, no '?'", async () => {
+    const w = await world({ now: NOW })
+    await w.task(w.staff, { title: "Lock up" })
+    const rep = await w.opened(w.staff)
+    const filled = await w.filled(w.staff, rep, { summary: "Didn\u2019t finish \u2013 will \u201cretry\u201d\u2026", blockers: "" })
+    expect((await w.submit(w.staff, filled)).status).toBe(200)
+    const one = await exported(w, w.staff, { format: "pdf", reportId: rep.id })
+    const t = one.bytes.toString("latin1")
+    expect(t).toContain("Didn't finish - will \"retry\"...")
   })
 })

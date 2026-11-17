@@ -102,12 +102,16 @@ export function exportRange(now: Date, tz: string, q: { from?: string; to?: stri
 
 type Body = ReturnType<typeof ExportBody.parse>
 
-function dtoOf(r: Row): ExportDto {
-  return { id: r.id, status: r.status as ExportDto["status"], format: r.format as ExportFormat, rowCount: r.rowCount, expiresAt: r.expiresAt?.toISOString() ?? null, errorCode: r.errorCode }
+/** `expired` is derived, never stored: a finished export whose 7 days are over (deps.clock). The sweep deletes the file; the row stays as the record. */
+function dtoOf(r: Row, now: Date): ExportDto {
+  const expired = r.status === "done" && r.expiresAt !== null && r.expiresAt.getTime() <= now.getTime()
+  return { id: r.id, status: expired ? "expired" : (r.status as ExportDto["status"]), format: r.format as ExportFormat, rowCount: r.rowCount, expiresAt: r.expiresAt?.toISOString() ?? null, errorCode: r.errorCode }
 }
 
+// An export is a person's act. The key deny-list (EXPORT_OR_DOWNLOAD, 403 api_key_forbidden_route) answers first for every export route, so this is UNREACHABLE through the router; it stays as a
+// defence in depth against a route being mounted without the deny-list (the 403 would then be human_required).
 const humanOnly = (c: Context<AppEnv>) => {
-  if (c.get("apiKey")) throw Forbidden("human_required") // an export is a person's act (the deny-lists answer first for a key; this is the backstop)
+  if (c.get("apiKey")) throw Forbidden("human_required")
 }
 
 /** POST /v1/report-exports. Every limit is checked here, before the row exists and before any job. */
@@ -178,7 +182,7 @@ async function mineOr404(c: Context<AppEnv>, tx: TenantTx, id: string): Promise<
 
 export async function exportStatus(c: Context<AppEnv>, id: string): Promise<ExportDto> {
   humanOnly(c)
-  return withTenant(c.get("deps").db, c.get("tenant")!.id, async (tx) => dtoOf(await mineOr404(c, tx, id)))
+  return withTenant(c.get("deps").db, c.get("tenant")!.id, async (tx) => dtoOf(await mineOr404(c, tx, id), c.get("deps").clock.now()))
 }
 
 /** The 60 s presigned URL: 409 export_not_ready until it is done, 404 after the 7 days (or when the file is gone). */
@@ -187,7 +191,13 @@ export async function exportDownload(c: Context<AppEnv>, id: string): Promise<st
   const deps = c.get("deps")
   const tenantId = c.get("tenant")!.id
   const now = deps.clock.now()
-  const row = await withTenant(deps.db, tenantId, (tx) => mineOr404(c, tx, id))
+  const row = await withTenant(deps.db, tenantId, async (tx) => {
+    const mine = await mineOr404(c, tx, id)
+    // H3: the file holds what the requester could see WHEN IT WAS MADE. Their scope now must not be narrower than that, else the file is out of reach (a demoted manager, a lost reports role).
+    const access = await peopleAccess(tx, tenantId, c.get("role")!, actorIdOf(c))
+    if (!access || RANK[access.kind] < RANK[asFilters(mine).scope]) throw ExportNotFound()
+    return mine
+  })
   if (row.status !== "done") throw Conflict("export_not_ready")
   if (!row.fileId || !row.expiresAt || row.expiresAt.getTime() <= now.getTime()) throw ExportNotFound()
   try {

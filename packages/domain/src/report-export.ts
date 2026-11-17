@@ -1,5 +1,5 @@
 // FR-M1-31: pure row building and text rules for the shift-report exports (PDF, Excel, CSV). No I/O and no library code here: the API's `export-build.ts` turns these tables into files.
-// One cell rule for every format (`exportText`): a text that starts with = + - @ tab or CR gets a leading quote, so no spreadsheet reads it as a formula, and control characters are dropped.
+// One cell rule for every format (`exportText`): a text that starts with = + - @ tab or CR (also after leading white space or line breaks) gets a leading quote, so no spreadsheet reads it as a formula, and control characters are dropped.
 import { csvEscape } from "./csv"
 import { ITEM_STATUS, REPORT_STATE, minutesText, windowLabel, type ItemStatus, type ReportState } from "./shift-report"
 
@@ -39,7 +39,8 @@ export const CSV_BOM = "﻿"
 
 // Control characters that break XML (the XLSX parts) or a terminal; tab, line feed and carriage return stay.
 const CONTROL = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g
-const FORMULA_LEAD = /^[=+\-@\t\r]/
+// A formula lead is = + - @ at the start, or after any run of white space, line breaks, NBSP, zero-width characters or a byte order mark (a spreadsheet skips those); a tab or CR at the start is neutralised on its own.
+const FORMULA_LEAD = /^(?:[\t\r]|[\s\u00a0\u200b-\u200d\u2060\ufeff]*[=+\-@])/
 
 /** The one text rule of every format: control characters dropped, then a leading quote on anything a spreadsheet would read as a formula. Markup is never interpreted (CSV, string cells and drawn PDF text). */
 export const exportText = (v: string): string => {
