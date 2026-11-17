@@ -1,6 +1,6 @@
 import pino from "pino"
 import { beforeEach, describe, expect, test } from "vitest"
-import { call, fakeMailer, resetDb, testApp, testEnv } from "../../../test/harness"
+import { call, resetDb, testApp, testEnv } from "../../../test/harness"
 import { ownerQuery } from "../../../test/db"
 import { makeUser, signIn, signUp } from "../../../test/factories"
 import { buildAuth } from "./auth"

@@ -300,3 +300,21 @@ test("features.drive follows the device policy per request: false on an unregist
   expect(off.features).toEqual({ drive: false })
   expect(off.device.trusted).toBe(false)
 })
+
+test("T6.3: /v1/me/tenant carries the caller's own role (label, home, access) so a plain member does not need settings:read to learn what it may do", async () => {
+  const t = testApp()
+  const a = await makeTenant(t.deps, { slug: "role-ctx" })
+  const owner = await makeMember(t.deps, a.id, "owner")
+  const staff = await makeMember(t.deps, a.id, "employee")
+  const mine = async (m: { email: string; password: string }) => {
+    const { cookie } = await signIn(t.app, m.email, m.password)
+    return (await (await call(t.app, "GET", "/v1/me/tenant", { cookie, tenant: "role-ctx" })).json()) as Json
+  }
+  const o = await mine(owner)
+  expect(o.member.role).toMatchObject({ label: expect.any(String), home: "manager", access: { settings: "write", tasks: "write" } })
+  const s = await mine(staff)
+  expect(s.member).toMatchObject({ roleKey: "employee", role: { home: "staff", access: { settings: "none" } } })
+  expect(Object.keys(s.member.role).sort()).toEqual(["access", "description", "home", "label"])
+  // the matrix is the caller's own: staff never see another role's rows
+  expect(JSON.stringify(s)).not.toContain('"settings":"write"')
+})

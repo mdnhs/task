@@ -282,6 +282,16 @@ export interface paths {
                                 userId: string;
                                 roleId: string;
                                 roleKey: string;
+                                role: {
+                                    label: string;
+                                    description: string;
+                                    /** @enum {string} */
+                                    home: "manager" | "staff";
+                                    /** @description The caller's OWN role, module -> none|read|write (staff cannot read GET /v1/roles, so the shell gets it here) */
+                                    access: {
+                                        [key: string]: "none" | "read" | "write";
+                                    };
+                                };
                             };
                             brand: {
                                 primaryColor: string | null;

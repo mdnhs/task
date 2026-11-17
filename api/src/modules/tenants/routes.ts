@@ -4,6 +4,7 @@ import { requireSession } from "../../core/middleware/session"
 import { requireTenant } from "../../core/middleware/tenant"
 import { UNREGISTERED_ID } from "@opsdesk/domain/devices"
 import { driveAllowed } from "../../core/middleware/device"
+import { loadRole } from "../../core/middleware/permission"
 import { withTenant } from "../../db/tenant-tx"
 import { getBranding, getOrganisation } from "../settings"
 import { listUserTenants, loadMe, tenantDisplayName } from "./me"
@@ -62,7 +63,13 @@ export const MeTenantDto = z
     tenant: z.object({
       id: z.string(), slug: z.string(), name: z.string(), timezone: z.string(), currency: z.string(), locale: z.string(), sessionIdleHours: z.number().int(), mfaPolicy: MfaPolicyDto,
     }),
-    member: z.object({ userId: z.string(), roleId: z.string(), roleKey: z.string() }),
+    member: z.object({
+      userId: z.string(), roleId: z.string(), roleKey: z.string(),
+      role: z.object({
+        label: z.string(), description: z.string(), home: z.enum(["manager", "staff"]),
+        access: z.record(z.string(), z.enum(["none", "read", "write"])).openapi({ description: "The caller's OWN role, module -> none|read|write (staff cannot read GET /v1/roles, so the shell gets it here)" }),
+      }),
+    }),
     brand: z.object({ primaryColor: z.string().nullable() }),
     reportDeadline: z.string().openapi({ description: "HH:mm, tenant-local" }),
     reportDueAfterMinutes: z.number().int(),
@@ -72,7 +79,7 @@ export const MeTenantDto = z
   .openapi({
     example: {
       tenant: { id: "0b6f4c1e-8f0e-4c53-9a3e-6a4c1b2d7e90", slug: "coppers", name: "Coppers", timezone: "Europe/Dublin", currency: "EUR", locale: "en-IE", sessionIdleHours: 12, mfaPolicy: { mode: "off", roles: [] } },
-      member: { userId: "usr_8Kq2mZ4tW1", roleId: "5e1c0d52-8d3a-4b7e-9c41-2a5b7e90d3f8", roleKey: "owner" },
+      member: { userId: "usr_8Kq2mZ4tW1", roleId: "5e1c0d52-8d3a-4b7e-9c41-2a5b7e90d3f8", roleKey: "owner", role: { label: "Tenant Owner", description: "Full control of the company workspace", home: "manager", access: { dashboard: "write", tasks: "write", settings: "write" } } },
       brand: { primaryColor: "#0A1B2C" }, reportDeadline: "17:30", reportDueAfterMinutes: 60,
       device: { id: null, type: "browser", label: "Unregistered browser", trusted: false }, features: { drive: false },
     },
@@ -106,15 +113,16 @@ export const tenantRoutes = newRouter()
   .openapi(meTenantRoute, async (c) => {
     const { tenant, member } = { tenant: c.get("tenant")!, member: c.get("member")! }
     const deps = c.get("deps")
-    const [name, { org, brand }] = await Promise.all([
+    const [name, role, { org, brand }] = await Promise.all([
       tenantDisplayName(deps.db, tenant.id),
+      loadRole(c),
       withTenant(deps.db, tenant.id, async (tx) => ({ org: await getOrganisation(tx, tenant.id), brand: await getBranding(tx, tenant.id) })),
     ])
     const d = c.get("device") // unset on the support-grant and API-key paths: the unregistered browser
     return c.json(
       {
         tenant: { ...tenant, name },
-        member,
+        member: { ...member, role: { label: role.label, description: role.description, home: role.home, access: role.access } },
         brand: { primaryColor: brand.primaryColor },
         reportDeadline: org.reportDeadline,
         reportDueAfterMinutes: org.reportDueAfterMinutes,
