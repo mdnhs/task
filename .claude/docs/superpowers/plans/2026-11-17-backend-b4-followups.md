@@ -83,3 +83,6 @@ Fix-wave decisions (rulings E12 and E13 of the ledger cover two of them): `40P01
 
 - DST fold: a wall time inside the repeated hour (25 Oct 2026, 01:30 in Europe/Dublin) maps to the FIRST instant when it round-trips. B6 should send the ISO instant for unchanged dates.
 - DSR erase leaves pseudonymous ids (not names): `evidence_rule.reviewer`, `proposal.by`, the assignee ids inside `task_history.changes`, and `voice_meta.recordedBy`.
+
+## Parked after the final re-review (Ruling E15)
+- `modules/tasks/views.ts:53`: board and calendar cards still return `parentId` for an out-of-scope parent (uuid only; no ref or title). Null it when the parent is outside the caller's scope, as the task DTO now does.
