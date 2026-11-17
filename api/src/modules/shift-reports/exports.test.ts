@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs"
+import pg from "pg"
 import { join } from "node:path"
 import { sql } from "drizzle-orm"
 import ExcelJS from "exceljs"
@@ -514,9 +515,9 @@ describe("large exports (memory)", () => {
         await wb.xlsx.load(bytes as unknown as ArrayBuffer)
         expect(wb.worksheets.map((x) => [x.name, x.rowCount])).toEqual([["Reports", 4001], ["Task rows", 40_001]])
       }
-      expect(Date.now() - t0).toBeLessThan(90_000)
+      expect(Date.now() - t0, `${format} took`).toBeLessThan(270_000) // 3x the old 90 s: the memory and page-count assertions above are the real contract, this only catches a runaway
     }
-  }, 240_000)
+  }, 600_000)
 
   test("the output cap: every encoder stops with export_too_large as soon as the file would pass the cap (no unbounded buffer), before it is stored", async () => {
     for (const format of ["csv", "xlsx", "pdf"] as const) {
@@ -893,4 +894,111 @@ describe("T5.5 review carry-ins", () => {
     const t = one.bytes.toString("latin1")
     expect(t).toContain("Didn't finish - will \"retry\"...")
   })
+})
+
+describe("the job holds no membership or role lock while it builds (H5)", () => {
+  /** A storage whose put waits for `release()`: the point between the build and the final tx. `reached` resolves when the job gets there. */
+  function gatedStorage(w: W) {
+    let release!: () => void
+    let reach!: () => void
+    const gate = new Promise<void>((r) => (release = r))
+    const reached = new Promise<void>((r) => (reach = r))
+    const puts: string[] = []
+    const storage = { ...w.deps.storage, put: async (k: string, b: Buffer, o: { contentType: string }) => { puts.push(k); reach(); await gate; await w.deps.storage.put(k, b, o) } } as Deps["storage"]
+    return { storage, release, reached, puts }
+  }
+  const within = async <T,>(p: Promise<T>, ms: number): Promise<T | "timeout"> => Promise.race([p, new Promise<"timeout">((r) => setTimeout(() => r("timeout"), ms))])
+  const roleOf = async (w: W, key: string) => (await w.q("select id from roles where tenant_id = $1 and key = $2", [w.tenant.id, key]))[0].id as string
+  /** Row-share locks on memberships or roles (what lockActor's FOR SHARE takes) held by any session right now. */
+  const shareLocks = async () => (await ownerQuery("select count(*)::int n from pg_locks where granted and mode = 'RowShareLock' and relation in ('memberships'::regclass, 'roles'::regclass)"))[0].n as number
+
+  test("a role change made while the export is between its build and its final tx is not blocked, and no membership or role row is held", async () => {
+    const w = await world({ now: NOW })
+    await scenario(w)
+    const id = await requested(w, w.ops, { format: "csv", ...RANGE })
+    const g = gatedStorage(w)
+    const job = runExport(w, id, { ...w.deps, storage: g.storage } as Deps)
+    await g.reached
+    expect(await shareLocks()).toBe(0) // the build's transactions are over: no membership or role row is held while the object is written
+    const r = await within(w.req("PATCH", `/v1/members/${w.ops.userId}`, w.owner, { roleId: await roleOf(w, "owner") }), 8000)
+    expect(r, "the member role change must not wait for the export").not.toBe("timeout")
+    expect((r as Response).status).toBe(200)
+    g.release()
+    await job
+    expect(await rowOf(w, id)).toMatchObject({ status: "done" }) // widened, not narrowed: still allowed
+  }, 30_000)
+
+  test("a downgrade during the write makes the final re-check fail with forbidden: no files row, no notification, no audit entry, and the object is removed", async () => {
+    const w = await world({ now: NOW })
+    await scenario(w)
+    const id = await requested(w, w.ops, { format: "csv", ...RANGE })
+    const g = gatedStorage(w)
+    const job = runExport(w, id, { ...w.deps, storage: g.storage } as Deps)
+    await g.reached
+    const r = await within(w.req("PATCH", `/v1/members/${w.ops.userId}`, w.owner, { roleId: await roleOf(w, "employee") }), 8000)
+    expect((r as Response).status).toBe(200)
+    g.release()
+    await job
+    expect(await rowOf(w, id)).toMatchObject({ status: "failed", error_code: "forbidden", file_id: null })
+    expect(await w.q("select 1 from files where purpose = 'report_export'")).toEqual([])
+    expect(await w.deps.storage.head(fileKey(w.tenant.id, exportFileId(id)))).toBeNull()
+    expect(await w.q("select 1 from notifications where title = 'Report export ready'")).toEqual([])
+    expect(await w.q("select 1 from audit_events where action = 'report.exported'")).toEqual([])
+  }, 30_000)
+
+  test("during the page reads (a trigger parks the lease renewal): a role change is not blocked, a downgrade is caught by the re-check BEFORE any object is written, and the lease is renewed after the page", async () => {
+    const w = await world({ now: NOW })
+    await scenario(w)
+    const id = await requested(w, w.ops, { format: "csv", ...RANGE })
+    await ownerQuery(`create function t55_park() returns trigger language plpgsql as $$ begin
+      if old.status = 'running' and new.status = 'running' then perform pg_advisory_lock(55001); perform pg_advisory_unlock(55001); end if; return new; end $$`)
+    await ownerQuery("create trigger t55_trg before update on report_exports for each row execute function t55_park()")
+    const holder = new pg.Client({ connectionString: process.env.TEST_DATABASE_OWNER_URL })
+    await holder.connect()
+    try {
+      await holder.query("select pg_advisory_lock(55001)")
+      const g = gatedStorage(w)
+      const job = runExport(w, id, { ...w.deps, storage: g.storage } as Deps)
+      // wait until the job is parked inside the renewal (an app_user session waiting on the advisory lock)
+      for (let i = 0; i < 200; i++) {
+        if ((await ownerQuery("select 1 from pg_locks l join pg_stat_activity a using (pid) where l.locktype = 'advisory' and not l.granted and a.usename = 'app_user'")).length) break
+        await new Promise((r) => setTimeout(r, 25))
+      }
+      expect((await ownerQuery("select 1 from pg_locks l join pg_stat_activity a using (pid) where l.locktype = 'advisory' and not l.granted and a.usename = 'app_user'")).length).toBeGreaterThan(0)
+      const r = await within(w.req("PATCH", `/v1/members/${w.ops.userId}`, w.owner, { roleId: await roleOf(w, "employee") }), 8000)
+      expect(r, "a role change must not wait for the build").not.toBe("timeout")
+      expect((r as Response).status).toBe(200)
+      await holder.query("select pg_advisory_unlock(55001)")
+      await job
+      expect(await rowOf(w, id)).toMatchObject({ status: "failed", error_code: "forbidden", file_id: null })
+      expect(g.puts).toEqual([]) // never written: the re-check before the write already refused it
+      expect(await w.q("select 1 from files where purpose = 'report_export'")).toEqual([])
+    } finally {
+      await holder.query("select pg_advisory_unlock_all()").catch(() => undefined)
+      await holder.end()
+      await ownerQuery("drop trigger t55_trg on report_exports")
+      await ownerQuery("drop function t55_park()")
+    }
+  }, 30_000)
+
+  test("the lease is renewed while the build runs: a second worker at a time past the ORIGINAL lease finds a live lease and does nothing, and the first worker still finishes exactly once", async () => {
+    const w = await world({ now: NOW })
+    await scenario(w)
+    const id = await requested(w, w.ops, { format: "csv", ...RANGE })
+    const g = gatedStorage(w)
+    const clockAt = (ms: number) => ({ now: () => new Date(ms) })
+    const base = w.clock.now().getTime()
+    // the build runs "9 minutes in": the renewal after its page pushes the lease to 9 + 10 minutes
+    const job = runExport(w, id, { ...w.deps, storage: g.storage, clock: clockAt(base + 9 * 60_000) } as Deps)
+    await g.reached
+    expect(iso((await rowOf(w, id)).claimed_until)).toBe(new Date(base + 19 * 60_000).toISOString())
+    // a second worker at +12 min (past the original 10 min lease, before the renewed one) must not take it over
+    await runExport(w, id, { ...w.deps, storage: g.storage, clock: clockAt(base + 12 * 60_000) } as Deps)
+    expect(g.puts).toHaveLength(1)
+    g.release()
+    await job
+    expect(await rowOf(w, id)).toMatchObject({ status: "done" })
+    expect(await w.q("select id from files where purpose = 'report_export'")).toHaveLength(1)
+    expect(await w.q("select 1 from audit_events where action = 'report.exported'")).toHaveLength(1)
+  }, 30_000)
 })

@@ -422,11 +422,17 @@ export async function applyTaskUpdate(tx: TenantTx, ctx: TaskCtx, u: TaskUpdate,
   }
   let status = row.status as TaskStatus
   let lead = "Reported"
+  let historyId = u.id // the id the history line is filed under
   if (isOpen({ status })) {
     if (u.itemStatus === "done") {
       const settled = await settleCompletion(tx, ctx, row, { strict: false }) // a report never fails on a pending scan: that is just "evidence still needed"
-      if (settled.target === "blocked") lead = "Report marked done; evidence still needed"
-      else {
+      if (settled.target === "blocked") {
+        lead = "Report marked done; evidence still needed"
+        // H6: "evidence still needed" does NOT consume `u.id` (a later "done" after the upload must still complete the task): its line has its own id, and a repeat of it adds nothing
+        historyId = `${u.id}#evidence`
+        const [seen] = await tx.select({ id: taskHistory.id }).from(taskHistory).where(and(eq(taskHistory.tenantId, ctx.tenantId), eq(taskHistory.taskId, row.id), eq(taskHistory.updateId, historyId)))
+        if (seen) return "applied"
+      } else {
         status = settled.target
         await applyCompletion(tx, ctx, row, settled)
       }
@@ -443,10 +449,10 @@ export async function applyTaskUpdate(tx: TenantTx, ctx: TaskCtx, u: TaskUpdate,
       .where(and(eq(tasks.id, row.id), eq(tasks.tenantId, ctx.tenantId)))
   }
   if (u.minutes > 0) {
-    await tx.insert(taskTimeEntries).values({ tenantId: ctx.tenantId, taskId: row.id, userId: ctx.me, minutes: u.minutes, note: u.note, source: u.source, updateId: u.id, at }).onConflictDoNothing()
+    await tx.insert(taskTimeEntries).values({ tenantId: ctx.tenantId, taskId: row.id, userId: ctx.me, minutes: u.minutes, note: u.note || `Time logged from the ${u.source}`, source: u.source, updateId: u.id, at }).onConflictDoNothing()
   }
   await writeHistory(tx, ctx, row.id, {
-    kind: "report", text: [lead, time].filter(Boolean).join(", ") + ` ${from}`, changes: moved ? [{ field: "status", from: row.status, to: status }] : [], notified: [], updateId: u.id,
+    kind: "report", text: [lead, time].filter(Boolean).join(", ") + ` ${from}`, changes: moved ? [{ field: "status", from: row.status, to: status }] : [], notified: [], updateId: historyId,
   })
   if (moved) {
     const event = status === "completed" ? ({ type: "task.completed", payload: { taskId: row.id } } as const)

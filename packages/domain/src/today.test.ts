@@ -127,6 +127,10 @@ describe("player actions through the tasks hand-off (FR-M1-74)", () => {
     expect(done).toEqual({ id: "today:2026-10-20:TSK-1:done", tenantId: "t1", ref: "TSK-1", itemStatus: "done", minutes: 0, note: "", at: "2026-10-20T09:00", by: "Daniel Okafor", source: TODAY_SOURCE })
     expect(todayUpdate("snooze", "TSK-1", "t1", "2026-10-20", "D", NOW)).toMatchObject({ id: "today:2026-10-20:TSK-1:snooze", snooze: true })
   })
+  it("the server adds the actor to the id, so two assignees' updates on one task stay apart (H6)", () => {
+    expect(todayUpdate("snooze", "TSK-1", "t1", "2026-10-20", "u1", NOW, "u1").id).toBe("today:2026-10-20:TSK-1:snooze:u1")
+    expect(todayUpdate("snooze", "TSK-1", "t1", "2026-10-20", "u2", NOW, "u2").id).not.toBe(todayUpdate("snooze", "TSK-1", "t1", "2026-10-20", "u1", NOW, "u1").id)
+  })
   it("reads back what was handled on this working day only", () => {
     const ups = [
       todayUpdate("done", "A", "t1", "2026-10-20", "D", NOW),

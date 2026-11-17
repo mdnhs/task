@@ -13,7 +13,7 @@ import { withTenant, type TenantTx } from "../../db/tenant-tx"
 import type { Deps } from "../../deps"
 import { recordAudit } from "../audit"
 import { tenantEntitlements } from "../entitlements/service"
-import { expireFile, reportExportDownloadUrl, storeGeneratedFile } from "../files"
+import { expireFile, insertGeneratedFileRow, putGeneratedObject, reportExportDownloadUrl } from "../files"
 import { notify, withTenantAfterCommit } from "../notifications"
 import { lockActor } from "../rbac"
 import { directReports, peopleAccess } from "../teams"
@@ -30,7 +30,7 @@ import { getReport, loadReportCtx, ReportNotFound, reportScopeWhere, type Report
 //   GET  /v1/report-exports/{id}      the requester's status; anybody else (an owner, an all-scope manager, support) is 404 report_export_not_found.
 //   GET  /v1/report-exports/{id}/download   the requester only: 302 to a 60 s presigned GET of the stored file (409 export_not_ready, 404 once the 7 days are over).
 //
-// The job `report.export` { exportId, tenantId } re-resolves the requester NOW (membership, role, scope: a downgrade fails the export with `forbidden` and no file is written), reads the reports in
+// The job `report.export` { exportId, tenantId } (three phases, H5: claim and check, a lock-free build, the storage write and a final short tx) re-resolves the requester NOW (membership, role, scope: a downgrade fails the export with `forbidden` and no file is written), reads the reports in
 // pages of 200 under THAT scope (the inbox's own query, so the rows equal the inbox rows), builds the file, writes it to Files (purpose `report_export`, hidden from /v1/files, search and webhooks,
 // F16) with a deterministic id (a re-run overwrites the same key: no orphans), and in ONE tx marks the export done, notifies the requester (no names), audits `report.exported` (format, count, range) and
 // publishes `report.export_completed`. Exactly once: the claim (queued, or running past its lease) is a row lock; the final tx only acts on a `running` row; the file row is ON CONFLICT DO NOTHING.
@@ -247,16 +247,31 @@ const asFilters = (r: Row): { from: string; to: string; team?: string; person?: 
   }
 }
 
-/** Job `report.export` { exportId, tenantId }: see the header. Never throws for an export problem (it is recorded as `failed`); bad job data throws. */
+/**
+ * Job `report.export` { exportId, tenantId }: see the header. Never throws for an export problem (it is recorded as `failed`); bad job data throws.
+ * Three phases (H5), so that a long build never holds a membership or role row or a connection:
+ *   1. claim (a short tx), then a short tx that re-resolves the requester (lockActor FOR SHARE for the length of that tx only);
+ *   2. the build: one short read-only tx per page and the encoder in memory, NO lockActor, no row lock on memberships or roles; the lease is renewed after every page;
+ *   3. the storage write (outside any tx, after a second lock-free re-check so a downgraded requester's data is never written), then a final short tx: lockActor, the scope re-check, the export
+ *      row FOR UPDATE, the files row, the notification, the audit entry, the event last.
+ * Crash points: after the claim (row `running`, lease lapses, the sweep re-runs it); during the build (nothing written, same); after the storage write and before the final commit (an object with no
+ * files row: the deterministic key means the re-run overwrites it, and a failure removes it with dropUncommittedObject); the final commit is atomic (files row, `done`, notification, audit).
+ */
 export async function runExportJob(data: unknown, deps: Deps): Promise<void> {
   const job = parseJob(data)
   if (!(await tenantMayRun(deps, job.tenantId))) return
   if (!(await claim(deps, job))) return
   try {
+    const requested = await withTenant(deps.db, job.tenantId, (tx) => lockRequester(tx, job.tenantId, job.exportId)) // phase 1: locks end with this tx
+    if (!requested) return // finished or taken over meanwhile
+    const built = await build(deps, job, requested.row, requested.ctx) // phase 2: no locks
+    if (!(await withTenant(deps.db, job.tenantId, (tx) => lockRequester(tx, job.tenantId, job.exportId)))) return // a short re-check BEFORE the write: a downgraded requester's data never reaches storage
+    const fileId = exportFileId(job.exportId)
+    const stored = await putGeneratedObject(deps, { tenantId: job.tenantId, id: fileId, mime: EXPORT_MIME[built.format], body: built.body }) // outside any tx
     await withTenantAfterCommit(deps, job.tenantId, async (tx, enqueue) => {
-      const requested = await lockRequester(tx, job.tenantId, job.exportId) // lockActor first (the requester's role, FOR SHARE), then the export row FOR UPDATE
-      if (!requested) return // finished or taken over meanwhile
-      await finish(deps, tx, enqueue, requested.row, requested.ctx)
+      const again = await lockRequester(tx, job.tenantId, job.exportId) // phase 3: lockActor, scope re-check, export row FOR UPDATE
+      if (!again) return
+      await complete(deps, tx, enqueue, again.row, again.ctx, built, fileId, stored)
     })
   } catch (err) {
     await dropUncommittedObject(deps, job)
@@ -272,6 +287,7 @@ export async function runExportJob(data: unknown, deps: Deps): Promise<void> {
 /**
  * The requester as they are NOW: membership, role and report scope re-resolved inside the tx (lockActor: 403 forbidden when they are gone, suspended or lost reports:read). A scope NARROWER
  * than the one the export was requested with is `forbidden` too: the file would have held rows the requester can no longer see. Returns null when the export is no longer `running`.
+ * Only ever called in a SHORT tx (never around the build): lockActor holds the membership and role rows FOR SHARE until that tx ends.
  */
 async function lockRequester(tx: TenantTx, tenantId: string, exportId: string): Promise<{ row: Row; ctx: ReportCtx } | null> {
   const [peek] = await tx.select({ requestedBy: reportExports.requestedBy }).from(reportExports).where(and(eq(reportExports.id, exportId), eq(reportExports.tenantId, tenantId)))
@@ -287,12 +303,22 @@ async function lockRequester(tx: TenantTx, tenantId: string, exportId: string): 
   return { row, ctx: { tenantId, tz: t.tz, me: row.requestedBy, actorId: row.requestedBy, role, access, reports, task: null, drive: false, now: new Date(0) } }
 }
 
-async function finish(deps: Deps, tx: TenantTx, enqueue: (name: string, data: unknown, o?: { delayMs?: number; key?: string }) => void, row: Row, base: ReportCtx): Promise<void> {
+/** Keeps a claimed export's lease alive while a long build runs (the sweep must not hand it to a second worker): one tiny tx on the export row only. */
+async function renewLease(deps: Deps, job: { exportId: string; tenantId: string }): Promise<void> {
+  const until = new Date(deps.clock.now().getTime() + LEASE_MS)
+  await withTenant(deps.db, job.tenantId, (tx) => tx.update(reportExports).set({ claimedUntil: until }).where(and(eq(reportExports.id, job.exportId), eq(reportExports.tenantId, job.tenantId), eq(reportExports.status, "running"))))
+}
+
+type Built = { body: Buffer; stats: BuildStats; name: ExportName; kind: "single" | "range"; format: ExportFormat }
+
+/** Phase 2: reads in short per-page txs under the requester's scope (resolved in phase 1) and encodes in memory. Writes nothing and holds no lock. */
+async function build(deps: Deps, job: { exportId: string; tenantId: string }, row: Row, base: ReportCtx): Promise<Built> {
   const now = deps.clock.now()
   const ctx: ReportCtx = { ...base, now }
+  const read = <T>(fn: (tx: TenantTx) => Promise<T>) => withTenant(deps.db, job.tenantId, fn)
   const format = row.format as ExportFormat
   const f = asFilters(row)
-  const [tn] = await tx.select({ name: tenants.name }).from(tenants).where(eq(tenants.id, ctx.tenantId))
+  const [tn] = await read((tx) => tx.select({ name: tenants.name }).from(tenants).where(eq(tenants.id, ctx.tenantId)))
   const meta = { tenantName: tn.name, title: row.reportId ? "Shift report" : "Shift reports", generatedAt: epochToWall(now.getTime(), ctx.tz).replace("T", " "), tz: ctx.tz, at: now }
   let body: Buffer
   let stats: BuildStats
@@ -301,14 +327,16 @@ async function finish(deps: Deps, tx: TenantTx, enqueue: (name: string, data: un
   if (row.reportId) {
     kind = "single"
     name = { kind: "single", reportId: row.reportId }
-    let report
-    try {
-      report = await loadSingle(tx, ctx, row.reportId)
-    } catch (e) {
-      if (!(e instanceof AppError) || e.code !== ReportNotFound().code) throw e
-      const [exists] = await tx.select({ id: shiftReports.id }).from(shiftReports).where(and(eq(shiftReports.id, row.reportId), eq(shiftReports.tenantId, ctx.tenantId)))
-      throw exists ? Forbidden("forbidden") : e // it exists but is out of the requester's scope now: forbidden; gone: report_not_found
-    }
+    const reportId = row.reportId
+    const report = await read(async (tx) => {
+      try {
+        return await loadSingle(tx, ctx, reportId)
+      } catch (e) {
+        if (!(e instanceof AppError) || e.code !== ReportNotFound().code) throw e
+        const [exists] = await tx.select({ id: shiftReports.id }).from(shiftReports).where(and(eq(shiftReports.id, reportId), eq(shiftReports.tenantId, ctx.tenantId)))
+        throw exists ? Forbidden("forbidden") : e // it exists but is out of the requester's scope now: forbidden; gone: report_not_found
+      }
+    })
     const tables = [{ title: "Details", head: ["Field", "Value"], rows: reportMeta(report).map(([k, v]) => [k, v]) }, ...singleTables(report)]
     const sink = makeSink(format, { tables: tables.map((t) => ({ title: t.title!, head: t.head })), meta })
     for (const [i, t] of tables.entries()) await sink.add(i, t.rows)
@@ -318,17 +346,25 @@ async function finish(deps: Deps, tx: TenantTx, enqueue: (name: string, data: un
     kind = "range"
     name = { kind: "range", from: f.from, to: f.to, scope: ctx.access.kind }
     const sink = makeSink(format, { tables: rangeTables(), meta })
-    stats = await pageThroughRange(tx, ctx, { from: f.from, to: f.to, team: f.team, person: f.person, status: f.status }, format, async (reports) => {
+    stats = await pageThroughRange(read, ctx, { from: f.from, to: f.to, team: f.team, person: f.person, status: f.status }, format, async (reports) => {
       const r = rangeRows(reports)
       await sink.add(0, r.reports)
       await sink.add(1, r.items)
+      await renewLease(deps, job) // a long build may outlast the 10 min lease: renew it after every page
     })
     body = await sink.finish(`${f.from === f.to ? f.from : `${f.from} to ${f.to}`} · ${stats.reports} ${stats.reports === 1 ? "report" : "reports"}`)
   }
   deps.logger.info({ exportId: row.id, format, pages: stats.pages, reports: stats.reports, rows: stats.rows, maxPage: stats.maxPage, bytes: body.length }, "report export built")
+  return { body, stats, name, kind, format }
+}
 
-  const fileId = exportFileId(row.id)
-  await storeGeneratedFile(deps, tx, { tenantId: ctx.tenantId, id: fileId, ownerUserId: row.requestedBy, name: exportFileName(name, format), mime: EXPORT_MIME[format], body, purpose: "report_export" })
+/** Phase 3 (inside the final tx, after lockActor and the export row lock): the files row for the object already written, `done`, the notification, the audit entry, then the event. */
+async function complete(
+  deps: Deps, tx: TenantTx, enqueue: (name: string, data: unknown, o?: { delayMs?: number; key?: string }) => void, row: Row, ctx: ReportCtx, built: Built, fileId: string, stored: { etag: string },
+): Promise<void> {
+  const { body, stats, name, kind, format } = built
+  const f = asFilters(row)
+  await insertGeneratedFileRow(deps, tx, { tenantId: ctx.tenantId, id: fileId, ownerUserId: row.requestedBy, name: exportFileName(name, format), mime: EXPORT_MIME[format], body, purpose: "report_export" }, stored)
   const done = deps.clock.now()
   await tx
     .update(reportExports)

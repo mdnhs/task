@@ -213,18 +213,22 @@ function toExportReport(base: { date: string; shiftName: string; team: string; p
  * page is read. `ctx` is the requester's scope as it is NOW (the caller re-resolved it) with `drive: false`. Stops with 422 export_too_large / pdf_too_large if the data grew past a cap since the request.
  */
 export async function pageThroughRange(
-  tx: TenantTx, ctx: ReportCtx, f: Omit<InboxFilter, "after">, format: ExportFormat, onPage: (reports: ExportReport[]) => Promise<void>,
+  read: <T>(fn: (tx: TenantTx) => Promise<T>) => Promise<T>, ctx: ReportCtx, f: Omit<InboxFilter, "after">, format: ExportFormat, onPage: (reports: ExportReport[]) => Promise<void>,
 ): Promise<BuildStats> {
   const stats: BuildStats = { pages: 0, reports: 0, rows: 0, maxPage: 0 }
   let after: InboxFilter["after"]
   for (;;) {
-    const page = await inboxPage(tx, ctx, { ...f, after }, EXPORT_LIMITS.page)
-    const ids = page.items.flatMap((i) => (i.id ? [i.id] : []))
-    const rows = ids.length ? await tx.select().from(shiftReports).where(and(eq(shiftReports.tenantId, ctx.tenantId), inArray(shiftReports.id, ids), reportScopeWhere(ctx))) : []
-    const dtos = new Map((await reportDtos(tx, ctx, rows)).map((d) => [d.id, d]))
-    const reports = page.items.map((i) =>
-      toExportReport({ date: i.date, shiftName: i.shiftName, team: i.team, person: i.person, state: i.state, start: i.start, end: i.end, due: i.due, submittedAt: i.submittedAt }, i.id ? dtos.get(i.id) : undefined, ctx.tz),
-    )
+    // H5: every page is its own short read-only tx (no row lock, no connection held while the encoder works)
+    const { page, reports } = await read(async (tx) => {
+      const page = await inboxPage(tx, ctx, { ...f, after }, EXPORT_LIMITS.page)
+      const ids = page.items.flatMap((i) => (i.id ? [i.id] : []))
+      const rows = ids.length ? await tx.select().from(shiftReports).where(and(eq(shiftReports.tenantId, ctx.tenantId), inArray(shiftReports.id, ids), reportScopeWhere(ctx))) : []
+      const dtos = new Map((await reportDtos(tx, ctx, rows)).map((d) => [d.id, d]))
+      const reports = page.items.map((i) =>
+        toExportReport({ date: i.date, shiftName: i.shiftName, team: i.team, person: i.person, state: i.state, start: i.start, end: i.end, due: i.due, submittedAt: i.submittedAt }, i.id ? dtos.get(i.id) : undefined, ctx.tz),
+      )
+      return { page, reports }
+    })
     stats.pages++
     stats.maxPage = Math.max(stats.maxPage, reports.length)
     stats.reports += reports.length

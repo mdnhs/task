@@ -62,3 +62,15 @@ Reporting members: Daniel (day patrol), Marcus (night patrol), Owen (weekend pat
 Leo (override off), Grace and Tomasz (Cleaning default off) get none. Mix: accepted, late (Marcus 16 Oct, Amara 16 Oct; Daniel 15 Oct
 accepted late), returned (Daniel 16 Oct, Amara 15 Oct), submitted, missing (Daniel 19 Oct draft, Owen 18 Oct, Nadia 15 and 19 Oct),
 and Daniel's running shift on 20 Oct as a draft.
+
+## Backend notes (B5)
+
+Rulings and follow-ups: `../superpowers/plans/2026-11-17-backend-b5-followups.md`.
+
+- A report row note lives only in the report. Submitting writes a neutral task history line (`... from the shift report <name>, <date>`) and a neutral time entry note; the note never reaches `task_history` or `task_time_entries` (H4), so a co-assignee or a support grant cannot read it and DSR erase covers it.
+- Export (FR-M1-31) is a job in three phases (H5): claim and requester check, a lock-free build in short per-page read transactions, then the storage write and a short final transaction that re-checks the requester's scope. A downgrade during the build fails the export with `forbidden` and writes no file. Files expire after 7 days; erase leaves copies in other managers' exports for up to 7 days.
+- The PDF is Latin-1 only: Bengali and other characters print as `?` until a Unicode font is embedded.
+- The report scope is one level (me plus direct reports, F5), narrower than the FE `teamOf`; the template matches by team name; the DTO status can be `expired`; `ReportSchema` uses a `catchall` (B6 items).
+- The dashboard "awaiting review" count leaves out the caller's own submitted reports (they cannot review them: `self_review`).
+- DSR erase against a reviewer's `notify` can deadlock in theory; the loser gets 409 `retry`.
+- `completed_at` can be off by up to an hour inside the repeated DST hour.

@@ -199,9 +199,10 @@ export const TODAY_SOURCE = "Today card"
  * (features/tasks/store.ts applyTaskUpdates). One id per task, action and working day, so pressing twice is a no-op.
  * Evidence-required tasks never come here: the card opens the task page instead (AC-M1-10).
  */
-export function todayUpdate(action: "done" | "snooze", ref: string, tenantId: string, dayKey: string, by: string, now: string): TaskUpdate {
+export function todayUpdate(action: "done" | "snooze", ref: string, tenantId: string, dayKey: string, by: string, now: string, actorKey?: string): TaskUpdate {
   return {
-    id: `today:${dayKey}:${ref}:${action}`,
+    // `actorKey` (the server passes the user id) keeps two assignees' updates on one task apart; the browser queue is one person's, so it omits it
+    id: `today:${dayKey}:${ref}:${action}${actorKey ? `:${actorKey}` : ""}`,
     tenantId,
     ref,
     itemStatus: "done",

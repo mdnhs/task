@@ -83,7 +83,7 @@ export async function submitReport(tx: TenantTx, env: { deps: Deps; enqueue: Enq
     try {
       results.set(
         i.position,
-        await applyTaskUpdate(tx, ctx.task!, { id: `${id}.v${v}.${ref}`, tenantId: ctx.tenantId, ref, itemStatus: i.status as "done", minutes: Math.max(0, i.minutes - (prevMinutes.get(ref) ?? 0)), note: i.note.trim(), at, by: ctx.me, source: `shift report ${row.shiftName}, ${row.shiftDate}` }, { events }),
+        await applyTaskUpdate(tx, ctx.task!, { id: `${id}.v${v}.${ref}`, tenantId: ctx.tenantId, ref, itemStatus: i.status as "done", minutes: Math.max(0, i.minutes - (prevMinutes.get(ref) ?? 0)), note: "", at, by: ctx.me, source: `shift report ${row.shiftName}, ${row.shiftDate}` }, { events }),
       )
     } catch (e) {
       if (!(e instanceof AppError) || e.code !== TaskNotFound().code) throw e // no longer an assignee / out of scope: skipped, nothing was written for this row

@@ -3,7 +3,7 @@ import { and, eq, sql } from "drizzle-orm"
 import type { Context } from "hono"
 import { todayUpdate } from "@opsdesk/domain/today"
 import type { AppEnv } from "../../core/context"
-import { Forbidden } from "../../core/errors"
+import { AppError, Forbidden } from "../../core/errors"
 import { requireModule } from "../../core/middleware/module"
 import { requirePermission } from "../../core/middleware/permission"
 import { requireTenant } from "../../core/middleware/tenant"
@@ -59,7 +59,7 @@ const todayUpdateR = createRoute({
   method: "post", path: "/v1/today/updates", middleware: guard("tasks", "write"),
   request: { body: { content: { "application/json": { schema: TodayUpdateBody } }, required: true as const } },
   responses: {
-    200: json(TodayUpdateOut, "Mark done or snooze from the Today card: one id per task, action and working day, so a repeat is `duplicate` and writes nothing. A Required task without clean evidence stays open (`evidenceStillNeeded`). Snooze writes one history line. 403 human_required (an API key marking done); 404 task_not_found (unknown, another tenant's, archived or out of scope)"),
+    200: json(TodayUpdateOut, "Mark done or snooze from the Today card: one id per person, task, action and working day, so a repeat is `duplicate` and writes nothing (an 'evidence still needed' result does not count: a later done completes the task). 422 invalid_day_key unless `dayKey` is today's working day in the tenant timezone. A Required task without clean evidence stays open (`evidenceStillNeeded`). Snooze writes one history line. 403 human_required (an API key marking done); 404 task_not_found (unknown, another tenant's, archived or out of scope)"),
   },
 })
 
@@ -81,9 +81,11 @@ export const readModelRoutes = newRouter()
     const b = c.req.valid("json")
     if (b.action === "done" && c.get("apiKey")) throw Forbidden("human_required") // marking done is the person's attestation (like a report submit); refused before any lookup
     const out = await mutate(c, async (tx, _env, ctx) => {
+      // H6: the day key is the server's working day (tenant timezone, deps.clock), never the client's word: otherwise a client could mint endless history lines with made-up days
+      if (b.dayKey !== localDay(ctx.now, ctx.tz)) throw new AppError(422, "invalid_day_key", "Unprocessable Entity")
       const [row] = await tx.select().from(tasks).where(and(eq(tasks.id, b.taskId), eq(tasks.tenantId, ctx.tenantId), sql`${tasks.archivedAt} is null`, taskScopeWhere(ctx.scope, ctx.reports)))
       if (!row) throw TaskNotFound() // unknown, another tenant's, archived and out of scope look alike
-      const update = todayUpdate(b.action, `TSK-${row.refNo}`, ctx.tenantId, b.dayKey, ctx.actorId, wallOf(ctx.now, ctx.tz).slice(0, 16))
+      const update = todayUpdate(b.action, `TSK-${row.refNo}`, ctx.tenantId, b.dayKey, ctx.actorId, wallOf(ctx.now, ctx.tz).slice(0, 16), ctx.actorId)
       const result = await applyTaskUpdate(tx, ctx, update)
       const [after] = await tx.select({ status: tasks.status }).from(tasks).where(and(eq(tasks.id, row.id), eq(tasks.tenantId, ctx.tenantId)))
       const status = after.status as (typeof TodayUpdateOut)["_output"]["status"]

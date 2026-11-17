@@ -260,15 +260,28 @@ export async function storeGeneratedFile(
   deps: Deps, tx: TenantTx,
   f: { tenantId: string; id: string; ownerUserId: string | null; name: string; mime: string; body: Buffer; purpose: "dsr_export" | "report_export" },
 ): Promise<void> {
+  await insertGeneratedFileRow(deps, tx, f, await putGeneratedObject(deps, f))
+}
+
+/** The storage half of storeGeneratedFile: write the object and read it back. No database; a caller that holds locks writes the object BEFORE its tx (report export job, H5). */
+export async function putGeneratedObject(deps: Deps, f: { tenantId: string; id: string; mime: string; body: Buffer }): Promise<{ etag: string }> {
   const key = fileKey(f.tenantId, f.id)
   await deps.storage.put(key, f.body, { contentType: f.mime })
   const head = await deps.storage.head(key)
   if (!head || head.size !== f.body.length) throw new Error("generated object missing after put")
+  return { etag: head.etag }
+}
+
+/** The database half: the `clean` files row for an object already written (ON CONFLICT DO NOTHING, so a re-run keeps the same row). */
+export async function insertGeneratedFileRow(
+  deps: Deps, tx: TenantTx,
+  f: { tenantId: string; id: string; ownerUserId: string | null; name: string; mime: string; body: Buffer; purpose: "dsr_export" | "report_export" }, head: { etag: string },
+): Promise<void> {
   const now = deps.clock.now()
   await tx
     .insert(files)
     .values({
-      id: f.id, tenantId: f.tenantId, ownerUserId: f.ownerUserId, key, name: f.name, mime: f.mime, sizeBytes: f.body.length, purpose: f.purpose,
+      id: f.id, tenantId: f.tenantId, ownerUserId: f.ownerUserId, key: fileKey(f.tenantId, f.id), name: f.name, mime: f.mime, sizeBytes: f.body.length, purpose: f.purpose,
       sha256: createHash("sha256").update(f.body).digest("hex"), status: "clean", etag: head.etag, createdAt: now, uploadedAt: now, scannedAt: now,
     })
     .onConflictDoNothing({ target: files.id })

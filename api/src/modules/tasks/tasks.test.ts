@@ -566,9 +566,10 @@ describe("events, applyTaskUpdate and RLS", () => {
     expect((await w.q("select status, version, completed_at from tasks where id = $1", [plain.id]))[0]).toMatchObject({ status: "completed", version: 2 })
     expect(await w.q("select minutes, update_id, user_id from task_time_entries")).toEqual([{ minutes: 15, update_id: "sr-1:plain", user_id: w.staff.userId }])
     expect(await run(up("sr-1:req", req.ref))).toBe("applied")
-    expect(await run(up("sr-1:req", req.ref))).toBe("duplicate")
+    expect(await run(up("sr-1:req", req.ref))).toBe("applied") // H6: "evidence still needed" does not consume the id: a repeat is applied again, but adds no second line
     expect((await w.q("select status from tasks where id = $1", [req.id]))[0].status).toBe("not_started") // stays open
-    const [line] = await w.q("select text, notified, update_id from task_history where task_id = $1 and update_id = 'sr-1:req'", [req.id])
+    expect((await w.q("select count(*)::int n from task_history where task_id = $1 and update_id like 'sr-1:req%'", [req.id]))[0].n).toBe(1)
+    const [line] = await w.q("select text, notified, update_id from task_history where task_id = $1 and update_id = 'sr-1:req#evidence'", [req.id])
     expect(line.text).toContain("Report marked done; evidence still needed")
     expect(line.notified).toEqual([])
     expect((await w.q("select count(*)::int n from task_time_entries"))[0].n).toBe(2)

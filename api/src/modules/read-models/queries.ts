@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, inArray, isNotNull, lt, sql, type SQL } from "drizzle-orm"
+import { and, asc, desc, eq, gte, inArray, isNotNull, lt, ne, sql, type SQL } from "drizzle-orm"
 import { shiftReports, taskAssignees, taskComments, taskEvidence, tasks, teams } from "../../db/schema"
 import type { TenantTx } from "../../db/tenant-tx"
 import { buildListQuery, OPEN_STATUSES, taskScopeWhere, type TaskCtx } from "../tasks"
@@ -133,7 +133,7 @@ export function awaitingReportsQuery(tx: TenantTx, ctx: ReportCtx, from: string,
   return tx
     .select({ n: sql<number>`count(*)::int` })
     .from(shiftReports)
-    .where(and(eq(shiftReports.tenantId, ctx.tenantId), gte(shiftReports.shiftDate, from), sql`${shiftReports.shiftDate} <= ${to}`, eq(shiftReports.status, "submitted"), isNotNull(shiftReports.userId), reportScopeWhere(ctx)))
+    .where(and(eq(shiftReports.tenantId, ctx.tenantId), gte(shiftReports.shiftDate, from), sql`${shiftReports.shiftDate} <= ${to}`, eq(shiftReports.status, "submitted"), isNotNull(shiftReports.userId), ne(shiftReports.userId, ctx.me), reportScopeWhere(ctx))) // not my own: review.ts refuses self_review
 }
 
 // ---------------------------------------------------------------- the member's own (staff dashboard, Today)

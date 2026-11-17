@@ -74,3 +74,13 @@ and the reports page; keep the report's `shiftKey` so the manager inbox can join
   today, history kept via `until`), reporting switch with "Team default" / "Override" and "Use team default", Assign dialog.
 - Patterns tab: name, team, hours (+1 for next-day end, nominal length), days, time zone, people on it today; edit and delete.
 - Skeleton: ghost text from the same seed (week tab, all teams). Measured equal at 1300 and 390 px.
+
+## Backend notes (B5)
+
+Rulings and follow-ups: `../superpowers/plans/2026-11-17-backend-b5-followups.md`.
+
+- A shift belongs to the date it STARTS on, in the pattern's own zone (F2). Start, end and due times are UTC instants stored in the report when it is first saved (F3).
+- A team that has archived patterns cannot be deleted (`team_has_shifts`). Pattern create, edit and archive are all-scope manager only (F14).
+- A pattern edit recomputes the virtual rows and alerts of unopened past shifts; saved reports keep their snapshot.
+- Today: `POST /v1/today/updates` takes the server's working day as `dayKey` (422 `invalid_day_key` otherwise); the update id carries the actor, and an "evidence still needed" result does not use up the id (H6). Today compares wall-clock strings, so it can be up to an hour off inside the repeated DST hour.
+- The sweeps (recurrence, report alerts, export sweep) iterate all tenants. The read-model cache is in-process with a 30 s TTL, so a second instance can be up to 30 s stale (G2).
