@@ -36,6 +36,7 @@ export async function reviewReport(tx: TenantTx, env: { deps: Deps; enqueue: Enq
   if (decision === "return" && !comment) throw unprocessable("comment_required")
   if (input.version !== row.version) throw Conflict("version_conflict")
   if (row.status !== "submitted") throw Conflict("report_not_submitted")
+  if (row.userId === null) throw Conflict("report_owner_erased") // the member was erased: nobody can be told or resubmit, so the report stays as it is
 
   const status = decision === "accept" ? "accepted" : "returned"
   const [out] = await tx

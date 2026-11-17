@@ -21,13 +21,13 @@ const dateOf = (n: number): string => new Date(n * DAY_MS).toISOString().slice(0
 const invalidCursor = () => new AppError(400, "invalid_cursor", "Bad Request")
 
 /** Opaque keyset cursor: base64url of `<date>|<user id>|<pattern id>` (the key of the last row of the page: virtual rows have no id). Anything else is 400 invalid_cursor. */
-export const encodeInboxCursor = (c: Cursor): string => Buffer.from(`${c.date}|${c.userId}|${c.patternId}`, "utf8").toString("base64url")
+export const encodeInboxCursor = (c: Cursor): string => Buffer.from(`${c.date}|${c.userId}|${c.patternId.toLowerCase()}`, "utf8").toString("base64url")
 export function decodeInboxCursor(raw: string): Cursor {
   const s = Buffer.from(raw, "base64url").toString("utf8")
   const first = s.indexOf("|")
   const last = s.lastIndexOf("|")
   if (first <= 0 || last <= first + 1) throw invalidCursor()
-  const c = { date: s.slice(0, first), userId: s.slice(first + 1, last), patternId: s.slice(last + 1) }
+  const c = { date: s.slice(0, first), userId: s.slice(first + 1, last), patternId: s.slice(last + 1).toLowerCase() } // lowercase hex: the SQL (uuid) and the JS string comparisons must agree
   if (!/^\d{4}-\d{2}-\d{2}$/.test(c.date) || dateOf(dayNum(c.date)) !== c.date || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(c.patternId)) throw invalidCursor()
   return c
 }

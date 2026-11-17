@@ -12,7 +12,7 @@ import { registerSearchIndexers } from "../search"
 import { registerTasks } from "../tasks"
 import { registerWebhooks } from "../webhooks-out"
 import { assignmentsInWindowQuery } from "../shifts"
-import { buildInboxQuery, type InboxScope } from "./inbox"
+import { buildInboxQuery, decodeInboxCursor, encodeInboxCursor, type InboxScope } from "./inbox"
 import { code, DAY, DRIVE, world, type Json, type Who, type W } from "./world"
 import { registerShiftReports } from "."
 
@@ -757,5 +757,46 @@ describe("database and plans (R8, EXPLAIN)", () => {
     expect((await a.req("PUT", "/v1/shift-reports/template", admin, { departments: [{ dept: "Night team", sections: [{ id: "summary", title: "S", enabled: true, fields: [{ id: "summary", label: "Summary", required: false }] }] }] })).status).toBe(200)
     expect((await b.json(await b.req("GET", "/v1/shift-reports/template", b.ops))).custom).toBe(false)
     expect((await a.json(await a.req("GET", "/v1/shift-reports/template", a.ops))).custom).toBe(true)
+  })
+})
+
+describe("T5.3 review carry-ins (T5.4 first commit)", () => {
+  test("inbox cursor: the pattern id is normalised to lowercase hex on decode and encode, so an uppercase hand-made cursor pages exactly like the lowercase one", async () => {
+    const lower = "0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d"
+    const c = decodeInboxCursor(Buffer.from(`2026-10-24|user-1|${lower.toUpperCase()}`, "utf8").toString("base64url"))
+    expect(c.patternId).toBe(lower)
+    expect(Buffer.from(encodeInboxCursor({ date: "2026-10-24", userId: "user-1", patternId: lower.toUpperCase() }), "base64url").toString("utf8")).toBe(`2026-10-24|user-1|${lower}`)
+    const w = await world()
+    await submitted(w, w.staff)
+    const first = await inbox(w, w.ops, "from=2026-10-24&to=2026-10-25&limit=3")
+    const [d, u, p] = Buffer.from(first.nextCursor!, "base64url").toString("utf8").split("|")
+    const upper = Buffer.from(`${d}|${u}|${p.toUpperCase()}`, "utf8").toString("base64url")
+    const a = await inbox(w, w.ops, `from=2026-10-24&to=2026-10-25&limit=3&cursor=${first.nextCursor}`)
+    const b = await inbox(w, w.ops, `from=2026-10-24&to=2026-10-25&limit=3&cursor=${upper}`)
+    expect(b.items.map((i) => i.key)).toEqual(a.items.map((i) => i.key))
+  })
+
+  test("template: a body over 64 KB serialised → 422 template_too_large, nothing written; a normal body still saves", async () => {
+    const w = await world()
+    const admin = await w.who("admin")
+    const big = Array.from({ length: 50 }, (_, i) => ({
+      dept: `Dept ${i}`.padEnd(60, "x"),
+      sections: Array.from({ length: 12 }, (_, s) => ({ id: `s${s}`, title: "T".repeat(80), enabled: true, fields: Array.from({ length: 12 }, (_, f) => ({ id: `f${f}`, label: "L".repeat(80), required: false })) })),
+    }))
+    const r = await w.req("PUT", "/v1/shift-reports/template", admin, { departments: big })
+    expect([r.status, await code(r)]).toEqual([422, "template_too_large"])
+    expect((await w.q("select count(*)::int n from tenant_settings where key = 'report_template'"))[0].n).toBe(0)
+  })
+
+  test("accept or return a submitted report whose owner was erased (user_id null) → 409 report_owner_erased: nobody can be told or resubmit; nothing changes", async () => {
+    const w = await world()
+    const rep = await submitted(w, w.staff)
+    await w.q("update shift_reports set user_id = null where id = $1", [rep.id])
+    const before = (await w.q("select version, status from shift_reports where id = $1", [rep.id]))[0]
+    for (const [path, body] of [["accept", {}], ["return", { comment: "redo" }]] as const) {
+      const r = await w.req("POST", `/v1/shift-reports/${rep.id}/${path}`, w.ops, { version: before.version, ...body })
+      expect([path, r.status, await code(r)]).toEqual([path, 409, "report_owner_erased"])
+    }
+    expect((await w.q("select version, status from shift_reports where id = $1", [rep.id]))[0]).toEqual(before)
   })
 })

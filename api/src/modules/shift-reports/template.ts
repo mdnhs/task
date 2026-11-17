@@ -86,8 +86,12 @@ export async function templatesInScope(tx: TenantTx, ctx: Pick<ReportCtx, "tenan
   return { custom: data !== null, departments: [...out].map(([dept, sections]) => ({ dept, sections })).sort((a, b) => a.dept.localeCompare(b.dept)) }
 }
 
+/** Total serialised size of a template body (64 KB; the default template is well under 10 KB). */
+export const TEMPLATE_MAX_BYTES = 64 * 1024
+
 /** PUT /template: validate, then the settings module takes its locks, writes and audits. */
 export async function saveTemplate(deps: Deps, tenantId: string, actorId: string, data: TemplateData): Promise<void> {
+  if (Buffer.byteLength(JSON.stringify(data), "utf8") > TEMPLATE_MAX_BYTES) throw new AppError(422, "template_too_large", "Unprocessable Entity") // per-field limits alone allow ~1.8 MB and the app has no body-limit middleware
   validateTemplate(data)
   await putReportTemplate(deps, tenantId, actorId, { departments: data.departments.map((d) => ({ dept: d.dept.trim(), sections: d.sections })) })
 }
