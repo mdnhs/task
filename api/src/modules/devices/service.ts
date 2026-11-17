@@ -66,6 +66,19 @@ export async function updateDevice(
   return toDevice(row)
 }
 
+/**
+ * Retires a device (B6 T6.5, ruling I24): the row is deleted, so its binding goes with it and the browser cookie that named it no longer matches any device (the next request is the
+ * unregistered browser). Same lock order as every device write (advisory, then the actor, then the row FOR UPDATE). The audit keeps what the device was and whether it was bound,
+ * never an enrolment code, a binding or their hashes.
+ */
+export async function retireDevice(tx: TenantTx, tenantId: string, actor: Actor, id: string, now: Date): Promise<void> {
+  await begin(tx, tenantId, actor)
+  const [cur] = await tx.select().from(devices).where(and(eq(devices.id, id), eq(devices.tenantId, tenantId))).for("update")
+  if (!cur) throw NotFound("device_not_found")
+  await tx.delete(devices).where(and(eq(devices.id, id), eq(devices.tenantId, tenantId)))
+  await recordAudit(tx, tenantId, { action: "device.retired", entity: "device", entityId: id, actorId: actor.userId, before: { ...snapshot(toDevice(cur)), bound: cur.bindingHash !== null }, after: null }, now)
+}
+
 // Enrolment (R28, CR-02). The code is issued by an admin on the trusted PC, typed there by its allocated user.
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789" // 32 symbols, no 0/O/1/I
 const CODE_LENGTH = 10

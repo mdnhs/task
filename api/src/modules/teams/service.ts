@@ -7,6 +7,7 @@ import { memberships, projects, reportingLines, roles, shiftPatterns, taskTempla
 import type { TenantTx } from "../../db/tenant-tx"
 import { recordAudit } from "../audit"
 import { lockActor } from "../rbac"
+import { renameTemplateDept, lockSettings } from "../settings"
 import { templateReportScope } from "../tenants"
 
 type Actor = { userId: string }
@@ -68,11 +69,16 @@ export async function createTeam(tx: TenantTx, tenantId: string, actor: Actor, i
 }
 
 export async function updateTeam(tx: TenantTx, tenantId: string, actor: Actor, id: string, patch: { name?: string; kind?: TeamKind }, now: Date): Promise<TeamDto> {
-  await begin(tx, tenantId, actor)
+  await lockTeams(tx, tenantId)
+  // A rename may rewrite the report template (ruling I26), so the settings lock is taken here, BEFORE the actor lock, in the same order as every settings writer (team lock, settings lock, actor, rows).
+  if (patch.name !== undefined) await lockSettings(tx, tenantId)
+  await lockActor(tx, tenantId, actor.userId, "settings", "write")
   const cur = await teamIn(tx, tenantId, id)
   if (patch.name !== undefined) await assertNameFree(tx, tenantId, patch.name, id)
+  // The report template is keyed by team NAME: carry the matching department to the new name in this transaction, so a rename cannot silently change which template applies.
+  const templateRenamed = patch.name !== undefined && patch.name !== cur.name ? await renameTemplateDept(tx, tenantId, cur.name, patch.name) : false
   const [row] = await tx.update(teams).set({ ...(patch.name !== undefined ? { name: patch.name } : {}), ...(patch.kind !== undefined ? { kind: patch.kind } : {}) }).where(and(eq(teams.id, id), eq(teams.tenantId, tenantId))).returning()
-  await recordAudit(tx, tenantId, { action: "team.updated", entity: "team", entityId: id, actorId: actor.userId, before: { name: cur.name, kind: cur.kind }, after: { name: row.name, kind: row.kind } }, now)
+  await recordAudit(tx, tenantId, { action: "team.updated", entity: "team", entityId: id, actorId: actor.userId, before: { name: cur.name, kind: cur.kind }, after: { name: row.name, kind: row.kind, reportTemplateRenamed: templateRenamed } }, now)
   await publish(tx, { tenantId, type: "team.updated", payload: { teamId: id, name: row.name, kind: row.kind }, actorId: actor.userId }, now)
   return dto(row, await memberIdsOf(tx, tenantId, id))
 }

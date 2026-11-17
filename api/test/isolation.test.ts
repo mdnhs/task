@@ -74,6 +74,10 @@ const SPECS: Record<string, Spec> = {
   "DELETE /v1/me/push-tokens/{id}": { actor: "owner", expect: "push_token_not_found" },
   // T6.3: another (non-current) session of the acting owner (control: 204). A session id of another user's is 404, like a never-existing one
   "DELETE /v1/me/sessions/{id}": { actor: "owner", expect: "session_not_found" },
+  // T6.5: a pending invite of A (control: DELETE 204, resend 429 resend_too_soon because the fixture was issued a moment ago) and retiring A's device (control: 204)
+  "DELETE /v1/invites/{id}": { actor: "owner", expect: "invite_not_found" },
+  "POST /v1/invites/{id}/resend": { actor: "owner", expect: "invite_not_found" },
+  "DELETE /v1/devices/{id}": { actor: "owner", expect: "device_not_found" },
   // a pending, never-uploaded file of A: GET 200, complete 409 upload_missing, download 409 file_not_ready, delete 204 (all "not 404")
   "GET /v1/files/{id}": { actor: "owner", expect: "file_not_found" },
   "POST /v1/files/{id}/complete": { actor: "owner", expect: "file_not_found" },

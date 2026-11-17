@@ -5,7 +5,7 @@ import { requireTenant } from "../../core/middleware/tenant"
 import { newRouter } from "../../core/router"
 import { withTenant } from "../../db/tenant-tx"
 import { AppError } from "../../core/errors"
-import { bindDevice, issueEnrolment, listDevices, listPolicies, registerDevice, setPolicy, updateDevice } from "./service"
+import { bindDevice, issueEnrolment, listDevices, listPolicies, registerDevice, retireDevice, setPolicy, updateDevice } from "./service"
 
 const Id = z.uuid()
 const Type = z.enum(["pc", "android", "browser"])
@@ -39,6 +39,11 @@ const patchRoute = createRoute({
   method: "patch", path: "/v1/devices/{id}", middleware: [requireTenant, requirePermission("settings", "write")] as const,
   request: { params: z.object({ id: Id }), body: { content: { "application/json": { schema: PatchBody } }, required: true } },
   responses: { 200: { description: "Updated device (takes effect on the device's next request)", content: { "application/json": { schema: Device } } } },
+})
+const retireRoute = createRoute({
+  method: "delete", path: "/v1/devices/{id}", middleware: [requireTenant, requirePermission("settings", "write")] as const,
+  request: { params: z.object({ id: Id }) },
+  responses: { 204: { description: "Retired: the device and its binding are removed (audited device.retired); a browser that was bound to it is the unregistered browser from its next request. 404 device_not_found (also another tenant's id). Open to a read-only (blocked) tenant." } },
 })
 const bindRoute = createRoute({
   method: "post", path: "/v1/devices/{id}/bind", middleware: [requireTenant] as const,
@@ -77,6 +82,13 @@ export const deviceRoutes = newRouter()
     const t = c.get("tenant")!
     const actor = { userId: c.get("member")!.userId }
     return c.json(await withTenant(deps.db, t.id, (tx) => updateDevice(tx, t.id, actor, c.req.valid("param").id, c.req.valid("json"), deps.clock.now())), 200)
+  })
+  .openapi(retireRoute, async (c) => {
+    const deps = c.get("deps")
+    const t = c.get("tenant")!
+    const actor = { userId: c.get("member")!.userId }
+    await withTenant(deps.db, t.id, (tx) => retireDevice(tx, t.id, actor, c.req.valid("param").id, deps.clock.now()))
+    return c.body(null, 204)
   })
   .openapi(enrolRoute, async (c) => {
     const deps = c.get("deps")

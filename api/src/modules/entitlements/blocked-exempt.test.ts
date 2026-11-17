@@ -1,6 +1,6 @@
 import { beforeEach, expect, test } from "vitest"
 import { call, resetDb, testApp } from "../../../test/harness"
-import { makeMember, makeStaff, makeTenant, signIn } from "../../../test/factories"
+import { makeMember, makeStaff, makeTenant, roleIdOf, signIn } from "../../../test/factories"
 import { resetSubscribers } from "../../core/events"
 import { changeSubscription } from "."
 
@@ -30,10 +30,12 @@ async function world() {
   const hook2 = await ok("POST", "/v1/webhooks", { url: "https://hooks.example.com/b", events: ["team.created"] }, 201)
   const hook3 = await ok("POST", "/v1/webhooks", { url: "https://hooks.example.com/c", events: ["team.created"] }, 201)
   const device = await ok("POST", "/v1/devices", { userId: employee.userId, type: "pc", owner: "company", label: "PC", trusted: true }, 201)
+  const device2 = await ok("POST", "/v1/devices", { userId: employee.userId, type: "pc", owner: "company", label: "PC 2", trusted: true }, 201)
+  const inv = await ok("POST", "/v1/invites", { email: "new.hire@example.com", roleId: await roleIdOf(t.deps, tenant.id, "employee") }, 201)
   const staff = await makeStaff(t.deps, "support")
   const g = (await (await call(t.app, "POST", `/v1/platform/tenants/${tenant.id}/support-grants`, { cookie: staff.cookie!, body: { reason: "Ticket 4411: report totals look wrong", hours: 2 } })).json()) as Json
   await changeSubscription(t.deps, tenant.id, owner.userId, { status: "canceled" })
-  return { ...t, tenant, owner, employee, req, ok, key, key2, hook, hook2, hook3, device, grant: g }
+  return { ...t, tenant, owner, employee, req, ok, key, key2, hook, hook2, hook3, device, device2, inv, grant: g }
 }
 
 test("blocked tenant: non-exempt writes are still 402, revoke/disable routes are 2xx", async () => {
@@ -52,6 +54,10 @@ test("blocked tenant: non-exempt writes are still 402, revoke/disable routes are
   expect((await w.ok("PATCH", `/v1/webhooks/${w.hook2.id}`, { active: false }, 200)).active).toBe(false)
   await w.ok("DELETE", `/v1/settings/support-grants/${w.grant.id}`, undefined, 200)
   expect((await w.ok("PATCH", `/v1/devices/${w.device.id}`, { trusted: false }, 200)).trusted).toBe(false)
+  // T6.5: revoking an invite and retiring a device are security duties too (a leaked link, a lost PC); creating or re-sending an invite is not
+  await w.ok("DELETE", `/v1/invites/${w.inv.id}`, undefined, 204)
+  await w.ok("DELETE", `/v1/devices/${w.device2.id}`, undefined, 204)
+  expect((await w.req("POST", "/v1/invites", { email: "late@example.com", roleId: await roleIdOf(w.deps, w.tenant.id, "employee") })).status).toBe(402)
   for (const kind of ["export", "erase", "correct", "restrict"]) {
     const r = await w.req("POST", "/v1/data-requests", { subjectUserId: w.employee.userId, kind, reason: `Subject asked for ${kind} by email` })
     expect(r.status, kind).not.toBe(402)

@@ -10,7 +10,7 @@ import { onboardingDefaults } from "../tenants"
 
 const SETTINGS_LOCK_NS = 0x73657474 // "sett"
 /** Serialises settings writes per tenant (take FIRST, before lockActor; the audit lock stays last). */
-const lockSettings = (tx: TenantTx, tenantId: string) => tx.execute(sql`select pg_advisory_xact_lock(${SETTINGS_LOCK_NS}::int, hashtext(${tenantId}::text))`)
+export const lockSettings = (tx: TenantTx, tenantId: string) => tx.execute(sql`select pg_advisory_xact_lock(${SETTINGS_LOCK_NS}::int, hashtext(${tenantId}::text))`)
 
 const unprocessable = (code: string) => new AppError(422, code, "Unprocessable Entity")
 
@@ -183,6 +183,20 @@ export async function putReportTemplate(deps: Deps, tenantId: string, actorId: s
     await writeSetting(tx, tenantId, REPORT_TEMPLATE_KEY, value)
     await recordAudit(tx, tenantId, { action: "tenant.report_template_updated", entity: "tenant", entityId: tenantId, actorId, before, after: shape(value) }, deps.clock.now())
   })
+}
+
+/**
+ * Team rename (ruling I26): the report template is keyed by team name, so the entry named `from` becomes `to` in the same transaction as the rename. Returns whether the stored template
+ * changed (nothing is written when none is stored or no entry matches). 409 template_dept_exists when the template already holds an entry named `to` (no silent merge of two entries).
+ * The caller holds the settings lock (lockSettings) and the actor lock. No separate audit row: the team.updated entry carries `reportTemplateRenamed`.
+ */
+export async function renameTemplateDept(tx: TenantTx, tenantId: string, from: string, to: string): Promise<boolean> {
+  const stored = (await readSetting(tx, tenantId, REPORT_TEMPLATE_KEY)) as { departments?: { dept?: unknown }[] } | undefined
+  if (!stored || !Array.isArray(stored.departments)) return false
+  if (!stored.departments.some((d) => d.dept === from)) return false
+  if (stored.departments.some((d) => d.dept === to)) throw new AppError(409, "template_dept_exists", "Conflict")
+  await writeSetting(tx, tenantId, REPORT_TEMPLATE_KEY, { ...stored, departments: stored.departments.map((d) => (d.dept === from ? { ...d, dept: to } : d)) })
+  return true
 }
 
 // ------------------------------------------------------------------ holidays

@@ -337,3 +337,57 @@ describe("devices", () => {
     expect((await call(prod.app, "GET", "/v1/_probe/drive-links", { tenant: "acme" })).status).toBe(404)
   })
 })
+
+// ---------------------------------------------------------------- B6 T6.5: DELETE /v1/devices/{id} (retire)
+describe("retire a device", () => {
+  test("DELETE drops the device and its binding, is audited device.retired, and the old cookie is the unregistered browser from the next request", async () => {
+    const w = await world()
+    const pc = await w.register(w.staff.userId)
+    const cookie = await w.bind(pc.id, w.staff)
+    await w.putPolicy("drive", "trusted-company-pc")
+    expect(await w.probe(w.staff, cookie)).toEqual({ links: [DRIVE_URL] })
+    const del = await w.req("DELETE", `/v1/devices/${pc.id}`, w.admin)
+    expect(del.status).toBe(204)
+    expect(await del.text()).toBe("")
+    expect(await ownerTenantQuery(w.tenant.id, "select 1 from devices")).toEqual([])
+    expect(await w.probe(w.staff, cookie)).toEqual({ links: [], withheld: 1 }) // the cookie still verifies but names no device
+    const a = await w.lastAudit()
+    expect(a).toMatchObject({ action: "device.retired", entity: "device", entity_id: pc.id, actor_id: w.admin.userId })
+    expect(a.before).toMatchObject({ userId: w.staff.userId, label: "Front desk PC", bound: true })
+    expect(a.after).toBeNull()
+    const dump = JSON.stringify(await ownerTenantQuery(w.tenant.id, "select before, after from audit_events"))
+    expect(dump).not.toMatch(/binding|secret|enrol_hash/i)
+    expect((await w.req("GET", "/v1/devices", w.admin).then((r) => r.json()) as Json[])).toEqual([])
+  })
+
+  test("an unbound device can be retired too; a second DELETE and a never-existing id are 404 device_not_found", async () => {
+    const w = await world()
+    const pc = await w.register(w.staff.userId)
+    expect((await w.req("DELETE", `/v1/devices/${pc.id}`, w.admin)).status).toBe(204)
+    expect((await w.lastAudit()).before.bound).toBe(false)
+    for (const id of [pc.id, "00000000-0000-4000-8000-000000000000"]) {
+      const r = await w.req("DELETE", `/v1/devices/${id}`, w.admin)
+      expect(r.status).toBe(404)
+      expect(((await r.json()) as Json).code).toBe("device_not_found")
+    }
+    expect((await w.req("DELETE", "/v1/devices/not-a-uuid", w.admin)).status).toBe(400)
+  })
+
+  test("needs settings:write (staff 403, signed-out 401); another tenant's device id is 404 and the device survives", async () => {
+    const w = await world()
+    const pc = await w.register(w.staff.userId)
+    expect((await w.req("DELETE", `/v1/devices/${pc.id}`, w.staff)).status).toBe(403)
+    expect((await w.req("DELETE", `/v1/devices/${pc.id}`, null)).status).toBe(401)
+    const other = await makeTenant(w.deps, { slug: "other" })
+    const o = await w.who("owner", other.id, "other")
+    const r = await w.req("DELETE", `/v1/devices/${pc.id}`, o)
+    expect(r.status).toBe(404)
+    expect(JSON.stringify(await r.json())).not.toContain(pc.id)
+    expect(await ownerTenantQuery(w.tenant.id, "select 1 from devices")).toHaveLength(1)
+  })
+
+  test("API keys are refused by the /v1/devices deny-list prefix", async () => {
+    const { API_KEY_DENIED_ROUTES } = await import("../../core/middleware/api-key")
+    expect(API_KEY_DENIED_ROUTES.some((r) => "prefix" in r && r.prefix === "/v1/devices")).toBe(true)
+  })
+})

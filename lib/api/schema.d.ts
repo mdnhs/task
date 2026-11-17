@@ -330,7 +330,36 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Pending (not yet accepted) invites of the tenant, newest first, at most 200. Expired ones are listed so they can be re-sent. No token or token hash. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            items: {
+                                /** Format: uuid */
+                                id: string;
+                                email: string;
+                                roleKey: string;
+                                createdAt: string;
+                                expiresAt: string;
+                                invitedBy: string;
+                            }[];
+                        };
+                    };
+                };
+            };
+        };
         put?: never;
         post: {
             parameters: {
@@ -370,6 +399,83 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/invites/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Revoked (audited invite.revoked); the link stops working at once. 404 invite_not_found, 409 invite_used (already accepted). Open to a read-only (blocked) tenant. */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/invites/{id}/resend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description A new token replaces the old one (the old link stops working), the expiry restarts and ONE mail is sent. The caller becomes the inviter of record and must be allowed to hand out the invited role (R24: 403 role_escalation). 404 invite_not_found, 409 invite_used, 422 role_not_invitable, 429 resend_too_soon (within 60 s of the last send). */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** Format: uuid */
+                            id: string;
+                            email: string;
+                            expiresAt: string;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/invites/accept": {
         parameters: {
             query?: never;
@@ -394,7 +500,7 @@ export interface paths {
                 };
             };
             responses: {
-                /** @description Joined the tenant */
+                /** @description Joined the tenant. Re-validates the inviter's CURRENT standing: a demoted, suspended or removed inviter, or an invited role above the inviter's current access, is 410 invite_invalid (nothing is written). 404 invite_not_found, 403 invite_email_mismatch, 409 invite_used | already_member | seat_limit, 410 invite_expired. */
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -10249,7 +10355,26 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        delete?: never;
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Retired: the device and its binding are removed (audited device.retired); a browser that was bound to it is the unregistered browser from its next request. 404 device_not_found (also another tenant's id). Open to a read-only (blocked) tenant. */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
         options?: never;
         head?: never;
         patch: {

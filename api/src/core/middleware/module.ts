@@ -31,6 +31,8 @@ const REVOKE_DELETES = [
   new RegExp(`^/v1/api-keys/${ONE_ID}$`),
   new RegExp(`^/v1/webhooks/${ONE_ID}$`),
   new RegExp(`^/v1/settings/support-grants/${ONE_ID}$`),
+  new RegExp(`^/v1/invites/${ONE_ID}$`), // revoke a leaked or mistaken invite link (T6.5)
+  new RegExp(`^/v1/devices/${ONE_ID}$`), // retire a lost device (T6.5); registering, patching and enrolment stay blocked
 ]
 /** PATCH routes that are exempt ONLY when the body is exactly the disabling field (decided here from a cloned body, so the handler is untouched). */
 const DISABLE_PATCHES: { path: RegExp; field: string; value: boolean }[] = [

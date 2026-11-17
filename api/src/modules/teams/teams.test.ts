@@ -266,3 +266,60 @@ describe("people", () => {
     expect((await w.req("GET", "/v1/people?scope=team", cc)).status).toBe(200)
   })
 })
+
+// ---------------------------------------------------------------- B6 T6.5 (ruling I26): a rename carries the report template
+describe("renaming a team keeps its report template", () => {
+  const dept = (name: string) => ({ dept: name, sections: [{ id: "summary", title: "Summary", enabled: true, fields: [{ id: "summary", label: "Shift summary", required: true }] }] })
+  const putTemplate = (w: Awaited<ReturnType<typeof world>>, departments: unknown) => w.req("PUT", "/v1/shift-reports/template", w.owner, { departments })
+  const stored = async (w: Awaited<ReturnType<typeof world>>) => (await ownerTenantQuery(w.tenant.id, "select value from tenant_settings where key = 'report_template'"))[0]?.value as { departments: { dept: string }[] } | undefined
+
+  test("the matching template department is renamed in the same transaction; other departments are untouched; the audit says so", async () => {
+    const w = await world()
+    const night = await w.mkTeam("Night team")
+    await w.mkTeam("Day team")
+    expect((await putTemplate(w, [dept("Night team"), dept("Day team")])).status).toBe(200)
+    const r = await w.req("PATCH", `/v1/teams/${night.id}`, w.owner, { name: "Late team" })
+    expect(r.status).toBe(200)
+    expect((await stored(w))!.departments.map((d) => d.dept)).toEqual(["Late team", "Day team"])
+    const a = await w.lastAudit()
+    expect(a.action).toBe("team.updated")
+    expect(a.after).toMatchObject({ name: "Late team", reportTemplateRenamed: true })
+    // the template GET still resolves the renamed team (an entry of its own, not the first-department fallback)
+    const t = (await (await w.req("GET", "/v1/shift-reports/template", w.owner)).json()) as Json
+    expect(t.custom).toBe(true)
+    expect(t.departments.map((d: Json) => d.dept).sort()).toEqual(["Day team", "Late team"])
+  })
+
+  test("a rename that touches no template (none stored, or no matching department, or only the kind changes) writes no settings row", async () => {
+    const w = await world()
+    const a = await w.mkTeam("Alpha")
+    expect((await w.req("PATCH", `/v1/teams/${a.id}`, w.owner, { name: "Beta" })).status).toBe(200)
+    expect(await stored(w)).toBeUndefined()
+    expect((await putTemplate(w, [dept("Gamma")])).status).toBe(200)
+    const before = await stored(w)
+    expect((await w.req("PATCH", `/v1/teams/${a.id}`, w.owner, { name: "Delta" })).status).toBe(200)
+    expect(await stored(w)).toEqual(before)
+    expect((await w.lastAudit()).after.reportTemplateRenamed).toBe(false)
+    expect((await w.req("PATCH", `/v1/teams/${a.id}`, w.owner, { kind: "department" })).status).toBe(200)
+  })
+
+  test("renaming onto a name the template already holds is 409 template_dept_exists and changes nothing (no silent merge)", async () => {
+    const w = await world()
+    const a = await w.mkTeam("Alpha")
+    expect((await putTemplate(w, [dept("Alpha"), dept("Orphan")])).status).toBe(200)
+    const r = await w.req("PATCH", `/v1/teams/${a.id}`, w.owner, { name: "Orphan" })
+    expect(r.status).toBe(409)
+    expect(((await r.json()) as Json).code).toBe("template_dept_exists")
+    expect((await ownerTenantQuery(w.tenant.id, "select name from teams"))[0].name).toBe("Alpha")
+    expect((await stored(w))!.departments.map((d) => d.dept)).toEqual(["Alpha", "Orphan"])
+  })
+
+  test("a template written by a custom role stays valid after the rename: the stored value still passes the template validation on the next PUT", async () => {
+    const w = await world()
+    const a = await w.mkTeam("Alpha")
+    await putTemplate(w, [dept("Alpha")])
+    await w.req("PATCH", `/v1/teams/${a.id}`, w.owner, { name: "Beta" })
+    const s = await stored(w)
+    expect((await putTemplate(w, s!.departments)).status).toBe(200)
+  })
+})
