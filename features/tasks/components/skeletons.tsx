@@ -146,9 +146,8 @@ export function TaskDetailSkeleton({ canEdit = true, reviewer = false }: { canEd
                 <li key={i} className="ev-item">
                   <div className="ev-main"><Sk w={46} h={19} r={6} /><span className="ev-name"><Line w={120} h={12} lh={21} /></span><Sk w={104} h={29.4} r={8} /></div>
                   <Line w={170} h={10} lh={18} />
-                  {reviewer && (
-                    <div className="ev-review"><Sk w={70} h={32} r={14} /><Sk w={70} h={32} r={14} /></div>
-                  )}
+                  {/* "Open" is on every file item; a reviewer also has Verify and Reject (T6.9 measures the thumbnail row). */}
+                  <div className="ev-review"><Sk w={56} h={32} r={14} />{reviewer && <><Sk w={70} h={32} r={14} /><Sk w={70} h={32} r={14} /></>}</div>
                 </li>
               ))}
             </ul>

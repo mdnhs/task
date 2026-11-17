@@ -6,6 +6,7 @@ import { toast } from "sonner"
 import { ConfirmDialog } from "@/components/confirm-dialog"
 import { VoiceNotePlayer, VoiceRecorder, type VoiceDraft } from "@/components/voice-note"
 import { When } from "@/components/when"
+import { ApiError, userMessage } from "@/lib/api/problem"
 import { formatDate } from "@/lib/dates"
 import { playUrl } from "../client"
 import type { Task } from "../types"
@@ -39,6 +40,17 @@ export function VoiceCard({ task, canManage, canSeePlays, today, tzLabel, onSet,
   const nonce = useRef(0)
   if (!note && !canManage) return null
 
+  /** The player could not load: read the API's answer (a manual-redirect probe, no second play is logged for a refusal) and say why in short copy. */
+  async function explain(path: string) {
+    try {
+      const res = await fetch(path, { redirect: "manual", credentials: "same-origin" })
+      if (res.type === "opaqueredirect" || (res.status >= 300 && res.status < 400)) return void toast.error("The voice note could not be played. Try again.")
+      toast.error(userMessage(await ApiError.fromResponse(res)).text)
+    } catch {
+      toast.error("The voice note could not be played. Try again.")
+    }
+  }
+
   async function save() {
     if (!draft) return
     setBusy(true)
@@ -62,7 +74,7 @@ export function VoiceCard({ task, canManage, canSeePlays, today, tzLabel, onSet,
         <span id="td-voice-h">Voice instructions</span>
         {note && <span className="td-voice-m">Recorded by {note.recordedBy} · {formatDate(note.recordedAt)}</span>}
       </div>
-      {note && <VoiceNotePlayer fresh={() => playUrl(task.id ?? "", `${Date.now()}-${++nonce.current}`)} durationSec={note.durationSec} label="voice instructions" />}
+      {note && <VoiceNotePlayer fresh={() => playUrl(task.id ?? "", `${Date.now()}-${++nonce.current}`)} onFail={(p) => void explain(p)} durationSec={note.durationSec} label="voice instructions" />}
       {(canManage || canSeePlays) && !recording && (
         <div className="vn-row">
           {canManage && <button type="button" className="vn-link" onClick={() => setRecording(true)}>{note ? "Replace" : "Add voice instructions"}</button>}

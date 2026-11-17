@@ -1,6 +1,6 @@
 "use client"
 
-import { useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { AnimatePresence, motion } from "motion/react"
 import { Camera, Link2, ListChecks, PenLine, StickyNote, Upload } from "lucide-react"
 import { toast } from "sonner"
@@ -16,6 +16,8 @@ import { Textarea } from "@/components/ui/textarea"
 import { When } from "@/components/when"
 import { isDriveUrl } from "@/lib/devices"
 import { listItem } from "@/lib/motion"
+import { userMessage } from "@/lib/api/problem"
+import { canOpenEvidence, evidencePath, openEvidence } from "../client"
 import { canVerifyItem, countable, evState, ruleView, type Viewer } from "../evidence-view"
 import {
   EVIDENCE_STATE,
@@ -223,6 +225,22 @@ export function EvidenceAdder({ task, me, driveAllowed, adds }: { task: Task; me
   )
 }
 
+/** The thumbnail of a clean image. The path (fresh nonce per mount) is set in the browser after mount, so it is never in server HTML, and no request is made for a scanning, infected or removed item. */
+function Thumb({ taskId, evidenceId }: { taskId: string; evidenceId: string }) {
+  const [src, setSrc] = useState<string>()
+  const [failed, setFailed] = useState(false)
+  useEffect(() => {
+    void Promise.resolve().then(() => setSrc(evidencePath(taskId, evidenceId, `${Date.now()}-${Math.random().toString(36).slice(2)}`)))
+  }, [taskId, evidenceId])
+  if (!src || failed) return null
+  // eslint-disable-next-line @next/next/no-img-element -- a same-origin redirect to a 60 s presigned URL, never optimisable or cacheable
+  return <img className="ev-thumb" src={src} alt="" loading="lazy" onError={() => setFailed(true)} />
+}
+
+async function openFile(taskId: string, evidenceId: string) {
+  const r = await openEvidence(taskId, evidenceId, { fetch: (...a) => fetch(...a), open: (u) => void window.open(u, "_blank", "noopener"), nonce: () => `${Date.now()}-${Math.random().toString(36).slice(2)}` })
+  if (!r.ok) toast.error(userMessage(r.error).text)
+}
 function EvidenceItem({ e, task, canAdd, canVerify, driveAllowed, today, tzLabel, onRemove, onVerify, onReject }: {
   e: Evidence
   task: Task
@@ -240,6 +258,7 @@ function EvidenceItem({ e, task, canAdd, canVerify, driveAllowed, today, tzLabel
   return (
     <motion.li className="ev-item" {...listItem}>
       <div className="ev-main">
+        {task.id && canOpenEvidence(e) && (e.kind === "photo" || e.kind === "image" || e.kind === "signature") && <Thumb taskId={task.id} evidenceId={e.id} />}
         <span className="dep-tag">{EVIDENCE_TYPE_LABEL[e.kind] ?? e.kind}</span>
         {e.kind === "drive" ? (
           // The API withholds a Drive link off the company PC (the name is then not a link): shown as is, never rebuilt here.
@@ -256,8 +275,9 @@ function EvidenceItem({ e, task, canAdd, canVerify, driveAllowed, today, tzLabel
         {e.locked && <span className="ev-lock"> · <Icon name="lock" /> Read-only</span>}
       </div>
       {e.reason && <p className="ev-reason">{e.reason}</p>}
-      {(canVerify && waiting) || (canAdd && !e.locked) ? (
+      {(canVerify && waiting) || (canAdd && !e.locked) || (task.id && canOpenEvidence(e)) ? (
         <div className="ev-review">
+          {task.id && canOpenEvidence(e) && <button type="button" className="btn btn-outline ev-btn" onClick={() => void openFile(task.id!, e.id)}>Open</button>}
           {canVerify && waiting && (
             <>
               <button type="button" className="btn btn-outline ev-btn" onClick={() => onVerify(e.id)}>Verify</button>

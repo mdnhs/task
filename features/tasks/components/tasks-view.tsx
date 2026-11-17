@@ -155,6 +155,13 @@ export function TasksView({
             }
           />
         )}
+        {rows.length === 0 && cursor && (
+          // The department switcher narrows only the rows loaded so far: more pages may hold matches, so the result must not look complete.
+          <div className="tasks-more">
+            <p className="td-muted">Only the tasks loaded so far were checked.</p>
+            <button type="button" className="btn btn-outline" disabled={loading} onClick={() => void loadMore()}>{loading ? "Loading…" : "Load more"}</button>
+          </div>
+        )}
       </div>
     </>
   )

@@ -184,7 +184,7 @@ export function VoiceRecorder({ id, value, onChange, max = VOICE_MAX_SEC, hint }
  * Plays a recording from a URL: play/pause, a scrubbable progress bar, elapsed / total. `durationSec` is the recorded length,
  * shown before the media loads and used when the browser reports no duration (recorded webm). `rate` sets the playback speed.
  */
-export function VoiceNotePlayer({ url, fresh, durationSec, rate = 1, label = "voice note" }: {
+export function VoiceNotePlayer({ url, fresh, onFail, durationSec, rate = 1, label = "voice note" }: {
   /** A local recording (a `blob:` URL owned by this tab). */
   url?: string
   /**
@@ -192,6 +192,8 @@ export function VoiceNotePlayer({ url, fresh, durationSec, rate = 1, label = "vo
    * keeps no source between plays: it is cleared when the note ends or fails, so no URL is cached, stored or replayed.
    */
   fresh?: () => string
+  /** A stored note failed to load: gets the path that was tried, so the caller can read the API's answer and say why (404, not ready, infected). */
+  onFail?: (path: string) => void
   durationSec: number
   rate?: number
   label?: string
@@ -238,7 +240,11 @@ export function VoiceNotePlayer({ url, fresh, durationSec, rate = 1, label = "vo
         onPause={() => setPlaying(false)}
         onError={() => {
           setPlaying(false)
-          if (fresh) audio.current?.removeAttribute("src")
+          if (fresh) {
+            const tried = audio.current?.getAttribute("src")
+            audio.current?.removeAttribute("src")
+            if (tried) onFail?.(tried)
+          }
         }}
         onEnded={() => {
           setPlaying(false)

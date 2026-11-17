@@ -176,4 +176,20 @@ describe("T6.6 contract (real API): tasks", () => {
     const wrong = toTask(await o.api.patch("/v1/tasks/{id}", { path: { id: task.id! }, body: { version: after.version!, due: task.due } }))
     expect(wrong.dueAt).toBe("2026-10-25T00:30:00.000Z")
   })
+
+  test("N2: dependencies with status and blocks map through toTask; what the staff member may not see is only a count", async () => {
+    const { t, owner, staff, other } = await world()
+    const o = await browser(t, owner, "coppers")
+    const s = await browser(t, staff, "coppers")
+    const a = await o.tasks.create(form(staff.userId, { title: "A" }))
+    const b = await o.tasks.create(form(staff.userId, { title: "B" }))
+    const c = await o.tasks.create(form(other.userId, { title: "C" }))
+    await o.tasks.setDependencies(a, [b.id, c.id])
+    const mine = (await loadTaskByRef(s.api, a.ref))!
+    expect(noUndefined(mine)).toEqual([])
+    expect(mine.dependencies).toEqual([{ id: b.id, ref: b.ref, title: "B", status: "not_started" }])
+    expect(mine.hiddenDependencies).toBe(1)
+    const bb = (await loadTaskByRef(s.api, b.ref))!
+    expect(bb.blocks!.map((x) => x.ref)).toEqual([a.ref])
+  })
 })

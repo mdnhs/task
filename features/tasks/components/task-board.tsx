@@ -129,17 +129,18 @@ export function TaskBoard(props: BoardProps) {
   const { people, projects, today, nowAt, tzLabel, staff, canEdit, actor, me, columns } = props
   const dept = useDept()
   const { filters: f, set, pending } = useUrlFilters<BoardFilterValues>(props.initialFilters ?? NO_BOARD_FILTERS, NO_BOARD_FILTERS)
-  const server = useMemo(() => columns.flatMap((c) => c.tasks), [columns])
-  const { tasks, write } = useTaskWrites(server)
-  // "Load more" pages of a column come from the API with that column's cursor; a new server answer starts over.
+  // "Load more" pages of a column come from the API with that column's cursor; a new server answer starts over (the server wins). The extra cards are part of the list the
+  // optimistic overlay sits on, so a move of a card loaded by "Load more" shows at once too.
   const [more, setMore] = useState<{ base: BoardColumn[]; add: Partial<Record<TaskStatus, { tasks: Task[]; cursor: string | null }>> }>({ base: columns, add: {} })
   const extra = useMemo(() => (more.base === columns ? more.add : {}), [more, columns])
+  const server = useMemo(() => [...columns.flatMap((c) => c.tasks), ...Object.values(extra).flatMap((x) => x?.tasks ?? [])], [columns, extra])
+  const { tasks, write } = useTaskWrites(server)
   const byId = useMemo(() => new Map(people.map((x) => [x.id, x])), [people])
   const [dragRef, setDragRef] = useState<string | null>(null)
   const [over, setOver] = useState<TaskStatus | null>(null)
   const now = nowIso(today)
   const shown = (t: Task) => dept === "all" || t.dept === dept // the department switcher is the shell's; the API has no department filter
-  const all = useMemo(() => [...tasks, ...Object.values(extra).flatMap((x) => x?.tasks ?? [])], [tasks, extra])
+  const all = tasks
   const total = columns.reduce((n, c) => n + c.count, 0)
 
   const targets = (t: Task): TaskStatus[] => (canEdit ? BOARD_COLUMNS.filter((c) => c !== t.status && boardMove(t, c, actor).ok) : [])
@@ -151,11 +152,12 @@ export function TaskBoard(props: BoardProps) {
       if (m.reason) toast.error(m.reason)
       return
     }
-    const ok = await write(t, m.action === "complete" ? "complete" : `status:${to}`, {
+    // The toast names the status the API ANSWERED with: a drag to Completed on a task that needs review is accepted as "Awaiting verification".
+    await write(t, m.action === "complete" ? "complete" : `status:${to}`, {
       predict: (x) => (m.action === "complete" ? completeTask(x, me, now) : changeStatus(x, to, me, now)),
       request: (c) => (m.action === "complete" ? c.complete(t) : c.setStatus(t, to)),
+      success: (v) => `${ref}: ${STATUS[(v as { status?: TaskStatus }).status ?? to].label}`,
     })
-    if (ok) toast.success(`${ref}: ${STATUS[to].label}`)
   }
   async function loadMore(col: TaskStatus, cursor: string) {
     try {
@@ -170,6 +172,7 @@ export function TaskBoard(props: BoardProps) {
   }
 
   const visible = all.filter(shown)
+  const nextCol = BOARD_COLUMNS.map((c) => ({ status: c, cursor: (extra[c] ? extra[c]!.cursor : columns.find((x) => x.status === c)?.nextCursor) ?? null })).find((x) => x.cursor !== null) as { status: TaskStatus; cursor: string } | undefined
   return (
     <>
       <PageHead title="Tasks" subtitle={`${total} tasks on the board`} />
@@ -177,7 +180,16 @@ export function TaskBoard(props: BoardProps) {
       <div className="card tasks-card" aria-busy={pending || undefined}>
         <BoardFilters {...f} set={set} people={people} projects={projects} staff={staff} />
         {visible.length === 0 ? (
-          <EmptyState icon="task" title="No tasks match" text="Try a different search or clear the filters." />
+          <>
+            <EmptyState icon="task" title="No tasks match" text="Try a different search or clear the filters." />
+            {nextCol && (
+              // The department switcher narrows only the cards loaded so far: a column may hold matches on its next page.
+              <div className="tasks-more">
+                <p className="td-muted">Only the cards loaded so far were checked.</p>
+                <button type="button" className="btn btn-outline" onClick={() => void loadMore(nextCol.status, nextCol.cursor)}>Load more</button>
+              </div>
+            )}
+          </>
         ) : (
           <div className="kb-scroll">
             <div className="kb-cols">

@@ -29,7 +29,7 @@ export type WriteOpts<T> = {
   predict?: (t: Task) => Task
   request: (c: TasksClient) => Promise<T>
   /** Shown after the API said yes. */
-  success?: string
+  success?: string | ((value: T) => string)
   /** The caller showed this refusal itself (under a field): no toast. */
   handled?: (e: unknown) => boolean
 }
@@ -52,7 +52,7 @@ export function useTaskWrites(server: readonly Task[], client: TasksClient = mak
         } catch {
           /* not a task answer: the refresh brings the record */
         }
-        if (o.success) toast.success(o.success)
+        if (o.success) toast.success(typeof o.success === "function" ? o.success(r.value) : o.success)
       }
       return r.ok
     },

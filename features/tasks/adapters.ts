@@ -117,6 +117,11 @@ export function toTask(dto: unknown, ctx: { comments?: readonly unknown[] } = {}
     const x = rec(c, "subtask")
     return { id: str(x, "id"), ref: str(x, "ref"), title: str(x, "title"), status: oneOf(x, "status", STATUS_ORDER) as TaskStatus }
   })
+  const dep = (list: unknown[]) =>
+    list.map((c) => {
+      const x = rec(c, "dependency")
+      return { id: str(x, "id"), ref: str(x, "ref"), title: str(x, "title"), status: oneOf(x, "status", STATUS_ORDER) as TaskStatus }
+    })
   const es = r.evidenceState
   if (es !== null && typeof es !== "string") bad("evidenceState", "a string or null")
   const parentId = r.parentId === null ? null : str(r, "parentId")
@@ -149,6 +154,10 @@ export function toTask(dto: unknown, ctx: { comments?: readonly unknown[] } = {}
     subtasks,
     dependsOn: strs(r, "dependsOn"),
     dependsOnIds: strs(r, "dependsOnIds"),
+    dependencies: dep(arr(r, "dependencies")),
+    hiddenDependencies: int(r, "hiddenDependencies"),
+    blocks: dep(arr(r, "blocks")),
+    hiddenBlocks: int(r, "hiddenBlocks"),
     ...when(optStr(r, "archivedAt"), "archivedAt"),
     ...when(optStr(r, "archivedBy"), "archivedBy"),
     ...(proposal ? { proposal: { start: str(proposal, "start"), due: str(proposal, "due"), reason: str(proposal, "reason"), by: str(proposal, "by"), at: str(proposal, "at") } } : {}),

@@ -143,6 +143,8 @@ export function TaskDetail({
   const project = projects.find((p) => p.id === task.projectId)
   const milestone = project?.milestones.find((m) => m.id === task.milestoneId)
   const subtasks = task.subtasks ?? []
+  // Open dependencies the caller can see (the API scoped them; the hidden ones are only a count).
+  const waiting = (task.dependencies ?? []).filter((d) => d.status !== "completed" && d.status !== "cancelled")
   // A parent outside the caller's scope has no ref in the DTO (E15): no link, no crash.
   const parentRef = task.parentRef
   const canVoice = canEdit && open && (manager || meId === task.creator)
@@ -253,7 +255,7 @@ export function TaskDetail({
                 </div>
               )}
               {parentRef && <div><dt>Subtask of</dt><dd><Link href={`/tasks/${parentRef}`} className="tpl-link">{parentRef}</Link></dd></div>}
-              {(task.dependsOn?.length || (manager && canEdit && open)) && (
+              {(task.dependsOn?.length || (task.hiddenDependencies ?? 0) > 0 || (manager && canEdit && open)) && (
                 <div>
                   <dt>Depends on</dt>
                   <dd>
@@ -261,8 +263,19 @@ export function TaskDetail({
                       ? task.dependsOn.map((r, i) => (
                           <span key={r}>{i > 0 && ", "}<Link href={`/tasks/${r}`} className="tpl-link">{r}</Link></span>
                         ))
-                      : "Nothing"}
+                      : (task.hiddenDependencies ?? 0) > 0 ? null : "Nothing"}
+                    {(task.hiddenDependencies ?? 0) > 0 && <span className="td-muted-inline"> +{task.hiddenDependencies} not shown</span>}
                     {manager && canEdit && open && <> · <button type="button" className="tpl-link" onClick={() => setDialog("deps")}>Edit</button></>}
+                    {waiting.length > 0 && open && <div className="td-wait">Waiting on {waiting.map((w) => w.ref).join(", ")} to finish</div>}
+                  </dd>
+                </div>
+              )}
+              {((task.blocks?.length ?? 0) > 0 || (task.hiddenBlocks ?? 0) > 0) && (
+                <div>
+                  <dt>Blocks</dt>
+                  <dd>
+                    {task.blocks?.map((b, i) => <span key={b.id}>{i > 0 && ", "}<Link href={`/tasks/${b.ref}`} className="tpl-link">{b.ref}</Link></span>)}
+                    {(task.hiddenBlocks ?? 0) > 0 && <span className="td-muted-inline">{task.blocks?.length ? " " : ""}+{task.hiddenBlocks} not shown</span>}
                   </dd>
                 </div>
               )}

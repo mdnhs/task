@@ -104,6 +104,12 @@ export type Task = {
   /** The parent's uuid, null when the parent is outside the caller's scope (opaque, E15). */
   parentId?: string | null
   dependsOnIds?: string[]
+  /** From the API (B6): the dependencies the caller may see, with their status, and how many they may not (a count only: no ref, title or status, D5). */
+  dependencies?: { id: string; ref: string; title: string; status: TaskStatus }[]
+  hiddenDependencies?: number
+  /** The tasks waiting on this one (reverse edges), scoped the same way. */
+  blocks?: { id: string; ref: string; title: string; status: TaskStatus }[]
+  hiddenBlocks?: number
   /** Live subtasks the caller may see. */
   subtasks?: { id: string; ref: string; title: string; status: TaskStatus }[]
   /** The API's evidence state (only clean, non-rejected items count): null when no evidence is asked. Components prefer it over computing it from `evidence`. */

@@ -133,6 +133,8 @@ const CODE_COPY: Record<string, string> = {
   evidence_required: "Add the required evidence first.",
   evidence_type_not_allowed: "That type of evidence isn't allowed here.",
   file_infected: "That file failed the malware scan.",
+  evidence_not_found: "That file is not available.",
+  file_not_found: "That file is not available.",
   file_not_ready: "That file is still being scanned.",
   file_too_large: "That file is too large.",
   mime_not_allowed: "That file type isn't allowed.",

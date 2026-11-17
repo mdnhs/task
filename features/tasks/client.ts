@@ -5,7 +5,7 @@
 //  - an upload is intent -> direct PUT of the bytes -> complete -> wait until the malware scan says clean (D10); an infected file is refused, never attached;
 //  - a voice note is never read through a URL kept by the client: playUrl() is a path on OUR origin that the API answers with a 60 s redirect, one logged play per call (D21).
 import type { ApiClient } from "@/lib/api/client"
-import { classifyApiError } from "@/lib/api/problem"
+import { ApiError, classifyApiError } from "@/lib/api/problem"
 import type { EvidenceRule, RepeatRule, Task } from "./types"
 import { toPatch, toTaskBody, type TaskForm } from "./adapters"
 
@@ -164,6 +164,28 @@ export function makeTasksClient(api: ApiClient, put: typeof fetch = (...a) => fe
       return api.get("/v1/tasks/{id}/voice-note/plays", { path: { id: idOf(t) }, query: { limit: 50 } })
     },
   }
+}
+
+/**
+ * The path that opens ONE evidence file: our own origin, a fresh `nonce` every call, no credential in it. The API answers it with a 60 s presigned redirect (409 file_not_ready, 410 file_infected,
+ * 404). Nothing here is stored, cached or rendered into server HTML: it is built at the moment of a click (or when a thumbnail mounts in the browser).
+ */
+export const evidencePath = (taskId: string, evidenceId: string, nonce: string): string => `/v1/tasks/${encodeURIComponent(taskId)}/evidence/${encodeURIComponent(evidenceId)}/download?o=${encodeURIComponent(nonce)}`
+
+/** An evidence item whose file may be opened or shown: a stored file that the scan cleared. Pending, infected and removed items fire NO request. */
+export const canOpenEvidence = (e: { fileId?: string; fileStatus?: string }): boolean => !!e.fileId && e.fileStatus === "clean"
+
+/**
+ * Open a file: first ask the API (a manual-redirect probe, so a refusal is read as the problem it is), then open a SECOND fresh path in a new tab. A refusal returns the ApiError for the
+ * caller's mapped copy; nothing is kept.
+ */
+export async function openEvidence(taskId: string, evidenceId: string, o: { fetch: typeof fetch; open(url: string): void; nonce(): string }): Promise<{ ok: true } | { ok: false; error: ApiError }> {
+  const res = await o.fetch(evidencePath(taskId, evidenceId, o.nonce()), { redirect: "manual", credentials: "same-origin" })
+  if (res.type === "opaqueredirect" || (res.status >= 300 && res.status < 400) || res.ok) {
+    o.open(evidencePath(taskId, evidenceId, o.nonce()))
+    return { ok: true }
+  }
+  return { ok: false, error: await ApiError.fromResponse(res) }
 }
 
 export const VOICE_MAX_SEC = 120
