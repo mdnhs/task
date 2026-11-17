@@ -26,6 +26,8 @@ import { platformStaffRoutes } from "./modules/platform-staff"
 import { platformConsoleRoutes, supportGrantRoutes } from "./modules/platform-console"
 import { rbacRoutes } from "./modules/rbac"
 import { authRoutes } from "./modules/auth/routes"
+import { authProviderRoutes } from "./modules/auth/providers-route"
+import { meSessionRoutes } from "./modules/me"
 import { inviteRoutes } from "./modules/invites"
 import { archiveRoutes, collabRoutes, planningRoutes, taskRoutes, taskViewRoutes, voiceRoutes } from "./modules/tasks"
 import { evidenceRoutes } from "./modules/task-evidence"
@@ -85,6 +87,8 @@ export function createApp(deps: Deps) {
   })
 
   app.route("/", authRoutes)
+  app.route("/", authProviderRoutes)
+  app.route("/", meSessionRoutes)
   app.route("/", tenantRoutes)
   app.route("/", inviteRoutes)
   app.route("/", rbacRoutes)

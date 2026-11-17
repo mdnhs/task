@@ -10,6 +10,7 @@ export function sanitizeMailError(err: unknown): string {
     .replace(/https?:\/\/\S*token=\S*/gi, "[redacted-url]")
     .replace(/\S*token=\S*/gi, "[redacted]")
     .replace(/re_[A-Za-z0-9_]+/g, "[redacted-key]")
+    .replace(/[^\s<>"',;()]+@[^\s<>"',;()]+/g, "[redacted-email]") // a provider error often echoes the recipient
     .replace(/\s+/g, " ")
     .slice(0, MAX)
   return `${name}${code}: ${msg}`

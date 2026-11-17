@@ -37,7 +37,28 @@ export function buildAuth({ env, db, clock, mailer, logger }: AuthDeps, opts: Au
     secret: env.BETTER_AUTH_SECRET,
     trustedOrigins: [env.APP_URL],
     database: drizzleAdapter(db, { provider: "pg", schema }),
-    emailAndPassword: { enabled: true, requireEmailVerification: true },
+    emailAndPassword: {
+      enabled: true,
+      requireEmailVerification: true,
+      // Reset links live one hour, work once, and end every session of the user (a stolen session must not survive a reset). B6 I23 a.
+      resetPasswordTokenExpiresIn: 3600,
+      revokeSessionsOnPasswordReset: true,
+      // Not awaited, like the verification mail: the answer must not depend on whether a mail was sent (no timing oracle). Better Auth already
+      // answers an unknown address with the same body and a simulated lookup. The link goes to the WEB page (the token is a path-free query value);
+      // an unverified account gets no reset mail (it has a verification mail instead). Never log the token, link or address.
+      sendResetPassword: async ({ user, token }) => {
+        if (!user.emailVerified) return
+        void mailer
+          .send({
+            to: user.email,
+            subject: "Reset your password",
+            text: `Someone asked to reset the password for your account. If it was you, choose a new one here:\n\n${env.APP_URL}/reset-password?token=${token}\n\nThe link works once and expires in 1 hour. If you did not ask, ignore this email; your password stays the same.`,
+          })
+          .catch((err) => {
+            logger.error({ error: sanitizeMailError(err), userId: user.id }, "password reset email send failed")
+          })
+      },
+    },
     emailVerification: {
       sendOnSignUp: true,
       // Explicit sign-in after verifying; verification alone never creates a session.

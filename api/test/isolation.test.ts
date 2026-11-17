@@ -72,6 +72,8 @@ const SPECS: Record<string, Spec> = {
   // the acting owner of A owns the A fixtures; B's ids belong to B's owner (own-notification rule + RLS)
   "POST /v1/notifications/{id}/read": { actor: "owner", expect: "notification_not_found" },
   "DELETE /v1/me/push-tokens/{id}": { actor: "owner", expect: "push_token_not_found" },
+  // T6.3: another (non-current) session of the acting owner (control: 204). A session id of another user's is 404, like a never-existing one
+  "DELETE /v1/me/sessions/{id}": { actor: "owner", expect: "session_not_found" },
   // a pending, never-uploaded file of A: GET 200, complete 409 upload_missing, download 409 file_not_ready, delete 204 (all "not 404")
   "GET /v1/files/{id}": { actor: "owner", expect: "file_not_found" },
   "POST /v1/files/{id}/complete": { actor: "owner", expect: "file_not_found" },
