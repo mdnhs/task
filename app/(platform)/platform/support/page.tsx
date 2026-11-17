@@ -1,5 +1,5 @@
 import { SupportView, getPlatformSeed, supportData } from "@/features/platform"
-import { getOrg } from "@/lib/org"
+import { getMockOrg } from "@/lib/org"
 
 import { gate } from "../../gate"
 
@@ -10,7 +10,7 @@ export const metadata = { title: "Support access · Platform · OpsDesk" }
 export default async function Page({ searchParams }: { searchParams: Promise<{ request?: string | string[] }> }) {
   const g = await gate("support.request", "platform support access")
   if ("denied" in g) return g.denied
-  const [seed, org, { request }] = await Promise.all([getPlatformSeed(), getOrg(), searchParams])
+  const [seed, org, { request }] = await Promise.all([getPlatformSeed(), getMockOrg(), searchParams])
   return (
     <SupportView
       data={supportData(seed, g.op)}

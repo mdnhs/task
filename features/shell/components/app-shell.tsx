@@ -21,10 +21,8 @@ import { SEG_MAX } from "../constants"
 import type { NavItemData, NavigationData, Notification, ShellSession, UserData } from "../types"
 import { DeptRow } from "./dept-row"
 import { NavUser } from "./nav-user"
-import type { NotifyContext } from "@/lib/notify"
 import { NotificationsPanel } from "./notifications-panel"
 import { AppPromo, Logo, PlatformContext } from "./sidebar-parts"
-import { SubscriptionBanner } from "./subscription-banner"
 
 // The nav item for the current path: an exact match, or (when `nested`) the longest href the path sits below,
 // so /platform/tenants/t1 keeps Tenants active. The tenant app matches exactly.
@@ -121,7 +119,8 @@ export function AppShell({
   tzLabel,
   today,
   notifications,
-  notify,
+  bellTimezone,
+  banner,
   assistant,
   search,
   departments,
@@ -135,9 +134,12 @@ export function AppShell({
   session: ShellSession
   tzLabel: string
   today: string
+  /** The console's static alerts (mock until T6.8). Ignored by the company bell, which lists the API's notifications. */
   notifications: Notification[]
-  // Reminder schedule and state for generating in-app reminders (lib/notify.ts); omitted where there is no company clock.
-  notify?: NotifyContext
+  /** The company's IANA zone: present = the bell lists the API's notifications (B6 T6.4); absent (the console) = it shows `notifications`. */
+  bellTimezone?: string
+  /** Slot above every page for the billing banner (components/billing-banner.tsx), so the shell does not decide billing copy. */
+  banner?: React.ReactNode
   // Slot for the AI assistant trigger, so the shell doesn't import another feature.
   assistant?: React.ReactNode
   // Slot for the global search (features/search), for the same reason. Without it the plain field is shown.
@@ -228,7 +230,7 @@ export function AppShell({
             {platform && <PlatformContext env={env} />}
             <div className="top-actions">
               {assistant}
-              <NotificationsPanel items={notifications} today={today} tzLabel={tzLabel} scope={bellScope ?? `${session.tenant.id}:${session.role.id}`} notify={notify} />
+              <NotificationsPanel items={notifications} today={today} tzLabel={tzLabel} scope={bellScope ?? `${session.tenant.id}:${session.role.id}`} timezone={bellTimezone} />
               <NavUser user={user} session={session} variant={variant} />
             </div>
             {showDepts && <DeptRow items={navigation.departments} dep={dep} onChange={setDep} />}
@@ -236,7 +238,7 @@ export function AppShell({
           </div>
 
           <main className="canvas">
-            <SubscriptionBanner tenant={session.tenant} tzLabel={tzLabel} />
+            {banner}
             {children}
           </main>
         </div>

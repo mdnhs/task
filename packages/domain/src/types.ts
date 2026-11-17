@@ -5,7 +5,8 @@ import type { Appearance } from "./contracts"
 export type Tone = "ok" | "warn" | "bad" | "info" | "mute"
 export type Status = { tone: Tone; label: string }
 
-export type Dept = "all" | "Security" | "Cleaning"
+/** "all" or the name of one of the company's departments (GET /v1/teams?kind=department): tenant data, never a fixed list. */
+export type Dept = string
 
 // Session / tenancy (see lib/permissions.ts, lib/session.ts)
 export type Module = "dashboard" | "tasks" | "reports" | "attention" | "staff" | "shifts" | "recruitment" | "files" | "payroll" | "orders" | "settings" | "audit" | "roster"

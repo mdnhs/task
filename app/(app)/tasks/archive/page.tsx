@@ -1,12 +1,12 @@
 import { TaskArchive, getTaskSeed, ME_ID } from "@/features/tasks"
 import { AccessRestricted, getUser } from "@/features/shell"
-import { getOrg } from "@/lib/org"
+import { getMockOrg } from "@/lib/org"
 import { can } from "@/lib/permissions"
 import { canWrite, getSession } from "@/lib/session"
 
 // FR-M1-13: managers restore; a tenant admin (settings write) may purge before the 30 days are up.
 export default async function Page() {
-  const [session, org, user] = await Promise.all([getSession(), getOrg(), getUser()])
+  const [session, org, user] = await Promise.all([getSession(), getMockOrg(), getUser()])
   if (!can(session.role, "tasks")) return <AccessRestricted moduleLabel="Tasks" />
   const { people, staff, seed, scopeKey, refFloor } = await getTaskSeed(session)
   const me = (staff && people.find((p) => p.id === ME_ID)?.name) || user.name

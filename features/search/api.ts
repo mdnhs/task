@@ -1,7 +1,7 @@
 import { getData } from "@/lib/data"
 import type { TenantEntitlements } from "@/lib/entitlements"
-import { getOrg } from "@/lib/org"
-import { ME_ID, getPeople } from "@/lib/people"
+import { getMockOrg } from "@/lib/org"
+import { ME_ID, getMockPeople } from "@/lib/people"
 import { reportScope } from "@/lib/permissions"
 import { reportState, scopeReports } from "@/lib/shift-report"
 import { getShiftReportData } from "@/lib/shift-reports-data"
@@ -13,8 +13,8 @@ import type { QuickAction, SearchConfig, SearchItem } from "./types"
 // Reads the JSON files directly (not other features' api.ts) so features stay independent.
 // Shift reports (FR-M1-28) come from the shared report model, cut to what the role may see (own / team / all).
 async function getShiftReports(role: Role, session: { entitlements: TenantEntitlements }): Promise<RawSources["reports"]> {
-  const org = await getOrg()
-  const [{ rows, shifts }, people] = await Promise.all([getShiftReportData(org, session), getPeople()])
+  const org = await getMockOrg()
+  const [{ rows, shifts }, people] = await Promise.all([getShiftReportData(org, session), getMockPeople()])
   const scope = reportScope(role, ME_ID)
   if (!scope) return []
   const name = (id: string) => people.find((p) => p.id === id)?.name ?? id

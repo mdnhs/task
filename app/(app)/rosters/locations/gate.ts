@@ -1,8 +1,8 @@
 import { getLocationAdminData, rosterScopeKey, type LocationAdminData } from "@/features/rosters"
 import { getData } from "@/lib/data"
-import { getOrg } from "@/lib/org"
+import { getMockOrg } from "@/lib/org"
 import { can } from "@/lib/permissions"
-import { getPeople } from "@/lib/people"
+import { getMockPeople } from "@/lib/people"
 import { rosterAccess, type LocationGrant, type OfficeLimit } from "@/lib/roster-access"
 import type { Session } from "@/lib/session"
 import { todayUserId } from "@/lib/today-data"
@@ -12,12 +12,12 @@ import { todayUserId } from "@/lib/today-data"
 export type LocationAdminGate = { data: LocationAdminData; scopeKey: string; me: string; today: string }
 
 export async function locationAdminGate(session: Session, user: { name: string }): Promise<LocationAdminGate | null> {
-  const org = await getOrg()
+  const org = await getMockOrg()
   if (!can(session.role, "roster")) return null
   const [{ locations }, { grants, limits }, people] = await Promise.all([
     getData<{ locations: { id: string }[] }>("rosters/locations.json"),
     getData<{ grants: LocationGrant[]; limits: OfficeLimit[] }>("rosters/access.json"),
-    getPeople(),
+    getMockPeople(),
   ])
   const me = todayUserId(session, people, user.name)
   const access = rosterAccess(session.role, me, grants, limits, locations.map((l) => l.id))

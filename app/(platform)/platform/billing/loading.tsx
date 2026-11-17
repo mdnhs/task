@@ -1,5 +1,5 @@
 import { BillingSkeleton, DeniedSkeleton, billingData, getPlatformSeed, getPlatformSettings, isBillingView } from "@/features/platform"
-import { getOrg } from "@/lib/org"
+import { getMockOrg } from "@/lib/org"
 import { requestParam } from "@/lib/request-path"
 
 import { skeletonGate } from "../../skeleton-gate"
@@ -8,7 +8,7 @@ import { skeletonGate } from "../../skeleton-gate"
 export default async function Loading() {
   const g = await skeletonGate("billing.read", "platform billing")
   if ("denied" in g) return <DeniedSkeleton />
-  const [seed, settings, org, view] = await Promise.all([getPlatformSeed(), getPlatformSettings(), getOrg(), requestParam("view")])
+  const [seed, settings, org, view] = await Promise.all([getPlatformSeed(), getPlatformSettings(), getMockOrg(), requestParam("view")])
   return (
     <BillingSkeleton
       data={billingData(seed, g.op, settings.payments)}

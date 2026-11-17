@@ -108,3 +108,13 @@ describe("userMessage", () => {
     expect(userMessage(err(500, "internal", "")).ref).toBeNull()
   })
 })
+
+describe("T6.4 gateOf: which full-page state a refused page read shows", () => {
+  test("403 module_not_entitled is the 'Not in your plan' state, any other 403 the permission state, everything else is not a gate", async () => {
+    const { gateOf } = await import("./problem")
+    expect(gateOf(new ApiError(403, "module_not_entitled", "r"))).toBe("plan")
+    expect(gateOf(new ApiError(403, "forbidden", "r"))).toBe("forbidden")
+    expect(gateOf(new ApiError(403, "device_policy", "r"))).toBe("forbidden")
+    for (const e of [new ApiError(402, "billing_required", "r"), new ApiError(404, "not_found", "r"), new ApiError(500, "x", "r"), new TypeError("net"), "boom"]) expect(gateOf(e)).toBeNull()
+  })
+})

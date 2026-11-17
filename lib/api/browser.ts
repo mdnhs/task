@@ -3,6 +3,7 @@
 // od-tenant cookie. The one thing it adds is x-od-tenant, the tenant the page was rendered for, so the BFF can refuse a stale tab (409 tenant_changed).
 // T6.3: a 401 that means "the session is gone" (not an MFA challenge) toasts ONCE and sends the page to /api/session/expired ONCE, however many calls fail together.
 import { toast } from "sonner"
+import { reportBillingBlocked } from "./blocked"
 import { makeApiClient, type ApiClient } from "./client"
 import { PAGE_TENANT_HEADER, isTenantSlug } from "./tenant"
 
@@ -28,6 +29,8 @@ export function makeBrowserClient(o: Opts = {}): ApiClient {
   let fired = false
   const guarded: typeof globalThis.fetch = async (input, init) => {
     const res = await (o.fetch ?? globalThis.fetch)(input, init)
+    // T6.4: a write refused with 402 billing_required lights the read-only banner (lib/api/blocked.ts); the caller still gets the ApiError and rolls back.
+    if (res.status === 402) reportBillingBlocked()
     if (res.status === 401 && !fired) {
       let code = ""
       try {

@@ -1,9 +1,9 @@
-import { BillingSkeleton, USAGE_ROWS, getBilling, getEntitlements } from "@/features/billing"
+import { BillingSkeleton, getEntitlements, getPlans } from "@/features/billing"
 import { SettingsLoading, getDeliveryLog, getDepartments, getOrganisation, getIntegrations, getNotificationSettings, getRolesMatrix, getTemplate, getUsersAndInvites } from "@/features/settings"
 import { PageSkeleton } from "@/features/shell"
 import { planModules } from "@/lib/entitlements"
 import { getDeviceRegister } from "@/lib/device-session"
-import { getOrg } from "@/lib/org"
+import { getMockOrg } from "@/lib/org"
 import { can } from "@/lib/permissions"
 import { canWrite } from "@/lib/permissions"
 import { getSupportAccess } from "@/lib/support-data"
@@ -13,8 +13,8 @@ import { getSkeletonSession } from "@/lib/skeleton-session"
 export default async function Loading() {
   const session = await getSkeletonSession()
   if (!can(session.role, "settings")) return <PageSkeleton />
-  const [{ users, invites }, departments, matrix, template, notifications, integrations, support, billing, organisation, org, deliveryLog, reg] = await Promise.all([
-    getUsersAndInvites(), getDepartments(), getRolesMatrix(), getTemplate(), getNotificationSettings(), getIntegrations(), getSupportAccess().then((rows) => rows.filter((r) => r.tenantId === session.tenant.id)), getBilling(session.tenant.id), getOrganisation(), getOrg(), getDeliveryLog(), getDeviceRegister(session),
+  const [{ users, invites }, departments, matrix, template, notifications, integrations, support, organisation, org, deliveryLog, reg] = await Promise.all([
+    getUsersAndInvites(), getDepartments(), getRolesMatrix(), getTemplate(), getNotificationSettings(), getIntegrations(), getSupportAccess().then((rows) => rows.filter((r) => r.tenantId === session.tenant.id)), getOrganisation(), getMockOrg(), getDeliveryLog(), getDeviceRegister(session),
   ])
   const counts = {
     users: users.length,
@@ -51,16 +51,15 @@ export default async function Loading() {
       roleLabels: Object.fromEntries(matrix.roles.map((r) => [r.id, r.label])),
     },
   }
-  const entitlements = await getEntitlements()
+  // Billing is static here: the TYPICAL company (the Business plan, a provider subscription, a few invoices). The API is never called from a loading file.
+  const [plans, entitlements] = await Promise.all([getPlans(), getEntitlements()])
   const manage = can(session.role, "settings", "write")
-  const sub = billing.subscription
-  const plan = billing.plans.find((p) => p.id === sub?.planId) ?? billing.plans[0]
-  const fullUsage = USAGE_ROWS.flatMap((r, i) => (billing.usage && billing.usage[r.key] >= plan.limits[r.key] ? [i] : []))
+  const plan = plans.find((p) => p.id === session.entitlements.planId) ?? plans[0]!
   return (
     <SettingsLoading
       counts={counts}
       canWrite={canWrite(session, "settings")}
-      billing={<BillingSkeleton plans={billing.plans.length} invoices={billing.invoices.length} invoiceRows={billing.invoices} canManage={manage} currentIndex={Math.max(0, billing.plans.indexOf(plan))} pastDue={session.tenant.status === "past_due"} fullUsage={fullUsage} locale={org.locale} modules={planModules(entitlements, plan.id)} planName={plan.name} />}
+      billing={<BillingSkeleton plans={plans.length} invoices={3} canManage={manage} currentIndex={Math.max(0, plans.indexOf(plan))} modules={planModules(entitlements, plan.id)} planName={plan.name} />}
     />
   )
 }

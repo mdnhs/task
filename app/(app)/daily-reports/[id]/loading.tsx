@@ -2,7 +2,7 @@ import { ReportPage, ReportPageSkeleton, getReportSeed } from "@/features/report
 import { PageSkeleton } from "@/features/shell"
 import { SkMask } from "@/components/sk"
 import { formatDate } from "@/lib/dates"
-import { getOrg } from "@/lib/org"
+import { getMockOrg } from "@/lib/org"
 import { can, canReview } from "@/lib/permissions"
 import { lastSegment } from "@/lib/request-path"
 import { canWrite } from "@/lib/permissions"
@@ -16,7 +16,7 @@ export default async function Loading() {
   const staff = session.role.home === "staff"
   const typical = <ReportPageSkeleton edit={staff && canWrite(session, "reports")} review={!staff && canReview(session.role, session.tenant.status)} />
   const id = await lastSegment("/daily-reports/")
-  const [seed, org, user] = await Promise.all([getReportSeed(session), getOrg(), getSkeletonUser()])
+  const [seed, org, user] = await Promise.all([getReportSeed(session), getMockOrg(), getSkeletonUser()])
   if (!seed || !id || !seed.reports.some((r) => r.id === id)) return typical
   const me = seed.people.find((p) => p.id === seed.meId)?.name || user.name
   return (

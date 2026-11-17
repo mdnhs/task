@@ -1,12 +1,12 @@
 import { TaskArchiveSkeleton, archivedTasks, getTasks, isAssigned, ME_ID } from "@/features/tasks"
 import { PageSkeleton } from "@/features/shell"
-import { getOrg } from "@/lib/org"
+import { getMockOrg } from "@/lib/org"
 import { can } from "@/lib/permissions"
 import { canWrite } from "@/lib/permissions"
 import { getSkeletonSession } from "@/lib/skeleton-session"
 
 export default async function Loading() {
-  const [session, { tasks }, org] = await Promise.all([getSkeletonSession(), getTasks(), getOrg()])
+  const [session, { tasks }, org] = await Promise.all([getSkeletonSession(), getTasks(), getMockOrg()])
   if (!can(session.role, "tasks")) return <PageSkeleton />
   const staff = session.role.home === "staff"
   const archived = archivedTasks(staff ? tasks.filter((t) => isAssigned(t, ME_ID)) : tasks, org.today)

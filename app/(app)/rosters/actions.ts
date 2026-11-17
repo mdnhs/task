@@ -3,9 +3,9 @@
 import { getUser } from "@/features/shell"
 import { assignmentViolations, weekViolations } from "@/features/rosters"
 import { getData } from "@/lib/data"
-import { getOrg } from "@/lib/org"
+import { getMockOrg } from "@/lib/org"
 import { can } from "@/lib/permissions"
-import { getPeople } from "@/lib/people"
+import { getMockPeople } from "@/lib/people"
 import { rosterAccess, type LocationGrant, type OfficeLimit } from "@/lib/roster-access"
 import type { RuleViolation } from "@/lib/roster-rules"
 import { getSession } from "@/lib/session"
@@ -20,12 +20,12 @@ import { todayUserId } from "@/lib/today-data"
  */
 export async function checkWeekRules(weekId: string, shifts?: unknown): Promise<RuleViolation[]> {
   if (typeof weekId !== "string") return []
-  const [session, org, user] = await Promise.all([getSession(), getOrg(), getUser()])
+  const [session, org, user] = await Promise.all([getSession(), getMockOrg(), getUser()])
   if (!can(session.role, "roster")) return []
   const [{ locations }, { grants, limits }, people] = await Promise.all([
     getData<{ locations: { id: string }[] }>("rosters/locations.json"),
     getData<{ grants: LocationGrant[]; limits: OfficeLimit[] }>("rosters/access.json"),
-    getPeople(),
+    getMockPeople(),
   ])
   const me = todayUserId(session, people, user.name)
   const access = rosterAccess(session.role, me, grants, limits, locations.map((l) => l.id))
@@ -39,12 +39,12 @@ export async function checkWeekRules(weekId: string, shifts?: unknown): Promise<
  */
 export async function checkAssignRules(assign: { shiftId: string; personId: string }[]): Promise<RuleViolation[]> {
   if (!Array.isArray(assign) || assign.some((x) => typeof x?.shiftId !== "string" || typeof x?.personId !== "string")) return []
-  const [session, org, user] = await Promise.all([getSession(), getOrg(), getUser()])
+  const [session, org, user] = await Promise.all([getSession(), getMockOrg(), getUser()])
   if (!can(session.role, "roster")) return []
   const [{ locations }, { grants, limits }, people] = await Promise.all([
     getData<{ locations: { id: string }[] }>("rosters/locations.json"),
     getData<{ grants: LocationGrant[]; limits: OfficeLimit[] }>("rosters/access.json"),
-    getPeople(),
+    getMockPeople(),
   ])
   const me = todayUserId(session, people, user.name)
   const access = rosterAccess(session.role, me, grants, limits, locations.map((l) => l.id))

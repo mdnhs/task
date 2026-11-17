@@ -2,7 +2,7 @@ import { headers } from "next/headers"
 
 import { StaffRostersSkeleton, gapGroups, getDerivedGaps, getRosters } from "@/features/staff-rosters"
 import { PageSkeleton } from "@/features/shell"
-import { getOrg } from "@/lib/org"
+import { getMockOrg } from "@/lib/org"
 import { can } from "@/lib/permissions"
 import { canWrite } from "@/lib/permissions"
 import { getSkeletonSession, getSkeletonUser } from "@/lib/skeleton-session"
@@ -13,7 +13,7 @@ import { getSkeletonSession, getSkeletonUser } from "@/lib/skeleton-session"
 export default async function Loading() {
   const session = await getSkeletonSession()
   if (!can(session.role, "staff")) return <PageSkeleton />
-  const [org, user] = await Promise.all([getOrg(), getSkeletonUser()])
+  const [org, user] = await Promise.all([getMockOrg(), getSkeletonUser()])
   const [{ incidents, gaps }, h] = await Promise.all([getRosters(false, await getDerivedGaps(session, user.name, org.today)), headers()])
   let fromGap = false
   try {

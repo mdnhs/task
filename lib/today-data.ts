@@ -1,7 +1,7 @@
 import { cookies } from "next/headers"
 import { getData } from "./data"
 import type { Org } from "./org"
-import { ME_ID, getPeople } from "./people"
+import { ME_ID, getMockPeople } from "./people"
 import { can, reportScope } from "./permissions"
 import { reportState, scopeReports } from "./shift-report"
 import { getShiftReportData } from "./shift-reports-data"
@@ -40,7 +40,7 @@ export function todayUserId(session: Session, people: { id: string; name: string
 }
 
 export async function getTodayData(session: Session, org: Org, userName?: string): Promise<TodayData> {
-  const [people, { tasks: seeded }, shifts, jar] = await Promise.all([getPeople(), getData<{ tasks: RawTask[] }>("tasks/tasks.json"), getShiftState(session), cookies()])
+  const [people, { tasks: seeded }, shifts, jar] = await Promise.all([getMockPeople(), getData<{ tasks: RawTask[] }>("tasks/tasks.json"), getShiftState(session), cookies()])
   // Archived tasks are out of every count (FR-M1-13); "mine" means any assignee, not only the primary one.
   const tasks = activeTasks(seeded)
   const meId = todayUserId(session, people, userName)

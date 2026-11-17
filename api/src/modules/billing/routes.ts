@@ -17,7 +17,7 @@ const roleGate = (...keys: string[]): MiddlewareHandler<AppEnv> => async (c, nex
 const ownerOnly = roleGate("owner")
 const ownerOrAdmin = roleGate("owner", "admin")
 
-const SubscriptionDto = z
+export const SubscriptionDto = z
   .object({
     planId: z.string(), planName: z.string(), priceMonthlyMinor: z.number().int(), currency: z.string(),
     status: z.enum(["trialing", "active", "past_due", "canceled", "incomplete", "unpaid", "paused"]),
@@ -46,7 +46,7 @@ const InvoiceDto = z
       hostedUrl: "https://invoice.stripe.com/i/acct_1/test_abc", periodStart: "2026-11-17T00:00:00.000Z", periodEnd: "2026-12-17T00:00:00.000Z", createdAt: "2026-11-17T00:00:05.000Z",
     },
   })
-const InvoiceList = z.object({ items: z.array(InvoiceDto), nextCursor: z.string().nullable() }).openapi({ example: { items: [], nextCursor: null } })
+export const InvoiceList = z.object({ items: z.array(InvoiceDto), nextCursor: z.string().nullable() }).openapi({ example: { items: [], nextCursor: null } })
 
 const json = <T extends z.ZodType>(schema: T, description: string) => ({ description, content: { "application/json": { schema } } })
 

@@ -1,5 +1,5 @@
 import { AuditLogSkeleton, DeniedSkeleton, auditLogData, getPlatformSeed } from "@/features/platform"
-import { getOrg } from "@/lib/org"
+import { getMockOrg } from "@/lib/org"
 
 import { skeletonGate } from "../../skeleton-gate"
 
@@ -7,6 +7,6 @@ import { skeletonGate } from "../../skeleton-gate"
 export default async function Loading() {
   const g = await skeletonGate("audit.read", "the platform audit log")
   if ("denied" in g) return <DeniedSkeleton />
-  const [seed, org] = await Promise.all([getPlatformSeed(), getOrg()])
+  const [seed, org] = await Promise.all([getPlatformSeed(), getMockOrg()])
   return <AuditLogSkeleton data={auditLogData(seed)} today={org.today} tzLabel={org.tzLabel} />
 }

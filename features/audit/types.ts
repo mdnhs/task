@@ -29,8 +29,6 @@ export type AuditEvent = {
   sensitive: boolean
   /** Key/value metadata shown in the expanded row. */
   meta: Record<string, string>
-  /** lib/audit-outbox key of an event recorded on another screen, so it is merged once. */
-  sourceKey?: string
 }
 
 export const ACTION: Record<AuditAction, { label: string; tone: Tone }> = {

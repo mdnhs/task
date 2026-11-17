@@ -1,6 +1,6 @@
 import { TasksSkeleton, getProjects, getTaskSeed, checklistProgress, isLate, liveTasks, materialiseRecurring, STATUS } from "@/features/tasks"
 import { PageSkeleton } from "@/features/shell"
-import { getOrg } from "@/lib/org"
+import { getMockOrg } from "@/lib/org"
 import { EVIDENCE_STATE, evidenceState } from "@/lib/task-evidence"
 import { assigneesOf } from "@/lib/task-scope"
 import { can } from "@/lib/permissions"
@@ -12,7 +12,7 @@ import { getSkeletonSession } from "@/lib/skeleton-session"
 export default async function Loading() {
   const session = await getSkeletonSession()
   if (!can(session.role, "tasks")) return <PageSkeleton />
-  const [{ seed, staff, refFloor, people }, projects, org] = await Promise.all([getTaskSeed(session), getProjects(), getOrg()])
+  const [{ seed, staff, refFloor, people }, projects, org] = await Promise.all([getTaskSeed(session), getProjects(), getMockOrg()])
   // The list adds the due instances of recurring series on mount, so the skeleton counts them too.
   const live = liveTasks(materialiseRecurring(seed, org.today, refFloor))
   const labels = live.slice(0, 10).map((t) => {

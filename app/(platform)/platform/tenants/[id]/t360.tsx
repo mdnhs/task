@@ -7,7 +7,7 @@ import {
   type PlatformAction, type StaffMember, type T360Ctx, type T360Head, type TenantTab,
 } from "@/features/platform"
 import { EmptyState } from "@/components/empty-state"
-import { getOrg } from "@/lib/org"
+import { getMockOrg } from "@/lib/org"
 import { requestPath } from "@/lib/request-path"
 
 // Shared by the tenant 360 routes (layout, tab pages, long-form pages and their loading.tsx), so a page and its
@@ -16,7 +16,7 @@ import { requestPath } from "@/lib/request-path"
 export type T360 = { head: T360Head; ctx: T360Ctx; tabs: TenantTab[]; tz: string; seed: Awaited<ReturnType<typeof getPlatformSeed>>; retentionDays: number }
 
 export async function load360(id: string, op: StaffMember): Promise<T360 | null> {
-  const [seed, settings, org] = await Promise.all([getPlatformSeed(), getPlatformSettings(), getOrg()])
+  const [seed, settings, org] = await Promise.all([getPlatformSeed(), getPlatformSettings(), getMockOrg()])
   const head = tenant360Head(seed, id, op, settings.payments)
   if (!head) return null
   return {

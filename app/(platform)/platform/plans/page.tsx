@@ -1,5 +1,5 @@
 import { PlansView, getPlatformSeed, plansData } from "@/features/platform"
-import { getOrg } from "@/lib/org"
+import { getMockOrg } from "@/lib/org"
 
 import { gate } from "../../gate"
 
@@ -10,6 +10,6 @@ export const metadata = { title: "Plans · Platform · OpsDesk" }
 export default async function Page() {
   const g = await gate("billing.read", "platform plans")
   if ("denied" in g) return g.denied
-  const [seed, org] = await Promise.all([getPlatformSeed(), getOrg()])
+  const [seed, org] = await Promise.all([getPlatformSeed(), getMockOrg()])
   return <PlansView data={plansData(seed, g.op)} today={org.today} operator={{ name: g.op.name, role: g.op.role }} />
 }

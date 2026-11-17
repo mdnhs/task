@@ -1,21 +1,21 @@
 import { RostersSkeleton, getRosterData, rosterScopeKey, getHolidayDates, getRosterExchange, getRosterHistory, getRosterRequests, getRosterRules, getWeekTemplates, rosterEdit, rosterViewData } from "@/features/rosters"
 import { PageSkeleton } from "@/features/shell"
 import { getData } from "@/lib/data"
-import { getOrg } from "@/lib/org"
+import { getMockOrg } from "@/lib/org"
 import { can } from "@/lib/permissions"
-import { getPeople } from "@/lib/people"
+import { getMockPeople } from "@/lib/people"
 import { rosterAccess, type LocationGrant, type OfficeLimit } from "@/lib/roster-access"
 import { todayUserId } from "@/lib/today-data"
 import { getSkeletonSession, getSkeletonUser } from "@/lib/skeleton-session"
 
 // Async so the skeleton is the real view for the role's default location and the current week (loading.tsx gets no params).
 export default async function Loading() {
-  const [session, org, user] = await Promise.all([getSkeletonSession(), getOrg(), getSkeletonUser()])
+  const [session, org, user] = await Promise.all([getSkeletonSession(), getMockOrg(), getSkeletonUser()])
   if (!can(session.role, "roster")) return <PageSkeleton />
   const [{ locations }, { grants, limits }, people] = await Promise.all([
     getData<{ locations: { id: string; name: string }[] }>("rosters/locations.json"),
     getData<{ grants: LocationGrant[]; limits: OfficeLimit[] }>("rosters/access.json"),
-    getPeople(),
+    getMockPeople(),
   ])
   const me = todayUserId(session, people, user.name)
   const access = rosterAccess(session.role, me, grants, limits, locations.map((l) => l.id))

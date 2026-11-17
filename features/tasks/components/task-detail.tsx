@@ -11,7 +11,6 @@ import { VoiceNotePlayer } from "@/components/voice-note"
 import { When } from "@/components/when"
 import { formatDate, isOverdue } from "@/lib/dates"
 import { EVIDENCE_STATE, canVerify as mayVerify, evidenceState, reviewerText } from "@/lib/task-evidence"
-import { noticeTitle, taskNotices } from "@/lib/task-notices"
 import { isLate, isOpen } from "../lifecycle"
 import {
   addChecklistItem,
@@ -96,24 +95,21 @@ export function TaskDetail({
   const name = useCallback((id: string) => byId.get(id)?.name ?? id, [byId])
   const meId = people.find((p) => p.name === me)?.id ?? me
   const manager = actor === "reviewer"
-  const tenantId = scopeKey.split(":")[0] ?? ""
 
   /**
    * A change to someone else's task tells the people on it (FR-M1-12, AC-M1-04): the history entry lists who was
-   * notified, and a notice goes to lib/task-notices for their bell.
+   * notified. (The notices themselves are written by the API; the mock UI has no client outbox any more.)
    */
   const withNotice = useCallback(
-    (before: Task, after: Task, what: string): Task => {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars -- `what` fed the deleted client notice; the mock UI keeps the signature until T6.6 rewrites this component
+    (before: Task, after: Task, _what: string): Task => {
       if (after === before) return after
       const to = [...new Set([...assigneesOf(before), ...assigneesOf(after)])].filter((id) => id !== meId)
       const last = after.timeline.at(-1)
       if (!to.length || !last) return after
-      to.forEach((id) =>
-        taskNotices.push({ id: `${after.ref}:${after.timeline.length}:${last.at}:${id}`, tenantId, to: id, title: noticeTitle(me, after.ref, what, last.changes), href: `/tasks/${after.ref}`, at: last.at }),
-      )
       return { ...after, timeline: [...after.timeline.slice(0, -1), { ...last, notified: to.map(name) }] }
     },
-    [meId, me, name, tenantId],
+    [meId, name],
   )
   const apply = useCallback((fn: (t: Task) => Task) => setTasks((prev) => prev.map((t) => (t.ref === taskRef ? fn(t) : t))), [setTasks, taskRef])
   /** Manager edits notify; the member's own edits don't. */

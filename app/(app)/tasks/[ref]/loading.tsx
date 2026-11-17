@@ -2,7 +2,7 @@ import { TaskDetail, TaskDetailLoading, TaskDetailSkeleton, getProjects, getTask
 import { PageSkeleton } from "@/features/shell"
 import { SkMask } from "@/components/sk"
 import { getDeviceContext } from "@/lib/device-session"
-import { getOrg } from "@/lib/org"
+import { getMockOrg } from "@/lib/org"
 import { can } from "@/lib/permissions"
 import { lastSegment } from "@/lib/request-path"
 import { canWrite } from "@/lib/permissions"
@@ -17,7 +17,7 @@ export default async function Loading() {
   const canEdit = canWrite(session, "tasks")
   const manager = session.role.home === "manager"
   const ref = await lastSegment("/tasks/")
-  const [{ people, staff, seed, scopeKey, refFloor }, projects, org, user, { canDrive }] = await Promise.all([getTaskSeed(session), getProjects(), getOrg(), getSkeletonUser(), getDeviceContext(session)])
+  const [{ people, staff, seed, scopeKey, refFloor }, projects, org, user, { canDrive }] = await Promise.all([getTaskSeed(session), getProjects(), getMockOrg(), getSkeletonUser(), getDeviceContext(session)])
   if (!ref) return <TaskDetailSkeleton canEdit={canEdit} reviewer={canEdit && manager} />
   const me = (staff && people.find((p) => p.id === ME_ID)?.name) || user.name
   // Not in the seed: maybe created in this tab (client store only, e.g. with voice instructions). The client decides.

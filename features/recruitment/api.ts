@@ -1,9 +1,9 @@
 import { getData } from "@/lib/data"
-import { getPeople } from "@/lib/people"
+import { getMockPeople } from "@/lib/people"
 import type { Candidate } from "./types"
 
 export async function getCandidates() {
-  const [{ candidates }, people] = await Promise.all([getData<{ candidates: Candidate[] }>("recruitment/candidates.json"), getPeople()])
+  const [{ candidates }, people] = await Promise.all([getData<{ candidates: Candidate[] }>("recruitment/candidates.json"), getMockPeople()])
   return { candidates, owners: people.map((p) => p.name) }
 }
 

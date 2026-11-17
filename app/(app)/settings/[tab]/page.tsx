@@ -2,7 +2,7 @@ import type { Metadata } from "next"
 import { DEFAULT_APPEARANCE } from "@/lib/appearance"
 import { notFound } from "next/navigation"
 
-import { BillingView, getBilling, getEntitlements, getSeatLimit } from "@/features/billing"
+import { BillingView, getBilling, getEntitlements, getPlans, getSeatLimit, moduleRows, planCards } from "@/features/billing"
 import {
   BrandingPanel, DepartmentsPanel, DevicePolicyCard, DevicesPanel, IntegrationsPanel, MfaPolicyCard, NotificationsPanel, OrganisationForm, PrivacyPanel, RolesMatrix, SETTINGS_TABS,
   SettingsLayout, TemplatePanel, UsersPanel, getBranding, getDeliveryLog, getDepartments, getIntegrations, getNotificationSettings, getOrganisation,
@@ -14,7 +14,8 @@ import { getDeviceRegister } from "@/lib/device-session"
 import { getTenantRoles } from "@/lib/roles-data"
 import { getOrg } from "@/lib/org"
 import { can } from "@/lib/permissions"
-import { canWrite, getSession } from "@/lib/session"
+import { canWrite, requireMfaOk } from "@/lib/session"
+import { canWhileBlocked } from "@/lib/billing-state"
 import { getSupportAccess } from "@/lib/support-data"
 
 export const dynamicParams = false
@@ -32,7 +33,9 @@ export async function generateMetadata({ params }: { params: Promise<{ tab: stri
 export default async function Page({ params }: { params: Promise<{ tab: string }> }) {
   const { tab } = await params
   if (!isTab(tab)) notFound()
-  const [session, org] = await Promise.all([getSession(), getOrg()])
+  // This page calls the API (billing, entitlements, the company clock): it gates itself on the second factor first (the API refuses tenant reads until then).
+  const session = await requireMfaOk()
+  const org = await getOrg()
   if (!can(session.role, "settings")) return <AccessRestricted moduleLabel="Settings" />
 
   const write = canWrite(session, "settings")
@@ -48,7 +51,7 @@ export default async function Page({ params }: { params: Promise<{ tab: string }
         return <DepartmentsPanel departments={departments} owners={users.filter((u) => u.status === "active").map((u) => u.name)} canWrite={write} scopeKey={scopeKey} />
       }
       case "users": {
-        const [{ users, invites }, seats] = await Promise.all([getUsersAndInvites(), getSeatLimit(tenant.id)])
+        const [{ users, invites }, seats] = await Promise.all([getUsersAndInvites(), getSeatLimit()])
         return (
           <UsersPanel
             users={users}
@@ -93,27 +96,21 @@ export default async function Page({ params }: { params: Promise<{ tab: string }
       case "branding":
         return <BrandingPanel tenantId={tenant.id} name={tenant.name} color={tenant.brand} appearance={tenant.appearance ?? DEFAULT_APPEARANCE} presets={(await getBranding()).presets} canWrite={write} />
       case "billing": {
-        const b = await getBilling(tenant.id)
-        if (!b.subscription) return null
+        // Owner only: anyone else gets null (the tab is not offered). Not canWrite: a blocked (read-only) company's owner must still reach billing to pay.
+        const [b, plans, ent] = await Promise.all([getBilling(), getPlans(), getEntitlements()])
+        if (!b) return null
         return (
           <BillingView
-            plans={b.plans}
-            tenantId={tenant.id}
-            planId={b.subscription.planId}
-            status={tenant.status}
-            graceEndsOn={tenant.graceEndsOn}
-            trialEndsOn={tenant.trialEndsOn}
-            renewsOn={b.subscription.renewsOn}
-            cardLast4={b.subscription.cardLast4}
-            provider={b.provider}
-            usage={b.usage}
+            subscription={b.subscription}
+            plans={planCards(plans, ent, b.subscription.planId)}
+            modules={moduleRows(ent, session.entitlements.allowed)}
             invoices={b.invoices}
+            invoicesMore={b.invoicesMore}
             today={org.today}
+            timezone={org.timezone}
             tzLabel={org.tzLabel}
-            // Not canWrite: a suspended (read-only) tenant owner must still reach billing to pay; read-only roles stay excluded.
-            canManage={can(session.role, "settings", "write")}
             locale={org.locale}
-            entitlements={await getEntitlements()}
+            canManage={canWhileBlocked(session, "billing")}
           />
         )
       }
@@ -131,7 +128,7 @@ export default async function Page({ params }: { params: Promise<{ tab: string }
             today={org.today}
             tzLabel={org.tzLabel}
             // FR-SET-08 / FR-SAAS-15: support grants, full export and deletion are Tenant Owner only; others see the list read-only.
-            canWrite={write && session.role.id === "owner"}
+            canWrite={canWhileBlocked(session, "export")}
           />
         )
       }

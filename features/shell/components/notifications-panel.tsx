@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { AlarmClock, BellRing, CalendarClock, CreditCard, FileCheck2, Hourglass, KeyRound, ListChecks, Repeat2, RotateCcw, type LucideIcon } from "lucide-react"
+import { AlarmClock, BellRing, CalendarClock, CreditCard, FileCheck2, Files, Hourglass, KeyRound, ListChecks, Repeat2, RotateCcw, ShieldCheck, UserPlus, Users, type LucideIcon } from "lucide-react"
 import { AnimatePresence, motion, useReducedMotion } from "motion/react"
 
 import { FilterSeg } from "@/components/filter-bar"
@@ -10,13 +10,14 @@ import { Icon } from "@/components/icons"
 import { RollNumber } from "@/components/roll-number"
 import { Button } from "@/components/ui/button"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { useNotifyFeed } from "@/hooks/use-notify-feed"
-import type { NotifyContext } from "@/lib/notify"
+import { useNotifications } from "@/hooks/use-notifications"
 import { formatDue } from "@/lib/dates"
 import { DUR, EASE, STAGGER, layoutTransition, listItem, numDir } from "@/lib/motion"
 import { cn } from "@/lib/utils"
 
+import { platformFeed } from "../platform-feed"
 import type { Notification, NotificationType } from "../types"
+import { NotificationsListSkeleton } from "./skeletons"
 
 const ICONS: Record<NotificationType, LucideIcon> = {
   assigned: ListChecks,
@@ -29,6 +30,16 @@ const ICONS: Record<NotificationType, LucideIcon> = {
   payment: CreditCard,
   access: KeyRound,
   trial: Hourglass,
+  // The API's notification kinds (B6 T6.4).
+  task: ListChecks,
+  report: FileCheck2,
+  billing: CreditCard,
+  security: KeyRound,
+  invite: UserPlus,
+  member: Users,
+  file: Files,
+  dsr: ShieldCheck,
+  system: BellRing,
 }
 
 type Tab = "all" | "unread"
@@ -41,16 +52,41 @@ const dotMotion = {
 }
 const badge = (n: number) => (n > 9 ? "9+" : String(n))
 
-// Bell + panel. The list lives in the notifyFeed store (hooks/use-notify-feed), which also adds due reminders (FR-NOT-02/03). Read state is client state only. One Popover at every width:
-// full-width under 640px via CSS (the existing useIsMobile hook breaks at 768).
-export function NotificationsPanel({ items, today, tzLabel, scope, notify }: { items: Notification[]; today: string; tzLabel: string; scope: string; notify?: NotifyContext }) {
-  const [feed, setList] = useNotifyFeed(items, scope, notify)
-  const list = feed as Notification[]
+// The platform console's alerts are still mock (T6.8): static items with read state kept in a client store, like before. The company bell below is the API's.
+// Bell + panel. One Popover at every width: full-width under 640px via CSS (the existing useIsMobile hook breaks at 768).
+// Company bell: the list is the API's (hooks/use-notifications: 60 s poll while the tab is visible, mark one, mark all). Console bell: static alerts.
+export function NotificationsPanel({ items, today, tzLabel, scope, timezone }: { items: Notification[]; today: string; tzLabel: string; scope: string; /** The company's IANA zone: present = the API's bell, absent = the console's static alerts. */ timezone?: string }) {
+  return timezone ? <ApiBell today={today} tzLabel={tzLabel} timezone={timezone} /> : <StaticBell items={items} today={today} tzLabel={tzLabel} scope={scope} />
+}
+
+function ApiBell({ today, tzLabel, timezone }: { today: string; tzLabel: string; timezone: string }) {
+  const n = useNotifications(timezone)
+  return <BellView list={n.items as Notification[]} loading={!n.loaded} onRead={n.read} onReadAll={n.readAll} today={today} tzLabel={tzLabel} />
+}
+
+function StaticBell({ items, today, tzLabel, scope }: { items: Notification[]; today: string; tzLabel: string; scope: string }) {
+  const [list, setList] = platformFeed.useStore(items, scope)
+  return (
+    <BellView
+      list={list}
+      loading={false}
+      onRead={(id) => setList((l) => l.map((x) => (x.id === id ? { ...x, read: true } : x)))}
+      onReadAll={() => setList((l) => l.map((x) => ({ ...x, read: true })))}
+      today={today}
+      tzLabel={tzLabel}
+    />
+  )
+}
+
+function BellView({ list: source, loading, onRead, onReadAll, today, tzLabel }: { list: Notification[]; loading: boolean; onRead: (id: string) => void; onReadAll: () => void; today: string; tzLabel: string }) {
   const [tab, setTab] = React.useState<Tab>("all")
   const [open, setOpen] = React.useState(false)
+  // "Mark all read" clears the dots top to bottom in a short cascade: these ids keep showing as unread until their turn (the data is already read).
+  const [hold, setHold] = React.useState<ReadonlySet<string>>(new Set())
+  const list = React.useMemo(() => source.map((n) => (n.read && hold.has(n.id) ? { ...n, read: false } : n)), [source, hold])
 
   const reduce = useReducedMotion()
-  // Pending "Mark all read" steps, cleared if the panel goes away mid-cascade.
+  // Pending cascade steps, cleared if the panel goes away mid-cascade.
   const timers = React.useRef<number[]>([])
   React.useEffect(() => {
     const t = timers
@@ -67,13 +103,14 @@ export function NotificationsPanel({ items, today, tzLabel, scope, notify }: { i
     setPrevCount(unread)
   }
 
-  const markRead = (id: string) => setList((l) => l.map((n) => (n.id === id ? { ...n, read: true } : n)))
-  // Clears the unread dots top→bottom in a short cascade (STAGGER apart); reduced motion: all at once.
+  const markRead = (id: string) => onRead(id)
   const markAll = () => {
     const ids = list.filter((n) => !n.read).map((n) => n.id)
-    if (reduce || ids.length < 2) return setList((l) => l.map((n) => ({ ...n, read: true })))
+    onReadAll()
+    if (reduce || ids.length < 2) return
     timers.current.forEach(clearTimeout)
-    timers.current = ids.map((id, i) => window.setTimeout(() => markRead(id), i * STAGGER * 1000))
+    setHold(new Set(ids))
+    timers.current = ids.map((id, i) => window.setTimeout(() => setHold((h) => new Set([...h].filter((x) => x !== id))), i * STAGGER * 1000))
   }
 
   return (
@@ -113,7 +150,8 @@ export function NotificationsPanel({ items, today, tzLabel, scope, notify }: { i
           />
         </div>
         <div className="od-notif-list">
-          {shown.length === 0 && <p className="od-menu-sub-hint">You are all caught up.</p>}
+          {loading && <NotificationsListSkeleton />}
+          {!loading && shown.length === 0 && <p className="od-menu-sub-hint">You are all caught up.</p>}
           <AnimatePresence initial={false}>
           {shown.map((n) => {
             const Ico = ICONS[n.type]

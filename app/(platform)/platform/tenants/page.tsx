@@ -1,5 +1,5 @@
 import { TenantsView, getPlatformSeed, isTenantView, tenantsData } from "@/features/platform"
-import { getOrg } from "@/lib/org"
+import { getMockOrg } from "@/lib/org"
 
 import { gate } from "../../gate"
 
@@ -10,6 +10,6 @@ export const metadata = { title: "Tenants · Platform · OpsDesk" }
 export default async function Page({ searchParams }: { searchParams: Promise<{ view?: string | string[] }> }) {
   const g = await gate("tenants.read", "platform tenants")
   if ("denied" in g) return g.denied
-  const [seed, org, { view }] = await Promise.all([getPlatformSeed(), getOrg(), searchParams])
+  const [seed, org, { view }] = await Promise.all([getPlatformSeed(), getMockOrg(), searchParams])
   return <TenantsView data={tenantsData(seed, g.op)} view={isTenantView(view) ? view : "all"} today={org.today} operator={{ name: g.op.name, role: g.op.role }} />
 }

@@ -1,7 +1,7 @@
 import { TaskCalendarSkeleton, byDueDay, getProjects, getTaskSeed, liveTasks, materialiseRecurring, monthGrid } from "@/features/tasks"
 import type { CalCellSk } from "@/features/tasks"
 import { PageSkeleton } from "@/features/shell"
-import { getOrg } from "@/lib/org"
+import { getMockOrg } from "@/lib/org"
 import { can } from "@/lib/permissions"
 import { getSkeletonSession } from "@/lib/skeleton-session"
 
@@ -12,7 +12,7 @@ const MONTH_CHIPS = 3
 export default async function Loading() {
   const session = await getSkeletonSession()
   if (!can(session.role, "tasks")) return <PageSkeleton />
-  const [{ seed, staff, refFloor }, projects, org] = await Promise.all([getTaskSeed(session), getProjects(), getOrg()])
+  const [{ seed, staff, refFloor }, projects, org] = await Promise.all([getTaskSeed(session), getProjects(), getMockOrg()])
   const days = byDueDay(liveTasks(materialiseRecurring(seed, org.today, refFloor)))
   const weeks = monthGrid(org.today.slice(0, 10)).map((week) =>
     week.map((d): CalCellSk => {

@@ -9,7 +9,7 @@ Phase 1 steps 3 (evidence rules) and 6 (task model and views), built 28 Oct 2026
 | `/tasks/board` | Kanban by status. Drag a card (HTML drag and drop) or use "Move to…" (keyboard, touch). Drops follow `boardMove()` |
 | `/tasks/calendar` | Month / week by due date, Monday first; phones show a count dot per day |
 | `/tasks/projects` | Projects with milestones (`projects.json`), progress from their tasks |
-| `/tasks/archive` | Removed tasks, restorable 30 days (managers); "Delete now" for tenant admins (settings write) |
+- Remove = `archiveTask()`; `archivedTasks()` hides tasks older than 30 days (a backend purges them). "Delete now" is audited by the API (T6.4 removed the client audit outbox).
 | `/tasks/[ref]` | Detail: evidence, checklist, subtasks, dependencies, history, manager tools |
 | `/tasks/new` | New task form as a page (was a dialog; it scrolled at 1568×698). Write access only, else "Access restricted". `?from=` = back/Cancel target (internal path only, default `/tasks`), `?assignee=` presets the assignee, `?then=task` opens the new task after Save instead of returning (dashboard "New Task" / "Assign Task"). Links built with `newTaskHref()` (`features/tasks/new-task.ts`); old `/tasks?new=1` redirects here. `loading.tsx` renders the real form masked (`SkMask`) |
 
@@ -24,7 +24,7 @@ Phase 1 steps 3 (evidence rules) and 6 (task model and views), built 28 Oct 2026
 - New fields: `assignees` (co-assignees; `assignee` stays primary; `lib/task-scope.ts` `isAssignee` / `activeTasks` make every assignee count and leave archived tasks out in tasks, search, shift reports and the Today card), `estimate` (min), `projectId`, `milestoneId`, `parentRef` (subtask), `checklist`, `dependsOn` (finish-to-start), `archivedAt/By`, `proposal`, `round`.
 - `knockOn()`: moving a task pushes open dependants that would start before it is due, by whole days, down the chain (never pulls earlier). Shown in the Reschedule dialog before saving.
 - Remove = `archiveTask()`; `archivedTasks()` hides tasks older than 30 days (a backend purges them). "Delete now" writes a `purge` audit event through `lib/audit-outbox.ts` (FR-M0-13).
-- History: `TimelineEvent.changes` holds old → new values; `notified` lists members told about a manager's change. Notices go to `lib/task-notices.ts` (outbox); `hooks/use-notify-feed.ts` subscribes and adds the member's notices to the shell bell once each.
+- History: `TimelineEvent.changes` holds old → new values; `notified` lists members told about a manager's change. The notices themselves are written by the API and listed by the shell bell (`lib/notifications.ts`); there is no client notice store.
 - Changes from outside /tasks arrive through `lib/task-inbox.ts` and `applyTaskUpdates`: shift report rows (status + time) and the Today card ("Mark done", "Snooze" = timeline line only). Each update id is kept on its timeline line, so it applies once.
 - Filters: `status=open` (not done), `status=review` (submitted, not the reviewer's own; managers only). Drive URLs are removed from the seed on devices without Drive access (`withholdDriveLinks`, FR-M1-52).
 - Q8 assumption: members don't change dates; they "Propose new dates", a manager reviews (with knock-on) and approves or declines.

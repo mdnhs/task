@@ -11,13 +11,13 @@ import { getNavigation } from "../api"
 // session.role is already narrowed to the tenant's plan (FR-M0-15), so when the role would have access but the plan lacks the module,
 // this shows the "Not in your plan" variant with a link to billing instead of the permission message.
 // `home`: where the way-out button goes (the platform console sends staff back to its overview).
-export async function AccessRestricted({ moduleLabel, home = { href: "/", label: "Back to Dashboard" } }: { moduleLabel: string; home?: { href: string; label: string } }) {
+export async function AccessRestricted({ moduleLabel, home = { href: "/", label: "Back to Dashboard" }, notInPlan: forcedPlan = false }: { moduleLabel: string; home?: { href: string; label: string }; /** The API itself answered 403 module_not_entitled: show the plan state even when the cached session still lists the module. */ notInPlan?: boolean }) {
   // Inside the console a staff person may have no company at all, so a missing company session falls back to the console session.
   const [session, nav] = await Promise.all([peekSession().then((s) => s ?? getPlatformSession()), getNavigation()])
   const href = [...nav.menu, ...nav.general].find((n) => n.label === moduleLabel)?.href
   const mod = href ? moduleForHref(href) : null
   const original = session.roles.find((r) => r.id === session.role.id) ?? session.role
-  const notInPlan = !!mod && !hasModule(session.entitlements, mod) && can(original, mod)
+  const notInPlan = forcedPlan || (!!mod && !hasModule(session.entitlements, mod) && can(original, mod))
 
   if (notInPlan) {
     return (

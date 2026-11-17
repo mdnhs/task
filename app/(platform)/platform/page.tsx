@@ -1,5 +1,5 @@
 import { OverviewDashboard, getPlatformSeed, overviewData } from "@/features/platform"
-import { getOrg } from "@/lib/org"
+import { getMockOrg } from "@/lib/org"
 
 import { gate } from "../gate"
 
@@ -10,6 +10,6 @@ export const metadata = { title: "Overview · Platform · OpsDesk" }
 export default async function Page() {
   const g = await gate("tenants.read", "the platform overview")
   if ("denied" in g) return g.denied
-  const [seed, org] = await Promise.all([getPlatformSeed(), getOrg()])
+  const [seed, org] = await Promise.all([getPlatformSeed(), getMockOrg()])
   return <OverviewDashboard data={overviewData(seed, org.today, g.op)} today={org.today} tzLabel={org.tzLabel} />
 }

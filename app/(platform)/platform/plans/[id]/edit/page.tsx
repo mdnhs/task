@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation"
 
 import { PlanEditView, getPlatformSeed, planFormData } from "@/features/platform"
-import { getOrg } from "@/lib/org"
+import { getMockOrg } from "@/lib/org"
 
 import { gate } from "../../../../gate"
 
@@ -20,7 +20,7 @@ export const metadata = { title: "Edit plan · Platform · OpsDesk" }
 export default async function Page({ params }: { params: Promise<{ id: string }> }) {
   const g = await gate("plans.write", "platform plan editing")
   if ("denied" in g) return g.denied
-  const [{ id }, org] = await Promise.all([params, getOrg()])
+  const [{ id }, org] = await Promise.all([params, getMockOrg()])
   const seed = await getPlatformSeed()
   if (!seed.plans.some((p) => p.id === id)) notFound()
   return <PlanEditView data={planFormData(seed)} planId={id} operator={{ name: g.op.name, role: g.op.role }} today={org.today} />

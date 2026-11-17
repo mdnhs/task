@@ -79,6 +79,15 @@ function kindOf(status: number, code: string): ErrorKind {
   return "unprocessable"
 }
 
+/**
+ * Which full-page state a refused page READ shows (B6 I10): 403 module_not_entitled is "Not in your plan", any other 403 (a role, a device policy) is the permission state.
+ * Anything else is not a gate (the page's error state handles it). A write never uses this: it shows the mapped copy as a toast.
+ */
+export function gateOf(e: unknown): "plan" | "forbidden" | null {
+  const { kind } = classifyApiError(e)
+  return kind === "module_not_entitled" ? "plan" : kind === "forbidden" && e instanceof ApiError && e.status === 403 ? "forbidden" : null
+}
+
 const KIND_COPY: Record<ErrorKind, string> = {
   unauthenticated: "Check your details and try again.",
   session_expired: "Session expired. Sign in again.",
@@ -104,6 +113,14 @@ const CODE_COPY: Record<string, string> = {
   device_policy: "Available on your work PC.",
   self_verification: "You can't verify your own task.",
   evidence_not_ready: "Evidence is still being scanned.",
+  // Billing (B3 service): the seat cap is local, the rest are checkout and portal states.
+  seat_limit_exceeds_plan: "That is more seats than your plan allows.",
+  seats_below_members: "Seats can't be fewer than your active members.",
+  already_subscribed: "This company already has a subscription. Use Manage billing.",
+  no_customer: "Start a plan first.",
+  no_subscription: "There is no active subscription to change.",
+  plan_not_purchasable: "That plan can't be bought online yet.",
+  billing_provider_error: "The payment provider did not answer. Try again.",
 }
 
 /** Short copy for the UI and a "Ref <requestId>" (null when there is none). The raw title, the server text and the code are never returned. */

@@ -141,3 +141,22 @@ export function PageSkeleton() {
     </SkGroup>
   )
 }
+
+// The bell's list while the first load is pending (B6 T6.4): the real `.od-notif-row` box with the 28px icon circle, a title line (13px at 1.35 = 17.55) and the
+// time line, so the open panel does not jump when the API answers. Static: no API, no session. The unread pip is not drawn (read state is unknown yet).
+// Intended row height: 8 + 17.55 + 16 + 8 = about 49.6px (T6.9: browser-measure the time line, light and dark).
+export function NotificationsListSkeleton({ rows = 3 }: { rows?: number }) {
+  return (
+    <div aria-hidden="true">
+      {Array.from({ length: rows }, (_, i) => (
+        <div key={i} className="od-notif-row">
+          <span className="od-notif-ico"><Sk w={28} h={28} r="circle" /></span>
+          <span className="od-notif-body">
+            <Sk w={i % 2 ? 190 : 230} h={11} lh={17.55} />
+            <Sk w={96} h={10} lh={16} style={{ marginTop: 0 }} />
+          </span>
+        </div>
+      ))}
+    </div>
+  )
+}

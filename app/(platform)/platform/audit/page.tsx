@@ -1,5 +1,5 @@
 import { AuditLogView, auditLogData, getPlatformSeed } from "@/features/platform"
-import { getOrg } from "@/lib/org"
+import { getMockOrg } from "@/lib/org"
 
 import { gate } from "../../gate"
 
@@ -10,6 +10,6 @@ export const metadata = { title: "Audit log · Platform · OpsDesk" }
 export default async function Page() {
   const g = await gate("audit.read", "the platform audit log")
   if ("denied" in g) return g.denied
-  const [seed, org] = await Promise.all([getPlatformSeed(), getOrg()])
+  const [seed, org] = await Promise.all([getPlatformSeed(), getMockOrg()])
   return <AuditLogView data={auditLogData(seed)} today={org.today} tzLabel={org.tzLabel} />
 }

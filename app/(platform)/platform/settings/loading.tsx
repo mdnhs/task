@@ -1,5 +1,5 @@
 import { DeniedSkeleton, SettingsSkeleton, getPlatformSettings, requireStaff } from "@/features/platform"
-import { getOrg } from "@/lib/org"
+import { getMockOrg } from "@/lib/org"
 
 import { skeletonGate } from "../../skeleton-gate"
 
@@ -7,6 +7,6 @@ import { skeletonGate } from "../../skeleton-gate"
 export default async function Loading() {
   const g = await skeletonGate("settings.read", "platform settings")
   if ("denied" in g) return <DeniedSkeleton />
-  const [settings, org] = await Promise.all([getPlatformSettings(), getOrg()])
+  const [settings, org] = await Promise.all([getPlatformSettings(), getMockOrg()])
   return <SettingsSkeleton settings={settings} today={org.today} tzLabel={org.tzLabel} operator={{ name: g.op.name, role: g.op.role }} canWrite={requireStaff(g.op, "settings.write")} />
 }

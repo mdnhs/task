@@ -1,5 +1,5 @@
 import { getData } from "./data"
-import { getPeople } from "./people"
+import { getMockPeople } from "./people"
 import type { Person } from "./types"
 
 // One person id across the app (D2). The directory (`tasks/people.json`, `p-*`) is canonical: a staff row with `personId` is that
@@ -29,7 +29,7 @@ export function mergeWorkforce(people: Person[], staff: StaffRow[], extras: Work
 /** Server only. */
 export async function getWorkforce(): Promise<WorkforceMember[]> {
   const [people, { staff }, { extras }] = await Promise.all([
-    getPeople(),
+    getMockPeople(),
     getData<{ staff: StaffRow[] }>("staff-rosters/staff.json"),
     getData<{ extras: WorkforceExtra[] }>("rosters/workforce.json"),
   ])

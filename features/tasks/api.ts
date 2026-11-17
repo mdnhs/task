@@ -2,14 +2,14 @@ import { getData } from "@/lib/data"
 import { getDeviceContext } from "@/lib/device-session"
 import { withholdDriveLinks } from "@/lib/devices"
 import type { Session } from "@/lib/session"
-import { ME_ID, getPeople } from "@/lib/people"
+import { ME_ID, getMockPeople } from "@/lib/people"
 import { isAssigned } from "./planning"
 import type { Person, Project, Task, TaskTemplate } from "./types"
 
 export { ME_ID }
 
 export async function getTasks() {
-  const [{ tasks }, people] = await Promise.all([getData<{ tasks: Task[] }>("tasks/tasks.json"), getPeople()])
+  const [{ tasks }, people] = await Promise.all([getData<{ tasks: Task[] }>("tasks/tasks.json"), getMockPeople()])
   return { tasks, people }
 }
 

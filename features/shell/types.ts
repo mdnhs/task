@@ -21,5 +21,7 @@ export type NotificationType =
   | "payment"
   | "access"
   | "trial"
-// Titles stay generic: no names, amounts or other sensitive details (FR-NOT-04).
+  // The API's notification kinds (B6 T6.4): the company bell lists what the API wrote.
+  | "task" | "report" | "billing" | "security" | "invite" | "member" | "file" | "dsr" | "system"
+// Titles stay generic: no names, amounts or other sensitive details (FR-NOT-04); the API redacts them.
 export type Notification = { id: string; type: NotificationType; title: string; at: string; read: boolean; href: string }

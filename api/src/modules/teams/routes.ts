@@ -12,8 +12,8 @@ const Id = z.uuid()
 const UserId = z.string().min(1).max(128)
 const Kind = z.enum(["team", "department"])
 const Name = z.string().trim().min(1).max(80).regex(/^[^\r\n]+$/)
-const Team = z.object({ id: z.string(), name: z.string(), kind: Kind, memberIds: z.array(z.string()) })
-const Person = z.object({ userId: z.string(), name: z.string(), email: z.string(), roleKey: z.string(), managerId: z.string().nullable() })
+export const TeamDto = z.object({ id: z.string(), name: z.string(), kind: Kind, memberIds: z.array(z.string()) })
+export const PersonDto = z.object({ userId: z.string(), name: z.string(), email: z.string(), roleKey: z.string(), managerId: z.string().nullable() })
 
 const CreateBody = z.object({ name: Name, kind: Kind.default("team") }).openapi({ example: { name: "Night shift", kind: "team" } })
 const PatchBody = z
@@ -26,17 +26,17 @@ const ManagerBody = z.object({ managerId: UserId.nullable() }).openapi({ example
 const listRoute = createRoute({
   method: "get", path: "/v1/teams", middleware: [requireTenant] as const,
   request: { query: z.object({ member: UserId.optional(), kind: Kind.optional() }) },
-  responses: { 200: { description: "Teams and departments of the tenant, optionally those a member belongs to", content: { "application/json": { schema: z.array(Team) } } } },
+  responses: { 200: { description: "Teams and departments of the tenant, optionally those a member belongs to", content: { "application/json": { schema: z.array(TeamDto) } } } },
 })
 const createRouteDef = createRoute({
   method: "post", path: "/v1/teams", middleware: [requireTenant, requirePermission("settings", "write")] as const,
   request: { body: { content: { "application/json": { schema: CreateBody } }, required: true } },
-  responses: { 201: { description: "Created team", content: { "application/json": { schema: Team } } } },
+  responses: { 201: { description: "Created team", content: { "application/json": { schema: TeamDto } } } },
 })
 const patchRoute = createRoute({
   method: "patch", path: "/v1/teams/{id}", middleware: [requireTenant, requirePermission("settings", "write")] as const,
   request: { params: z.object({ id: Id }), body: { content: { "application/json": { schema: PatchBody } }, required: true } },
-  responses: { 200: { description: "Updated team", content: { "application/json": { schema: Team } } } },
+  responses: { 200: { description: "Updated team", content: { "application/json": { schema: TeamDto } } } },
 })
 const deleteRoute = createRoute({
   method: "delete", path: "/v1/teams/{id}", middleware: [requireTenant, requirePermission("settings", "write")] as const,
@@ -46,7 +46,7 @@ const deleteRoute = createRoute({
 const membersRoute = createRoute({
   method: "put", path: "/v1/teams/{id}/members", middleware: [requireTenant, requirePermission("settings", "write")] as const,
   request: { params: z.object({ id: Id }), body: { content: { "application/json": { schema: MembersBody } }, required: true } },
-  responses: { 200: { description: "Team with its new member set", content: { "application/json": { schema: Team } } } },
+  responses: { 200: { description: "Team with its new member set", content: { "application/json": { schema: TeamDto } } } },
 })
 const managerRoute = createRoute({
   method: "put", path: "/v1/members/{userId}/manager", middleware: [requireTenant, requirePermission("settings", "write")] as const,
@@ -56,7 +56,7 @@ const managerRoute = createRoute({
 const peopleRoute = createRoute({
   method: "get", path: "/v1/people", middleware: [requireTenant, requireModule("M1"), requirePermission("reports", "read")] as const,
   request: { query: z.object({ scope: z.enum(["own", "team", "all"]).optional() }) },
-  responses: { 200: { description: "People in the caller's report scope", content: { "application/json": { schema: z.array(Person) } } } },
+  responses: { 200: { description: "People in the caller's report scope", content: { "application/json": { schema: z.array(PersonDto) } } } },
 })
 
 export const teamRoutes = newRouter()

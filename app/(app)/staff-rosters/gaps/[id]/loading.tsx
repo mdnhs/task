@@ -1,7 +1,7 @@
 import { GapPage, GapPageSkeleton, getDerivedGaps, getRosters } from "@/features/staff-rosters"
 import { PageSkeleton } from "@/features/shell"
 import { SkMask } from "@/components/sk"
-import { getOrg } from "@/lib/org"
+import { getMockOrg } from "@/lib/org"
 import { can } from "@/lib/permissions"
 import { lastSegment } from "@/lib/request-path"
 import { canWrite } from "@/lib/permissions"
@@ -15,7 +15,7 @@ export default async function Loading() {
   const write = canWrite(session, "staff")
   const id = await lastSegment("/staff-rosters/gaps/")
   const sensitive = can(session.role, "staff", "write")
-  const [org, user] = await Promise.all([getOrg(), getSkeletonUser()])
+  const [org, user] = await Promise.all([getMockOrg(), getSkeletonUser()])
   const { gaps, staff } = await getRosters(sensitive, await getDerivedGaps(session, user.name, org.today))
   if (!id || !gaps.some((g) => g.id === id)) return <GapPageSkeleton canWrite={write} />
   return (

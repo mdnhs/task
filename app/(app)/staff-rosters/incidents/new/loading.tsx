@@ -1,7 +1,7 @@
 import { IncidentForm, getRosters } from "@/features/staff-rosters"
 import { PageSkeleton } from "@/features/shell"
 import { SkMask } from "@/components/sk"
-import { getOrg } from "@/lib/org"
+import { getMockOrg } from "@/lib/org"
 import { can } from "@/lib/permissions"
 import { canWrite } from "@/lib/permissions"
 import { getSkeletonSession, getSkeletonUser } from "@/lib/skeleton-session"
@@ -10,7 +10,7 @@ import { getSkeletonSession, getSkeletonUser } from "@/lib/skeleton-session"
 export default async function Loading() {
   const session = await getSkeletonSession()
   if (!can(session.role, "staff") || !canWrite(session, "staff")) return <PageSkeleton />
-  const [{ incidents, staff }, org, user] = await Promise.all([getRosters(can(session.role, "staff", "write")), getOrg(), getSkeletonUser()])
+  const [{ incidents, staff }, org, user] = await Promise.all([getRosters(can(session.role, "staff", "write")), getMockOrg(), getSkeletonUser()])
   return (
     <SkMask label="Loading incident form">
       <IncidentForm incidents={incidents} staff={staff} today={org.today} tz={org.timezone} actor={user.name} scopeKey={`${session.tenant.id}:${session.role.id}`} />

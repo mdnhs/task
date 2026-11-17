@@ -35,3 +35,7 @@
 .bill-mods li>div{min-width:0}
 .bill-mods li:not([data-included]) .tt{color:var(--ink-3)}
 @media (max-width:720px){.bill-mods{grid-template-columns:1fr}}
+.bill-seat-form{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap;margin-top:18px}
+.bill-seat-form .od-field{flex:1 1 220px;max-width:320px}
+.bill-seat-form .btn{cursor:pointer}
+.bill-usage.bill-seats{grid-template-columns:1fr}

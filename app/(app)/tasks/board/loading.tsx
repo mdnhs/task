@@ -1,7 +1,7 @@
 import { TaskBoardSkeleton, boardMove, checklistProgress, getProjects, getTaskSeed, liveTasks, materialiseRecurring } from "@/features/tasks"
 import type { BoardCardSk, TaskStatus } from "@/features/tasks"
 import { PageSkeleton } from "@/features/shell"
-import { getOrg } from "@/lib/org"
+import { getMockOrg } from "@/lib/org"
 import { can } from "@/lib/permissions"
 import { EVIDENCE_STATE, evidenceState } from "@/lib/task-evidence"
 import { canWrite } from "@/lib/permissions"
@@ -14,7 +14,7 @@ const COLUMNS: TaskStatus[] = ["not_started", "in_progress", "blocked", "submitt
 export default async function Loading() {
   const session = await getSkeletonSession()
   if (!can(session.role, "tasks")) return <PageSkeleton />
-  const [{ seed, staff, refFloor }, projects, org] = await Promise.all([getTaskSeed(session), getProjects(), getOrg()])
+  const [{ seed, staff, refFloor }, projects, org] = await Promise.all([getTaskSeed(session), getProjects(), getMockOrg()])
   const live = liveTasks(materialiseRecurring(seed, org.today, refFloor))
   const canEdit = canWrite(session, "tasks")
   const actor = canEdit && session.role.home === "manager" ? "reviewer" : "assignee"

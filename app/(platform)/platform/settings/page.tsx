@@ -1,5 +1,5 @@
 import { SettingsView, getPlatformSettings, requireStaff } from "@/features/platform"
-import { getOrg } from "@/lib/org"
+import { getMockOrg } from "@/lib/org"
 
 import { gate } from "../../gate"
 
@@ -10,6 +10,6 @@ export const metadata = { title: "Settings · Platform · OpsDesk" }
 export default async function Page() {
   const g = await gate("settings.read", "platform settings")
   if ("denied" in g) return g.denied
-  const [settings, org] = await Promise.all([getPlatformSettings(), getOrg()])
+  const [settings, org] = await Promise.all([getPlatformSettings(), getMockOrg()])
   return <SettingsView settings={settings} today={org.today} tzLabel={org.tzLabel} operator={{ name: g.op.name, role: g.op.role }} canWrite={requireStaff(g.op, "settings.write")} />
 }

@@ -1,11 +1,11 @@
 import { StaffRostersView, getDerivedGaps, getRosters } from "@/features/staff-rosters"
 import { AccessRestricted, getUser } from "@/features/shell"
-import { getOrg } from "@/lib/org"
+import { getMockOrg } from "@/lib/org"
 import { can } from "@/lib/permissions"
 import { canWrite, getSession } from "@/lib/session"
 
 export default async function Page() {
-  const [session, org, user] = await Promise.all([getSession(), getOrg(), getUser()])
+  const [session, org, user] = await Promise.all([getSession(), getMockOrg(), getUser()])
   if (!can(session.role, "staff")) return <AccessRestricted moduleLabel="Staff & Rosters" />
   // Contact details and notes are sensitive (FR-STAFF-03): only roles with staff write access receive them.
   const sensitive = can(session.role, "staff", "write")

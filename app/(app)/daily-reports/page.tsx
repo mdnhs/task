@@ -1,13 +1,13 @@
 import { ReportsView, getReportSeed } from "@/features/reports"
 import { AccessRestricted } from "@/features/shell"
 import { formatDate } from "@/lib/dates"
-import { getOrg } from "@/lib/org"
+import { getMockOrg } from "@/lib/org"
 import { parseReportFilters } from "@/lib/shift-report"
 import { getSession } from "@/lib/session"
 
 // Shift reports (FR-M1-22..31). The URL stays /daily-reports so old links keep working; the nav label is "Shift Reports".
 export default async function Page({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
-  const [sp, session, org] = await Promise.all([searchParams, getSession(), getOrg()])
+  const [sp, session, org] = await Promise.all([searchParams, getSession(), getMockOrg()])
   const seed = await getReportSeed(session)
   if (!seed) return <AccessRestricted moduleLabel="Shift Reports" />
   const initialFilters = parseReportFilters(sp, { teams: seed.teams, people: seed.people.map((p) => p.id) })

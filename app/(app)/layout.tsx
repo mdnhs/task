@@ -5,15 +5,13 @@ import { DEFAULT_APPEARANCE, appearanceCss } from "@/lib/appearance"
 import { BRAND_STYLE_ID, brandCss } from "@/lib/brand"
 import { formatTime } from "@/lib/dates"
 import { filterByEntitlement, hasProductModule } from "@/lib/entitlements"
-import { getNotifyContext } from "@/lib/notify-data"
-import { getPeople } from "@/lib/people"
-import { todayUserId } from "@/lib/today-data"
-import { getOrg } from "@/lib/org"
+import { getOrg, neutralOrg } from "@/lib/org"
 import { getPlatformNotice } from "@/lib/platform-notice-data"
+import { BillingBanner } from "@/components/billing-banner"
 import { PlatformNoticeBanner } from "@/components/platform-notice"
-import { can, filterNav } from "@/lib/permissions"
+import { filterNav } from "@/lib/permissions"
 import { getSession } from "@/lib/session"
-import { AppShell, getNavigation, getNotifications, getUser } from "@/features/shell"
+import { AppShell, getNavigation, getUser } from "@/features/shell"
 
 import "../styles/search.css"
 import "../styles/devices.css"
@@ -23,23 +21,16 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // The real check (proxy.ts only looked for a cookie): getSession() asks the API who this is and redirects a signed-out, expired or company-less caller.
   const session = await getSession()
 
-  const [navigation, user, assistant, org, notifications] = await Promise.all([
-    getNavigation(),
-    getUser(),
-    getAssistant(),
-    getOrg(),
-    getNotifications(),
-  ])
+  // Tenant data is only readable once the second factor is in order (the API answers 401 mfa_* otherwise); until then the gate renders and nothing is asked.
+  const [navigation, user, assistant, org] = await Promise.all([getNavigation(), getUser(), getAssistant(), session.mfa === "ok" ? getOrg() : neutralOrg()])
 
   const notice = await getPlatformNotice(org.today)
-  // The bell's person (task change notices, FR-M1-12): the same directory person the Today card uses.
-  const me = { tenantId: session.tenant.id, personId: todayUserId(session, await getPeople(), user.name) }
-  const notify = await getNotifyContext(org, session.role, can(session.role, "reports", "write"), session, me)
 
   // Filtered on the server so hidden modules never reach the client payload.
   // session.role is already narrowed to the plan; filterByEntitlement states the plan check (FR-M0-15) on its own.
   const inPlan = <T extends { href: string }>(items: T[]) => filterByEntitlement(filterNav(items, session.role), session.entitlements)
-  const nav = { ...navigation, menu: inPlan(navigation.menu), general: inPlan(navigation.general) }
+  // The department filter is the company's own departments (GET /v1/teams?kind=department), not the seed file's.
+  const nav = { ...navigation, menu: inPlan(navigation.menu), general: inPlan(navigation.general), departments: [{ dep: "all", label: "All" }, ...org.departments.map((d) => ({ dep: d, label: d }))] }
 
   return (
     <>
@@ -57,14 +48,24 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       }}
       tzLabel={org.tzLabel}
       today={org.today}
-      notifications={filterNav(notifications, session.role)}
-      notify={notify}
+      notifications={[]}
+      bellTimezone={session.mfa === "ok" ? org.timezone : undefined}
+      banner={
+        <BillingBanner
+          status={session.tenant.status}
+          billingState={session.billingState}
+          trialEndsAt={session.trialEndsAt}
+          graceEndsAt={session.graceEndsAt}
+          timezone={org.timezone}
+          tzLabel={org.tzLabel}
+        />
+      }
       assistant={
         !hasProductModule(session.entitlements, session.entitlements.assistant) ? undefined : <AiAssistant
           key="assistant"
           data={fillAssistant(assistant, {
             firstName: user.name.split(" ")[0] ?? user.name,
-            deadline: formatTime(`${org.today.slice(0, 10)}T${org.deadline}`),
+            deadline: org.deadline ? formatTime(`${org.today.slice(0, 10)}T${org.deadline}`) : "",
             tz: org.tzLabel,
           })}
         />

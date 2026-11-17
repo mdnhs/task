@@ -1,5 +1,5 @@
-import { getOrg } from "@/lib/org"
-import { ME_ID, getPeople } from "@/lib/people"
+import { getMockOrg } from "@/lib/org"
+import { ME_ID, getMockPeople } from "@/lib/people"
 import { reportScope } from "@/lib/permissions"
 import type { Session } from "@/lib/session"
 import { scopeReports, templateFor, type TemplateSection } from "@/lib/shift-report"
@@ -14,8 +14,8 @@ import type { ReportsSeed } from "./types"
 export async function getReportSeed(session: Session): Promise<ReportsSeed | null> {
   const scope = reportScope(session.role, ME_ID)
   if (!scope) return null
-  const org = await getOrg()
-  const [{ rows, template, shifts, range }, people] = await Promise.all([getShiftReportData(org, session), getPeople()])
+  const org = await getMockOrg()
+  const [{ rows, template, shifts, range }, people] = await Promise.all([getShiftReportData(org, session), getMockPeople()])
   const reports = scopeReports(rows, scope, shifts.members)
   const meId = scope.kind === "own" ? scope.personId : session.role.person ?? ""
   const ids = new Set([...reports.map((r) => r.personId), meId])

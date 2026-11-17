@@ -20,7 +20,7 @@ export async function getSkeletonSession(): Promise<Session> {
   const tenant = { id: "skeleton", name: "", slug: "skeleton", initials: "", brand: DEFAULT_BRAND, status: "active" as const, plan: "" }
   return {
     signedIn: true, role, roles: [role], tenant, tenants: [tenant], entitlements, user: { id: "", email: "", name: "" }, tenantSlug: "skeleton",
-    billingState: "ok", device: { id: null, label: "", trusted: true }, drive: true, mfa: "ok", twoFactorEnabled: false, mfaPolicy: { mode: "off", roles: [] }, platformRole: null,
+    billingState: "ok", trialEndsAt: null, graceEndsAt: null, device: { id: null, label: "", trusted: true }, drive: true, mfa: "ok", twoFactorEnabled: false, mfaPolicy: { mode: "off", roles: [] }, platformRole: null,
   }
 }
 

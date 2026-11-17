@@ -1,6 +1,6 @@
 import { getData } from "@/lib/data"
 import type { Org } from "@/lib/org"
-import { getPeople } from "@/lib/people"
+import { getMockPeople } from "@/lib/people"
 import { reportScope } from "@/lib/permissions"
 import { memberDeadline, secondsUntil, teamDeadline } from "@/lib/report-deadline"
 import { inScope, scopeReports } from "@/lib/shift-report"
@@ -67,7 +67,7 @@ export function getDashboardPerms(session: Session): DashboardPerms {
  * (no reporting shift in the window), so the page and loading.tsx leave the card out alike.
  */
 export async function getReportDeadline(session: Session, org: Org, userName?: string): Promise<ReportDeadlineCardData | undefined> {
-  const people = await getPeople()
+  const people = await getMockPeople()
   const meId = todayUserId(session, people, userName)
   const scope = reportScope(session.role, meId)
   if (!scope) return undefined

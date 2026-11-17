@@ -9,7 +9,7 @@ import type { ApiClient } from "./api/client"
 import { ApiError } from "./api/problem"
 import { DEFAULT_BRAND } from "./brand"
 import { initialsOf } from "./branding"
-import { restrictRole, type EntitlementsData, type TenantEntitlements } from "./entitlements"
+import { restrictRole, toTenantEntitlements, type EntitlementsData, type TenantEntitlements } from "./entitlements"
 import type { Access, Module, Role, Tenant } from "./types"
 
 export type PlatformRoleKey = "owner" | "support" | "billing" | "viewer"
@@ -33,6 +33,9 @@ export type Session = {
   user: SessionUser
   tenantSlug: string
   billingState: "ok" | "grace" | "blocked"
+  /** ISO instants from /v1/entitlements (null when the plan has none): the banner formats them in the tenant zone. */
+  trialEndsAt: string | null
+  graceEndsAt: string | null
   device: { id: string | null; label: string; trusted: boolean }
   drive: boolean
   mfa: "ok" | "enrol" | "challenge"
@@ -125,7 +128,7 @@ export async function resolveSession(deps: SessionDeps): Promise<Resolved> {
       throw e
     }
     const [entData, ent, statics] = await Promise.all([deps.entitlementsData(), api.get("/v1/entitlements"), deps.staticRoles()])
-    const entitlements: TenantEntitlements = { planId: ent.planId, allowed: ent.modules, modules: entData.modules, assistant: entData.assistant }
+    const entitlements: TenantEntitlements = toTenantEntitlements(ent, entData)
     const extras = statics.find((r) => r.id === ctx.member.roleKey && !r.platform)
     const role: Role = restrictRole(
       {
@@ -148,7 +151,7 @@ export async function resolveSession(deps: SessionDeps): Promise<Resolved> {
     }
     const session: Session = {
       signedIn: true, role, roles: [role], tenant, tenants: me.tenants.map((t) => (t.slug === ctx.tenant.slug ? tenant : listed(t))), entitlements,
-      user: { id: me.user.id, email: me.user.email, name: me.user.name }, tenantSlug: ctx.tenant.slug, billingState: ent.billingState,
+      user: { id: me.user.id, email: me.user.email, name: me.user.name }, tenantSlug: ctx.tenant.slug, billingState: ent.billingState, trialEndsAt: ent.trialEndsAt, graceEndsAt: ent.graceEndsAt,
       device: { id: ctx.device.id, label: ctx.device.label, trusted: ctx.device.trusted }, drive: ctx.features.drive === true,
       mfa: "ok", twoFactorEnabled: me.user.twoFactorEnabled, mfaPolicy: ctx.tenant.mfaPolicy, platformRole: me.platformRole,
     }
@@ -166,7 +169,7 @@ async function gate(me: Me, slug: string, mfa: "enrol" | "challenge", deps: Sess
   const session: Session = {
     signedIn: true, role, roles: [role], tenant, tenants: me.tenants.map(listed),
     entitlements: { planId: entData.defaultPlan, allowed: [], modules: entData.modules, assistant: entData.assistant },
-    user: { id: me.user.id, email: me.user.email, name: me.user.name }, tenantSlug: slug, billingState: "ok",
+    user: { id: me.user.id, email: me.user.email, name: me.user.name }, tenantSlug: slug, billingState: "ok", trialEndsAt: null, graceEndsAt: null,
     device: { id: null, label: "Unregistered browser", trusted: false }, drive: false, mfa,
     twoFactorEnabled: me.user.twoFactorEnabled, mfaPolicy: { mode: "off", roles: [] }, platformRole: me.platformRole,
   }

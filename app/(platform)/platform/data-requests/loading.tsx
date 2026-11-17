@@ -1,5 +1,5 @@
 import { DataRequestsSkeleton, DeniedSkeleton, dataRequestsData, getPlatformSeed, isDataView } from "@/features/platform"
-import { getOrg } from "@/lib/org"
+import { getMockOrg } from "@/lib/org"
 import { requestParam } from "@/lib/request-path"
 
 import { skeletonGate } from "../../skeleton-gate"
@@ -8,6 +8,6 @@ import { skeletonGate } from "../../skeleton-gate"
 export default async function Loading() {
   const g = await skeletonGate("data.requests", "platform data requests")
   if ("denied" in g) return <DeniedSkeleton />
-  const [seed, org, view] = await Promise.all([getPlatformSeed(), getOrg(), requestParam("view")])
+  const [seed, org, view] = await Promise.all([getPlatformSeed(), getMockOrg(), requestParam("view")])
   return <DataRequestsSkeleton data={dataRequestsData(seed)} view={isDataView(view) ? view : "open"} today={org.today} operator={{ name: g.op.name, role: g.op.role }} />
 }

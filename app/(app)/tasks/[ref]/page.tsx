@@ -1,14 +1,14 @@
 import { TaskDetail, getProjects, getTaskSeed, ME_ID } from "@/features/tasks"
 import { AccessRestricted, getUser } from "@/features/shell"
 import { getDeviceContext } from "@/lib/device-session"
-import { getOrg } from "@/lib/org"
+import { getMockOrg } from "@/lib/org"
 import { can } from "@/lib/permissions"
 import { canWrite, getSession } from "@/lib/session"
 
 // Next 16: `params` is a Promise. The store is seeded exactly like /tasks (same seed, same scopeKey), so a staff user
 // who opens someone else's ref gets "Task not found" from the client lookup (still HTTP 200; no 404 status needed).
 export default async function Page({ params }: { params: Promise<{ ref: string }> }) {
-  const [{ ref }, session, org, user] = await Promise.all([params, getSession(), getOrg(), getUser()])
+  const [{ ref }, session, org, user] = await Promise.all([params, getSession(), getMockOrg(), getUser()])
   if (!can(session.role, "tasks")) return <AccessRestricted moduleLabel="Tasks" />
   const [{ people, staff, seed, scopeKey, refFloor }, projects] = await Promise.all([getTaskSeed(session), getProjects()])
   const { canDrive } = await getDeviceContext(session)

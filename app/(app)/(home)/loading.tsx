@@ -1,7 +1,7 @@
 import { DashboardSkeleton, StaffDashboardSkeleton, getCoverage, getDashboard, getDashboardPerms, getReportDeadline, getStaffDashboard, getSummary, getTeamTasks } from "@/features/dashboard"
 import { PageSkeleton } from "@/features/shell"
 import { can } from "@/lib/permissions"
-import { getOrg } from "@/lib/org"
+import { getMockOrg } from "@/lib/org"
 import { getTodayData } from "@/lib/today-data"
 import { getSkeletonSession, getSkeletonUser } from "@/lib/skeleton-session"
 
@@ -10,13 +10,13 @@ export default async function Loading() {
   const session = await getSkeletonSession()
   if (!can(session.role, "dashboard")) return <PageSkeleton />
   if (session.role.home !== "staff") {
-    const [{ tasks }, { stats }, { coverage }, org, user, { attention, progress }] = await Promise.all([getTeamTasks(), getSummary(), getCoverage(), getOrg(), getSkeletonUser(), getDashboard()])
+    const [{ tasks }, { stats }, { coverage }, org, user, { attention, progress }] = await Promise.all([getTeamTasks(), getSummary(), getCoverage(), getMockOrg(), getSkeletonUser(), getDashboard()])
     // The Today card is folded to a compact entry once dismissed; the same cookies decide it here as on the page (needs the real data's shape only).
     const [t, deadline] = await Promise.all([getTodayData(session, org, user.name), getReportDeadline(session, org, user.name)])
     const today = { mode: t.mode, tiles: t.team ? 5 : 4, team: !!t.team, data: t }
     return <DashboardSkeleton today={today} deadline={deadline} perms={getDashboardPerms(session)} teamTasks={tasks} notes={stats.map((s) => s.note)} coverage={coverage} attention={attention} progress={progress} />
   }
-  const [{ myTasks, comments, evidence }, org] = await Promise.all([getStaffDashboard(), getOrg()])
+  const [{ myTasks, comments, evidence }, org] = await Promise.all([getStaffDashboard(), getMockOrg()])
   const [t, deadline] = await Promise.all([getTodayData(session, org), getReportDeadline(session, org)])
   return <StaffDashboardSkeleton today={{ mode: t.mode, tiles: 4, team: false, data: t }} deadline={deadline} comments={comments} myTasks={myTasks} evidence={evidence} date={org.today} tzLabel={org.tzLabel} notes={myTasks.stats.map((s) => ({ text: s.note }))} />
 }

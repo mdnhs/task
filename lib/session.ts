@@ -112,7 +112,7 @@ async function platformSessionOf(r: Extract<Resolved, { kind: "ok" } | { kind: "
   const entData = await getData<EntitlementsData>("billing/entitlements.json")
   return {
     signedIn: true, role, roles: [role], tenant, tenants: [], entitlements: { planId: entData.defaultPlan, allowed: [], modules: entData.modules, assistant: entData.assistant },
-    user: { id: r.me.user.id, email: r.me.user.email, name: r.me.user.name }, tenantSlug: "", billingState: "ok", device: { id: null, label: "Unregistered browser", trusted: false },
+    user: { id: r.me.user.id, email: r.me.user.email, name: r.me.user.name }, tenantSlug: "", billingState: "ok", trialEndsAt: null, graceEndsAt: null, device: { id: null, label: "Unregistered browser", trusted: false },
     drive: false, mfa: "ok", twoFactorEnabled: r.me.user.twoFactorEnabled, mfaPolicy: { mode: "off", roles: [] }, platformRole: r.me.platformRole,
   }
 }

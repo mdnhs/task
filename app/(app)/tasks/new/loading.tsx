@@ -1,7 +1,7 @@
 import { NewTaskPage, getNewTaskData } from "@/features/tasks"
 import { PageSkeleton } from "@/features/shell"
 import { SkMask } from "@/components/sk"
-import { getOrg } from "@/lib/org"
+import { getMockOrg } from "@/lib/org"
 import { can } from "@/lib/permissions"
 import { canWrite } from "@/lib/permissions"
 import { getSkeletonSession, getSkeletonUser } from "@/lib/skeleton-session"
@@ -11,7 +11,7 @@ import { getSkeletonSession, getSkeletonUser } from "@/lib/skeleton-session"
 export default async function Loading() {
   const session = await getSkeletonSession()
   if (!can(session.role, "tasks") || !canWrite(session, "tasks")) return <PageSkeleton />
-  const [org, user] = await Promise.all([getOrg(), getSkeletonUser()])
+  const [org, user] = await Promise.all([getMockOrg(), getSkeletonUser()])
   const data = await getNewTaskData(session, user.name, org.departments, org.today)
   return (
     <SkMask label="Loading new task form">

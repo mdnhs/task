@@ -8,7 +8,6 @@ import { ConfirmDialog } from "@/components/confirm-dialog"
 import { EmptyState } from "@/components/empty-state"
 import { PageHead } from "@/components/page-head"
 import { StatusPill } from "@/components/status-pill"
-import { auditOutbox } from "@/lib/audit-outbox"
 import { formatDate } from "@/lib/dates"
 import { nowIso, restoreTask } from "../mutations"
 import { ARCHIVE_DAYS, archiveDaysLeft, archivedTasks, isAssigned } from "../planning"
@@ -21,7 +20,7 @@ import { TaskViewTabs } from "./task-view-tabs"
  * Removed tasks (FR-M1-13): restorable for 30 days by managers; a tenant admin may purge one for good before that.
  * Expired ones are not shown (a backend deletes them).
  */
-export function TaskArchive({ tasks, people, today, scopeKey, refFloor, onlyAssignee, canRestore, canPurge, me, meRole }: {
+export function TaskArchive({ tasks, people, today, scopeKey, refFloor, onlyAssignee, canRestore, canPurge, me }: {
   tasks: Task[]
   people: Person[]
   today: string
@@ -86,19 +85,7 @@ export function TaskArchive({ tasks, people, today, scopeKey, refFloor, onlyAssi
         onConfirm={() => {
           if (!purging) return
           setTasks((prev) => prev.filter((x) => x.ref !== purging.ref))
-          // FR-M0-13: a purge is permanent, so it is audited (merged into the audit log by lib/audit-outbox.ts).
-          auditOutbox.push({
-            key: `purge:${scopeKey.split(":")[0]}:${purging.ref}`,
-            tenantId: scopeKey.split(":")[0] ?? "",
-            at: now,
-            actor: me,
-            actorRole: meRole,
-            action: "purge",
-            recordType: "Task",
-            recordRef: purging.ref,
-            sensitive: true,
-            meta: { Title: purging.title, "Archived by": purging.archivedBy ?? "", "Archived at": purging.archivedAt ?? "", Reason: "Deleted from the archive before the 30 days were up" },
-          })
+          // FR-M0-13: a purge is permanent and audited; the API writes that audit row in the same transaction (the mock UI keeps no client outbox).
           toast.success(`${purging.ref} deleted`)
           setPurging(null)
         }}

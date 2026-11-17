@@ -7,7 +7,8 @@ import { addPushToken, getPreferences, listNotifications, markAllRead, markRead,
 
 const Kind = z.enum(KINDS)
 const Id = z.uuid()
-const Notification = z.object({ id: z.string(), kind: Kind, title: z.string(), body: z.string(), link: z.string().nullable(), createdAt: z.string(), readAt: z.string().nullable() })
+export const NotificationDto = z.object({ id: z.string(), kind: Kind, title: z.string(), body: z.string(), link: z.string().nullable(), createdAt: z.string(), readAt: z.string().nullable() })
+export const NotificationList = z.object({ items: z.array(NotificationDto), unread: z.number() })
 const Channel = z.object({ inApp: z.boolean(), email: z.boolean(), push: z.boolean() })
 const Prefs = z.object({ channels: z.record(Kind, Channel), quietStart: z.string().nullable(), quietEnd: z.string().nullable() })
 const ChannelPatch = z.object({ inApp: z.boolean().optional(), email: z.boolean().optional(), push: z.boolean().optional() })
@@ -20,7 +21,7 @@ const Token = z.object({ id: z.string(), platform: z.enum(["android"]), createdA
 const listRoute = createRoute({
   method: "get", path: "/v1/notifications", middleware: [requireTenant] as const,
   request: { query: z.object({ unread: z.enum(["true", "false"]).optional(), limit: z.coerce.number().int().min(1).max(100).default(50) }) },
-  responses: { 200: { description: "The caller's own in-app notifications, newest first, with their unread count", content: { "application/json": { schema: z.object({ items: z.array(Notification), unread: z.number() }) } } } },
+  responses: { 200: { description: "The caller's own in-app notifications, newest first, with their unread count", content: { "application/json": { schema: NotificationList } } } },
 })
 const readAllRoute = createRoute({
   method: "post", path: "/v1/notifications/read-all", middleware: [requireTenant] as const,
@@ -29,7 +30,7 @@ const readAllRoute = createRoute({
 const readRoute = createRoute({
   method: "post", path: "/v1/notifications/{id}/read", middleware: [requireTenant] as const,
   request: { params: z.object({ id: Id }) },
-  responses: { 200: { description: "The notification, marked read. Another user's or tenant's id is 404 notification_not_found", content: { "application/json": { schema: Notification } } } },
+  responses: { 200: { description: "The notification, marked read. Another user's or tenant's id is 404 notification_not_found", content: { "application/json": { schema: NotificationDto } } } },
 })
 const getPrefsRoute = createRoute({
   method: "get", path: "/v1/me/notification-preferences", middleware: [requireTenant] as const,

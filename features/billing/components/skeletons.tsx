@@ -3,12 +3,10 @@ import type { ReactNode } from "react"
 import { PagerSkeleton, needsPager, pageRows } from "@/components/pager-skeleton"
 import { Sk } from "@/components/sk"
 import { INVOICES_PAGE_SIZE } from "../constants"
-import type { Invoice } from "../types"
 
-// Mirrors BillingView's four cards (plan, usage, plans grid, invoices) with the same classes. Rendered inside the settings skeleton's .set-body.
-const dateText = (iso: string, locale: string) => new Date(`${iso}T00:00:00Z`).toLocaleDateString(locale, { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" }).replace(",", "")
-const moneyText = (amount: number, currency: string, locale: string) => new Intl.NumberFormat(locale, { style: "currency", currency }).format(amount)
-
+// Mirrors BillingView's five cards (plan, seats, modules, plans grid, invoices) with the same classes. Rendered inside the settings skeleton's .set-body.
+// Static: it never reads the API. The settings loading passes the TYPICAL case (owner, a plan with a provider subscription, a few invoices); the real page then
+// replaces it. T6.9 browser-measures the seats card (new in T6.4) and the invoice row (the View link replaces the Download button).
 const CardHead = ({ title, sub, actions }: { title: number; sub: number | string; actions?: ReactNode }) => (
   <div className="card-head">
     <div>
@@ -22,28 +20,25 @@ const CardHead = ({ title, sub, actions }: { title: number; sub: number | string
 export function BillingSkeleton({
   plans = 3,
   invoices = 0,
-  invoiceRows = [],
   canManage = true,
   currentIndex = 0,
   pastDue = false,
-  fullUsage = [],
-  locale = "en-IE",
+  seatsFull = false,
+  subscribed = true,
   modules = [],
   planName = "",
 }: {
   plans?: number
   invoices?: number
   canManage?: boolean
-  /** The tenant's invoices: first-page rows render as ghost text so they wrap like the loaded ones (phones). */
-  invoiceRows?: Invoice[]
   /** Index of the tenant's plan in the plans list: that card shows the Current pill and no Switch button. */
   currentIndex?: number
   /** Renders the payment-failed notice. */
   pastDue?: boolean
-  /** Usage row indexes that are at their limit (they show the "Limit reached" line). */
-  fullUsage?: number[]
-  /** Tenant locale (org.locale), so ghost dates and amounts wrap like the loaded ones. */
-  locale?: string
+  /** The seat cap is reached (the "Seat cap reached" line shows). */
+  seatsFull?: boolean
+  /** The company has a provider subscription: the Cancel plan button shows beside Manage billing. */
+  subscribed?: boolean
   /** Product modules of the catalogue (label + description) for the Included modules card; ghost text wraps like the real one. */
   modules?: { label: string; description: string; included?: boolean }[]
   /** The tenant's plan name, for the Included modules subtitle (it wraps on phones). */
@@ -54,8 +49,8 @@ export function BillingSkeleton({
       <section className="card set-card bill-head">
         <CardHead
           title={130}
-          sub={140}
-          actions={canManage && (<><span className="btn btn-primary sk-ghost-btn">Change plan</span><span className="btn btn-outline sk-ghost-btn">Manage billing</span></>)}
+          sub="Billed monthly"
+          actions={canManage && (<><span className="btn btn-primary sk-ghost-btn">Change plan</span><span className="btn btn-outline sk-ghost-btn">Manage billing</span>{subscribed && <span className="btn btn-outline sk-ghost-btn">Cancel plan</span>}</>)}
         />
         {pastDue && <Sk h={43} r={12} style={{ marginBottom: 14 }} />}
         <dl className="bill-summary">
@@ -69,16 +64,25 @@ export function BillingSkeleton({
         </dl>
       </section>
       <section className="card set-card">
-        <CardHead title={70} sub={290} />
-        <ul className="bill-usage">
-          {[0, 1, 2, 3].map((i) => (
-            <li key={i}>
-              <div className="bill-usage-row"><Sk w={100} h={12} lh={20} /><Sk w={110} h={12} lh={19} /></div>
-              <Sk h={8} r="pill" style={{ marginTop: 8 }} />
-              {fullUsage.includes(i) && <Sk w={200} h={12} lh={17} style={{ marginTop: 6 }} />}
-            </li>
-          ))}
+        <CardHead title={60} sub="Active members against your seat cap" />
+        <ul className="bill-usage bill-seats">
+          <li>
+            <div className="bill-usage-row"><Sk w={100} h={12} lh={20} /><Sk w={110} h={12} lh={19} /></div>
+            <Sk h={8} r="pill" style={{ marginTop: 8 }} />
+            {seatsFull && <Sk w={230} h={12} lh={17} style={{ marginTop: 6 }} />}
+          </li>
         </ul>
+        {canManage && (
+          <div className="bill-seat-form">
+            {/* browser-measured field (settings): label line 18.1, control 44, hint line 17.4 plus the hint's 6px top margin */}
+            <div className="od-field">
+              <label><span className="sk-ghost">Seat cap</span></label>
+              <Sk h={44} r={12} />
+              <div className="od-field-msg"><p className="od-field-hint"><span className="sk-ghost">Between 0 and 0 on the Business plan.</span></p></div>
+            </div>
+            <span className="btn btn-primary sk-ghost-btn">Save seats</span>
+          </div>
+        )}
       </section>
       <section className="card set-card">
         <CardHead title={150} sub={planName ? `What the ${planName} plan includes. Other modules are hidden from your workspace.` : 330} />
@@ -115,22 +119,17 @@ export function BillingSkeleton({
         {invoices > 0 && (
           <div className="table-wrap">
             <table className="rtable set-table">
-              <thead><tr>{[50, 36, 50, 40, 60].map((w, i) => <th key={i}><Sk w={w} h={10} lh={16} /></th>)}</tr></thead>
+              <thead><tr>{[50, 36, 50, 40, 50].map((w, i) => <th key={i}><Sk w={w} h={10} lh={16} /></th>)}</tr></thead>
               <tbody>
-                {Array.from({ length: pageRows(invoices, INVOICES_PAGE_SIZE) }, (_, i) => {
-                  const inv = invoiceRows[i]
-                  return (
-                    <tr key={i}>
-                      <td data-label="Number">
-                        {inv ? <><span className="tt num sk-ghost">{inv.number}</span><div className="tm sk-ghost">{inv.description}</div></> : <><Sk w={130} h={12} lh={19} /><Sk w={120} h={10} lh={16} /></>}
-                      </td>
-                      <td data-label="Date" className="num">{inv ? <time className="od-when sk-ghost">{dateText(inv.date, locale)}</time> : <Sk w={80} h={12} />}</td>
-                      <td data-label="Amount" className="num">{inv ? <span className="sk-ghost">{moneyText(inv.amount, inv.currency, locale)}</span> : <Sk w={64} h={12} />}</td>
-                      <td data-label="Status"><Sk w={64} h={29.4} r={8} /></td>
-                      <td data-label="Download"><Sk w={100} h={48} r={12} /></td>
-                    </tr>
-                  )
-                })}
+                {Array.from({ length: pageRows(invoices, INVOICES_PAGE_SIZE) }, (_, i) => (
+                  <tr key={i}>
+                    <td data-label="Number"><Sk w={130} h={12} lh={19} /></td>
+                    <td data-label="Date" className="num"><Sk w={80} h={12} /></td>
+                    <td data-label="Amount" className="num"><Sk w={64} h={12} /></td>
+                    <td data-label="Status"><Sk w={64} h={29.4} r={8} /></td>
+                    <td data-label="Invoice"><Sk w={64} h={48} r={12} /></td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>

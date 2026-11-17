@@ -1,6 +1,6 @@
 import { getData } from "@/lib/data"
 import { hasProductModule } from "@/lib/entitlements"
-import { getPeople } from "@/lib/people"
+import { getMockPeople } from "@/lib/people"
 import { can } from "@/lib/permissions"
 import { rosterAccess, type LocationGrant, type OfficeLimit } from "@/lib/roster-access"
 import type { Location, RosterShift, RosterWeek, ShiftTemplate } from "@/lib/rosters"
@@ -39,7 +39,7 @@ export async function getDerivedGaps(session: Session, userName: string, today: 
   const [locs, { grants, limits }, people] = await Promise.all([
     getData<{ locations: Location[] }>("rosters/locations.json"),
     getData<{ grants: LocationGrant[]; limits: OfficeLimit[] }>("rosters/access.json"),
-    getPeople(),
+    getMockPeople(),
   ])
   const access = rosterAccess(session.role, todayUserId(session, people, userName), grants, limits, locs.locations.map((l) => l.id))
   if (access.scope === "none" || access.scope === "own") return []

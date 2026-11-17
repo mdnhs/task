@@ -1,5 +1,5 @@
 import { BillingLedger, billingData, getPlatformSeed, getPlatformSettings, isBillingView } from "@/features/platform"
-import { getOrg } from "@/lib/org"
+import { getMockOrg } from "@/lib/org"
 
 import { gate } from "../../gate"
 
@@ -10,7 +10,7 @@ export const metadata = { title: "Billing · Platform · OpsDesk" }
 export default async function Page({ searchParams }: { searchParams: Promise<{ view?: string | string[]; q?: string | string[] }> }) {
   const g = await gate("billing.read", "platform billing")
   if ("denied" in g) return g.denied
-  const [seed, settings, org, { view, q }] = await Promise.all([getPlatformSeed(), getPlatformSettings(), getOrg(), searchParams])
+  const [seed, settings, org, { view, q }] = await Promise.all([getPlatformSeed(), getPlatformSettings(), getMockOrg(), searchParams])
   return (
     <BillingLedger
       data={billingData(seed, g.op, settings.payments)}

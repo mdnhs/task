@@ -3,7 +3,7 @@ import { STAFF_ROLE_LABEL, filterForStaff, requireStaff, getOperator, getPlatfor
 import { GlobalSearch } from "@/features/search"
 import { AppShell, getUser } from "@/features/shell"
 import { initialsOf } from "@/lib/branding"
-import { getOrg } from "@/lib/org"
+import { getMockOrg } from "@/lib/org"
 import { getPlatformSession } from "@/lib/session"
 
 import "../styles/search.css"
@@ -14,7 +14,7 @@ export default async function PlatformLayout({ children }: { children: React.Rea
   // Real check (proxy.ts only looks for a cookie): active staff need no company; anyone else gets the restricted page or /onboarding.
   const session = await getPlatformSession()
   const allowed = !!session.role.platform
-  const [navigation, org, op, env] = await Promise.all([getPlatformNav(), getOrg(), getOperator(), getPlatformEnv()])
+  const [navigation, org, op, env] = await Promise.all([getPlatformNav(), getMockOrg(), getOperator(), getPlatformEnv()])
   // Other roles get the restricted page without the console's navigation, alerts or search.
   const nav = allowed ? { ...navigation, menu: filterForStaff(navigation.menu, op) } : { ...navigation, menu: [], general: [] }
   const seed = allowed ? await getPlatformSeed() : null
