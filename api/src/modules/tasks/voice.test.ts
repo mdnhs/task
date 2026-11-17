@@ -4,7 +4,7 @@ import { sql } from "drizzle-orm"
 import pg from "pg"
 import { afterEach, beforeEach, describe, expect, test } from "vitest"
 import { ownerQuery, ownerTenantQuery } from "../../../test/db"
-import { makeApiKey, makeMember, makeTenant, signIn } from "../../../test/factories"
+import { makeApiKey, makeMember, makeStaff, makeTenant, signIn } from "../../../test/factories"
 import { call, resetDb, testApp, testEnv } from "../../../test/harness"
 import { resetSubscribers } from "../../core/events"
 import { runJob } from "../../core/queue/queue"
@@ -278,6 +278,31 @@ describe("playing and the access log", () => {
     expect((await w.json(set)).voiceNote.recordedBy).toBe(w.ops.userId)
     const [h] = await w.q("select actor_id from task_history where task_id = $1 and kind = 'voice' order by at desc, id desc limit 1", [t.id])
     expect(h.actor_id).toBe(`apikey:${wk.id}`)
+  }, 60_000)
+
+  test("ruling E11: a support grant cannot play a voice note (403 support_forbidden_route, audited, no log row) nor read the plays; other task reads still work; API keys are not deny-listed (deliberate)", async () => {
+    const w = await world()
+    const { t } = await withVoice(w)
+    const staff = await makeStaff(w.deps, "support")
+    const g = await call(w.app, "POST", `/v1/platform/tenants/${w.tenant.id}/support-grants`, { cookie: staff.cookie, body: { reason: "Ticket 4411: report totals look wrong", hours: 2 } })
+    expect(g.status, await g.clone().text()).toBe(201)
+    const as = (path: string) => call(w.app, "GET", path, { cookie: staff.cookie, tenant: "acme" })
+    const r = await as(`/v1/tasks/${t.id}/voice-note`)
+    expect(r.status).toBe(403)
+    expect(await code(r)).toBe("support_forbidden_route")
+    expect(r.headers.get("location")).toBeNull()
+    expect(await plays(w, t.id)).toHaveLength(0)
+    const denied = await w.q("select after from audit_events where action = 'support.route_denied'")
+    expect(denied.map((d) => (d.after as Json).path)).toEqual([`/v1/tasks/${t.id}/voice-note`])
+    // the plays list is not audio, and a support role cannot manage (read-only role): 403 forbidden, not a URL
+    const pl = await as(`/v1/tasks/${t.id}/voice-note/plays`)
+    expect(pl.status).toBe(403)
+    // the other task reads work under the grant, and show metadata only
+    const detail = await as(`/v1/tasks/${t.id}`)
+    expect(detail.status).toBe(200)
+    expect((await w.json(detail)).voiceNote).toMatchObject({ durationSec: 30 })
+    expect((await as("/v1/tasks")).status).toBe(200)
+    expect(await plays(w, t.id)).toHaveLength(0)
   }, 60_000)
 
   test("device policy: a voice note is audio, not a Drive link, so playing is the same on every device", async () => {

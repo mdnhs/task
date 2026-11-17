@@ -35,6 +35,7 @@ export const SUPPORT_DENIED_ROUTES: readonly DenyRule[] = [
   { prefix: "/v1/me/data-export", why: "personal data export" },
   { prefix: "/v1/audit/export", why: "bulk audit export (download)" },
   { pattern: /^\/v1\/files\/[^/]+\/download$/, why: "file download (presigned GET)" },
+  { pattern: /^\/v1\/tasks\/[^/]+\/voice-note$/, why: "personal audio (presigned GET)" },
   EXPORT_OR_DOWNLOAD,
   { prefix: "/v1/integrations", why: "integrations: OAuth tokens and connection status" },
   { prefix: "/v1/settings/support-grants", why: "support must not see or alter its own grants from the tenant side" },

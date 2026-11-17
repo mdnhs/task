@@ -337,7 +337,7 @@ describe("rulings", () => {
   test("ruling 4: sensitive GETs are refused even under a grant, and audited", async () => {
     const w = await world()
     const g = (await (await w.grant(w.support)).json()) as Json
-    const denied = ["/v1/data-requests", `/v1/data-requests/${NIL}`, "/v1/me/data-export", "/v1/audit/export", `/v1/files/${NIL}/download`, "/v1/integrations", "/v1/settings/support-grants"]
+    const denied = ["/v1/data-requests", `/v1/data-requests/${NIL}`, "/v1/me/data-export", "/v1/audit/export", `/v1/files/${NIL}/download`, `/v1/tasks/${NIL}/voice-note`, "/v1/integrations", "/v1/settings/support-grants"]
     for (const p of denied) {
       const r = await w.asStaff("GET", p)
       expect(r.status, p).toBe(403)
