@@ -80,7 +80,7 @@ export async function taskDtos(tx: TenantTx, ctx: TaskCtx, rows: TaskRow[], time
     const p = people.get(r.id)!
     const timeline = timelines.get(r.id) ?? []
     return {
-      id: r.id, ref: ref(r.refNo), version: r.version, title: r.title,
+      id: r.id, ref: ref(r.refNo), version: r.version, title: ctx.drive ? r.title : withholdDriveText(r.title),
       description: ctx.drive ? r.description : withholdDriveText(r.description),
       dept: r.teamId ? (teamName.get(r.teamId) ?? "") : "", teamId: r.teamId,
       assignee: p.primary ?? "", assignees: p.others, creator: r.creatorId ?? "", priority: r.priority,

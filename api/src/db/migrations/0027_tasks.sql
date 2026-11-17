@@ -130,3 +130,35 @@ ALTER TABLE "task_time_entries" FORCE ROW LEVEL SECURITY;
 ALTER TABLE "notifications" DROP CONSTRAINT "notifications_kind_check";
 --> statement-breakpoint
 ALTER TABLE "notifications" ADD CONSTRAINT "notifications_kind_check" CHECK ("kind" IN ('invite','member','file','security','dsr','billing','system','task'));
+--> statement-breakpoint
+-- Minimal app_user grants (ruling 9): only what the code uses. Task rows leave through app_user DELETE on `tasks` (purge, T4.5); their
+-- children (assignees, history, time entries) go with them by the ON DELETE CASCADE foreign keys, which run as the table owner, so
+-- history needs no DELETE grant of its own.
+REVOKE ALL ON "task_counters" FROM app_user;
+--> statement-breakpoint
+GRANT SELECT, INSERT ON "task_counters" TO app_user;
+--> statement-breakpoint
+GRANT UPDATE ("next_no") ON "task_counters" TO app_user;
+--> statement-breakpoint
+REVOKE ALL ON "tasks" FROM app_user;
+--> statement-breakpoint
+GRANT SELECT, INSERT, DELETE ON "tasks" TO app_user;
+--> statement-breakpoint
+GRANT UPDATE ("title", "description", "team_id", "creator_id", "priority", "start_at", "due_at", "status", "labels", "estimate_min", "client", "project_id", "milestone_id", "parent_id", "evidence_rule", "round", "repeat", "series_id", "occurrence_date", "repeat_cursor", "proposal", "overdue_plan", "voice_file_id", "voice_meta", "submitted_at", "completed_at", "archived_at", "archived_by", "archive_batch_id", "version", "updated_at") ON "tasks" TO app_user;
+--> statement-breakpoint
+REVOKE ALL ON "task_assignees" FROM app_user;
+--> statement-breakpoint
+GRANT SELECT, INSERT, DELETE ON "task_assignees" TO app_user;
+--> statement-breakpoint
+-- History is append-only; erasure may only drop the actor and remove a person from `notified`.
+REVOKE ALL ON "task_history" FROM app_user;
+--> statement-breakpoint
+GRANT SELECT, INSERT ON "task_history" TO app_user;
+--> statement-breakpoint
+GRANT UPDATE ("actor_id", "notified") ON "task_history" TO app_user;
+--> statement-breakpoint
+REVOKE ALL ON "task_time_entries" FROM app_user;
+--> statement-breakpoint
+GRANT SELECT, INSERT ON "task_time_entries" TO app_user;
+--> statement-breakpoint
+GRANT UPDATE ("user_id") ON "task_time_entries" TO app_user;

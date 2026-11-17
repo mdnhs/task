@@ -18,6 +18,8 @@ import { allAssignees, assigneesOf, replaceAssignees } from "./repo"
 import { canManage, getTask, taskScopeWhere, TaskNotFound, type TaskCtx, type TaskRow } from "./scope"
 import { instantOfWall, wallOf } from "./time"
 
+/** The two fields the lifecycle rules read, typed (archivedAt is a wall string there, only its presence matters). */
+const lifecycleOf = (r: TaskRow) => ({ status: r.status as TaskStatus, archivedAt: r.archivedAt?.toISOString() })
 const unprocessable = (code: string) => new AppError(422, code, "Unprocessable Entity")
 const OPEN_STATUSES: TaskStatus[] = ["not_started", "in_progress", "blocked", "submitted", "changes_requested"]
 
@@ -38,12 +40,14 @@ async function checkTeam(tx: TenantTx, ctx: TaskCtx, teamId: string | null | und
 }
 
 /**
- * Assignees must be ACTIVE members of this tenant (a foreign, inactive or unknown id is the same 422 invalid_assignee) and distinct.
- * A team manager may assign anyone: they keep seeing the task as its creator even when the assignee is outside their team.
+ * Assignees must be ACTIVE members of this tenant (a foreign, inactive or unknown id is the same 422 invalid_assignee) and distinct;
+ * a team-scope manager may only pick themself or a direct report (422 assignee_out_of_scope, the same for any other id).
  */
 async function checkAssignees(tx: TenantTx, ctx: TaskCtx, primary: string, others: string[]): Promise<void> {
   const ids = [primary, ...others]
   if (new Set(ids).size !== ids.length) throw unprocessable("invalid_assignee")
+  // Ruling E2: a team-scope manager assigns only themself or their direct reports; all-scope managers assign anyone.
+  if (ctx.scope.kind === "team" && ids.some((id) => id !== ctx.me && !ctx.reports.includes(id))) throw unprocessable("assignee_out_of_scope")
   const rows = await tx.select({ u: memberships.userId }).from(memberships).where(and(eq(memberships.tenantId, ctx.tenantId), eq(memberships.status, "active"), inArray(memberships.userId, ids)))
   if (rows.length !== ids.length) throw unprocessable("invalid_assignee")
 }
@@ -258,14 +262,14 @@ export async function changeStatus(tx: TenantTx, env: TaskEnv, ctx: TaskCtx, id:
   if (!manage && !mine) throw Forbidden("forbidden")
   staleVersion(row, input.version)
   if (input.to === "completed") return completeLocked(tx, env, ctx, row, assignees, manage, mine)
-  const allowed = new Set<TaskStatus>([...nextStatuses(row as never, "assignee"), ...(manage ? nextStatuses(row as never, "reviewer").filter((s) => s === "cancelled") : [])])
+  const allowed = new Set<TaskStatus>([...nextStatuses(lifecycleOf(row), "assignee"), ...(manage ? nextStatuses(lifecycleOf(row), "reviewer").filter((s) => s === "cancelled") : [])])
   if (!allowed.has(input.to) || input.to === "submitted") throw unprocessable("invalid_transition")
   return moveStatus(tx, env, ctx, row, assignees, input.to, "status")
 }
 
 async function completeLocked(tx: TenantTx, env: TaskEnv, ctx: TaskCtx, row: TaskRow, assignees: string[], manage: boolean, mine: boolean): Promise<TaskDto> {
   if (!manage && !mine) throw Forbidden("forbidden")
-  if (!nextStatuses(row as never, "assignee").includes("completed")) throw unprocessable("invalid_transition")
+  if (!nextStatuses(lifecycleOf(row), "assignee").includes("completed")) throw unprocessable("invalid_transition")
   const target = completeTarget(row.evidenceRule, []) // evidence items arrive with T4.6: until then a Required task cannot be completed
   if (target === "blocked") throw unprocessable("evidence_required")
   return moveStatus(tx, env, ctx, row, assignees, target, target === "completed" ? "completed" : "submitted")
@@ -287,18 +291,19 @@ const REF = /^TSK-(\d{1,9})$/
  * A task change made outside /tasks (end-of-shift report FR-M1-26, Today card FR-M1-74), idempotent on `u.id`: a repeat is
  * "duplicate" and writes nothing. Status moves like taskStatusFor (never backwards); Done goes through completeTarget, so a Required
  * task without evidence stays open and gets the line "Report marked done; evidence still needed". Minutes are logged once per update id.
- * The caller names the person (ctx.me/actorId): they must be an assignee of the task or a manager of it. Archived tasks are skipped.
+ * The caller names the person (ctx.me/actorId): the task must be in their scope and they must be an assignee or a manager of it, else 404 task_not_found. Archived tasks are skipped.
  */
 export async function applyTaskUpdate(tx: TenantTx, ctx: TaskCtx, u: TaskUpdate): Promise<"applied" | "duplicate" | "skipped_archived"> {
   const m = REF.exec(u.ref)
   if (!m) throw TaskNotFound()
-  const [row] = await tx.select().from(tasks).where(and(eq(tasks.tenantId, ctx.tenantId), eq(tasks.refNo, Number(m[1])))).for("update", { of: [tasks] })
+  // Scope and authority first, and every refusal is the same 404 (an unknown ref, another person's task and a task you may not report on look alike).
+  const [row] = await tx.select().from(tasks).where(and(eq(tasks.tenantId, ctx.tenantId), eq(tasks.refNo, Number(m[1])), taskScopeWhere(ctx.scope, ctx.reports))).for("update", { of: [tasks] })
   if (!row) throw TaskNotFound()
+  const assignees = allAssignees((await assigneesOf(tx, ctx.tenantId, [row.id])).get(row.id)!)
+  if (!assignees.includes(ctx.me) && !canManage(ctx, row, assignees)) throw TaskNotFound()
   const [dup] = await tx.select({ id: taskHistory.id }).from(taskHistory).where(and(eq(taskHistory.tenantId, ctx.tenantId), eq(taskHistory.taskId, row.id), eq(taskHistory.updateId, u.id)))
   if (dup) return "duplicate"
   if (row.archivedAt) return "skipped_archived"
-  const assignees = allAssignees((await assigneesOf(tx, ctx.tenantId, [row.id])).get(row.id)!)
-  if (!assignees.includes(ctx.me) && !canManage(ctx, row, assignees)) throw Forbidden("forbidden")
   const at = instantOfWall(u.at, ctx.tz)
   const time = u.minutes > 0 ? `${u.minutes} min logged` : ""
   const from = `from the ${u.source}${u.note ? `: ${u.note}` : ""}`

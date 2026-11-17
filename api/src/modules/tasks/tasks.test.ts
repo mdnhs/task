@@ -40,26 +40,27 @@ async function world(over: { timezone?: string; sessionIdleHours?: number } = {}
   return { ...t, tenant, who, owner, manager, ops, staff, staff2, req, json, manages, base, mk, q }
 }
 type W = Awaited<ReturnType<typeof world>>
+const ctxFor = (w: W, who: Who): TaskCtx => ({ tenantId: w.tenant.id, tz: "Europe/Dublin", me: who.userId, actorId: who.userId, role: { home: "staff", access: { tasks: "write" } } as never, scope: { kind: "all" }, reports: [], drive: true, now: w.clock.now() })
 const code = async (r: Response) => ((await r.clone().json()) as Json).code as string
 
 describe("create, wall clock and refs", () => {
   test("create stores UTC and echoes tenant-local wall clock: due 2026-10-25T01:30:00 Europe/Dublin → dueAt 2026-10-25T00:30:00.000Z (earlier instant)", async () => {
     const w = await world()
-    const r = await w.mk(w.manager, { start: "2026-10-24T09:00:00", due: "2026-10-25T01:30:00" })
+    const r = await w.mk(w.ops, { start: "2026-10-24T09:00:00", due: "2026-10-25T01:30:00" })
     expect(r.dueAt).toBe("2026-10-25T00:30:00.000Z")
     expect(r.due).toBe("2026-10-25T01:30:00")
     expect(r.startAt).toBe("2026-10-24T08:00:00.000Z") // BST still (+1)
     expect(r.ref).toBe("TSK-1000")
     expect(r.version).toBe(1)
     expect(r.assignee).toBe(w.staff.userId)
-    expect(r.creator).toBe(w.manager.userId)
+    expect(r.creator).toBe(w.ops.userId)
     const [row] = await w.q("select due_at from tasks")
     expect(new Date(row.due_at as string).toISOString()).toBe("2026-10-25T00:30:00.000Z")
   })
 
   test("due 2027-03-28T01:30:00 (spring-forward gap) is stored as 01:30Z and shown as 02:30 local", async () => {
     const w = await world()
-    const r = await w.mk(w.manager, { start: "2027-03-27T09:00:00", due: "2027-03-28T01:30:00" })
+    const r = await w.mk(w.ops, { start: "2027-03-27T09:00:00", due: "2027-03-28T01:30:00" })
     expect(r.dueAt).toBe("2027-03-28T01:30:00.000Z")
     expect(r.due).toBe("2027-03-28T02:30:00")
   })
@@ -101,7 +102,7 @@ describe("create, wall clock and refs", () => {
     expect(j.tags).toEqual(["safety", "fire"])
     expect(j.version).toBe(2)
     // a manager-created task: the assignee is not its creator, so a title edit is forbidden
-    const mine = await w.mk(w.manager)
+    const mine = await w.mk(w.ops)
     expect((await w.req("PATCH", `/v1/tasks/${mine.id}`, w.staff, { version: 1, title: "x" })).status).toBe(403)
   })
 
@@ -202,12 +203,12 @@ describe("list filters, cursor and indexes", () => {
     const w = await world({ timezone: "Pacific/Auckland", sessionIdleHours: 72 })
     // 2026-11-16T23:30Z = 2026-11-17 12:30 in Auckland (NZDT, +13)
     w.clock.advance({ hours: 14, minutes: 30 })
-    const a = await w.mk(w.manager, { title: "A", start: "2026-11-17T08:00:00", due: "2026-11-17T09:00:00" }) // today, already past
-    const b = await w.mk(w.manager, { title: "B", start: "2026-11-16T19:00:00", due: "2026-11-16T20:00:00" }) // yesterday (but 07:00Z on the 16th: "today" in UTC)
-    const c = await w.mk(w.manager, { title: "C", start: "2026-11-17T17:00:00", due: "2026-11-17T18:00:00" }) // today, still ahead
-    const d = await w.mk(w.manager, { title: "D", start: "2026-11-24T08:00:00", due: "2026-11-24T09:00:00" }) // 7 days ahead (this week window)
-    const e = await w.mk(w.manager, { title: "E", start: "2026-11-25T08:00:00", due: "2026-11-25T09:00:00" }) // 8 days ahead
-    const titles = async (qs: string) => ((await w.json(await w.req("GET", `/v1/tasks?${qs}`, w.manager))).items as Json[]).map((i) => i.title as string).sort()
+    const a = await w.mk(w.ops, { title: "A", start: "2026-11-17T08:00:00", due: "2026-11-17T09:00:00" }) // today, already past
+    const b = await w.mk(w.ops, { title: "B", start: "2026-11-16T19:00:00", due: "2026-11-16T20:00:00" }) // yesterday (but 07:00Z on the 16th: "today" in UTC)
+    const c = await w.mk(w.ops, { title: "C", start: "2026-11-17T17:00:00", due: "2026-11-17T18:00:00" }) // today, still ahead
+    const d = await w.mk(w.ops, { title: "D", start: "2026-11-24T08:00:00", due: "2026-11-24T09:00:00" }) // 7 days ahead (this week window)
+    const e = await w.mk(w.ops, { title: "E", start: "2026-11-25T08:00:00", due: "2026-11-25T09:00:00" }) // 8 days ahead
+    const titles = async (qs: string) => ((await w.json(await w.req("GET", `/v1/tasks?${qs}`, w.ops))).items as Json[]).map((i) => i.title as string).sort()
     expect(await titles("due=today")).toEqual(["A", "C"])
     expect(await titles("due=overdue")).toEqual(["A", "B"])
     expect(await titles("due=week")).toEqual(["A", "C", "D"])
@@ -285,6 +286,7 @@ describe("update, history and optimistic version (AC-M1-04, D4)", () => {
   test("a manager reschedules and reassigns a member's task: the member is notified and history has old and new values (AC-M1-04)", async () => {
     const w = await world()
     await w.manages(w.manager, w.staff)
+    await w.manages(w.manager, w.staff2)
     const t = await w.mk(w.manager)
     w.clock.advance({ minutes: 5 })
     const r = await w.req("PATCH", `/v1/tasks/${t.id}`, w.manager, { version: 1, due: "2026-11-21T17:00:00", start: "2026-11-20T09:00:00" })
@@ -546,8 +548,6 @@ describe("events, applyTaskUpdate and RLS", () => {
     expect(byType["task.updated"].fields).toEqual(["title", "labels"])
   })
 
-  const ctxFor = (w: W, who: Who): TaskCtx => ({ tenantId: w.tenant.id, tz: "Europe/Dublin", me: who.userId, actorId: who.userId, role: null as never, scope: { kind: "all" }, reports: [], drive: true, now: w.clock.now() })
-
   test("applyTaskUpdate is idempotent by update id, logs time, and never completes a Required task without evidence", async () => {
     const w = await world()
     const plain = await w.mk(w.owner, { title: "Plain" })
@@ -562,10 +562,9 @@ describe("events, applyTaskUpdate and RLS", () => {
     expect(await run(up("sr-1:req", req.ref))).toBe("applied")
     expect(await run(up("sr-1:req", req.ref))).toBe("duplicate")
     expect((await w.q("select status from tasks where id = $1", [req.id]))[0].status).toBe("not_started") // stays open
-    const lines = await w.q("select text, notified, update_id from task_history where task_id = $1 order by at, id", [req.id])
-    expect(lines.at(-1)!.update_id).toBe("sr-1:req")
-    expect(lines.at(-1)!.text).toContain("Report marked done; evidence still needed")
-    expect(lines.at(-1)!.notified).toEqual([])
+    const [line] = await w.q("select text, notified, update_id from task_history where task_id = $1 and update_id = 'sr-1:req'", [req.id])
+    expect(line.text).toContain("Report marked done; evidence still needed")
+    expect(line.notified).toEqual([])
     expect((await w.q("select count(*)::int n from task_time_entries"))[0].n).toBe(2)
     // a snooze logs a line only; zero minutes logs no time entry; an in_progress report moves the status
     expect(await run(up("sr-2:snooze", req.ref, { snooze: true, minutes: 0 }))).toBe("applied")
@@ -614,5 +613,129 @@ describe("events, applyTaskUpdate and RLS", () => {
     expect((await w.q("select count(*)::int n from task_assignees where user_id = $1", [w.staff.userId]))[0].n).toBe(0)
     expect((await w.q("select count(*)::int n from task_history where actor_id = $1", [w.staff.userId]))[0].n).toBe(0)
     expect((await w.q("select actor_id from task_history where task_id = $1 and kind = 'status'", [t1.id]))[0].actor_id).toBeNull()
+  })
+})
+
+describe("review fixes (I1, M2, M3, M5, E2)", () => {
+  test("I1: Drive URLs in old and new description values do not leak through history, the detail timeline or the PATCH response without Drive access", async () => {
+    const w = await world()
+    const url = "https://drive.google.com/file/d/abc123/view"
+    const t = await w.mk(w.owner, { description: "plain" })
+    w.clock.advance({ minutes: 1 })
+    expect((await w.req("PATCH", `/v1/tasks/${t.id}`, w.owner, { version: 1, description: `See ${url}` })).status).toBe(200)
+    w.clock.advance({ minutes: 1 })
+    // with access: intact (the stored change really holds the URL)
+    expect(JSON.stringify(await w.json(await w.req("GET", `/v1/tasks/${t.id}/history`, w.owner)))).toContain("drive.google.com")
+    expect((await w.req("PUT", "/v1/device-policies/drive", w.owner, { allow: "none" })).status).toBe(200)
+    const hist = await w.json(await w.req("GET", `/v1/tasks/${t.id}/history`, w.owner))
+    expect(JSON.stringify(hist)).not.toContain("drive.google.com")
+    expect(JSON.stringify(hist)).toContain("Google Drive link")
+    expect(JSON.stringify(await w.json(await w.req("GET", `/v1/tasks/${t.id}`, w.owner)))).not.toContain("drive.google.com")
+    const patched = await w.json(await w.req("PATCH", `/v1/tasks/${t.id}`, w.owner, { version: 2, title: `Look ${url}` }))
+    expect(JSON.stringify(patched)).not.toContain("drive.google.com")
+    // an API key has no device: withheld too
+    const k = await makeApiKey(w.deps, w.tenant.id, w.owner.userId, ["tasks:read"])
+    const viaKey = await call(w.app, "GET", `/v1/tasks/${t.id}/history`, { headers: { authorization: `Bearer ${k.key}` } })
+    expect(JSON.stringify(await viaKey.json())).not.toContain("drive.google.com")
+  })
+
+  test("M2: applyTaskUpdate answers task_not_found for an unknown ref, an out-of-scope task and a non-assignee, before any duplicate/archived answer", async () => {
+    const w = await world()
+    const t = await w.mk(w.owner) // assigned to staff
+    const up = (id: string, ref: string) => ({ id, tenantId: w.tenant.id, ref, itemStatus: "in_progress" as const, minutes: 0, note: "", at: "2026-11-16T09:30", by: "x", source: "report" })
+    const as = (who: Who, scope: TaskCtx["scope"], u: ReturnType<typeof up>) => withTenant(w.deps.db, w.tenant.id, (tx) => applyTaskUpdate(tx, { ...ctxFor(w, who), scope }, u))
+    expect(await as(w.staff, { kind: "own", personId: w.staff.userId }, up("a1", t.ref))).toBe("applied")
+    // staff2 sees nothing of it (own scope): the same 404 as a ref that does not exist, even for a duplicate id or an archived task
+    await w.q("update tasks set archived_at = now() where id = $1", [t.id])
+    for (const ref of [t.ref, "TSK-9999"]) {
+      await expect(as(w.staff2, { kind: "own", personId: w.staff2.userId }, up("a1", ref))).rejects.toMatchObject({ code: "task_not_found" })
+    }
+    // an all-scope non-assignee without manage rights (staff-home role) is refused the same way
+    await expect(as(w.staff2, { kind: "all" }, up("a1", t.ref))).rejects.toMatchObject({ code: "task_not_found" })
+    expect(await as(w.staff, { kind: "own", personId: w.staff.userId }, up("a1", t.ref))).toBe("duplicate")
+  })
+
+  test("M3: app_user holds minimal grants on the task tables (no DELETE on counters and history, history UPDATE only actor_id and notified)", async () => {
+    const tbl = async (t: string) => (await ownerQuery(`select privilege_type from information_schema.role_table_grants where grantee = 'app_user' and table_name = $1 order by 1`, [t])).map((r) => r.privilege_type)
+    const col = async (t: string) => (await ownerQuery(`select column_name from information_schema.column_privileges where grantee = 'app_user' and table_name = $1 and privilege_type = 'UPDATE' order by 1`, [t])).map((r) => r.column_name)
+    expect(await tbl("task_counters")).toEqual(["INSERT", "SELECT"])
+    expect(await col("task_counters")).toEqual(["next_no"])
+    expect(await tbl("task_history")).toEqual(["INSERT", "SELECT"])
+    expect(await col("task_history")).toEqual(["actor_id", "notified"])
+    expect(await tbl("task_time_entries")).toEqual(["INSERT", "SELECT"])
+    expect(await col("task_time_entries")).toEqual(["user_id"])
+    expect(await tbl("task_assignees")).toEqual(["DELETE", "INSERT", "SELECT"])
+    expect(await tbl("tasks")).toEqual(["DELETE", "INSERT", "SELECT"])
+    expect(await col("tasks")).not.toContain("tenant_id")
+    expect(await col("tasks")).not.toContain("ref_no")
+    expect(await col("tasks")).not.toContain("id")
+    const w = await world()
+    const t = await w.mk(w.owner)
+    const code42501 = (e: unknown) => (e as { cause?: { code?: string } })?.cause?.code
+    for (const stmt of [sql`delete from task_history`, sql`update task_history set text = 'x'`, sql`delete from task_counters`, sql`update tasks set ref_no = 5`]) {
+      const err = await withTenant(w.deps.db, w.tenant.id, (tx) => tx.execute(stmt)).catch((e) => e)
+      expect(code42501(err), String(stmt)).toBe("42501")
+    }
+    void t
+  })
+
+  test("M5: the own-scope and team-scope list queries also avoid a sequential scan at 4001 rows", async () => {
+    const w = await world()
+    await w.manages(w.manager, w.staff)
+    await w.mk(w.owner)
+    await w.q(
+      `insert into tasks (tenant_id, ref_no, title, evidence_rule, start_at, due_at, created_at, updated_at, creator_id)
+       select $1::uuid, 2000 + g, 'Seed ' || g, $2::jsonb, now(), date_trunc('milliseconds', now()) + (g || ' minutes')::interval, now(), now(), $3 from generate_series(1, 4000) g`,
+      [w.tenant.id, JSON.stringify(NO_EVIDENCE), w.owner.userId],
+    )
+    await w.q("insert into task_assignees (tenant_id, task_id, user_id, is_primary) select tenant_id, id, $1, true from tasks where ref_no >= 2000 and ref_no % 40 = 0", [w.staff.userId])
+    await w.q("insert into task_assignees (tenant_id, task_id, user_id, is_primary) select tenant_id, id, $1, true from tasks where ref_no % 40 = 1", [w.staff2.userId])
+    await ownerQuery("analyze tasks")
+    await ownerQuery("analyze task_assignees")
+    const explain = async (scope: TaskCtx["scope"], reports: string[], me: string) => {
+      const ctx: TaskCtx = { tenantId: w.tenant.id, tz: "Europe/Dublin", me, actorId: me, role: null as never, scope, reports, drive: true, now: w.clock.now() }
+      const { sql: text, params } = await withTenant(w.deps.db, w.tenant.id, async (tx) => buildListQuery(tx, ctx, {}, 26).toSQL())
+      const c = new pg.Client({ connectionString: process.env.TEST_DATABASE_OWNER_URL })
+      await c.connect()
+      try {
+        await c.query("begin")
+        await c.query("select set_config('app.tenant_id', $1, true)", [w.tenant.id])
+        const rows = (await c.query(`explain ${text}`, params as unknown[])).rows.map((r) => r["QUERY PLAN"] as string).join("\n")
+        await c.query("rollback")
+        return rows
+      } finally {
+        await c.end()
+      }
+    }
+    const own = await explain({ kind: "own", personId: w.staff.userId }, [], w.staff.userId)
+    const team = await explain({ kind: "team", managerId: w.manager.userId }, [w.staff.userId], w.manager.userId)
+    for (const [name, plan] of [["own", own], ["team", team]] as const) {
+      expect(plan, `${name}\n${plan}`).not.toMatch(/Seq Scan on tasks/)
+      expect(plan, `${name}\n${plan}`).toMatch(/tasks_live_due_idx|tasks_live_status_due_idx|tasks_pkey|task_assignees_user_idx/)
+    }
+    // and the answers are right: staff see only their 100 of 4001 tasks
+    const mine = await w.json(await w.req("GET", "/v1/tasks?limit=100", w.staff))
+    expect(mine.items).toHaveLength(100)
+  }, 60_000)
+
+  test("E2: a team-scope manager assigns only themself or direct reports (assignee_out_of_scope), all-scope managers anyone; staff unchanged", async () => {
+    const w = await world()
+    await w.manages(w.manager, w.staff)
+    const out = await w.req("POST", "/v1/tasks", w.manager, w.base({ primary: w.staff2.userId }))
+    expect(out.status).toBe(422)
+    expect(await code(out)).toBe("assignee_out_of_scope")
+    expect(await code(await w.req("POST", "/v1/tasks", w.manager, w.base({ primary: w.staff.userId, others: [w.staff2.userId] })))).toBe("assignee_out_of_scope")
+    expect(await code(await w.req("POST", "/v1/tasks", w.manager, w.base({ primary: "usr_ghost" })))).toBe("assignee_out_of_scope") // no oracle: any outsider alike
+    const ok = await w.json(await w.req("POST", "/v1/tasks", w.manager, w.base({ primary: w.staff.userId, others: [w.manager.userId] })))
+    expect(ok.assignee).toBe(w.staff.userId)
+    expect((await w.req("POST", "/v1/tasks", w.manager, w.base({ primary: w.manager.userId }))).status).toBe(201) // themself
+    // PUT /assignees follows the same rule
+    expect(await code(await w.req("PUT", `/v1/tasks/${ok.id}/assignees`, w.manager, { version: 1, primary: w.staff.userId, others: [w.staff2.userId] }))).toBe("assignee_out_of_scope")
+    expect((await w.req("PUT", `/v1/tasks/${ok.id}/assignees`, w.manager, { version: 1, primary: w.manager.userId, others: [w.staff.userId] })).status).toBe(200)
+    // all-scope managers: anyone (an invalid id is still invalid_assignee)
+    expect((await w.req("POST", "/v1/tasks", w.ops, w.base({ primary: w.staff2.userId, others: [w.manager.userId] }))).status).toBe(201)
+    expect(await code(await w.req("POST", "/v1/tasks", w.ops, w.base({ primary: "usr_ghost" })))).toBe("invalid_assignee")
+    // staff: themselves only
+    expect(await code(await w.req("POST", "/v1/tasks", w.staff, w.base({ primary: w.staff2.userId })))).toBe("cannot_assign_others")
   })
 })

@@ -1,4 +1,5 @@
 import { and, desc, eq, inArray, lt, or } from "drizzle-orm"
+import { withholdDriveText } from "@opsdesk/domain/devices"
 import { formatChange, type RawChange } from "@opsdesk/domain/task-history"
 import type { FieldChange } from "@opsdesk/domain/task-model"
 import { taskHistory, teams, user } from "../../db/schema"
@@ -44,12 +45,14 @@ function referenced(rows: HistoryRow[]): { users: string[]; teamIds: string[] } 
   return { users: [...users], teamIds: [...teamIds] }
 }
 
-export async function historyDtos(tx: TenantTx, ctx: Pick<TaskCtx, "tenantId" | "tz">, rows: HistoryRow[]): Promise<HistoryDto[]> {
+export async function historyDtos(tx: TenantTx, ctx: Pick<TaskCtx, "tenantId" | "tz" | "drive">, rows: HistoryRow[]): Promise<HistoryDto[]> {
   const ref = referenced(rows)
   const nameOf = await namesOf(tx, ref.users)
   const teamRows = ref.teamIds.length ? await tx.select({ id: teams.id, name: teams.name }).from(teams).where(and(eq(teams.tenantId, ctx.tenantId), inArray(teams.id, ref.teamIds))) : []
   const teamNames = new Map(teamRows.map((t) => [t.id, t.name]))
   const fmt = { tz: ctx.tz, nameOf, teamName: (id: string) => teamNames.get(id) ?? "Former team" }
+  // Drive links (ruling D22): old and new values of free text can hold one, so a device without Drive access gets them withheld here too.
+  const free = (v: string) => (ctx.drive ? v : withholdDriveText(v))
   return rows.map((r) => ({
     id: r.id,
     at: wallOf(r.at, ctx.tz),
@@ -57,8 +60,8 @@ export async function historyDtos(tx: TenantTx, ctx: Pick<TaskCtx, "tenantId" | 
     actorId: r.actorId,
     by: r.actorId ? nameOf(r.actorId) : FORMER,
     kind: r.kind,
-    text: r.text ?? "",
-    changes: r.changes.map((c) => formatChange(c, fmt)),
+    text: free(r.text ?? ""),
+    changes: r.changes.map((c) => formatChange(c, fmt)).map((c) => ({ ...c, from: free(c.from), to: free(c.to) })),
     notified: r.notified,
     ...(r.updateId ? { updateId: r.updateId } : {}),
   }))
