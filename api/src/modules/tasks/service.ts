@@ -7,7 +7,7 @@ import { isOpen, nextStatuses } from "@opsdesk/domain/task-lifecycle"
 import { STATUS, type TaskStatus } from "@opsdesk/domain/task-model"
 import { taskStatusFor } from "@opsdesk/domain/shift-report"
 import { AppError, Conflict, Forbidden } from "../../core/errors"
-import { memberships, projectMilestones, projects, taskHistory, taskTimeEntries, tasks, teams } from "../../db/schema"
+import { memberships, projectMilestones, projects, taskHistory, taskTemplates, taskTimeEntries, tasks, teams } from "../../db/schema"
 import type { TenantTx } from "../../db/tenant-tx"
 import { decodeCursor, encodeCursor } from "./cursor"
 import { taskDtos, type CreateInput, type ListQueryInput, type PatchInput, type TaskDto } from "./dto"
@@ -20,7 +20,7 @@ import { instantOfWall, wallOf } from "./time"
 
 /** The two fields the lifecycle rules read, typed (archivedAt is a wall string there, only its presence matters). */
 const lifecycleOf = (r: TaskRow) => ({ status: r.status as TaskStatus, archivedAt: r.archivedAt?.toISOString() })
-const unprocessable = (code: string) => new AppError(422, code, "Unprocessable Entity")
+export const unprocessable = (code: string) => new AppError(422, code, "Unprocessable Entity")
 const OPEN_STATUSES: TaskStatus[] = ["not_started", "in_progress", "blocked", "submitted", "changes_requested"]
 
 // ---------- validation helpers ----------
@@ -43,7 +43,7 @@ export async function checkTeam(tx: TenantTx, ctx: TaskCtx, teamId: string | nul
  * Assignees must be ACTIVE members of this tenant (a foreign, inactive or unknown id is the same 422 invalid_assignee) and distinct;
  * a team-scope manager may only pick themself or a direct report (422 assignee_out_of_scope, the same for any other id).
  */
-async function checkAssignees(tx: TenantTx, ctx: TaskCtx, primary: string, others: string[]): Promise<void> {
+export async function checkAssignees(tx: TenantTx, ctx: TaskCtx, primary: string, others: string[]): Promise<void> {
   const ids = [primary, ...others]
   if (new Set(ids).size !== ids.length) throw unprocessable("invalid_assignee")
   // Ruling E2: a team-scope manager assigns only themself or their direct reports; all-scope managers assign anyone.
@@ -81,25 +81,57 @@ export const staleVersion = (row: TaskRow, version: number) => {
 
 // ---------- create ----------
 
-/** POST /v1/tasks. The caller has already taken the ref (nextRefNo) and the actor lock (loadTaskCtx(…, "write")), in that order. */
+/**
+ * The evidence rule a new task gets (ruling D23): the body's own rule, else the template's (`templateId`), else the project's default,
+ * else NO_EVIDENCE. Only the RULE is inherited server-side; the other template fields are filled in by the client (applyTemplate). An
+ * inherited rule whose named reviewer has left is kept but falls back to manager review, so a stale template never blocks creating a task.
+ * A template of another tenant is the same 422 invalid_template as an unknown id.
+ */
+async function inheritedRule(tx: TenantTx, ctx: TaskCtx, body: EvidenceRule | undefined, templateId: string | undefined, projectRule: EvidenceRule | null): Promise<EvidenceRule> {
+  if (body) return checkRule(tx, ctx, body)
+  let from: EvidenceRule | null = projectRule
+  if (templateId) {
+    const [t] = await tx.select({ rule: taskTemplates.evidenceRule }).from(taskTemplates).where(and(eq(taskTemplates.tenantId, ctx.tenantId), eq(taskTemplates.id, templateId)))
+    if (!t) throw unprocessable("invalid_template")
+    from = t.rule
+  }
+  if (!from) return { ...NO_EVIDENCE }
+  try {
+    return await checkRule(tx, ctx, from)
+  } catch (e) {
+    if (e instanceof AppError && e.code === "invalid_reviewer") return checkRule(tx, ctx, { ...from, review: "manager", reviewer: undefined })
+    throw e
+  }
+}
+
+/**
+ * POST /v1/tasks. The caller has already taken the ref (nextRefNo) and the actor lock (loadTaskCtx(…, "write")), in that order. A project
+ * (and milestone) at creation is a manager's choice like in a PATCH (ruling D6): staff get 403 forbidden. The project row is locked FOR
+ * SHARE after the ref counter and before the task row, the same order the recurrence job and PATCH use.
+ */
 export async function createTask(tx: TenantTx, env: TaskEnv, ctx: TaskCtx, refNo: number, input: CreateInput): Promise<TaskDto> {
   const primary = input.primary ?? ctx.me
   const others = [...new Set(input.others)].sort()
   // Staff create tasks for themselves only (ruling D6): always 403, whether or not the other person exists.
   if (ctx.scope.kind === "own" && (primary !== ctx.me || others.length > 0)) throw Forbidden("cannot_assign_others")
+  if (ctx.role.home !== "manager" && (input.projectId || input.milestoneId)) throw Forbidden("forbidden")
   const startAt = instantOfWall(input.start, ctx.tz)
   const dueAt = instantOfWall(input.due, ctx.tz)
   if (startAt.getTime() > dueAt.getTime()) throw unprocessable("invalid_dates")
   const labels = normaliseLabels(input.labels)
   const teamId = await checkTeam(tx, ctx, input.teamId)
   await checkAssignees(tx, ctx, primary, others)
-  const evidenceRule = await checkRule(tx, ctx, input.evidenceRule as EvidenceRule | undefined)
+  const place = { projectId: input.projectId ?? undefined, milestoneId: input.milestoneId ?? undefined }
+  await lockPlacementTargets(tx, ctx, place)
+  const { projectId, milestoneId } = await checkPlacement(tx, ctx, { projectId: null, milestoneId: null }, place)
+  const [project] = projectId ? await tx.select({ rule: projects.defaultEvidenceRule }).from(projects).where(and(eq(projects.tenantId, ctx.tenantId), eq(projects.id, projectId))) : []
+  const evidenceRule = await inheritedRule(tx, ctx, input.evidenceRule as EvidenceRule | undefined, input.templateId, project?.rule ?? null)
 
   const [row] = await tx
     .insert(tasks)
     .values({
       tenantId: ctx.tenantId, refNo, title: input.title, description: input.description, teamId, creatorId: ctx.me, priority: input.priority, startAt, dueAt,
-      labels, estimateMin: input.estimateMin ?? null, client: input.client ?? null, evidenceRule, overduePlan: input.overduePlan ?? null, createdAt: ctx.now, updatedAt: ctx.now,
+      labels, estimateMin: input.estimateMin ?? null, client: input.client ?? null, projectId, milestoneId, evidenceRule, overduePlan: input.overduePlan ?? null, createdAt: ctx.now, updatedAt: ctx.now,
     })
     .returning()
   await replaceAssignees(tx, ctx.tenantId, row.id, primary, others)
@@ -107,7 +139,7 @@ export async function createTask(tx: TenantTx, env: TaskEnv, ctx: TaskCtx, refNo
   await writeHistory(tx, ctx, row.id, { kind: "created", text: "Task created", notified: recipients })
   await notifyTask(tx, env, ctx, row, recipients, "New task")
   const dto = await detail(tx, ctx, row)
-  await publishTaskEvent(tx, ctx, { type: "task.created", payload: { taskId: row.id, parentId: null, projectId: null, seriesId: null } })
+  await publishTaskEvent(tx, ctx, { type: "task.created", payload: { taskId: row.id, parentId: null, projectId, seriesId: null } })
   return dto
 }
 
@@ -168,7 +200,7 @@ const STAFF_EDITABLE = ["title", "description", "priority", "labels"]
  * milestone writes lock the project row first and its tasks second, so both orders agree (no deadlock) and a project deleted meanwhile
  * is simply "not found" (422 invalid_project) instead of a foreign key error.
  */
-async function lockPlacementTargets(tx: TenantTx, ctx: TaskCtx, input: PatchInput): Promise<void> {
+async function lockPlacementTargets(tx: TenantTx, ctx: TaskCtx, input: Pick<PatchInput, "projectId" | "milestoneId">): Promise<void> {
   const ids = new Set<string>()
   if (input.projectId) ids.add(input.projectId)
   if (input.milestoneId) {
@@ -183,7 +215,7 @@ async function lockPlacementTargets(tx: TenantTx, ctx: TaskCtx, input: PatchInpu
  * tenant (422 invalid_project, the same for another tenant's id); the milestone must belong to the resulting project (422 invalid_milestone).
  * Moving to another project without naming a milestone drops the old milestone.
  */
-async function checkPlacement(tx: TenantTx, ctx: TaskCtx, row: TaskRow, input: PatchInput): Promise<{ projectId: string | null; milestoneId: string | null }> {
+async function checkPlacement(tx: TenantTx, ctx: TaskCtx, row: Pick<TaskRow, "projectId" | "milestoneId">, input: Pick<PatchInput, "projectId" | "milestoneId">): Promise<{ projectId: string | null; milestoneId: string | null }> {
   let projectId = row.projectId
   let milestoneId = row.milestoneId
   if (input.projectId === undefined && input.milestoneId === undefined) return { projectId, milestoneId }

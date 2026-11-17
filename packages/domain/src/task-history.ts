@@ -1,5 +1,6 @@
 import { epochToWall } from "./shifts"
-import { STATUS, type FieldChange, type TaskStatus } from "./task-model"
+import { STATUS, type FieldChange, type RepeatRule, type TaskStatus } from "./task-model"
+import { describeRepeat } from "./task-recurrence"
 
 // Field history of a task (FR-M1-12, AC-M1-04). The server stores RAW old and new values per field (UTC ISO for dates, ids for
 // people and teams) and formats them per request in tenant time with the CURRENT names, so a name change or an erasure shows up
@@ -23,7 +24,7 @@ const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "
 const PRIORITY = ["", "Low", "Medium", "High"]
 const LABEL: Record<string, string> = {
   title: "Title", description: "Description", priority: "Priority", labels: "Labels", estimateMin: "Estimate", client: "Client", teamId: "Department",
-  start: "Start", due: "Due", overduePlan: "Overdue plan", assignees: "Assignees", status: "Status", projectId: "Project", milestoneId: "Milestone", dependsOn: "Depends on",
+  start: "Start", due: "Due", overduePlan: "Overdue plan", assignees: "Assignees", status: "Status", projectId: "Project", milestoneId: "Milestone", dependsOn: "Depends on", repeat: "Repeat",
 }
 
 /** "20 Nov 17:00" in `tz` for a UTC ISO instant. */
@@ -56,6 +57,8 @@ function show(field: string, v: unknown, ctx: FormatCtx): string {
       return Array.isArray(v) ? v.join(", ") : ""
     case "estimateMin":
       return `${v} min`
+    case "repeat":
+      return typeof v === "object" ? describeRepeat(v as RepeatRule) : String(v)
     case "overduePlan":
       return typeof v === "object" ? "Plan set" : String(v)
     default:

@@ -86,6 +86,9 @@ export const tasks = pgTable(
     // A task's milestone must belong to the task's own project (MATCH SIMPLE: skipped while milestone_id is null; the check forbids a milestone without a project).
     foreignKey({ columns: [t.tenantId, t.projectId, t.milestoneId], foreignColumns: [projectMilestones.tenantId, projectMilestones.projectId, projectMilestones.id], name: "tasks_milestone_fk" }),
     check("tasks_milestone_needs_project", sql`${t.milestoneId} is null or ${t.projectId} is not null`),
+    // Recurrence (ruling D11, T4.4): one instance per (series, local date); the job's ON CONFLICT DO NOTHING rests on this key.
+    unique("tasks_series_occ_uq").on(t.tenantId, t.seriesId, t.occurrenceDate),
+    index("tasks_series_live_idx").on(t.tenantId).where(sql`${t.repeat} is not null and ${t.archivedAt} is null`),
     index("tasks_project_idx").on(t.tenantId, t.projectId).where(sql`${t.archivedAt} is null`),
     index("tasks_milestone_idx").on(t.tenantId, t.milestoneId).where(sql`${t.milestoneId} is not null`),
     index("tasks_live_due_idx").on(t.tenantId, t.dueAt, t.id).where(sql`${t.archivedAt} is null`),

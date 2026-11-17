@@ -136,6 +136,8 @@ export const CreateBody = z
     start: Wall, due: Wall, primary: UserId.optional(), others: z.array(UserId).max(9).default([]),
     teamId: z.uuid().nullable().optional(), labels: z.array(z.string().max(100)).max(50).default([]), estimateMin: z.number().int().min(1).max(100_000).nullable().optional(),
     client: z.string().trim().min(1).max(120).nullable().optional(), evidenceRule: EvidenceRuleSchema.optional(), overduePlan: OverduePlan.nullable().optional(),
+    templateId: z.uuid().optional().openapi({ description: "Only the template's evidence rule is applied here (ruling D23); a body rule wins, then the template's, then the project's default" }),
+    projectId: z.uuid().nullable().optional(), milestoneId: z.uuid().nullable().optional(),
   })
   .openapi({ example: { title: "Check fire exits", description: "Walk every floor.", priority: 2, start: "2026-11-20T09:00:00", due: WALL_EX, primary: UID, others: [], labels: ["safety"] } })
 export type CreateInput = z.infer<typeof CreateBody>
@@ -149,6 +151,21 @@ export const PatchBody = z
   })
   .openapi({ example: { version: 1, due: "2026-11-21T17:00:00" } })
 export type PatchInput = z.infer<typeof PatchBody>
+
+export const RepeatBody = z
+  .object({
+    version: Version,
+    rule: z
+      .object({
+        freq: z.string().min(1).max(20).openapi({ description: "daily | weekdays | weekly | monthly (per_shift is not available yet: 422 unsupported_repeat)", example: "weekly" }),
+        days: z.array(z.number().int()).max(14).optional().openapi({ description: "Weekly: weekdays 0 = Sunday … 6 = Saturday" }),
+        dayOfMonth: z.number().int().optional().openapi({ description: "Monthly: 1–31; a short month uses its last day" }),
+        until: z.string().max(10).optional().openapi({ description: "Last local day (YYYY-MM-DD), inclusive" }),
+      })
+      .nullable()
+      .openapi({ description: "null stops the repetition" }),
+  })
+  .openapi({ example: { version: 1, rule: { freq: "weekly", days: [1, 3], until: "2026-12-31" } } })
 
 export const AssigneesBody = z.object({ version: Version, primary: UserId, others: z.array(UserId).max(9) }).openapi({ example: { version: 1, primary: UID, others: [] } })
 export const StatusBody = z.object({ version: Version, to: Status }).openapi({ example: { version: 1, to: "in_progress" } })

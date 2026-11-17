@@ -4,14 +4,15 @@ import { requirePermission } from "../../core/middleware/permission"
 import { requireTenant } from "../../core/middleware/tenant"
 import { newRouter } from "../../core/router"
 import { withTenantAfterCommit } from "../notifications"
-import { AssigneesBody, CompleteBody, CreateBody, HistoryList, HistoryQuery, IdParam, ListQuery, PatchBody, StatusBody, TaskDtoSchema, TaskList } from "./dto"
+import { AssigneesBody, CompleteBody, CreateBody, HistoryList, HistoryQuery, IdParam, ListQuery, PatchBody, RepeatBody, StatusBody, TaskDtoSchema, TaskList } from "./dto"
 import { nextRefNo } from "./repo"
 import { mutate, read1 } from "./run"
+import { setRepeat } from "./recurrence"
 import { getTask, loadTaskCtx } from "./scope"
 import { changeStatus, completeTask, createTask, getTaskDetail, listHistory, listTasks, patchTask, setAssignees } from "./service"
 
 const json = (schema: typeof TaskDtoSchema | typeof TaskList | typeof HistoryList, description: string) => ({ description, content: { "application/json": { schema } } })
-const body = <T extends typeof CreateBody | typeof PatchBody | typeof AssigneesBody | typeof StatusBody | typeof CompleteBody>(schema: T) => ({ content: { "application/json": { schema } }, required: true as const })
+const body = <T extends typeof CreateBody | typeof PatchBody | typeof AssigneesBody | typeof StatusBody | typeof CompleteBody | typeof RepeatBody>(schema: T) => ({ content: { "application/json": { schema } }, required: true as const })
 
 const listR = createRoute({
   method: "get", path: "/v1/tasks", middleware: [requireTenant, requireModule("M1"), requirePermission("tasks", "read")] as const, request: { query: ListQuery },
@@ -41,6 +42,10 @@ const completeR = createRoute({
   method: "post", path: "/v1/tasks/{id}/complete", middleware: [requireTenant, requireModule("M1"), requirePermission("tasks", "write")] as const, request: { params: IdParam, body: body(CompleteBody) },
   responses: { 200: json(TaskDtoSchema, "Completed, or Awaiting verification when a reviewer must check. 409 version_conflict; 422 invalid_transition | evidence_required") },
 })
+const repeatR = createRoute({
+  method: "put", path: "/v1/tasks/{id}/repeat", middleware: [requireTenant, requireModule("M1"), requirePermission("tasks", "write")] as const, request: { params: IdParam, body: body(RepeatBody) },
+  responses: { 200: json(TaskDtoSchema, "The task with its new repetition (managers only); rule null stops it. A job creates the instances. 403 forbidden; 404 task_not_found; 409 version_conflict; 422 invalid_repeat (also for an instance or a subtask) | unsupported_repeat") },
+})
 const historyR = createRoute({
   method: "get", path: "/v1/tasks/{id}/history", middleware: [requireTenant, requireModule("M1"), requirePermission("tasks", "read")] as const, request: { params: IdParam, query: HistoryQuery },
   responses: { 200: json(HistoryList, "Field history newest first with old and new values in tenant time; pass nextCursor back as cursor. 400 invalid_cursor") },
@@ -63,6 +68,7 @@ export const taskRoutes = newRouter()
   .openapi(assigneesR, async (c) => c.json(await mutate(c, (tx, env, ctx) => setAssignees(tx, env, ctx, c.req.valid("param").id, c.req.valid("json"))), 200))
   .openapi(statusR, async (c) => c.json(await mutate(c, (tx, env, ctx) => changeStatus(tx, env, ctx, c.req.valid("param").id, c.req.valid("json"))), 200))
   .openapi(completeR, async (c) => c.json(await mutate(c, (tx, env, ctx) => completeTask(tx, env, ctx, c.req.valid("param").id, c.req.valid("json"))), 200))
+  .openapi(repeatR, async (c) => c.json(await mutate(c, (tx, env, ctx) => setRepeat(tx, env, ctx, c.req.valid("param").id, c.req.valid("json"))), 200))
   .openapi(historyR, async (c) =>
     c.json(
       await read1(c, async (tx, ctx) => {

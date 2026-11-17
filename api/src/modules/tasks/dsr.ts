@@ -1,5 +1,5 @@
 import { and, asc, eq, or, sql } from "drizzle-orm"
-import { projects, taskAssignees, taskChecklistItems, taskComments, taskFiles, taskHistory, taskTimeEntries, tasks } from "../../db/schema"
+import { projects, taskAssignees, taskTemplates, taskChecklistItems, taskComments, taskFiles, taskHistory, taskTimeEntries, tasks } from "../../db/schema"
 import type { DsrHandler } from "../gdpr/registry"
 
 /**
@@ -34,6 +34,8 @@ export const tasksDsrHandler: DsrHandler = {
   async erase(tx, tenantId, userId) {
     await tx.update(tasks).set({ creatorId: null }).where(and(eq(tasks.tenantId, tenantId), eq(tasks.creatorId, userId)))
     await tx.update(projects).set({ leadId: null }).where(and(eq(projects.tenantId, tenantId), eq(projects.leadId, userId)))
+    await tx.update(taskTemplates).set({ createdBy: null }).where(and(eq(taskTemplates.tenantId, tenantId), eq(taskTemplates.createdBy, userId)))
+    await tx.update(taskTemplates).set({ assigneeId: null }).where(and(eq(taskTemplates.tenantId, tenantId), eq(taskTemplates.assigneeId, userId)))
     await tx.update(tasks).set({ archivedBy: null }).where(and(eq(tasks.tenantId, tenantId), eq(tasks.archivedBy, userId)))
     await tx.update(taskHistory).set({ actorId: null }).where(and(eq(taskHistory.tenantId, tenantId), eq(taskHistory.actorId, userId)))
     await tx.update(taskHistory).set({ notified: sql`array_remove(${taskHistory.notified}, ${userId})` }).where(and(eq(taskHistory.tenantId, tenantId), sql`${userId} = any(${taskHistory.notified})`))

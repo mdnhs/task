@@ -28,6 +28,7 @@ import { authRoutes } from "./modules/auth/routes"
 import { inviteRoutes } from "./modules/invites"
 import { collabRoutes, planningRoutes, taskRoutes } from "./modules/tasks"
 import { projectRoutes } from "./modules/projects"
+import { templateRoutes } from "./modules/task-templates"
 import { teamRoutes } from "./modules/teams"
 import { tenantRoutes } from "./modules/tenants"
 
@@ -72,6 +73,7 @@ export function createApp(deps: Deps) {
   app.route("/", collabRoutes)
   app.route("/", planningRoutes)
   app.route("/", projectRoutes)
+  app.route("/", templateRoutes)
   app.route("/", mfaRoutes)
   app.route("/", auditRoutes)
   app.route("/", deviceRoutes)
