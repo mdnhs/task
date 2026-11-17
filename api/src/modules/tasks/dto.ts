@@ -15,6 +15,15 @@ const UID = "usr_8Kq2mZ4tW1"
 const WALL_EX = "2026-11-20T17:00:00"
 const UTC_EX = "2026-11-20T17:00:00.000Z"
 
+/**
+ * The voice note as the task DTO shows it (ruling D21): metadata only. The file id, the file name and the play log never appear here: playing goes through
+ * GET /voice-note (logged), and the log is read through GET /voice-note/plays by the managers of the task.
+ */
+export const voiceNoteOf = (r: Pick<TaskRow, "voiceFileId" | "voiceMeta">): { durationSec: number; mime: string; recordedBy: string; recordedAt: string } | null => {
+  const m = r.voiceMeta as { durationSec?: number; mime?: string; recordedBy?: string; recordedAt?: string } | null
+  return r.voiceFileId && m ? { durationSec: Number(m.durationSec), mime: String(m.mime), recordedBy: String(m.recordedBy), recordedAt: String(m.recordedAt) } : null
+}
+
 export const Status = z.enum(TASK_STATUSES)
 export const EvidenceRuleSchema = z
   .object({
@@ -123,7 +132,7 @@ export async function taskDtos(tx: TenantTx, ctx: TaskCtx, rows: TaskRow[], time
       ...(r.proposal ? { proposal: ctx.drive ? r.proposal : { ...r.proposal, reason: withholdDriveText(String(r.proposal.reason ?? "")) } } : {}), ...(r.repeat ? { repeat: r.repeat as Record<string, unknown> } : {}), ...(r.seriesId ? { seriesId: r.seriesId } : {}),
       ...(r.submittedAt ? { submittedAt: wallOf(r.submittedAt, ctx.tz) } : {}), ...(r.completedAt ? { completedAt: wallOf(r.completedAt, ctx.tz) } : {}),
       notes: [], evidence: items.map((e) => evidenceDto.get(e.id)!), timeline, ...(r.overduePlan ? { overdue: r.overduePlan } : {}), timeEntries: [],
-      evidenceState: evidenceState(r.evidenceRule, stateItems(items), r.status), voiceNote: null,
+      evidenceState: evidenceState(r.evidenceRule, stateItems(items), r.status), voiceNote: voiceNoteOf(r),
     }
   })
 }

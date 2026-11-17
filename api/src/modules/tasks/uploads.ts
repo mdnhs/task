@@ -109,6 +109,8 @@ export async function completeTaskUpload(c: Context<AppEnv>, taskId: string, fil
 /** GET /v1/tasks/{id}/files/{fileId}/download: needs access to the TASK, then the scan gate; returns the 60 s presigned GET. */
 export async function taskFileDownload(c: Context<AppEnv>, taskId: string, fileId: string): Promise<string> {
   const tenantId = c.get("tenant")!.id
-  await withTenant(c.get("deps").db, tenantId, async (tx) => taskFileOf(tx, await loadTaskCtx(c, tx), taskId, fileId))
+  const f = await withTenant(c.get("deps").db, tenantId, async (tx) => taskFileOf(tx, await loadTaskCtx(c, tx), taskId, fileId))
+  // A voice note is personal audio: it is served ONLY by GET /voice-note, which logs every play (ruling D21). Here it looks like a missing file.
+  if (f.purpose === "task_voice") throw FileNotFound()
   return taskFileDownloadUrl(c.get("deps"), tenantId, fileId)
 }

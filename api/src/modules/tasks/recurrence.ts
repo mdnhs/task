@@ -221,8 +221,8 @@ async function materialiseSeries(deps: Deps, r: Run): Promise<void> {
           .values({
             tenantId, refNo, title: s.title, description: s.description, teamId: s.teamId, creatorId: s.creatorId, priority: s.priority, startAt, dueAt, labels: s.labels,
             estimateMin: s.estimateMin, client: s.client, projectId: s.projectId, milestoneId: s.milestoneId, evidenceRule: s.evidenceRule, seriesId: s.id, occurrenceDate: date,
-            // The voice note is shared across the series (ruling D21): the instance points at the series' file. T4.7 adds the file itself and its retention (a file
-            // still referenced by another task is kept, D13), so this copy is the only hook it needs; templates never reach this path.
+            // The voice note is shared across the series (ruling D21): the instance points at the series' file. voice.ts replaces and clears it under the purge lock and
+            // deletes the file only with its last reference (see the argument there); templates never reach this path.
             voiceFileId: s.voiceFileId, voiceMeta: s.voiceMeta, createdAt: now, updatedAt: now,
           })
           .onConflictDoNothing({ target: [tasks.tenantId, tasks.seriesId, tasks.occurrenceDate] })

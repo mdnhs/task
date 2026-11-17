@@ -70,6 +70,8 @@ export const ROUTE_PARAMS: Record<string, Record<string, Resource>> = {
   "/v1/tasks/{id}/repeat": { id: "task" },
   "/v1/tasks/{id}/archive": { id: "task" },
   "/v1/tasks/{id}/restore": { id: "task" },
+  "/v1/tasks/{id}/voice-note": { id: "task" },
+  "/v1/tasks/{id}/voice-note/plays": { id: "task" },
   "/v1/tasks/{id}/evidence-rule": { id: "task" },
   "/v1/tasks/{id}/evidence": { id: "task" },
   "/v1/tasks/{id}/evidence/{evidenceId}": { id: "task", evidenceId: "evidence" },

@@ -459,7 +459,7 @@ export async function runErase(data: unknown, deps: Deps): Promise<void> {
       if (m && m.roleKey === "owner" && m.status === "active") await assertNotLastOwner(tx, job.tenantId, subject, true)
       const now = deps.clock.now()
       for (const [name, h] of dsrHandlers()) {
-        await h.erase(tx, job.tenantId, subject, now)
+        await h.erase(tx, job.tenantId, subject, now, enqueue)
         modules.push(name)
       }
       // exports generated ABOUT this person hold their data: delete them with it

@@ -8,7 +8,8 @@ import type { TenantTx } from "../../db/tenant-tx"
  */
 export type DsrHandler = {
   export(tx: TenantTx, tenantId: string, userId: string): Promise<Record<string, unknown>>
-  erase(tx: TenantTx, tenantId: string, userId: string, now: Date): Promise<void>
+  /** `enqueue` runs jobs after the erase tx commits (e.g. deleting stored objects); a handler that has none to queue ignores it. */
+  erase(tx: TenantTx, tenantId: string, userId: string, now: Date, enqueue?: (name: string, data: unknown, opts?: { delayMs?: number; key?: string }) => void): Promise<void>
 }
 
 const handlers = new Map<string, DsrHandler>()

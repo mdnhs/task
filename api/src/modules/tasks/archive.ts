@@ -21,6 +21,7 @@ import { writeHistory } from "./history"
 import { allAssignees, assigneesOf } from "./repo"
 import { canManage, getTask, loadTaskCtx, type TaskCtx, type TaskRow } from "./scope"
 import { indexTask } from "./search"
+import { lockTaskPurge, TASK_PURGE_LOCK_NS, voiceHolders } from "./voice-refs"
 import { staleVersion, taskDetailDto } from "./service"
 
 // Archive, restore and purge (FR-M1-13, ruling D13).
@@ -47,9 +48,7 @@ const DAY_MS = 86_400_000
 const OPEN_STATUSES = ["not_started", "in_progress", "blocked", "submitted", "changes_requested"]
 const ref = (n: number) => `TSK-${n}`
 
-/** Two-key advisory lock namespace for purges of one tenant ("tprn"), same pattern as TASK_GRAPH_LOCK_NS. */
-export const TASK_PURGE_LOCK_NS = 0x7470726e
-const lockTaskPurge = (tx: TenantTx, tenantId: string) => tx.execute(sql`select pg_advisory_xact_lock(${TASK_PURGE_LOCK_NS}::int, hashtext(${tenantId}::text))`)
+export { TASK_PURGE_LOCK_NS }
 
 const safeCode = (e: unknown): string => {
   const c = e && typeof e === "object" ? ((e as { code?: unknown }).code ?? (e as { name?: unknown }).name) : undefined
@@ -196,18 +195,14 @@ export async function purgeArchivedTask(tx: TenantTx, enqueue: Enqueue, who: Who
 
   const mine = await tx.select({ fileId: taskFiles.fileId }).from(taskFiles).where(and(eq(taskFiles.tenantId, tenantId), eq(taskFiles.taskId, row.id))).orderBy(asc(taskFiles.fileId))
   const fileIds = mine.map((f) => f.fileId)
-  const holders = fileIds.length
-    ? await tx
-        .select({ fileId: tasks.voiceFileId, holder: sql<string>`(array_agg(${tasks.id} order by (${tasks.archivedAt} is not null), ${tasks.id}))[1]` })
-        .from(tasks)
-        .where(and(eq(tasks.tenantId, tenantId), inArray(tasks.voiceFileId, fileIds), sql`${tasks.id} <> ${row.id}`))
-        .groupBy(tasks.voiceFileId)
-    : []
-  const kept = new Map(holders.map((h) => [h.fileId!, h.holder]))
-  for (const fileId of fileIds) {
+  // The task's own voice file too: after a replace on the series an instance can be the LAST holder of a file whose task_files row belongs to another task.
+  const check = row.voiceFileId && !fileIds.includes(row.voiceFileId) ? [...fileIds, row.voiceFileId] : fileIds
+  const kept = await voiceHolders(tx, tenantId, check, row.id) // the shared check of voice replace / clear (voice-refs.ts); the caller holds the purge lock
+  for (const fileId of check) {
     const holder = kept.get(fileId)
-    if (holder) await tx.update(taskFiles).set({ taskId: holder }).where(and(eq(taskFiles.tenantId, tenantId), eq(taskFiles.fileId, fileId)))
-    else await expireFile(tx, tenantId, fileId, enqueue)
+    if (holder) {
+      if (fileIds.includes(fileId)) await tx.update(taskFiles).set({ taskId: holder }).where(and(eq(taskFiles.tenantId, tenantId), eq(taskFiles.fileId, fileId)))
+    } else await expireFile(tx, tenantId, fileId, enqueue)
   }
 
   const gone = await tx.delete(tasks).where(and(eq(tasks.id, row.id), eq(tasks.tenantId, tenantId))).returning({ id: tasks.id })

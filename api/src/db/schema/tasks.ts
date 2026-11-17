@@ -244,6 +244,28 @@ export const taskFiles = pgTable(
 ).enableRLS()
 
 /**
+ * Who played a task's voice note (ruling D21): one row per play, written in the same tx that hands out the 60 s URL. `user_id` is a member id or
+ * `apikey:<id>` (the actor, like task history), nulled on erasure. Readable only by the managers of the task (never in a task DTO). Rows leave with
+ * their task through the composite ON DELETE CASCADE (the purge runs as the table owner); `file_id` is a plain id (the file is soft-deleted, never removed).
+ */
+export const taskVoiceAccess = pgTable(
+  "task_voice_access",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    tenantId: uuid("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    taskId: uuid("task_id").notNull(),
+    fileId: uuid("file_id").notNull(),
+    userId: text("user_id"),
+    at: ts("at").notNull(),
+  },
+  (t) => [
+    foreignKey({ columns: [t.tenantId, t.taskId], foreignColumns: [tasks.tenantId, tasks.id], name: "task_voice_access_task_fk" }).onDelete("cascade"),
+    index("task_voice_access_task_idx").on(t.tenantId, t.taskId, t.at, t.id),
+    tenantPolicy(),
+  ],
+).enableRLS()
+
+/**
  * Finish-to-start edges (FR-M1-02): `task_id` cannot start before `depends_on_id` is done. Edits take the tenant's TASK_GRAPH advisory
  * lock, so cycle checks never race. Edges leave with either task by the composite cascade foreign keys (purge).
  */

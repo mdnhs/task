@@ -52,6 +52,10 @@ const archiveFixtureTask = async (w: World) => {
   const r = await call(t.app, "POST", `/v1/tasks/${w.resources.task}/archive`, { cookie: w.owner.cookie, tenant: w.tenant.slug, body: { version: 1 } })
   if (r.status !== 200) throw new Error(`fixture archive failed: ${r.status} ${await r.text()}`)
 }
+/** The control run for play / clear needs a task WITH a voice note: point A's fixture task at its (unfinished) attachment upload, as the API would after a clean scan. */
+const voiceFixture = async (w: World) => {
+  await ownerTenantQuery(w.tenant.id, "update tasks set voice_file_id = $2, voice_meta = $3::jsonb where id = $1", [w.resources.task, w.resources.taskFile, JSON.stringify({ durationSec: 5, mime: "audio/webm", recordedBy: "x", recordedAt: "2026-11-16T09:00:00.000Z" })])
+}
 const SPECS: Record<string, Spec> = {
   "POST /v1/roles/{id}/clone": { actor: "owner", expect: "role_not_found" },
   "PATCH /v1/roles/{id}": { actor: "owner", expect: "role_not_found" },
@@ -126,6 +130,12 @@ const SPECS: Record<string, Spec> = {
   "DELETE /v1/tasks/{id}": { actor: "owner", expect: "task_not_found", prepare: archiveFixtureTask },
   // T4.6: evidence rule (control: 200), attach (control: 201 with a note), delete (control: 204), download (control: 409 file_not_ready), verify and reject
   // (control: 409 invalid_transition, the fixture task is not submitted)
+  // T4.7: voice note. Set (control: 422 voice_too_long for the example's 121 s, which is checked right after the task lookup), play and clear (control: the fixture task
+  // gets a voice_file_id first, pointing at its still-uploading attachment: 409 file_not_ready / 200), and the play log (control: 200 for the owner, a manager)
+  "PUT /v1/tasks/{id}/voice-note": { actor: "owner", expect: "task_not_found", body: () => ({ version: 1, fileId: NIL_UUID, durationSec: 121 }) },
+  "GET /v1/tasks/{id}/voice-note": { actor: "owner", expect: "task_not_found", prepare: voiceFixture },
+  "DELETE /v1/tasks/{id}/voice-note": { actor: "owner", expect: "task_not_found", prepare: voiceFixture },
+  "GET /v1/tasks/{id}/voice-note/plays": { actor: "owner", expect: "task_not_found" },
   "PUT /v1/tasks/{id}/evidence-rule": { actor: "owner", expect: "task_not_found" },
   "POST /v1/tasks/{id}/evidence": { actor: "owner", expect: "task_not_found", body: () => ({ kind: "note", text: "Walked every floor" }) },
   "DELETE /v1/tasks/{id}/evidence/{evidenceId}": { actor: "owner", expect: "task_not_found" },
@@ -160,7 +170,7 @@ const substitute = (path: string, params: Record<string, string>) => path.replac
 
 async function hashes(tenantId: string): Promise<Record<string, string>> {
   const out: Record<string, string> = {}
-  for (const tbl of ["roles", "memberships", "teams", "team_members", "reporting_lines", "devices", "device_policies", "invites", "audit_events", "tenant_settings", "notifications", "notification_preferences", "push_tokens", "notification_deliveries", "files", "integration_connections", "oauth_states", "public_holidays", "data_requests", "support_grants", "api_keys", "webhook_endpoints", "webhook_deliveries", "tasks", "task_assignees", "task_history", "task_time_entries", "task_counters", "task_checklist_items", "task_comments", "task_files", "task_templates"]) {
+  for (const tbl of ["roles", "memberships", "teams", "team_members", "reporting_lines", "devices", "device_policies", "invites", "audit_events", "tenant_settings", "notifications", "notification_preferences", "push_tokens", "notification_deliveries", "files", "integration_connections", "oauth_states", "public_holidays", "data_requests", "support_grants", "api_keys", "webhook_endpoints", "webhook_deliveries", "tasks", "task_assignees", "task_history", "task_time_entries", "task_counters", "task_checklist_items", "task_comments", "task_files", "task_templates", "task_voice_access"]) {
     const [r] = await ownerTenantQuery(tenantId, `select count(*)::text || ':' || coalesce(md5(string_agg(to_jsonb(x)::text, ',' order by to_jsonb(x)::text)), '') as h from ${tbl} x`)
     out[tbl] = String(r.h)
   }
