@@ -17,13 +17,13 @@ export function diffFields(before: Record<string, unknown>, after: Record<string
   return out
 }
 
-export type FormatCtx = { tz: string; nameOf(userId: string): string; teamName(teamId: string): string }
+export type FormatCtx = { tz: string; nameOf(userId: string): string; teamName(teamId: string): string; projectName?(projectId: string): string; milestoneName?(milestoneId: string): string }
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 const PRIORITY = ["", "Low", "Medium", "High"]
 const LABEL: Record<string, string> = {
   title: "Title", description: "Description", priority: "Priority", labels: "Labels", estimateMin: "Estimate", client: "Client", teamId: "Department",
-  start: "Start", due: "Due", overduePlan: "Overdue plan", assignees: "Assignees", status: "Status",
+  start: "Start", due: "Due", overduePlan: "Overdue plan", assignees: "Assignees", status: "Status", projectId: "Project", milestoneId: "Milestone", dependsOn: "Depends on",
 }
 
 /** "20 Nov 17:00" in `tz` for a UTC ISO instant. */
@@ -42,6 +42,12 @@ function show(field: string, v: unknown, ctx: FormatCtx): string {
       return Array.isArray(v) ? v.map((id) => ctx.nameOf(String(id))).join(", ") : ""
     case "teamId":
       return ctx.teamName(String(v))
+    case "projectId":
+      return ctx.projectName ? ctx.projectName(String(v)) : String(v)
+    case "milestoneId":
+      return ctx.milestoneName ? ctx.milestoneName(String(v)) : String(v)
+    case "dependsOn":
+      return Array.isArray(v) ? v.join(", ") : ""
     case "status":
       return STATUS[v as TaskStatus]?.label ?? String(v)
     case "priority":

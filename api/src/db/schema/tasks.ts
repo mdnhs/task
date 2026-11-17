@@ -5,6 +5,7 @@ import type { RepeatRule } from "@opsdesk/domain/task-model"
 import { memberships, tenants } from "./tenants"
 import { teams } from "./teams"
 import { files } from "./files"
+import { projectMilestones, projects } from "./projects"
 
 // Standard RLS template (R8); FORCE is appended by hand in the migration.
 const tenantMatch = sql`tenant_id = nullif(current_setting('app.tenant_id', true), '')::uuid`
@@ -80,6 +81,11 @@ export const tasks = pgTable(
     foreignKey({ columns: [t.tenantId, t.creatorId], foreignColumns: [memberships.tenantId, memberships.userId], name: "tasks_creator_fk" }),
     foreignKey({ columns: [t.tenantId, t.teamId], foreignColumns: [teams.tenantId, teams.id], name: "tasks_team_fk" }),
     foreignKey({ columns: [t.tenantId, t.parentId], foreignColumns: [t.tenantId, t.id], name: "tasks_parent_fk" }),
+    // No cascade: the service unlinks a project's / milestone's tasks (with a history line each) before it deletes them.
+    foreignKey({ columns: [t.tenantId, t.projectId], foreignColumns: [projects.tenantId, projects.id], name: "tasks_project_fk" }),
+    foreignKey({ columns: [t.tenantId, t.milestoneId], foreignColumns: [projectMilestones.tenantId, projectMilestones.id], name: "tasks_milestone_fk" }),
+    index("tasks_project_idx").on(t.tenantId, t.projectId).where(sql`${t.archivedAt} is null`),
+    index("tasks_milestone_idx").on(t.tenantId, t.milestoneId).where(sql`${t.milestoneId} is not null`),
     index("tasks_live_due_idx").on(t.tenantId, t.dueAt, t.id).where(sql`${t.archivedAt} is null`),
     index("tasks_live_status_due_idx").on(t.tenantId, t.status, t.dueAt, t.id).where(sql`${t.archivedAt} is null`),
     index("tasks_parent_idx").on(t.tenantId, t.parentId).where(sql`${t.parentId} is not null`),
@@ -225,6 +231,27 @@ export const taskFiles = pgTable(
     foreignKey({ columns: [t.tenantId, t.fileId], foreignColumns: [files.tenantId, files.id], name: "task_files_file_fk" }),
     check("task_files_purpose_check", sql`${t.purpose} IN ('task_evidence','task_attachment','task_voice')`),
     index("task_files_task_idx").on(t.tenantId, t.taskId),
+    tenantPolicy(),
+  ],
+).enableRLS()
+
+/**
+ * Finish-to-start edges (FR-M1-02): `task_id` cannot start before `depends_on_id` is done. Edits take the tenant's TASK_GRAPH advisory
+ * lock, so cycle checks never race. Edges leave with either task by the composite cascade foreign keys (purge).
+ */
+export const taskDependencies = pgTable(
+  "task_dependencies",
+  {
+    tenantId: uuid("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    taskId: uuid("task_id").notNull(),
+    dependsOnId: uuid("depends_on_id").notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.taskId, t.dependsOnId] }),
+    check("task_dependencies_no_self", sql`${t.taskId} <> ${t.dependsOnId}`),
+    foreignKey({ columns: [t.tenantId, t.taskId], foreignColumns: [tasks.tenantId, tasks.id], name: "task_dependencies_task_fk" }).onDelete("cascade"),
+    foreignKey({ columns: [t.tenantId, t.dependsOnId], foreignColumns: [tasks.tenantId, tasks.id], name: "task_dependencies_on_fk" }).onDelete("cascade"),
+    index("task_deps_on_idx").on(t.tenantId, t.dependsOnId),
     tenantPolicy(),
   ],
 ).enableRLS()

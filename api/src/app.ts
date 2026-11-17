@@ -26,7 +26,8 @@ import { platformConsoleRoutes, supportGrantRoutes } from "./modules/platform-co
 import { rbacRoutes } from "./modules/rbac"
 import { authRoutes } from "./modules/auth/routes"
 import { inviteRoutes } from "./modules/invites"
-import { collabRoutes, taskRoutes } from "./modules/tasks"
+import { collabRoutes, planningRoutes, taskRoutes } from "./modules/tasks"
+import { projectRoutes } from "./modules/projects"
 import { teamRoutes } from "./modules/teams"
 import { tenantRoutes } from "./modules/tenants"
 
@@ -69,6 +70,8 @@ export function createApp(deps: Deps) {
   app.route("/", teamRoutes)
   app.route("/", taskRoutes)
   app.route("/", collabRoutes)
+  app.route("/", planningRoutes)
+  app.route("/", projectRoutes)
   app.route("/", mfaRoutes)
   app.route("/", auditRoutes)
   app.route("/", deviceRoutes)

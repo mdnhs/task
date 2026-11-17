@@ -99,6 +99,20 @@ const SPECS: Record<string, Spec> = {
   "POST /v1/tasks/{id}/uploads": { actor: "owner", expect: "task_not_found" },
   "POST /v1/tasks/{id}/uploads/{fileId}/complete": { actor: "owner", expect: "task_not_found" }, // control: 409 upload_missing
   "GET /v1/tasks/{id}/files/{fileId}/download": { actor: "owner", expect: "task_not_found" }, // control: 409 file_not_ready
+  // T4.3: dependencies (control: 422 invalid_dependency for the example's made-up id), knock-on (control: 200), date proposals (control: 403 for the
+  // owner who is not an assignee, then 422 no_proposal), projects (control: 200 / 204) and milestones
+  "PUT /v1/tasks/{id}/dependencies": { actor: "owner", expect: "task_not_found" },
+  "POST /v1/tasks/{id}/reschedule/preview": { actor: "owner", expect: "task_not_found" },
+  "POST /v1/tasks/{id}/reschedule": { actor: "owner", expect: "task_not_found" },
+  "POST /v1/tasks/{id}/date-proposal": { actor: "owner", expect: "task_not_found" },
+  "POST /v1/tasks/{id}/date-proposal/approve": { actor: "owner", expect: "task_not_found" },
+  "POST /v1/tasks/{id}/date-proposal/decline": { actor: "owner", expect: "task_not_found" },
+  "GET /v1/projects/{id}": { actor: "owner", expect: "project_not_found" },
+  "PATCH /v1/projects/{id}": { actor: "owner", expect: "project_not_found" },
+  "DELETE /v1/projects/{id}": { actor: "owner", expect: "project_not_found" },
+  "POST /v1/projects/{id}/milestones": { actor: "owner", expect: "project_not_found" },
+  "PATCH /v1/projects/{id}/milestones/{milestoneId}": { actor: "owner", expect: "project_not_found" }, // B's project id is looked up first
+  "DELETE /v1/projects/{id}/milestones/{milestoneId}": { actor: "owner", expect: "project_not_found" },
 }
 
 let t: ReturnType<typeof testApp>

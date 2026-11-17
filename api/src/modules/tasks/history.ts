@@ -2,7 +2,7 @@ import { and, desc, eq, inArray, lt, or } from "drizzle-orm"
 import { withholdDriveText } from "@opsdesk/domain/devices"
 import { formatChange, type RawChange } from "@opsdesk/domain/task-history"
 import type { FieldChange } from "@opsdesk/domain/task-model"
-import { taskHistory, teams, user } from "../../db/schema"
+import { projectMilestones, projects, taskHistory, teams, user } from "../../db/schema"
 import type { TenantTx } from "../../db/tenant-tx"
 import { decodeCursor, encodeCursor } from "./cursor"
 import type { TaskCtx } from "./scope"
@@ -31,18 +31,22 @@ export async function namesOf(tx: TenantTx, ids: string[]): Promise<(id: string)
 }
 
 /** Ids a set of raw changes refers to: people (assignees) and teams. */
-function referenced(rows: HistoryRow[]): { users: string[]; teamIds: string[] } {
+function referenced(rows: HistoryRow[]): { users: string[]; teamIds: string[]; projectIds: string[]; milestoneIds: string[] } {
   const users = new Set<string>()
   const teamIds = new Set<string>()
+  const projectIds = new Set<string>()
+  const milestoneIds = new Set<string>()
   for (const r of rows) {
     if (r.actorId) users.add(r.actorId)
     for (const n of r.notified) users.add(n)
     for (const c of r.changes) {
       if (c.field === "assignees") for (const v of [c.from, c.to]) if (Array.isArray(v)) v.forEach((x) => users.add(String(x)))
       if (c.field === "teamId") for (const v of [c.from, c.to]) if (typeof v === "string") teamIds.add(v)
+      if (c.field === "projectId") for (const v of [c.from, c.to]) if (typeof v === "string") projectIds.add(v)
+      if (c.field === "milestoneId") for (const v of [c.from, c.to]) if (typeof v === "string") milestoneIds.add(v)
     }
   }
-  return { users: [...users], teamIds: [...teamIds] }
+  return { users: [...users], teamIds: [...teamIds], projectIds: [...projectIds], milestoneIds: [...milestoneIds] }
 }
 
 export async function historyDtos(tx: TenantTx, ctx: Pick<TaskCtx, "tenantId" | "tz" | "drive">, rows: HistoryRow[]): Promise<HistoryDto[]> {
@@ -50,7 +54,14 @@ export async function historyDtos(tx: TenantTx, ctx: Pick<TaskCtx, "tenantId" | 
   const nameOf = await namesOf(tx, ref.users)
   const teamRows = ref.teamIds.length ? await tx.select({ id: teams.id, name: teams.name }).from(teams).where(and(eq(teams.tenantId, ctx.tenantId), inArray(teams.id, ref.teamIds))) : []
   const teamNames = new Map(teamRows.map((t) => [t.id, t.name]))
-  const fmt = { tz: ctx.tz, nameOf, teamName: (id: string) => teamNames.get(id) ?? "Former team" }
+  const projectRows = ref.projectIds.length ? await tx.select({ id: projects.id, name: projects.name }).from(projects).where(and(eq(projects.tenantId, ctx.tenantId), inArray(projects.id, ref.projectIds))) : []
+  const projectNames = new Map(projectRows.map((p) => [p.id, p.name]))
+  const milestoneRows = ref.milestoneIds.length ? await tx.select({ id: projectMilestones.id, name: projectMilestones.name }).from(projectMilestones).where(and(eq(projectMilestones.tenantId, ctx.tenantId), inArray(projectMilestones.id, ref.milestoneIds))) : []
+  const milestoneNames = new Map(milestoneRows.map((m) => [m.id, m.name]))
+  const fmt = {
+    tz: ctx.tz, nameOf, teamName: (id: string) => teamNames.get(id) ?? "Former team",
+    projectName: (id: string) => projectNames.get(id) ?? "Former project", milestoneName: (id: string) => milestoneNames.get(id) ?? "Former milestone",
+  }
   // Drive links (ruling D22): old and new values of free text can hold one, so a device without Drive access gets them withheld here too.
   const free = (v: string) => (ctx.drive ? v : withholdDriveText(v))
   return rows.map((r) => ({

@@ -204,6 +204,13 @@
       "when": 1794876452000,
       "tag": "0028_task_collab",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1794877953930,
+      "tag": "0029_projects_deps",
+      "breakpoints": true
     }
   ]
 }

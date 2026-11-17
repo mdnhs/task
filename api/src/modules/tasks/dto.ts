@@ -2,7 +2,7 @@ import { and, asc, eq, inArray, sql } from "drizzle-orm"
 import { z } from "@hono/zod-openapi"
 import { evidenceState } from "@opsdesk/domain/task-evidence"
 import { withholdDriveText } from "@opsdesk/domain/devices"
-import { TASK_STATUSES, taskChecklistItems, tasks, teams } from "../../db/schema"
+import { TASK_STATUSES, taskChecklistItems, taskDependencies, tasks, teams } from "../../db/schema"
 import type { TenantTx } from "../../db/tenant-tx"
 import { assigneesOf } from "./repo"
 import type { HistoryDto } from "./history"
@@ -89,6 +89,17 @@ export async function taskDtos(tx: TenantTx, ctx: TaskCtx, rows: TaskRow[], time
     : []
   const children = new Map<string, { id: string; ref: string; title: string; status: string }[]>()
   for (const c of childRows) children.set(c.parentId!, [...(children.get(c.parentId!) ?? []), { id: c.id, ref: ref(c.refNo), title: free(c.title), status: c.status }])
+  // Dependencies the caller may see (their scope applies to the tasks they point at, so no ref of an unseen task leaks), live ones only.
+  const depRows = ids.length
+    ? await tx
+        .select({ taskId: taskDependencies.taskId, id: tasks.id, refNo: tasks.refNo })
+        .from(taskDependencies)
+        .innerJoin(tasks, and(eq(tasks.tenantId, taskDependencies.tenantId), eq(tasks.id, taskDependencies.dependsOnId)))
+        .where(and(eq(taskDependencies.tenantId, ctx.tenantId), inArray(taskDependencies.taskId, ids), sql`${tasks.archivedAt} is null`, taskScopeWhere(ctx.scope, ctx.reports)))
+        .orderBy(asc(tasks.refNo))
+    : []
+  const deps = new Map<string, { id: string; ref: string }[]>()
+  for (const d of depRows) deps.set(d.taskId, [...(deps.get(d.taskId) ?? []), { id: d.id, ref: ref(d.refNo) }])
   return rows.map((r) => {
     const p = people.get(r.id)!
     const timeline = timelines.get(r.id) ?? []
@@ -102,9 +113,9 @@ export async function taskDtos(tx: TenantTx, ctx: TaskCtx, rows: TaskRow[], time
       ...(r.client ? { client: r.client } : {}), ...(r.estimateMin ? { estimate: r.estimateMin } : {}),
       ...(r.projectId ? { projectId: r.projectId } : {}), ...(r.milestoneId ? { milestoneId: r.milestoneId } : {}),
       ...(r.parentId ? { parentRef: parentRef.get(r.parentId) ?? "" } : {}), parentId: r.parentId,
-      checklist: checklists.get(r.id) ?? [], subtasks: children.get(r.id) ?? [], dependsOn: [], dependsOnIds: [], round: r.round,
+      checklist: checklists.get(r.id) ?? [], subtasks: children.get(r.id) ?? [], dependsOn: (deps.get(r.id) ?? []).map((d) => d.ref), dependsOnIds: (deps.get(r.id) ?? []).map((d) => d.id), round: r.round,
       ...(r.archivedAt ? { archivedAt: wallOf(r.archivedAt, ctx.tz) } : {}), ...(r.archivedBy ? { archivedBy: r.archivedBy } : {}),
-      ...(r.proposal ? { proposal: r.proposal } : {}), ...(r.repeat ? { repeat: r.repeat as Record<string, unknown> } : {}), ...(r.seriesId ? { seriesId: r.seriesId } : {}),
+      ...(r.proposal ? { proposal: ctx.drive ? r.proposal : { ...r.proposal, reason: withholdDriveText(String(r.proposal.reason ?? "")) } } : {}), ...(r.repeat ? { repeat: r.repeat as Record<string, unknown> } : {}), ...(r.seriesId ? { seriesId: r.seriesId } : {}),
       ...(r.submittedAt ? { submittedAt: wallOf(r.submittedAt, ctx.tz) } : {}), ...(r.completedAt ? { completedAt: wallOf(r.completedAt, ctx.tz) } : {}),
       notes: [], evidence: [], timeline, ...(r.overduePlan ? { overdue: r.overduePlan } : {}), timeEntries: [],
       evidenceState: evidenceState(r.evidenceRule, [], r.status), voiceNote: null,
@@ -114,8 +125,8 @@ export async function taskDtos(tx: TenantTx, ctx: TaskCtx, rows: TaskRow[], time
 
 // ---------- request bodies and query (R5: every JSON body declares an example) ----------
 
-const Wall = z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/).openapi({ description: "Tenant-local wall clock YYYY-MM-DDTHH:mm[:ss] (ruling D3)", example: WALL_EX })
-const Version = z.number().int().min(1).openapi({ description: "The task's current version (optimistic lock, ruling D4); a stale one is 409 version_conflict", example: 1 })
+export const Wall = z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/).openapi({ description: "Tenant-local wall clock YYYY-MM-DDTHH:mm[:ss] (ruling D3)", example: WALL_EX })
+export const Version = z.number().int().min(1).openapi({ description: "The task's current version (optimistic lock, ruling D4); a stale one is 409 version_conflict", example: 1 })
 const UserId = z.string().min(1).max(128)
 const OverduePlan = z.object({ reason: z.string().max(500), nextAction: z.string().max(500), owner: z.string().max(200), revisedDue: z.string().max(40) })
 
@@ -134,6 +145,7 @@ export const PatchBody = z
     version: Version, title: z.string().trim().min(1).max(200).optional(), description: z.string().max(10_000).optional(), priority: z.number().int().min(1).max(3).optional(),
     labels: z.array(z.string().max(100)).max(50).optional(), estimateMin: z.number().int().min(1).max(100_000).nullable().optional(), client: z.string().trim().min(1).max(120).nullable().optional(),
     teamId: z.uuid().nullable().optional(), start: Wall.optional(), due: Wall.optional(), overduePlan: OverduePlan.nullable().optional(),
+    projectId: z.uuid().nullable().optional(), milestoneId: z.uuid().nullable().optional(),
   })
   .openapi({ example: { version: 1, due: "2026-11-21T17:00:00" } })
 export type PatchInput = z.infer<typeof PatchBody>

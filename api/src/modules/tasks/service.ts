@@ -7,7 +7,7 @@ import { isOpen, nextStatuses } from "@opsdesk/domain/task-lifecycle"
 import { STATUS, type TaskStatus } from "@opsdesk/domain/task-model"
 import { taskStatusFor } from "@opsdesk/domain/shift-report"
 import { AppError, Conflict, Forbidden } from "../../core/errors"
-import { memberships, taskHistory, taskTimeEntries, tasks, teams } from "../../db/schema"
+import { memberships, projectMilestones, projects, taskHistory, taskTimeEntries, tasks, teams } from "../../db/schema"
 import type { TenantTx } from "../../db/tenant-tx"
 import { decodeCursor, encodeCursor } from "./cursor"
 import { taskDtos, type CreateInput, type ListQueryInput, type PatchInput, type TaskDto } from "./dto"
@@ -32,7 +32,7 @@ export function normaliseLabels(input: string[]): string[] {
   return out
 }
 
-async function checkTeam(tx: TenantTx, ctx: TaskCtx, teamId: string | null | undefined): Promise<string | null> {
+export async function checkTeam(tx: TenantTx, ctx: TaskCtx, teamId: string | null | undefined): Promise<string | null> {
   if (!teamId) return null
   const [t] = await tx.select({ id: teams.id }).from(teams).where(and(eq(teams.tenantId, ctx.tenantId), eq(teams.id, teamId), eq(teams.kind, "department")))
   if (!t) throw unprocessable("invalid_team") // another tenant's team, a plain team and a random id all look alike
@@ -52,7 +52,7 @@ async function checkAssignees(tx: TenantTx, ctx: TaskCtx, primary: string, other
   if (rows.length !== ids.length) throw unprocessable("invalid_assignee")
 }
 
-async function checkRule(tx: TenantTx, ctx: TaskCtx, rule: EvidenceRule | undefined): Promise<EvidenceRule> {
+export async function checkRule(tx: TenantTx, ctx: TaskCtx, rule: EvidenceRule | undefined): Promise<EvidenceRule> {
   if (!rule) return { ...NO_EVIDENCE }
   const r = normaliseRule(rule)
   if (ruleError(r)) throw unprocessable("invalid_evidence_rule")
@@ -68,14 +68,14 @@ const detail = async (tx: TenantTx, ctx: TaskCtx, row: TaskRow): Promise<TaskDto
   return (await taskDtos(tx, ctx, [row], new Map([[row.id, timeline]])))[0]
 }
 
-async function lockedTask(tx: TenantTx, ctx: TaskCtx, id: string) {
+export async function lockedTask(tx: TenantTx, ctx: TaskCtx, id: string) {
   const row = await getTask(tx, ctx, id, { forUpdate: true })
   const people = (await assigneesOf(tx, ctx.tenantId, [row.id])).get(row.id)!
   const assignees = allAssignees(people)
   return { row, people, assignees, manage: canManage(ctx, row, assignees), mine: assignees.includes(ctx.me) }
 }
 
-const staleVersion = (row: TaskRow, version: number) => {
+export const staleVersion = (row: TaskRow, version: number) => {
   if (row.version !== version) throw Conflict("version_conflict")
 }
 
@@ -163,8 +163,50 @@ export async function listTasks(tx: TenantTx, ctx: TaskCtx, q: ListQueryInput): 
 
 const STAFF_EDITABLE = ["title", "description", "priority", "labels"]
 
+/**
+ * A PATCH that links a task to a project or milestone first takes FOR SHARE on that project row, BEFORE the task row lock: project and
+ * milestone writes lock the project row first and its tasks second, so both orders agree (no deadlock) and a project deleted meanwhile
+ * is simply "not found" (422 invalid_project) instead of a foreign key error.
+ */
+async function lockPlacementTargets(tx: TenantTx, ctx: TaskCtx, input: PatchInput): Promise<void> {
+  const ids = new Set<string>()
+  if (input.projectId) ids.add(input.projectId)
+  if (input.milestoneId) {
+    const [m] = await tx.select({ p: projectMilestones.projectId }).from(projectMilestones).where(and(eq(projectMilestones.tenantId, ctx.tenantId), eq(projectMilestones.id, input.milestoneId)))
+    if (m) ids.add(m.p)
+  }
+  if (ids.size) await tx.select({ id: projects.id }).from(projects).where(and(eq(projects.tenantId, ctx.tenantId), inArray(projects.id, [...ids]))).orderBy(asc(projects.id)).for("share", { of: [projects] })
+}
+
+/**
+ * The project and milestone a PATCH leaves the task in (managers only, enforced by the field whitelist above). A project must exist in this
+ * tenant (422 invalid_project, the same for another tenant's id); the milestone must belong to the resulting project (422 invalid_milestone).
+ * Moving to another project without naming a milestone drops the old milestone.
+ */
+async function checkPlacement(tx: TenantTx, ctx: TaskCtx, row: TaskRow, input: PatchInput): Promise<{ projectId: string | null; milestoneId: string | null }> {
+  let projectId = row.projectId
+  let milestoneId = row.milestoneId
+  if (input.projectId === undefined && input.milestoneId === undefined) return { projectId, milestoneId }
+  if (input.projectId !== undefined) {
+    projectId = input.projectId
+    if (projectId !== row.projectId && input.milestoneId === undefined) milestoneId = null
+  }
+  if (input.milestoneId !== undefined) milestoneId = input.milestoneId
+  if (projectId && projectId !== row.projectId) {
+    const [p] = await tx.select({ id: projects.id }).from(projects).where(and(eq(projects.tenantId, ctx.tenantId), eq(projects.id, projectId)))
+    if (!p) throw unprocessable("invalid_project")
+  }
+  if (milestoneId && (milestoneId !== row.milestoneId || projectId !== row.projectId)) {
+    const [m] = projectId ? await tx.select({ id: projectMilestones.id }).from(projectMilestones).where(and(eq(projectMilestones.tenantId, ctx.tenantId), eq(projectMilestones.id, milestoneId), eq(projectMilestones.projectId, projectId))) : []
+    if (!m) throw unprocessable("invalid_milestone")
+  }
+  if (milestoneId && !projectId) throw unprocessable("invalid_milestone")
+  return { projectId, milestoneId }
+}
+
 /** PATCH /v1/tasks/{id}. Row lock → permission → version → validation → write → history → notify → publish. */
 export async function patchTask(tx: TenantTx, env: TaskEnv, ctx: TaskCtx, id: string, input: PatchInput): Promise<TaskDto> {
+  await lockPlacementTargets(tx, ctx, input) // project row first, then the task row (the order project deletes use)
   const { row, assignees, manage, mine } = await lockedTask(tx, ctx, id)
   const touched = (Object.keys(input) as (keyof PatchInput)[]).filter((k) => k !== "version" && input[k] !== undefined)
   if (!manage) {
@@ -180,14 +222,15 @@ export async function patchTask(tx: TenantTx, env: TaskEnv, ctx: TaskCtx, id: st
   if (startAt.getTime() > dueAt.getTime()) throw unprocessable("invalid_dates")
   const labels = input.labels ? normaliseLabels(input.labels) : row.labels
   const teamId = input.teamId === undefined ? row.teamId : await checkTeam(tx, ctx, input.teamId)
+  const { projectId, milestoneId } = await checkPlacement(tx, ctx, row, input)
   const before = {
     title: row.title, description: row.description, priority: row.priority, labels: row.labels, estimateMin: row.estimateMin, client: row.client, teamId: row.teamId,
-    start: row.startAt.toISOString(), due: row.dueAt.toISOString(), overduePlan: row.overduePlan,
+    start: row.startAt.toISOString(), due: row.dueAt.toISOString(), overduePlan: row.overduePlan, projectId: row.projectId, milestoneId: row.milestoneId,
   }
   const after = {
     title: input.title ?? row.title, description: input.description ?? row.description, priority: input.priority ?? row.priority, labels,
     estimateMin: input.estimateMin === undefined ? row.estimateMin : input.estimateMin, client: input.client === undefined ? row.client : input.client, teamId,
-    start: startAt.toISOString(), due: dueAt.toISOString(), overduePlan: input.overduePlan === undefined ? row.overduePlan : input.overduePlan,
+    start: startAt.toISOString(), due: dueAt.toISOString(), overduePlan: input.overduePlan === undefined ? row.overduePlan : input.overduePlan, projectId, milestoneId,
   }
   const changes = diffFields(before, after)
   if (changes.length === 0) return detail(tx, ctx, row) // nothing changed: no new version, no history line
@@ -197,7 +240,7 @@ export async function patchTask(tx: TenantTx, env: TaskEnv, ctx: TaskCtx, id: st
     .update(tasks)
     .set({
       title: after.title, description: after.description, priority: after.priority, labels, estimateMin: after.estimateMin, client: after.client, teamId, startAt, dueAt,
-      overduePlan: after.overduePlan, ...(datesMoved ? { proposal: null } : {}), version: row.version + 1, updatedAt: ctx.now,
+      overduePlan: after.overduePlan, projectId, milestoneId, ...(datesMoved ? { proposal: null } : {}), version: row.version + 1, updatedAt: ctx.now,
     })
     .where(and(eq(tasks.id, row.id), eq(tasks.tenantId, ctx.tenantId)))
     .returning()
