@@ -159,6 +159,32 @@ export async function putBranding(deps: Deps, tenantId: string, actorId: string,
   })
 }
 
+// ------------------------------------------------------------------ report template (FR-M1-25, T5.3)
+
+const REPORT_TEMPLATE_KEY = "report_template"
+
+/** The stored report template (`TemplateData`, validated by the shift-reports module before it gets here), or undefined when the tenant never set one (then the default is DATA, ruling F13). */
+export const readReportTemplate = (tx: TenantTx, tenantId: string): Promise<unknown> => readSetting(tx, tenantId, REPORT_TEMPLATE_KEY)
+
+const shape = (v: unknown): { custom: boolean; departments: number } => {
+  const d = (v as { departments?: unknown } | undefined)?.departments
+  return Array.isArray(d) ? { custom: true, departments: d.length } : { custom: false, departments: 0 }
+}
+
+/**
+ * Replaces the tenant's report template. Lock order: the settings advisory lock, the actor lock (`settings:write`, role re-read FOR SHARE), the write, the audit (ids and counts only,
+ * never the labels). It applies to NEW submissions only: a saved report is never re-validated, and submit reads the template in force when it runs.
+ */
+export async function putReportTemplate(deps: Deps, tenantId: string, actorId: string, value: object): Promise<void> {
+  await withTenant(deps.db, tenantId, async (tx) => {
+    await lockSettings(tx, tenantId)
+    await lockActor(tx, tenantId, actorId, "settings", "write")
+    const before = shape(await readSetting(tx, tenantId, REPORT_TEMPLATE_KEY))
+    await writeSetting(tx, tenantId, REPORT_TEMPLATE_KEY, value)
+    await recordAudit(tx, tenantId, { action: "tenant.report_template_updated", entity: "tenant", entityId: tenantId, actorId, before, after: shape(value) }, deps.clock.now())
+  })
+}
+
 // ------------------------------------------------------------------ holidays
 
 export type Holiday = { date: string; name: string }

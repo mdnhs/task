@@ -3,6 +3,7 @@ import type { Context } from "hono"
 import type { AppEnv } from "../../core/context"
 import { Forbidden } from "../../core/errors"
 import { requireModule } from "../../core/middleware/module"
+import { actorIdOf } from "../../core/middleware/principal"
 import { requirePermission } from "../../core/middleware/permission"
 import { requireTenant } from "../../core/middleware/tenant"
 import { newRouter } from "../../core/router"
@@ -10,7 +11,10 @@ import { withTenant, type TenantTx } from "../../db/tenant-tx"
 import { withTenantAfterCommit, type Enqueue } from "../notifications"
 import type { Deps } from "../../deps"
 import { currentItem, openReport, saveDraft } from "./draft"
-import { CurrentOut, DraftBody, FileParams, IdParam, OpenBody, ReportFileSchema, ReportSchema, SubmitBody, UploadBody, UploadIntent, VersionsOut } from "./dto"
+import { decodeInboxCursor, inboxPage, inboxRange } from "./inbox"
+import { reviewReport } from "./review"
+import { saveTemplate, templatesInScope } from "./template"
+import { AcceptBody, CurrentOut, DraftBody, FileParams, IdParam, InboxOut, InboxQuery, OpenBody, ReportFileSchema, ReportSchema, ReturnBody, SubmitBody, TemplateBody, TemplateOut, UploadBody, UploadIntent, VersionsOut } from "./dto"
 import { getReport, loadReportCtx, type ReportCtx } from "./scope"
 import { submitReport } from "./submit"
 import { completeReportUpload, reportFileDownload, reportUploadIntent } from "./uploads"
@@ -32,7 +36,7 @@ const write = <T>(c: Context<AppEnv>, fn: (tx: TenantTx, env: { deps: Deps; enqu
   return withTenantAfterCommit(deps, c.get("tenant")!.id, async (tx, enqueue) => fn(tx, { deps, enqueue }, await loadReportCtx(c, tx, "write")))
 }
 
-/** A submission is the member's own attestation: no API key may submit, whatever its scopes (ruling F6/F7). Refused BEFORE the report is even looked up. */
+/** A submission is the member's own attestation and a review is a person's decision: no API key may submit, accept or return, whatever its scopes (ruling F6/F7). Refused BEFORE the report is even looked up. */
 const humanOnly = (c: Context<AppEnv>) => {
   if (c.get("apiKey")) throw Forbidden("human_required")
 }
@@ -47,6 +51,26 @@ const openR = createRoute({
     201: json(ReportSchema, "The caller's own draft was created; its rows are the shift's tasks. 404 shift_not_found (not assigned, not a pattern day, a live pattern of someone else, or the shift has not started); 422 reporting_off"),
     200: json(ReportSchema, "The report already existed (idempotent on member, pattern and shift date)"),
   },
+})
+const inboxR = createRoute({
+  method: "get", path: "/v1/shift-reports", middleware: guard("read"), request: { query: InboxQuery },
+  responses: { 200: json(InboxOut, "The inbox: stored reports AND virtual rows (assigned, reporting on, started, no report yet: id null, state draft or missing) of the window, newest shift date first then member then pattern, in the caller's scope only (own, direct reports for a team manager, all for others; a person or team filter can only narrow it, never 403). No free text. from/to default to the last 7 tenant-local days, at most 31 days (422 range_too_long | invalid_range); status all|draft|submitted|late|missing|accepted|returned; 400 invalid_cursor") },
+})
+const templateGetR = createRoute({
+  method: "get", path: "/v1/shift-reports/template", middleware: guard("read"),
+  responses: { 200: json(TemplateOut, "The report templates of the TEAMS IN THE CALLER'S SCOPE (a department is matched to a team by name; a team with no entry shows the one it is validated against). custom false = the default from the onboarding data") },
+})
+const templatePutR = createRoute({
+  method: "put", path: "/v1/shift-reports/template", middleware: [requireTenant, requireModule("M1"), requirePermission("settings", "write")], request: { body: body(TemplateBody) },
+  responses: { 200: json(TemplateOut, "Replaces the whole template (at most 50 departments, 12 sections of 12 fields, ids [a-z0-9_]{1,40}); applies to NEW submissions only. Audited. 400 validation_failed; 422 invalid_template (duplicate ids, or a field a built-in section does not have) with errors[{key,message}]") },
+})
+const acceptR = createRoute({
+  method: "post", path: "/v1/shift-reports/{id}/accept", middleware: guard("write"), request: { params: IdParam, body: body(AcceptBody) },
+  responses: { 200: json(ReportSchema, "Accepted: the reviewer is the caller, the member is told. Manager-home roles only, a person (never an API key), NEVER the report's own member. 403 forbidden | human_required | self_review; 404 report_not_found (also outside the caller's scope); 409 version_conflict | report_not_submitted | retry") },
+})
+const returnR = createRoute({
+  method: "post", path: "/v1/shift-reports/{id}/return", middleware: guard("write"), request: { params: IdParam, body: body(ReturnBody) },
+  responses: { 200: json(ReportSchema, "Returned with a comment (1-2000 characters): the member edits and resubmits into the next version. Same rules as accept. 422 comment_required; 403 forbidden | human_required | self_review; 404 report_not_found; 409 version_conflict | report_not_submitted | retry") },
 })
 const getR = createRoute({
   method: "get", path: "/v1/shift-reports/{id}", middleware: guard("read"), request: { params: IdParam },
@@ -79,6 +103,23 @@ const downloadR = createRoute({
 
 export const shiftReportRoutes = newRouter()
   .openapi(currentR, async (c) => c.json({ item: await read(c, (tx, ctx) => currentItem(tx, ctx)) }, 200))
+  .openapi(inboxR, async (c) => {
+    const q = c.req.valid("query")
+    return c.json(
+      await read(c, async (tx, ctx) => {
+        const range = inboxRange(ctx.now, ctx.tz, q)
+        return inboxPage(tx, ctx, { ...range, team: q.team, person: q.person, status: q.status, after: q.cursor ? decodeInboxCursor(q.cursor) : undefined }, q.limit)
+      }),
+      200,
+    )
+  })
+  .openapi(templateGetR, async (c) => c.json(await read(c, (tx, ctx) => templatesInScope(tx, ctx)), 200))
+  .openapi(templatePutR, async (c) => {
+    const deps = c.get("deps")
+    const t = c.get("tenant")!
+    await saveTemplate(deps, t.id, actorIdOf(c), c.req.valid("json"))
+    return c.json(await withTenant(deps.db, t.id, async (tx) => templatesInScope(tx, { tenantId: t.id, access: { kind: "all" }, reports: [], me: actorIdOf(c) })), 200)
+  })
   .openapi(openR, async (c) => {
     const { dto, created } = await write(c, async (tx, _env, ctx) => {
       const { row, created } = await openReport(tx, ctx, c.req.valid("json"))
@@ -93,6 +134,18 @@ export const shiftReportRoutes = newRouter()
   .openapi(submitR, async (c) => {
     humanOnly(c)
     return c.json(await write(c, async (tx, env, ctx) => (await reportDtos(tx, ctx, [await submitReport(tx, env, ctx, c.req.valid("param").id, c.req.valid("json"))]))[0]), 200)
+  })
+  .openapi(acceptR, async (c) => {
+    humanOnly(c)
+    const { id } = c.req.valid("param")
+    const input = c.req.valid("json")
+    return c.json(await write(c, async (tx, env, ctx) => (await reportDtos(tx, ctx, [await reviewReport(tx, env, ctx, id, "accept", input)]))[0]), 200)
+  })
+  .openapi(returnR, async (c) => {
+    humanOnly(c)
+    const { id } = c.req.valid("param")
+    const input = c.req.valid("json")
+    return c.json(await write(c, async (tx, env, ctx) => (await reportDtos(tx, ctx, [await reviewReport(tx, env, ctx, id, "return", input)]))[0]), 200)
   })
   .openapi(versionsR, async (c) =>
     c.json({ items: await read(c, async (tx, ctx) => versionDtos(tx, ctx, (await getReport(tx, ctx, c.req.valid("param").id)).id)) }, 200),

@@ -3,6 +3,7 @@ import { subscribe } from "../../core/events"
 import { files, memberships, roles, teams, user } from "../../db/schema"
 import type { TenantTx } from "../../db/tenant-tx"
 import { registerTaskSearchIndexers } from "../tasks/search"
+import { registerReportSearchIndexers } from "../shift-reports/search"
 import { isScopedPurpose } from "../files"
 import { indexDocument, removeDocument } from "./service"
 
@@ -56,4 +57,5 @@ export function registerSearchIndexers(): void {
   on("file.scanned", "file-scanned", async (e, { tx }) => { const id = str(e.payload.fileId); if (id) await indexFile(tx, e.tenantId, id, now(e)) })
   on("file.deleted", "file-deleted", async (e, { tx }) => { const id = str(e.payload.fileId); if (id) await removeDocument(tx, e.tenantId, "file", id) })
   registerTaskSearchIndexers() // tasks (ruling D12): scoped by audience
+  registerReportSearchIndexers() // shift reports (T5.3): by shift name and date, scoped by audience
 }

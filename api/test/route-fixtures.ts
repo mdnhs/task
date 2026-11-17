@@ -86,6 +86,8 @@ export const ROUTE_PARAMS: Record<string, Record<string, Resource>> = {
   "/v1/shift-reports/{id}": { id: "report" },
   "/v1/shift-reports/{id}/draft": { id: "report" },
   "/v1/shift-reports/{id}/submit": { id: "report" },
+  "/v1/shift-reports/{id}/accept": { id: "report" },
+  "/v1/shift-reports/{id}/return": { id: "report" },
   "/v1/shift-reports/{id}/versions": { id: "report" },
   "/v1/shift-reports/{id}/uploads": { id: "report" },
   "/v1/shift-reports/{id}/uploads/{fileId}/complete": { id: "report", fileId: "reportFile" },

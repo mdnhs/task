@@ -2,6 +2,7 @@ import { and, asc, eq, inArray, sql } from "drizzle-orm"
 import { shiftReportComments, shiftReportFiles, shiftReportItems, shiftReportVersions, shiftReports } from "../../db/schema"
 import { expireFile } from "../files"
 import type { DsrHandler } from "../gdpr/registry"
+import { removeDocument } from "../search/service"
 
 export const ERASED_TEXT = "[erased]"
 const erased = (s: string): string => (s.length ? ERASED_TEXT : s)
@@ -55,6 +56,7 @@ export const shiftReportsDsrHandler: DsrHandler = {
         .where(and(eq(shiftReports.id, r.id), eq(shiftReports.tenantId, tenantId)))
     }
     const ids = mine.map((r) => r.id)
+    for (const id of ids) await removeDocument(tx, tenantId, "report", id) // the shift name and date of an erased member's report are no longer searchable
     if (ids.length) {
       await tx.update(shiftReportItems).set({ note: sql`case when ${shiftReportItems.note} = '' then '' else ${ERASED_TEXT} end` }).where(and(eq(shiftReportItems.tenantId, tenantId), inArray(shiftReportItems.reportId, ids)))
       const vs = await tx.select({ id: shiftReportVersions.id, snapshot: shiftReportVersions.snapshot }).from(shiftReportVersions).where(and(eq(shiftReportVersions.tenantId, tenantId), inArray(shiftReportVersions.reportId, ids))).orderBy(asc(shiftReportVersions.id))

@@ -112,3 +112,77 @@ export const CurrentOut = z
 export const VersionsOut = z
   .object({ items: z.array(z.object({ v: z.number(), at: z.string(), by: z.string(), note: z.string(), snapshot: z.any() })) })
   .openapi({ example: { items: [{ v: 1, at: "2026-10-25T06:20:00.000Z", by: "Alex Byrne", note: "Submitted", snapshot: { summary: "Quiet night.", items: [] } }] } })
+
+// ---------- T5.3: review, inbox, template ----------
+export const COMMENT_MAX = 2000
+/** `comment` is checked by the service (422 comment_required for a return), never by zod (which would answer 400 for an absent one). */
+export const AcceptBody = z
+  .strictObject({ version: z.number().int().min(1), comment: z.string().max(COMMENT_MAX).optional() })
+  .openapi({ example: { version: 2, comment: "Thanks, all good" } })
+export const ReturnBody = z
+  .strictObject({ version: z.number().int().min(1), comment: z.string().max(COMMENT_MAX).optional() })
+  .openapi({ example: { version: 2, comment: "Please add the lift fault and the time spent on it" } })
+
+export const INBOX_STATUSES = ["all", "draft", "submitted", "late", "missing", "accepted", "returned"] as const
+export type InboxStatus = (typeof INBOX_STATUSES)[number]
+export const INBOX_MAX_DAYS = 31
+export const INBOX_DEFAULT_DAYS = 7
+
+export const InboxQuery = z.object({
+  from: date.optional().openapi({ example: "2026-10-18" }),
+  to: date.optional().openapi({ example: "2026-10-24" }),
+  team: z.uuid().optional().openapi({ example: "5e1c0d52-8d3a-4b7e-9c41-2a5b7e90d3f8" }),
+  person: z.string().min(1).max(100).optional().openapi({ example: "usr_8Kq2mZ4tW1" }),
+  status: z.enum(INBOX_STATUSES).default("all"),
+  limit: z.coerce.number().int().min(1).max(100).default(25),
+  cursor: z.string().max(400).optional(),
+})
+
+export type InboxItemDto = {
+  id: string | null; key: string; userId: string; person: string; patternId: string; teamId: string; shiftName: string; team: string; date: string
+  start: string; end: string; due: string; startAt: string; endAt: string; dueAt: string
+  status: "draft" | "submitted" | "accepted" | "returned"; state: "draft" | "submitted" | "late" | "missing" | "accepted" | "returned"; version: number; submissions: number
+  itemCount: number; doneCount: number; submittedAt: string | null; reviewedAt: string | null; reviewedBy: string | null
+}
+const InboxItem = z.object({
+  id: z.string().nullable(), key: z.string(), userId: z.string(), person: z.string(), patternId: z.string(), teamId: z.string(), shiftName: z.string(), team: z.string(), date: z.string(),
+  start: z.string(), end: z.string(), due: z.string(), startAt: z.string(), endAt: z.string(), dueAt: z.string(),
+  status: z.enum(["draft", "submitted", "accepted", "returned"]), state: z.enum(["draft", "submitted", "late", "missing", "accepted", "returned"]), version: z.number(), submissions: z.number(),
+  itemCount: z.number(), doneCount: z.number(), submittedAt: z.string().nullable(), reviewedAt: z.string().nullable(), reviewedBy: z.string().nullable(),
+})
+export const InboxOut = z
+  .object({ items: z.array(InboxItem), nextCursor: z.string().nullable() })
+  .openapi({
+    example: {
+      items: [
+        { id: RID, key: `usr_8Kq2mZ4tW1:${PID}:2026-10-24`, userId: "usr_8Kq2mZ4tW1", person: "Alex Byrne", patternId: PID, teamId: "5e1c0d52-8d3a-4b7e-9c41-2a5b7e90d3f8", shiftName: "Night", team: "Security", date: "2026-10-24", start: "2026-10-24T22:00", end: "2026-10-25T06:00", due: "2026-10-25T07:00", startAt: "2026-10-24T21:00:00.000Z", endAt: "2026-10-25T06:00:00.000Z", dueAt: "2026-10-25T07:00:00.000Z", status: "submitted", state: "submitted", version: 2, submissions: 1, itemCount: 4, doneCount: 3, submittedAt: "2026-10-25T06:20:00.000Z", reviewedAt: null, reviewedBy: null },
+        { id: null, key: `usr_3Zt9pQ7rLm:${PID}:2026-10-24`, userId: "usr_3Zt9pQ7rLm", person: "Sam Doyle", patternId: PID, teamId: "5e1c0d52-8d3a-4b7e-9c41-2a5b7e90d3f8", shiftName: "Night", team: "Security", date: "2026-10-24", start: "2026-10-24T22:00", end: "2026-10-25T06:00", due: "2026-10-25T07:00", startAt: "2026-10-24T21:00:00.000Z", endAt: "2026-10-25T06:00:00.000Z", dueAt: "2026-10-25T07:00:00.000Z", status: "draft", state: "missing", version: 0, submissions: 0, itemCount: 0, doneCount: 0, submittedAt: null, reviewedAt: null, reviewedBy: null },
+      ],
+      nextCursor: null,
+    },
+  })
+
+// ---------- template (FR-M1-25): TemplateData of @opsdesk/domain/shift-report, validated ----------
+export const TEMPLATE_LIMITS = { departments: 50, sections: 12, fields: 12, dept: 100, title: 100, label: 200 } as const
+const TEMPLATE_ID = /^[a-z0-9_]{1,40}$/
+const TemplateField = z.strictObject({ id: z.string().regex(TEMPLATE_ID, "[a-z0-9_]{1,40}"), label: z.string().min(1).max(TEMPLATE_LIMITS.label), required: z.boolean() })
+const TemplateSection = z.strictObject({
+  id: z.string().regex(TEMPLATE_ID, "[a-z0-9_]{1,40}"), title: z.string().min(1).max(TEMPLATE_LIMITS.title), enabled: z.boolean(), fields: z.array(TemplateField).max(TEMPLATE_LIMITS.fields),
+})
+const TemplateDepartment = z.strictObject({ dept: z.string().trim().min(1).max(TEMPLATE_LIMITS.dept), sections: z.array(TemplateSection).max(TEMPLATE_LIMITS.sections) })
+const TEMPLATE_EXAMPLE = {
+  departments: [
+    {
+      dept: "Security",
+      sections: [
+        { id: "tasks", title: "Tasks in the shift", enabled: true, fields: [{ id: "time", label: "Time spent on done and in-progress tasks", required: true }, { id: "note", label: "Note on blocked tasks", required: true }] },
+        { id: "summary", title: "Summary", enabled: true, fields: [{ id: "summary", label: "Shift summary", required: true }] },
+        { id: "handover", title: "Handover", enabled: true, fields: [{ id: "keys", label: "Keys returned", required: false }] },
+      ],
+    },
+  ],
+}
+export const TemplateBody = z.strictObject({ departments: z.array(TemplateDepartment).min(1).max(TEMPLATE_LIMITS.departments) }).openapi({ example: TEMPLATE_EXAMPLE })
+export const TemplateOut = z
+  .object({ custom: z.boolean(), departments: z.array(z.object({ dept: z.string(), sections: z.array(z.object({ id: z.string(), title: z.string(), enabled: z.boolean(), fields: z.array(z.object({ id: z.string(), label: z.string(), required: z.boolean() })) })) })) })
+  .openapi({ example: { custom: true, ...TEMPLATE_EXAMPLE } })

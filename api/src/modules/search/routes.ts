@@ -3,6 +3,7 @@ import { requireTenant } from "../../core/middleware/tenant"
 import { visibleModules } from "../../core/middleware/permission"
 import { newRouter } from "../../core/router"
 import { withTenant } from "../../db/tenant-tx"
+import { reportSearchScope } from "../shift-reports/search"
 import { taskSearchScope } from "../tasks/search"
 import { parseLimit, searchDocuments } from "./service"
 
@@ -21,6 +22,9 @@ export const searchRoutes = newRouter().openapi(searchRoute, async (c) => {
   const t = c.get("tenant")!
   const { q, limit } = c.req.valid("query")
   const modules = await visibleModules(c)
-  const hits = await withTenant(c.get("deps").db, t.id, async (tx) => searchDocuments(tx, t.id, modules, q, parseLimit(limit), modules.includes("tasks") ? await taskSearchScope(c, tx) : {}))
+  const hits = await withTenant(c.get("deps").db, t.id, async (tx) =>
+    // scoped modules (D12): tasks and reports are filtered by audience, everything else by the plain module gate
+    searchDocuments(tx, t.id, modules, q, parseLimit(limit), { ...(modules.includes("tasks") ? await taskSearchScope(c, tx) : {}), ...(modules.includes("reports") ? await reportSearchScope(c, tx) : {}) }),
+  )
   return c.json({ hits }, 200)
 })

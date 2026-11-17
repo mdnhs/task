@@ -7,6 +7,9 @@ export { getReport, loadReportCtx, reportScopeWhere, ReportNotFound, type Report
 export { reportDtos, stateOf, versionDtos } from "./view"
 export { openReport, saveDraft, currentItem } from "./draft"
 export { submitReport } from "./submit"
+export { reviewReport } from "./review"
+export { inboxPage, buildInboxQuery } from "./inbox"
+export { reportTemplateFor, templatesInScope, loadTemplate } from "./template"
 export type { ReportDto, ReportItemDto } from "./dto"
 
 /** Registers the shift-reports DSR handler (worker.ts, tests; FR-M0-18, ruling F22). Safe to call again. */

@@ -157,6 +157,9 @@ const SPECS: Record<string, Spec> = {
   "GET /v1/shift-reports/{id}": { actor: "owner", expect: "report_not_found" },
   "PUT /v1/shift-reports/{id}/draft": { actor: "owner", expect: "report_not_found" },
   "POST /v1/shift-reports/{id}/submit": { actor: "owner", expect: "report_not_found" },
+  // T5.3: review (control: 403 self_review, the fixture report is the OWNER'S own and the independence check comes before version and state; B's id is looked up first: 404)
+  "POST /v1/shift-reports/{id}/accept": { actor: "owner", expect: "report_not_found" },
+  "POST /v1/shift-reports/{id}/return": { actor: "owner", expect: "report_not_found" },
   "GET /v1/shift-reports/{id}/versions": { actor: "owner", expect: "report_not_found" },
   "POST /v1/shift-reports/{id}/uploads": { actor: "owner", expect: "report_not_found" },
   "POST /v1/shift-reports/{id}/uploads/{fileId}/complete": { actor: "owner", expect: "report_not_found" },
