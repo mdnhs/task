@@ -3,11 +3,11 @@
   "defaultPlan": "business",
   "locale": "en-IE",
   "countries": [
-    { "code": "IE", "name": "Ireland", "timezone": "Europe/Dublin" },
-    { "code": "GB", "name": "United Kingdom", "timezone": "Europe/London" },
-    { "code": "DE", "name": "Germany", "timezone": "Europe/Berlin" },
-    { "code": "US", "name": "United States", "timezone": "America/New_York" },
-    { "code": "AE", "name": "United Arab Emirates", "timezone": "Asia/Dubai" }
+    { "code": "IE", "name": "Ireland", "timezone": "Europe/Dublin", "currency": "EUR", "locale": "en-IE" },
+    { "code": "GB", "name": "United Kingdom", "timezone": "Europe/London", "currency": "GBP", "locale": "en-GB" },
+    { "code": "DE", "name": "Germany", "timezone": "Europe/Berlin", "currency": "EUR", "locale": "de-DE" },
+    { "code": "US", "name": "United States", "timezone": "America/New_York", "currency": "USD", "locale": "en-US" },
+    { "code": "AE", "name": "United Arab Emirates", "timezone": "Asia/Dubai", "currency": "AED", "locale": "en-AE" }
   ],
   "timezones": [
     { "value": "Europe/Dublin", "label": "Irish time (Europe/Dublin)" },

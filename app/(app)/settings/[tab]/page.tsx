@@ -11,6 +11,7 @@ import {
 import type { SettingsTabId } from "@/features/settings"
 import { AccessRestricted, getUser } from "@/features/shell"
 import { getDeviceRegister } from "@/lib/device-session"
+import { getTenantRoles } from "@/lib/roles-data"
 import { getOrg } from "@/lib/org"
 import { can } from "@/lib/permissions"
 import { canWrite, getSession } from "@/lib/session"
@@ -52,7 +53,7 @@ export default async function Page({ params }: { params: Promise<{ tab: string }
           <UsersPanel
             users={users}
             invites={invites}
-            roles={session.roles.filter((r) => !r.platform).map((r) => ({ id: r.id, label: r.label }))}
+            roles={(await getTenantRoles()).map((r) => ({ id: r.id, label: r.label }))}
             departments={org.departments}
             today={org.today}
             tzLabel={org.tzLabel}
@@ -68,7 +69,7 @@ export default async function Page({ params }: { params: Promise<{ tab: string }
         return (
           <>
             <RolesMatrix data={matrix} canWrite={write} scopeKey={scopeKey} />
-            <MfaPolicyCard policy={reg.mfaPolicy} roles={session.roles.filter((r) => !r.platform).map((r) => ({ id: r.id, label: r.label }))} canWrite={write} scopeKey={scopeKey} />
+            <MfaPolicyCard policy={reg.mfaPolicy} roles={(await getTenantRoles()).map((r) => ({ id: r.id, label: r.label }))} canWrite={write} scopeKey={scopeKey} />
           </>
         )
       }

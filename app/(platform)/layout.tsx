@@ -1,20 +1,18 @@
-import { redirect } from "next/navigation"
-
 import { platformSearchIndex } from "@/app/actions/platform-search"
 import { STAFF_ROLE_LABEL, filterForStaff, requireStaff, getOperator, getPlatformEnv, getPlatformNav, getPlatformSeed, platformAlerts } from "@/features/platform"
 import { GlobalSearch } from "@/features/search"
 import { AppShell, getUser } from "@/features/shell"
 import { initialsOf } from "@/lib/branding"
 import { getOrg } from "@/lib/org"
-import { getSession } from "@/lib/session"
+import { getPlatformSession } from "@/lib/session"
 
 import "../styles/search.css"
 
 // The Platform console (D1): the shared shell in its platform variant: grouped navigation (D2) filtered by the operator's
 // staff role (D3), the operator from platform/staff.json as the user, platform alerts in the bell and the platform search index.
 export default async function PlatformLayout({ children }: { children: React.ReactNode }) {
-  const session = await getSession()
-  if (!session.signedIn) redirect("/sign-in")
+  // Real check (proxy.ts only looks for a cookie): active staff need no company; anyone else gets the restricted page or /onboarding.
+  const session = await getPlatformSession()
   const allowed = !!session.role.platform
   const [navigation, org, op, env] = await Promise.all([getPlatformNav(), getOrg(), getOperator(), getPlatformEnv()])
   // Other roles get the restricted page without the console's navigation, alerts or search.

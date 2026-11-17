@@ -9,11 +9,16 @@ import { allowedCookiePairs } from "./cookies"
 import { makeApiClient, type ApiClient } from "./client"
 import { TENANT_COOKIE, TENANT_HEADER, isTenantSlug } from "./tenant"
 
-/** The typed API client for the current request. Build it per request (it reads this request's cookies); it is cheap. */
-export async function apiServer(): Promise<ApiClient> {
+/**
+ * The typed API client for the current request. Build it per request (it reads this request's cookies); it is cheap.
+ * `tenant` overrides the cookie's slug: ONLY for server code that has just checked the slug against the caller's own memberships (lib/session.ts
+ * falling back to another membership, the sign-in action picking the first one). It is never read from client input, and the API's membership
+ * check stays the authority. `tenant: null` sends no tenant at all.
+ */
+export async function apiServer(o: { tenant?: string | null } = {}): Promise<ApiClient> {
   const [jar, incoming] = await Promise.all([cookies(), requestHeaders()])
   const cookie = allowedCookiePairs(jar.getAll())
-  const slug = jar.get(TENANT_COOKIE)?.value
+  const slug = o.tenant !== undefined ? o.tenant : jar.get(TENANT_COOKIE)?.value
   const userAgent = incoming.get("user-agent")
   const forwardedFor = incoming.get("x-forwarded-for")
   const origin = appOrigin()

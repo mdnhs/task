@@ -1,14 +1,17 @@
 "use client"
 
 import Link from "next/link"
-import { useRouter } from "next/navigation"
-import { useState } from "react"
+import { useState, useTransition } from "react"
 import { toast } from "sonner"
 
+import { afterSignIn } from "@/app/actions/session"
 import { useSlideDir } from "@/components/data-pagination"
 import { Field } from "@/components/field"
 import { FilterSelect } from "@/components/filter-bar"
 import { Input } from "@/components/ui/input"
+import { resendVerification, signInEmail, signUpEmail } from "@/lib/auth-client"
+import { signInStep, signUpStep } from "@/lib/auth-flow"
+import { SIGNUP_KEY } from "../signup-handoff"
 import { PASSWORD_RULES, orgSchema, ownerSchema, passwordScore, slugify } from "../schemas"
 import type { OnboardingDefaults, PlanOption } from "../types"
 import { Stepper } from "./stepper"
@@ -18,9 +21,9 @@ type Errors = Record<string, string>
 
 const money = (p: PlanOption, locale: string) => new Intl.NumberFormat(locale, { style: "currency", currency: p.currency, maximumFractionDigits: 0 }).format(p.priceMonthly)
 
-// FR-SAAS-03: organisation, owner, email verification (mock), plan. Finish hands over to /onboarding.
+// FR-SAAS-03: organisation, owner account, email verification, plan. Sign-up creates NO session (the address must be verified first): step 2 waits for the
+// emailed link, "I've verified" then signs in. Finish hands over to /onboarding, which creates the company (the choices travel in sessionStorage, not secret).
 export function SignUpWizard({ defaults, plans }: { defaults: OnboardingDefaults; plans: PlanOption[] }) {
-  const router = useRouter()
   const num = (n: number) => new Intl.NumberFormat(defaults.locale).format(n)
   const [step, setStep] = useState(0)
   // Next step slides in from the right, going back from the left.
@@ -31,6 +34,8 @@ export function SignUpWizard({ defaults, plans }: { defaults: OnboardingDefaults
   const [org, setOrg] = useState({ company: "", country: first.code, timezone: first.timezone })
   const [owner, setOwner] = useState({ name: "", email: "", password: "" })
   const [verified, setVerified] = useState(false)
+  const [signedUpAs, setSignedUpAs] = useState("") // "email\n"+password of the account this wizard already created (a second click must not sign up twice)
+  const [pending, start] = useTransition()
   const [plan, setPlan] = useState(plans.find((p) => p.id === defaults.defaultPlan)?.id ?? plans[0].id)
 
   const go = (i: number) => {
@@ -63,17 +68,41 @@ export function SignUpWizard({ defaults, plans }: { defaults: OnboardingDefaults
     const r = ownerSchema.safeParse(owner)
     if (!r.success) return fail(r.error.issues)
     setVerified(false)
-    go(2)
+    const who = `${owner.email.trim().toLowerCase()}\n${owner.password}`
+    if (signedUpAs === who) return go(2)
+    start(async () => {
+      const out = await signUpStep({ signUpEmail }, owner)
+      if (!out.ok) return setErrors({ email: out.message })
+      setSignedUpAs(who)
+      go(2)
+    })
   }
+  // The visitor has opened the link (in another tab): sign in with the credentials typed in step 2. Until then Better Auth answers 403 email_not_verified.
   function confirmVerified() {
-    setVerified(true)
-    toast.success("Email verified")
-    go(3)
+    start(async () => {
+      const r = await signInStep({ signInEmail }, owner)
+      if (r.kind === "unverified") return void toast.error("Not verified yet. Open the link in your inbox, then try again.")
+      if (r.kind === "error") return void toast.error(r.message)
+      if (r.kind === "mfa") return void toast.error("Sign in to continue.")
+      setOwner((o) => ({ ...o, password: "" }))
+      setVerified(true)
+      toast.success("Email verified")
+      go(3)
+    })
+  }
+  function resend() {
+    start(async () => {
+      await resendVerification(owner.email.trim()).catch(() => {})
+      toast.success(`If ${owner.email.trim()} needs a link, a new one is on its way`)
+    })
   }
   function finish() {
-    const chosen = plans.find((p) => p.id === plan)
-    toast.success(`${org.company.trim()} created. ${chosen ? `${chosen.name} trial started.` : ""}`)
-    router.push("/onboarding")
+    try {
+      sessionStorage.setItem(SIGNUP_KEY, JSON.stringify({ company: org.company.trim(), country: org.country, timezone: org.timezone, plan }))
+    } catch {
+      /* private mode: onboarding then asks for the company name */
+    }
+    start(() => afterSignIn("/onboarding")) // no company yet: the server sends the signed-in visitor to /onboarding
   }
 
   const slug = slugify(org.company)
@@ -142,7 +171,7 @@ export function SignUpWizard({ defaults, plans }: { defaults: OnboardingDefaults
           </div>
           <div className="auth-actions">
             <button type="button" className="btn btn-outline" onClick={() => go(0)}>Back</button>
-            <button type="submit" className="btn btn-primary">Continue</button>
+            <button type="submit" className="btn btn-primary" disabled={pending}>{pending ? "Creating…" : "Continue"}</button>
           </div>
         </form>
       )}
@@ -150,16 +179,16 @@ export function SignUpWizard({ defaults, plans }: { defaults: OnboardingDefaults
       {step === 2 && (
         <div className="auth-form od-slide" data-slide={dir}>
           <div className="auth-notice" role="status">
-            <h2>Verify your email</h2>
+            <h2>Check your inbox</h2>
             <p>
               We sent a link to <strong>{owner.email.trim()}</strong>. Open it to confirm your address, then come back here.
             </p>
           </div>
           <div className="auth-actions">
             <button type="button" className="btn btn-outline" onClick={() => go(1)}>Back</button>
-            <button type="button" className="btn btn-primary" onClick={confirmVerified}>I&apos;ve verified</button>
+            <button type="button" className="btn btn-primary" disabled={pending} onClick={confirmVerified}>{pending ? "Checking…" : "I\u2019ve verified"}</button>
           </div>
-          <button type="button" className="auth-link" onClick={() => toast.success(`Verification link re-sent to ${owner.email.trim()}`)}>
+          <button type="button" className="auth-link" disabled={pending} onClick={resend}>
             Resend the link
           </button>
         </div>
@@ -188,7 +217,7 @@ export function SignUpWizard({ defaults, plans }: { defaults: OnboardingDefaults
           )}
           <div className="auth-actions">
             <button type="button" className="btn btn-outline" onClick={() => go(2)}>Back</button>
-            <button type="button" className="btn btn-primary" disabled={!verified} onClick={finish}>
+            <button type="button" className="btn btn-primary" disabled={!verified || pending} onClick={finish}>
               Start {chosen.trialDays}-day trial
             </button>
           </div>

@@ -1,4 +1,4 @@
-export type Country = { code: string; name: string; timezone: string }
+export type Country = { code: string; name: string; timezone: string; currency?: string; locale?: string }
 export type TimezoneOption = { value: string; label: string }
 export type PlanOption = {
   id: string
@@ -25,3 +25,6 @@ export type OnboardingDefaults = {
 
 export type SignUpData = { defaults: OnboardingDefaults; plans: PlanOption[]; roles: RoleOption[] }
 export type OnboardingData = { defaults: OnboardingDefaults; roles: RoleOption[] }
+
+/** Which social sign-in providers the API has configured (GET /v1/auth/providers). */
+export type AuthProviders = { google: boolean; microsoft: boolean }

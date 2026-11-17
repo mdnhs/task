@@ -4,52 +4,61 @@ import { cookies } from "next/headers"
 import { redirect } from "next/navigation"
 import { revalidatePath } from "next/cache"
 
-import { getDeviceContext } from "@/lib/device-session"
+import { apiUrl, appOrigin } from "@/lib/api/config"
+import { allowedCookiePairs, hasSessionCookie } from "@/lib/api/cookies"
+import { ApiError } from "@/lib/api/problem"
+import { apiServer } from "@/lib/api/server"
+import { isTenantSlug } from "@/lib/api/tenant"
 import { parseAppearance, type Appearance } from "@/lib/appearance"
-import { canWrite, getSession } from "@/lib/session"
+import { makeAuthClient } from "@/lib/auth-client"
+import { safeNext } from "@/lib/safe-next"
+import { EXPIRED_PATH, canWrite, getSession } from "@/lib/session"
+import { clearTenantSlug, writeTenantSlug } from "@/lib/tenant-cookie"
 
-const opts = { path: "/", sameSite: "lax" as const }
+const BETTER_AUTH_COOKIE = /^(?:__Secure-)?better-auth\./
 
-// Demo switchers ("View as", "Switch company") stay in this demo deployment, but only accept ids from the seed lists,
-// and only for a signed-in session.
-export async function setRole(id: string) {
-  const session = await getSession()
-  if (!session.signedIn || typeof id !== "string" || !session.roles.some((r) => r.id === id)) return
+// The one writer of the active-company cookie (B6 I5): the slug must be one of the caller's own memberships (GET /v1/me) AND the API must answer for it
+// (a removed or suspended membership is a 404 there). A client can send any string; nothing here trusts it. Returns whether the cookie was set.
+export async function switchTenant(slug: string): Promise<{ ok: boolean }> {
+  if (typeof slug !== "string" || !isTenantSlug(slug)) return { ok: false }
   const jar = await cookies()
-  jar.set("od-role", id, opts)
-  if (id === "platform") redirect("/platform")
+  if (!hasSessionCookie(jar.getAll().map((c) => c.name))) return redirect("/sign-in")
+  try {
+    const me = await (await apiServer({ tenant: null })).get("/v1/me")
+    if (!me.tenants.some((t) => t.slug === slug)) return { ok: false }
+    try {
+      await (await apiServer({ tenant: slug })).get("/v1/me/tenant")
+    } catch (e) {
+      // The API reaches its MFA check only after it has verified the membership, so these two still prove it (the gate is shown inside that company).
+      const mfa = e instanceof ApiError && e.status === 401 && (e.code === "mfa_enrolment_required" || e.code === "mfa_challenge")
+      if (!mfa) throw e
+    }
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 401) return redirect(EXPIRED_PATH)
+    return { ok: false } // not a member any more, or the API is unreachable: never set a cookie on a guess
+  }
+  await writeTenantSlug(slug)
   revalidatePath("/", "layout")
+  return { ok: true }
 }
 
-export async function setTenant(id: string) {
-  const session = await getSession()
-  if (!session.signedIn || typeof id !== "string" || !session.tenants.some((t) => t.id === id)) return
-  const jar = await cookies()
-  jar.set("od-tenant", id, opts)
-  revalidatePath("/", "layout")
+// Called by the sign-in flow once the browser holds the session cookie (after the password step, or the code step for 2FA users).
+// od-tenant = the first membership; staff with no company go to the console, anyone else with none to onboarding. `next` is validated (same origin, path only).
+export async function afterSignIn(next?: string): Promise<void> {
+  let me
+  try {
+    me = await (await apiServer({ tenant: null })).get("/v1/me")
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 401) return redirect("/sign-in")
+    throw e
+  }
+  const first = me.tenants[0]
+  if (!first) return redirect(me.platformRole ? "/platform" : "/onboarding")
+  await writeTenantSlug(first.slug)
+  return redirect(safeNext(next))
 }
 
-// Demo "current device" switcher (CR-02): only ids from the signed-in person's register, or the unregistered browser.
-export async function setDevice(id: string) {
-  const session = await getSession()
-  if (!session.signedIn || typeof id !== "string") return
-  const { options } = await getDeviceContext(session)
-  if (!options.some((d) => d.id === id)) return
-  const jar = await cookies()
-  jar.set("od-device", id, opts)
-  revalidatePath("/", "layout")
-}
-
-export async function signIn(roleId?: string) {
-  const { roles } = await getSession()
-  const role = typeof roleId === "string" && roles.some((r) => r.id === roleId) ? roleId : undefined
-  const jar = await cookies()
-  jar.delete("od-auth")
-  if (role) jar.set("od-role", role, opts)
-  redirect(role === "platform" ? "/platform" : "/")
-}
-
-// Mock persistence for tenant branding (FR-SAAS-11): a per-tenant cookie that getSession() merges over the seed.
+// Mock persistence for tenant branding (FR-SAAS-11): a per-tenant cookie that getSession() merges over the API's brand, until the settings task moves it.
 export async function saveBranding(input: { name: string; color: string; appearance?: Appearance }) {
   const session = await getSession()
   if (!canWrite(session, "settings")) return { ok: false as const }
@@ -58,17 +67,30 @@ export async function saveBranding(input: { name: string; color: string; appeara
   if (name.length < 2 || !/^#[0-9a-f]{6}$/.test(color)) return { ok: false as const }
   const jar = await cookies()
   const appearance = parseAppearance(input.appearance ?? session.tenant.appearance)
-  jar.set(`od-brand-${session.tenant.id}`, JSON.stringify({ name, color, appearance }), opts)
+  jar.set(`od-brand-${session.tenant.id}`, JSON.stringify({ name, color, appearance }), { path: "/", sameSite: "lax" })
   revalidatePath("/", "layout")
   return { ok: true as const }
 }
 
-export async function signOut() {
+// Ends the session on the API (Better Auth revokes it, so a stolen copy of the cookie dies too) and clears this browser's cookies. The cookies are cleared
+// even when the API call fails: the visitor asked to be signed out of this browser.
+export async function signOutAction(): Promise<void> {
   const jar = await cookies()
-  jar.set("od-auth", "out", opts)
-  // Drop the role and company too, so nothing (e.g. the platform console) keeps working off a stale role cookie.
-  jar.delete("od-role")
-  jar.delete("od-tenant")
-  jar.delete("od-device")
+  const cookie = allowedCookiePairs(jar.getAll())
+  const origin = appOrigin()
+  if (cookie) {
+    try {
+      await makeAuthClient({ baseUrl: `${apiUrl()}/api/auth`, headers: () => new Headers({ cookie, ...(origin ? { origin } : {}) }) }).signOut()
+    } catch {
+      /* revocation is best effort; the local clear below always happens */
+    }
+  }
+  for (const { name } of jar.getAll()) {
+    if (!BETTER_AUTH_COOKIE.test(name)) continue
+    // A __Secure- cookie can only be overwritten with the Secure attribute, so expire it explicitly instead of delete().
+    if (name.startsWith("__Secure-")) jar.set(name, "", { maxAge: 0, path: "/", secure: true, httpOnly: true, sameSite: "lax" })
+    else jar.delete(name)
+  }
+  await clearTenantSlug()
   redirect("/sign-in")
 }

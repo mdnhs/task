@@ -229,6 +229,16 @@ describe("path rules", () => {
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
+  test("T6.3: /api/auth/get-session (it returns the session row with its token) is a 404 in every spelling, any method", async () => {
+    for (const p of ["/api/auth/get-session", "/api/auth/get-session/", "/api/auth/GET-SESSION", "/api/auth/get-%73ession", "/api/auth//get-session"]) {
+      for (const method of ["GET", "POST"]) {
+        const r = method === "GET" ? req(p) : req(p, { method, headers: { origin: APP, "content-type": "application/json" }, body: "{}" })
+        expect((await forwardToApi(r, AUTH)).status, `${method} ${p}`).toBe(404)
+      }
+    }
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
   test("M1: a percent-encoded letter or digit anywhere in an /api/auth path is a 404 (no Better Auth endpoint needs one); the query keeps its encoding", async () => {
     for (const p of ["/api/auth/sign-%69n/email", "/api/auth/two-factor/verify-t%6Ftp", "/api/auth/%76erify-email"]) expect((await forwardToApi(post(p), AUTH)).status, p).toBe(404)
     expect(fetchMock).not.toHaveBeenCalled()

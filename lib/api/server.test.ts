@@ -83,4 +83,26 @@ describe("apiServer (server components and server actions call API_URL directly)
     const e = await (await apiServer() as unknown as { get(p: string): Promise<unknown> }).get("/v1/tasks/x").catch((x: unknown) => x)
     expect(e).toMatchObject({ status: 404, code: "not_found", requestId: "r-1" })
   })
+
+  test("T6.3: an explicit tenant (a membership the server just verified) replaces the cookie's slug; an invalid one or null sends none", async () => {
+    jar.set("od-tenant", "stale-co")
+    const call = async (o?: { tenant?: string | null }) => {
+      await (await apiServer(o)).get("/v1/me" as never)
+      return sent().headers.get("x-tenant")
+    }
+    expect(await call()).toBe("stale-co")
+    expect(await call({ tenant: "acme" })).toBe("acme")
+    expect(await call({ tenant: null })).toBeNull()
+    expect(await call({ tenant: "../x" })).toBeNull()
+    expect(await call({ tenant: "ACME\r\nx-evil: 1" })).toBeNull()
+  })
+
+  test("T6.3: server components forward the bound-device cookie (so features.drive flips) and the session cookie, and nothing else of the web's", async () => {
+    jar.set("better-auth.session_token", "tok")
+    jar.set("__Host-od-device-1a2b3c4d", "sig.val")
+    jar.set("od-tenant", "acme")
+    jar.set("od-brand-x", "{}")
+    await (await apiServer()).get("/v1/me/tenant" as never)
+    expect(sent().headers.get("cookie")).toBe("better-auth.session_token=tok; __Host-od-device-1a2b3c4d=sig.val")
+  })
 })

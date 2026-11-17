@@ -3,8 +3,9 @@
 import { useSyncExternalStore, useTransition, type MouseEvent } from "react"
 import Link from "next/link"
 import { flushSync } from "react-dom"
-import { BadgeCheck, Bell, Building2, Check, ChevronsUpDown, CircleHelp, LogOut, Moon, MonitorSmartphone, Settings, UserCog } from "lucide-react"
+import { BadgeCheck, Bell, Building2, Check, ChevronsUpDown, CircleHelp, LogOut, Moon, MonitorSmartphone, Settings } from "lucide-react"
 import { useTheme } from "next-themes"
+import { toast } from "sonner"
 
 import {
   DropdownMenu,
@@ -18,21 +19,23 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { setDevice, setRole, setTenant, signOut } from "@/app/actions/session"
+import { signOutAction, switchTenant } from "@/app/actions/session"
+import { userMenu } from "../menu"
 import type { ShellSession, UserData } from "../types"
 
 const noop = () => () => {}
 
 // variant "platform": the operator (platform staff), so the role line is their staff role, Settings is the console's,
-// and the tenant-only items (account pages, device, company switch) are left out.
+// and the tenant-only items (account pages, device, company switch) are left out. No demo switchers: the role is the membership role,
+// the company switcher shows only with 2+ memberships (the server re-checks every switch), the device is a read-only label.
 export function NavUser({ user, session, variant = "app" }: { user: UserData; session: ShellSession; variant?: "app" | "platform" }) {
   const platform = variant === "platform"
   const { resolvedTheme, setTheme } = useTheme()
   // resolvedTheme is unknown on the server; wait for mount to avoid a hydration mismatch.
   const mounted = useSyncExternalStore(noop, () => true, () => false)
   const [, startTransition] = useTransition()
-  // The default owner keeps the signed-in person's own title; other roles show the previewed role.
-  const roleLine = platform || session.role.id === "owner" ? user.role : session.role.label
+  const menu = userMenu(session, user, variant)
+  const roleLine = menu.roleLine
   const dark = mounted && resolvedTheme === "dark"
 
   // Circular reveal from the click point via the View Transitions API.
@@ -79,6 +82,12 @@ export function NavUser({ user, session, variant = "app" }: { user: UserData; se
                 <span className="od-menu-sub truncate">{user.email}</span>
               </div>
             </div>
+            {menu.device && (
+              <div className="od-menu-device" data-registered={menu.device.registered || undefined} title="The device this session is using">
+                <MonitorSmartphone aria-hidden="true" />
+                <span className="truncate">{menu.device.label}</span>
+              </div>
+            )}
           </DropdownMenuLabel>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
@@ -111,60 +120,28 @@ export function NavUser({ user, session, variant = "app" }: { user: UserData; se
           </DropdownMenuItem>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
-        <DropdownMenuSub>
-          <DropdownMenuSubTrigger>
-            <UserCog />
-            View as (preview)
-          </DropdownMenuSubTrigger>
-          <DropdownMenuSubContent className="od-menu min-w-56">
-            <div className="od-menu-sub-hint">Demo preview of each role</div>
-            {session.roles.map((r) => (
-              <DropdownMenuItem key={r.id} onClick={() => startTransition(() => setRole(r.id))}>
-                {r.label}
-                {r.id === session.role.id && <Check className="od-check" />}
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuSubContent>
-        </DropdownMenuSub>
-        {!platform && session.devices && (
+        {menu.companies && (
           <DropdownMenuSub>
             <DropdownMenuSubTrigger>
-              <MonitorSmartphone />
-              Device (preview)
+              <Building2 />
+              Switch company
             </DropdownMenuSubTrigger>
             <DropdownMenuSubContent className="od-menu min-w-56">
-              <div className="od-menu-sub-hint">Demo: open the app from another device</div>
-              {session.devices.options.map((d) => (
-                <DropdownMenuItem key={d.id} onClick={() => startTransition(() => setDevice(d.id))}>
-                  {d.label}
-                  {d.id === session.devices?.current && <Check className="od-check" />}
+              {menu.companies.map((c) => (
+                <DropdownMenuItem key={c.slug} onClick={() => startTransition(async () => { if (!c.current && !(await switchTenant(c.slug)).ok) toast.error("Could not switch company.") })}>
+                  {c.name}
+                  {c.current && <Check className="od-check" />}
                 </DropdownMenuItem>
               ))}
             </DropdownMenuSubContent>
           </DropdownMenuSub>
-        )}
-        {!platform && (
-        <DropdownMenuSub>
-          <DropdownMenuSubTrigger>
-            <Building2 />
-            Switch company
-          </DropdownMenuSubTrigger>
-          <DropdownMenuSubContent className="od-menu min-w-56">
-            {session.tenants.map((t) => (
-              <DropdownMenuItem key={t.id} onClick={() => startTransition(() => setTenant(t.id))}>
-                {t.name}
-                {t.id === session.tenant.id && <Check className="od-check" />}
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuSubContent>
-        </DropdownMenuSub>
         )}
         <DropdownMenuSeparator />
         <DropdownMenuItem>
           <CircleHelp />
           Help
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => startTransition(() => signOut())}>
+        <DropdownMenuItem onClick={() => startTransition(() => signOutAction())}>
           <LogOut />
           Log out
         </DropdownMenuItem>

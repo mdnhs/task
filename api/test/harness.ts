@@ -88,11 +88,11 @@ export function call(
  */
 const CALLBACKS = new Set(["/v1/integrations/google/callback"])
 
-/** GET routes from the OpenAPI document that have no path params, minus /v1/me*, /v1/platform/* (platform staff, not tenant routes) and the spec itself (R6). */
+/** GET routes from the OpenAPI document that have no path params, minus /v1/me*, /v1/auth/* (public, no tenant), /v1/platform/* (platform staff, not tenant routes) and the spec itself (R6). */
 export function tenantGetRoutes(app: AppType): string[] {
   const doc = app.getOpenAPI31Document({ openapi: "3.1.0", info: { title: "t", version: "1" } })
   return Object.entries(doc.paths ?? {})
-    .filter(([path, item]) => "get" in (item ?? {}) && !path.includes("{") && !path.startsWith("/v1/me") && !path.startsWith("/v1/platform/") && path !== "/v1/openapi.json" && !CALLBACKS.has(path))
+    .filter(([path, item]) => "get" in (item ?? {}) && !path.includes("{") && !path.startsWith("/v1/me") && !path.startsWith("/v1/auth/") && !path.startsWith("/v1/platform/") && path !== "/v1/openapi.json" && !CALLBACKS.has(path))
     .map(([path]) => path)
     .sort()
 }

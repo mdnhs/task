@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest"
-import { apiBrowser, setPageTenant } from "@/lib/api/browser"
+import { apiBrowser, makeBrowserClient, setPageTenant } from "@/lib/api/browser"
 
 let fetchMock: ReturnType<typeof vi.fn>
 beforeEach(() => {
@@ -46,5 +46,57 @@ describe("apiBrowser (the only API the browser has: same-origin /v1)", () => {
     setPageTenant("Not A Slug")
     await (apiBrowser as unknown as { get(p: string): Promise<unknown> }).get("/v1/me")
     expect(sent().headers.has("x-od-tenant")).toBe(false)
+  })
+})
+
+describe("T6.3 a client mutation that gets 401: one toast, one redirect (no pile-up from parallel calls)", () => {
+  const problem = (status: number, code: string) => new Response(JSON.stringify({ status, code, requestId: "r1" }), { status, headers: { "content-type": "application/problem+json" } })
+  const post = (api: ReturnType<typeof makeBrowserClient>) => (api as unknown as { post(p: string, o?: unknown): Promise<unknown> }).post("/v1/tasks", { body: {} })
+
+  test("401 session_expired or unauthenticated calls onSessionExpired once, however many calls fail, and each call still rejects", async () => {
+    const onSessionExpired = vi.fn()
+    const f = vi.fn(async () => problem(401, "session_expired"))
+    const api = makeBrowserClient({ fetch: f as never, onSessionExpired })
+    const results = await Promise.allSettled([post(api), post(api), post(api)])
+    expect(results.every((r) => r.status === "rejected")).toBe(true)
+    expect(onSessionExpired).toHaveBeenCalledTimes(1)
+    await post(api).catch(() => {})
+    expect(onSessionExpired).toHaveBeenCalledTimes(1)
+    const other = makeBrowserClient({ fetch: (async () => problem(401, "unauthenticated")) as never, onSessionExpired })
+    await post(other).catch(() => {})
+    expect(onSessionExpired).toHaveBeenCalledTimes(2) // a fresh client is a fresh page: its own single redirect
+  })
+
+  test("the 401 problem body is still the error the caller sees (status and code), not swallowed by the guard", async () => {
+    const api = makeBrowserClient({ fetch: (async () => problem(401, "session_expired")) as never, onSessionExpired: vi.fn() })
+    await expect(post(api)).rejects.toMatchObject({ status: 401, code: "session_expired" })
+  })
+
+  test("a 401 that is an MFA challenge is NOT a dead session (the step-up handles it), nor is 403, 404, 409 or 500", async () => {
+    const onSessionExpired = vi.fn()
+    for (const [status, code] of [[401, "mfa_challenge"], [401, "mfa_enrolment_required"], [403, "mfa_required"], [403, "forbidden"], [404, "not_found"], [409, "version_conflict"], [500, "internal"]] as const) {
+      await post(makeBrowserClient({ fetch: (async () => problem(status, code)) as never, onSessionExpired })).catch(() => {})
+    }
+    expect(onSessionExpired).not.toHaveBeenCalled()
+  })
+
+  test("a 401 whose body is not JSON (a proxy page) still counts as an expired session", async () => {
+    const onSessionExpired = vi.fn()
+    const api = makeBrowserClient({ fetch: (async () => new Response("<html>401</html>", { status: 401 })) as never, onSessionExpired })
+    await post(api).catch(() => {})
+    expect(onSessionExpired).toHaveBeenCalledTimes(1)
+  })
+
+  test("the default handler toasts once and sends the page to the cookie-clearing route", async () => {
+    const assign = vi.fn()
+    vi.stubGlobal("window", { location: { assign } })
+    const toast = await import("sonner")
+    const spy = vi.spyOn(toast.toast, "error").mockImplementation(() => "id" as never)
+    const api = makeBrowserClient({ fetch: (async () => problem(401, "session_expired")) as never })
+    await Promise.allSettled([post(api), post(api)])
+    expect(spy).toHaveBeenCalledTimes(1)
+    expect(assign).toHaveBeenCalledTimes(1)
+    expect(assign).toHaveBeenCalledWith("/api/session/expired")
+    spy.mockRestore()
   })
 })

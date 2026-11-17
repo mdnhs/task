@@ -1,10 +1,11 @@
 "use client"
 
-import { useState, useTransition } from "react"
+import { useState, useSyncExternalStore, useTransition } from "react"
+import { useRouter } from "next/navigation"
 import { Building2, CalendarClock, ClipboardList, UserPlus } from "lucide-react"
 import { toast } from "sonner"
 
-import { signIn } from "@/app/actions/session"
+import { completeOnboarding } from "@/app/actions/onboarding"
 import { useSlideDir } from "@/components/data-pagination"
 import { ConfirmDialog } from "@/components/confirm-dialog"
 import { Field } from "@/components/field"
@@ -14,15 +15,36 @@ import { TimePicker } from "@/components/time-picker"
 import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
 import { emailSchema } from "../schemas"
+import { SIGNUP_KEY, readSignupHandoff } from "../signup-handoff"
 import type { OnboardingDefaults, RoleOption } from "../types"
 import { Stepper } from "./stepper"
 
 const STEPS = ["Departments", "Timezone and deadline", "Report template", "Invite users"]
 
+const noop = () => () => {}
+function readStored(): string | null {
+  try {
+    return sessionStorage.getItem(SIGNUP_KEY)
+  } catch {
+    return null
+  }
+}
+const serverStored = (): undefined => undefined
+
 type Invite = { id: number; email: string; role: string; dept: string }
 
-// FR-SAAS-04: first-run checklist. Every step can be revisited; Finish signs in as the owner.
+// FR-SAAS-04: first-run checklist. Every step can be revisited; Finish creates the company (POST /v1/tenants) with its deadline, one team per department
+// and the invites, and the signed-in person becomes its owner. The report-template switches are not saved yet (no API until the template task).
+// The company name comes from the sign-up wizard (sessionStorage); when it is missing (another browser) the timezone step asks for it.
 export function OnboardingWizard({ defaults, roles }: { defaults: OnboardingDefaults; roles: RoleOption[] }) {
+  const router = useRouter()
+  // The sign-up hand-off lives in sessionStorage: undefined on the server and during hydration, the stored string (or null) in the browser.
+  const stored = useSyncExternalStore(noop, readStored, serverStored)
+  const handoff = stored === undefined ? null : readSignupHandoff(stored)
+  const [typedCompany, setCompany] = useState<string | null>(null)
+  const company = typedCompany ?? handoff?.company ?? ""
+  const companyKnown = stored === undefined ? null : Boolean(handoff?.company.trim())
+  const [nameTaken, setNameTaken] = useState(false)
   const [step, setStep] = useState(0)
   // Next step slides in from the right, going back from the left.
   const dir = useSlideDir(step)
@@ -30,7 +52,8 @@ export function OnboardingWizard({ defaults, roles }: { defaults: OnboardingDefa
   const [depts, setDepts] = useState(() => defaults.departments.map((name, id) => ({ id, name })))
   const [nextId, setNextId] = useState(defaults.departments.length)
   const [removing, setRemoving] = useState<number | null>(null)
-  const [timezone, setTimezone] = useState(defaults.countries[0].timezone)
+  const [chosenTz, setTimezone] = useState<string | null>(null)
+  const timezone = chosenTz ?? (handoff && defaults.timezones.some((t) => t.value === handoff.timezone) ? handoff.timezone : defaults.countries[0].timezone)
   const [deadline, setDeadline] = useState(defaults.deadline)
   const [off, setOff] = useState<Set<string>>(new Set()) // "section|department" pairs switched off
   const inviteRoles = roles.filter((r) => defaults.inviteRoles.includes(r.id))
@@ -79,9 +102,29 @@ export function OnboardingWizard({ defaults, roles }: { defaults: OnboardingDefa
   }
 
   function finish() {
-    const sent = invites.filter((i) => i.email.trim()).length
-    toast.success(sent ? `Workspace ready. ${sent} invite${sent === 1 ? "" : "s"} sent` : "Workspace ready")
-    start(() => signIn("owner"))
+    if (!company.trim()) return setErrors({ company: "Enter your company name" })
+    start(async () => {
+      const r = await completeOnboarding({
+        company, timezone, deadline,
+        departments: names.filter(Boolean),
+        invites: invites.map((i) => ({ email: i.email, roleKey: i.role })),
+      })
+      if (!r.ok) {
+        toast.error(r.error === "slug_taken" ? "That company name is taken. Choose another." : r.error === "invalid" ? "Check the company name, timezone and deadline." : "Could not set up the workspace. Try again.")
+        if (r.error === "slug_taken") setNameTaken(true)
+        if (r.error !== "failed") go(1)
+        return
+      }
+      try {
+        sessionStorage.removeItem(SIGNUP_KEY)
+      } catch {
+        /* nothing to clear */
+      }
+      toast.success(r.invited ? `Workspace ready. ${r.invited} invite${r.invited === 1 ? "" : "s"} sent` : "Workspace ready")
+      if (r.failedInvites) toast.error(`${r.failedInvites} invite${r.failedInvites === 1 ? "" : "s"} could not be sent`)
+      router.replace("/")
+      router.refresh()
+    })
   }
 
   // Keyed by department id so renaming a department keeps its switches.
@@ -142,6 +185,11 @@ export function OnboardingWizard({ defaults, roles }: { defaults: OnboardingDefa
       {step === 1 && (
         <div className="auth-form od-slide" data-slide={dir}>
           <FormSection icon={CalendarClock} title="Timezone and deadline">
+            {(companyKnown === false || nameTaken) && (
+              <Field label="Company name" htmlFor="ob-company" error={errors.company} required>
+                <Input id="ob-company" autoComplete="organization" value={company} onChange={(e) => { setCompany(e.target.value); setErrors({}) }} />
+              </Field>
+            )}
             <div className="od-row2">
               <Field label="Timezone" htmlFor="ob-tz">
                 <FilterSelect label="Timezone" value={timezone} options={defaults.timezones.map((t) => ({ value: t.value, label: t.label }))} onChange={setTimezone} />

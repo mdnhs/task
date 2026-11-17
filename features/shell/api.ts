@@ -1,9 +1,15 @@
 import { getData } from "@/lib/data"
+import { getSession } from "@/lib/session"
+import { initialsOf } from "@/lib/branding"
 
 import type { NavigationData, Notification, UserData } from "./types"
 
 export const getNavigation = () => getData<NavigationData>("shell/navigation.json")
-export const getUser = () => getData<UserData>("shell/user.json")
+/** The signed-in person (B6 T6.3): the real user from /v1/me and the role label from the membership, not the demo file. */
+export async function getUser(): Promise<UserData> {
+  const s = await getSession()
+  return { name: s.user.name, role: s.role.label, email: s.user.email, initials: initialsOf(s.user.name) }
+}
 export const getNotifications = () => getData<Notification[]>("shell/notifications.json")
 
 export const findNavItem = (nav: NavigationData, section: string) =>

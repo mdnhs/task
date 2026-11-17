@@ -41,3 +41,9 @@ export function allowedCookiePairs(all: { name: string; value: string }[]): stri
 export function cookieValue(header: string | null | undefined, name: string): string | null {
   return parse(header).find(([n]) => n === name)?.[1] ?? null
 }
+
+/** Better Auth's SESSION cookie by name (`__Secure-` over https). The `two_factor` and `dont_remember` cookies are not a session. */
+const SESSION_COOKIE = /^(?:__Secure-)?better-auth\.session_token$/
+export const isSessionCookieName = (name: string): boolean => SESSION_COOKIE.test(name)
+/** True when any of these cookie names is the session cookie. Presence only: the API decides whether it is valid. */
+export const hasSessionCookie = (names: Iterable<string>): boolean => [...names].some(isSessionCookieName)

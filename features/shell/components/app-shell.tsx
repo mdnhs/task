@@ -10,6 +10,7 @@ import { RevealObserver } from "@/components/reveal-observer"
 import { Button } from "@/components/ui/button"
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel"
 import { DeptContext } from "@/hooks/use-dept"
+import { setPageTenant } from "@/lib/api/browser"
 import type { Dept } from "@/lib/types"
 import { StretchIndicator } from "@/components/stretch-indicator"
 import { layoutTransition } from "@/lib/motion"
@@ -152,6 +153,11 @@ export function AppShell({
   children: React.ReactNode
 }) {
   const platform = variant === "platform"
+  // Browser API calls carry the tenant this page was rendered for, so the BFF can refuse a stale tab (409 tenant_changed). The console has no company.
+  const pageTenant = platform ? null : session.tenant.slug
+  React.useEffect(() => {
+    setPageTenant(pageTenant)
+  }, [pageTenant])
   const showDepts = departments !== false && !platform
   const grouped = navigation.menu.some((n) => n.section)
   const pathname = usePathname()

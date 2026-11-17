@@ -24,7 +24,7 @@ ENV NODE_ENV=production \
     PORT=3000 \
     HOSTNAME=0.0.0.0
 # Server-only runtime env, set by Dokploy (never baked in, never NEXT_PUBLIC_*): API_URL (internal API address, e.g. http://api:3001) and
-# APP_ORIGIN (the public web origin = the API's APP_URL, e.g. https://app.example.com). The BFF refuses writes in production without APP_ORIGIN.
+# APP_ORIGIN (the public web origin = the API's APP_URL, e.g. https://app.example.com). In production the server refuses to boot without APP_ORIGIN and API_URL (instrumentation.ts), and the BFF refuses writes without APP_ORIGIN.
 RUN addgroup -S -g 1001 nodejs && adduser -S -u 1001 -G nodejs nextjs
 # public/ holds the mock API JSON (read at runtime by lib/data.ts) and static assets.
 COPY --from=build --chown=nextjs:nodejs /app/public ./public

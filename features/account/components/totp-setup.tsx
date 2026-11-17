@@ -1,67 +1,97 @@
 "use client"
 
 import { useState, useTransition } from "react"
+import { Copy, Smartphone } from "lucide-react"
 import { toast } from "sonner"
 
-import { finishMfaSetup, verifyMfaCode } from "@/app/actions/security"
 import { Field } from "@/components/field"
 import { Input } from "@/components/ui/input"
-import { MOCK_TOTP_CODE, MOCK_TOTP_SECRET, RECOVERY_CODES, qrPattern } from "@/lib/mfa"
+import { enableTotp, verifyTotp } from "@/lib/auth-client"
+import { copyText } from "@/lib/clipboard"
+import { confirmEnrolment, otpauthHref, startEnrolment } from "../totp-flow"
 
-const N = 25
-const PATTERN = qrPattern(MOCK_TOTP_SECRET, N)
+type Step = "password" | "scan" | "codes"
 
-// Mock authenticator setup (FR-M0-03): QR placeholder + secret, a 6-digit check, then recovery codes.
+// Authenticator set-up (FR-M0-03) on Better Auth: confirm the password, then add the account to an authenticator app (the secret to type or copy, or the
+// otpauth link on a phone; no QR), confirm with a 6-digit code, then the recovery codes (shown once). The secret and codes live only in this component's
+// state: nothing is stored, logged or put in a URL. 2FA turns on when the first code verifies.
 export function TotpSetup({ account, onDone }: { account: string; onDone(): void }) {
-  const [step, setStep] = useState<"scan" | "codes">("scan")
+  const [step, setStep] = useState<Step>("password")
+  const [password, setPassword] = useState("")
+  const [secret, setSecret] = useState("")
+  const [uri, setUri] = useState("")
+  const [codes, setCodes] = useState<string[]>([])
   const [code, setCode] = useState("")
   const [error, setError] = useState<string>()
   const [pending, start] = useTransition()
 
+  function begin(e: React.FormEvent) {
+    e.preventDefault()
+    start(async () => {
+      const r = await startEnrolment({ enable: enableTotp, verify: verifyTotp }, password)
+      setPassword("")
+      if (!r.ok) return setError(r.message)
+      setError(undefined)
+      setSecret(r.secret)
+      setUri(r.uri)
+      setCodes(r.backupCodes)
+      setStep("scan")
+    })
+  }
   function verify(e: React.FormEvent) {
     e.preventDefault()
-    if (!/^\d{6}$/.test(code.replace(/\s/g, ""))) return setError("Enter the 6-digit code")
     start(async () => {
-      const r = await verifyMfaCode(code)
-      if (!r.ok) return setError("That code is not right. Check your authenticator app and try again.")
+      const r = await confirmEnrolment({ enable: enableTotp, verify: verifyTotp }, code)
+      if (!r.ok) return setError(r.message)
       setError(undefined)
       setStep("codes")
     })
   }
+  async function copy(text: string) {
+    if (await copyText(text.replace(/\s/g, ""))) toast.success("Copied")
+  }
   function finish() {
-    start(async () => {
-      const r = await finishMfaSetup()
-      if (!r.ok) {
-        toast.error("Could not finish setup. Try again.")
-        return
-      }
-      toast.success("Two-step verification on")
-      onDone()
-    })
+    // The codes were shown once; drop them from memory before handing back.
+    setCodes([])
+    setSecret("")
+    setUri("")
+    toast.success("Two-step verification on")
+    onDone()
   }
 
   if (step === "codes")
     return (
       <div className="mfa-steps">
-        <p>Save these recovery codes somewhere safe. Each works once if you lose your phone.</p>
+        <p>Save these recovery codes somewhere safe. Each works once if you lose your phone. They are not shown again.</p>
         <ul className="mfa-codes" aria-label="Recovery codes">
-          {RECOVERY_CODES.map((c) => <li key={c}>{c}</li>)}
+          {codes.map((c) => <li key={c}>{c}</li>)}
         </ul>
-        <button type="button" className="btn btn-primary" disabled={pending} onClick={finish}>I saved my codes</button>
+        <button type="button" className="btn btn-primary" onClick={finish}>I saved my codes</button>
       </div>
     )
 
+  if (step === "password")
+    return (
+      <form className="mfa-steps" onSubmit={begin} noValidate>
+        <p>Confirm your password for {account} to start.</p>
+        <Field label="Password" htmlFor="mfa-pw" error={error} required>
+          <Input id="mfa-pw" type="password" autoComplete="current-password" value={password} onChange={(e) => { setPassword(e.target.value); setError(undefined) }} />
+        </Field>
+        <div><button type="submit" className="btn btn-primary" disabled={pending}>Continue</button></div>
+      </form>
+    )
+
+  const href = otpauthHref(uri)
   return (
-    <form className="mfa-setup" onSubmit={verify} noValidate>
-      <div className="mfa-qr" role="img" aria-label="Placeholder for the authenticator QR code">
-        <svg viewBox={`0 0 ${N} ${N}`} shapeRendering="crispEdges" aria-hidden="true">
-          {PATTERN.flatMap((row, y) => row.map((on, x) => (on ? <rect key={`${x}-${y}`} x={x} y={y} width="1" height="1" fill="currentColor" /> : null)))}
-        </svg>
-      </div>
+    <form className="mfa-setup mfa-noqr" onSubmit={verify} noValidate>
       <div className="mfa-steps">
-        <p>Scan in your authenticator app for {account}, or type this key:</p>
-        <span className="mfa-secret">{MOCK_TOTP_SECRET}</span>
-        <Field label="6-digit code" htmlFor="mfa-code" error={error} hint={`Demo: the code is ${MOCK_TOTP_CODE}.`} required>
+        <p>Add {account} to your authenticator app: type this key, or open the link on your phone.</p>
+        <span className="mfa-secret" aria-label="Setup key">{secret}</span>
+        <div className="mfa-actions">
+          <button type="button" className="btn btn-outline set-sm" onClick={() => copy(secret)}><Copy aria-hidden="true" /> Copy key</button>
+          {href && <a className="btn btn-outline set-sm" href={href}><Smartphone aria-hidden="true" /> Open in app</a>}
+        </div>
+        <Field label="6-digit code" htmlFor="mfa-code" error={error} required>
           <Input
             id="mfa-code"
             className="mfa-code"

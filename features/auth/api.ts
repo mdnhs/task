@@ -1,5 +1,6 @@
+import { apiServer } from "@/lib/api/server"
 import { getData } from "@/lib/data"
-import type { OnboardingData, OnboardingDefaults, PlanOption, RoleOption, SignUpData } from "./types"
+import type { AuthProviders, OnboardingData, OnboardingDefaults, PlanOption, RoleOption, SignUpData } from "./types"
 
 type ShellRole = { id: string; label: string }
 
@@ -15,8 +16,15 @@ async function getRoles(): Promise<RoleOption[]> {
 
 const getDefaults = () => getData<OnboardingDefaults>("auth/onboarding-defaults.json")
 
-/** Roles offered on the "Continue as" step. */
-export const getSignInRoles = getRoles
+/** The social buttons the sign-in page shows: only providers the API has configured (id and secret). The API being down shows none (the form still works). */
+export async function getProviders(): Promise<AuthProviders> {
+  try {
+    const p = await (await apiServer({ tenant: null })).get("/v1/auth/providers")
+    return { google: p.google, microsoft: p.microsoft }
+  } catch {
+    return { google: false, microsoft: false }
+  }
+}
 
 export async function getSignUpData(): Promise<SignUpData> {
   const [defaults, plans, roles] = await Promise.all([getDefaults(), getPlans(), getRoles()])

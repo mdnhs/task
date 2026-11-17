@@ -1,7 +1,7 @@
 "use server"
 
 import { buildPlatformIndex, getOperator, getPlatformNav, getPlatformSeed, getStaff, platformQuickActions, type PlatformQuickAction, type PlatformSearchItem } from "@/features/platform"
-import { getSession } from "@/lib/session"
+import { getPlatformSession } from "@/lib/session"
 
 /**
  * The platform console's ⌘K index (D1), loaded lazily on the first open like the tenant index, so it is never in a
@@ -10,7 +10,7 @@ import { getSession } from "@/lib/session"
  */
 export async function platformSearchIndex(): Promise<{ items: PlatformSearchItem[]; config: { popular: string[]; actions: PlatformQuickAction[] } }> {
   const empty = { items: [], config: { popular: [], actions: [] } }
-  const session = await getSession()
+  const session = await getPlatformSession()
   if (!session.signedIn || !session.role.platform) return empty
   const [op, nav, seed, { staff }] = await Promise.all([getOperator(), getPlatformNav(), getPlatformSeed(), getStaff()])
   const items = buildPlatformIndex(

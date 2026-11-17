@@ -33,14 +33,45 @@ describe("proxy: /data stays a 404, existing page redirect unchanged", () => {
     expect(proxy(next("/data/tasks/tasks.json")).status).toBe(404)
   })
 
-  test("signed-out visitors are redirected to /sign-in; the auth pages themselves are not", () => {
-    expect(proxy(next("/tasks", { headers: { cookie: "od-auth=out" } })).headers.get("location")).toBe(`${APP}/sign-in`)
-    expect(proxy(next("/sign-in", { headers: { cookie: "od-auth=out" } })).headers.get("location")).toBeNull()
-    expect(proxy(next("/sign-up", { headers: { cookie: "od-auth=out" } })).headers.get("location")).toBeNull()
+  test("T6.3: no Better Auth session cookie redirects pages to /sign-in with a safe next; the public auth pages are not redirected", () => {
+    const r = proxy(next("/tasks?view=board"))
+    expect(r.status).toBe(307)
+    expect(r.headers.get("location")).toBe(`${APP}/sign-in?next=${encodeURIComponent("/tasks?view=board")}`)
+    expect(proxy(next("/")).headers.get("location")).toBe(`${APP}/sign-in`)
+    expect(proxy(next("/platform/tenants")).headers.get("location")).toContain("/sign-in")
+    expect(proxy(next("/onboarding")).headers.get("location")).toContain("/sign-in") // needs a session; the page checks it for real
+    for (const p of ["/sign-in", "/sign-up", "/forgot-password", "/verify-email", "/reset-password", "/verify-email/x"]) expect(proxy(next(p)).headers.get("location"), p).toBeNull()
+  })
+
+  test("T6.3: Next's _rsc marker is not carried into next", () => {
+    const loc = proxy(next("/tasks?view=board&_rsc=abc12")).headers.get("location") ?? ""
+    expect(new URL(loc).searchParams.get("next")).toBe("/tasks?view=board")
+    expect(new URL(proxy(next("/tasks?_rsc=abc12")).headers.get("location") ?? "").searchParams.get("next")).toBe("/tasks")
+  })
+
+  test("T6.3: only the session cookie counts (the two_factor and dont_remember cookies and the old od-auth do not); the https name works too", () => {
+    for (const cookie of ["better-auth.two_factor=x", "better-auth.dont_remember=1", "od-auth=in", "better-auth.session_token_x=1", "x-better-auth.session_token=1"]) {
+      expect(proxy(next("/tasks", { headers: { cookie } })).headers.get("location"), cookie).toContain("/sign-in")
+    }
+    for (const cookie of ["better-auth.session_token=tok", "__Secure-better-auth.session_token=tok", "a=1; better-auth.session_token=tok"]) {
+      expect(proxy(next("/tasks", { headers: { cookie } })).headers.get("location"), cookie).toBeNull()
+    }
+  })
+
+  test("T6.3: a cookie that merely EXISTS is not authorisation: the proxy only lets the request reach the page, whose layout checks the session with the API", () => {
+    const res = proxy(next("/tasks", { headers: { cookie: "better-auth.session_token=forged" } }))
+    expect(res.status).toBe(200)
+    expect(res.headers.get("x-middleware-request-x-od-path")).toBe("/tasks")
+  })
+
+  test("T6.3: a hostile path cannot smuggle an off-site next (it is encoded into the query, and the sign-in page validates it again)", () => {
+    const loc = proxy(next("/%2F%2Fevil.com")).headers.get("location") ?? ""
+    expect(new URL(loc).origin).toBe(APP)
+    expect(new URL(loc).pathname).toBe("/sign-in")
   })
 
   test("a normal page request passes and carries the x-od-path headers", () => {
-    const res = proxy(next("/tasks?view=board"))
+    const res = proxy(next("/tasks?view=board", { headers: { cookie: "better-auth.session_token=t" } }))
     expect(res.status).toBe(200)
     expect(res.headers.get("x-middleware-request-x-od-path")).toBe("/tasks")
     expect(res.headers.get("x-middleware-request-x-od-search")).toBe("?view=board")
@@ -75,7 +106,7 @@ describe("proxy: Next server actions get an Origin check of their own (I6 layer 
 
   test("a plain navigation POST or a GET with next-action is not an action: untouched", () => {
     expect(proxy(next("/tasks", { method: "POST", headers: { origin: "https://evil.example" }, body: "x" })).status).toBe(200)
-    expect(proxy(next("/tasks", { headers: { "next-action": "x", origin: "https://evil.example" } })).status).toBe(200)
+    expect(proxy(next("/tasks", { headers: { "next-action": "x", origin: "https://evil.example", cookie: "better-auth.session_token=t" } })).status).toBe(200)
   })
 
   test("M4: in production an unset or invalid APP_ORIGIN refuses every server action (fail closed, like the BFF), whatever Origin and Host say", () => {

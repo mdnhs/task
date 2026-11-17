@@ -14,7 +14,6 @@ export type AccountCounts = {
   activity: number
   events: number
   channels: number
-  /** The security tab's real text (loading.tsx reads it from the same seed): ghost text wraps like the loaded rows. */
   /** The notification table's real labels (ghost text; the stacked rows on phones show them). */
   prefs?: { channels: { id: string; label: string }[]; events: { id: string; label: string; hint: string }[] }
   security?: { mfaHint: string; sessions: DeviceSession[]; activity: { text: string; at: string }[]; today: string; tzLabel: string }
@@ -100,7 +99,7 @@ function Security({ counts }: { counts: AccountCounts }) {
                       <b className="sk-ghost">{x.device}</b>
                       {x.current && <Sk w={102} h={34} r={8} />}
                     </span>
-                    <span className="tm sk-ghost">{x.location} · {whenText(x.lastActive, counts.security!.today, counts.security!.tzLabel)}</span>
+                    <span className="tm sk-ghost">{whenText(x.lastActive, counts.security!.today, counts.security!.tzLabel)}</span>
                   </div>
                   {!x.current && <Sk w={81} h={48} r={12} className="sk-btn" />}
                 </li>
@@ -109,23 +108,13 @@ function Security({ counts }: { counts: AccountCounts }) {
             <li key={i} className="acc-sess">
               <Sk w={40} h={40} r={12} />
               <div className="acc-sess-main">
-                {/* the current session's top line also holds its 34px "This device" pill */}
+                {/* the current session's top line also holds its 34px "This device" pill; every row is the device label and one last-active line (no location) */}
                 {i === 0 ? (
                   <span className="acc-sess-top"><Sk w={150} h={13} lh={22} /><Sk w={102} h={34} r={8} /></span>
                 ) : (
-                  <>
-                    <Sk w={150} h={13} lh={22} />
-                    {/* phones: the seeded device name wraps to 2 lines and the last-seen line to 3 */}
-                    <Sk w={90} h={13} lh={22} className="sk-wrap" />
-                  </>
+                  <Sk w={150} h={13} lh={22} />
                 )}
-                <Sk w={200} h={10} lh={16} />
-                {i > 0 && (
-                  <>
-                    <Sk w={160} h={10} lh={16} className="sk-wrap" />
-                    <Sk w={100} h={10} lh={16} className="sk-wrap" />
-                  </>
-                )}
+                <Sk w={130} h={10} lh={16} />
               </div>
               {i > 0 && <Sk w={81} h={48} r={12} />}
             </li>

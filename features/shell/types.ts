@@ -5,9 +5,9 @@ export type { NavItemData, NavigationData }
 
 export type UserData = { name: string; role: string; email: string; initials: string }
 
-/** Demo device switcher (CR-02): the signed-in person's registered devices plus an unregistered browser. */
-export type ShellDevices = { current: string; options: { id: string; label: string }[] }
-export type ShellSession = { role: Role; roles: Role[]; tenant: Tenant; tenants: Tenant[]; devices?: ShellDevices }
+/** The device this request comes from, as the API resolved it (CR-02): read-only in the shell. */
+export type ShellDevice = { label: string; registered: boolean }
+export type ShellSession = { role: Role; roles: Role[]; tenant: Tenant; tenants: Tenant[]; device?: ShellDevice }
 
 export type NotificationType =
   | "assigned"

@@ -97,3 +97,4 @@
 .auth-or::before,.auth-or::after{content:"";flex:1;height:1px;background:color-mix(in srgb,var(--ink) 10%,transparent)}
 .auth-or>span{flex:none}
 .auth-or>.sk-line{flex:1}
+.auth-ref{font-weight:500;color:var(--ink-3)}

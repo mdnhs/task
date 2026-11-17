@@ -10,3 +10,8 @@ export const PAGE_TENANT_HEADER = "x-od-tenant"
 /** The API's own slug rule (POST /v1/tenants): 3-40 chars, lowercase letters and digits, hyphens inside. */
 const SLUG = /^[a-z0-9][a-z0-9-]{1,38}[a-z0-9]$/
 export const isTenantSlug = (v: unknown): v is string => typeof v === "string" && SLUG.test(v)
+
+/** httpOnly (JS never sees it), SameSite=Lax, Secure in production, host-only (no Domain: sibling subdomains cannot set or read it), session-long. */
+export function tenantCookieOptions(o: { production?: boolean } = {}) {
+  return { httpOnly: true, sameSite: "lax" as const, secure: o.production ?? process.env.NODE_ENV === "production", path: "/" }
+}

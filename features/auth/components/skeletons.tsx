@@ -4,12 +4,13 @@ import { Sk, SkGroup } from "@/components/sk"
 // Browser-measured (1440 and 390): h1 line 32, subtitle line 20 (it wraps to a second line on phones, .sk-wrap), field label
 // 18.1 + 44px control, hint 17.4. Multi-step pages wrap each step's body in a nested .auth-form, like the real pages.
 
-function Head() {
+// `wrap`: the subtitle needs a second line on phones (.sk-wrap); the shorter subtitles fit one line.
+function Head({ wrap = true }: { wrap?: boolean }) {
   return (
     <header className="auth-head">
       <Sk w="60%" h={24} r={8} lh={32} />
       <Sk w="92%" h={13} lh={20} style={{ marginTop: 6 }} />
-      <Sk w="50%" h={13} lh={20} className="sk-wrap" />
+      {wrap && <Sk w="50%" h={13} lh={20} className="sk-wrap" />}
     </header>
   )
 }
@@ -38,20 +39,53 @@ function StepperSk({ steps }: { steps: number }) {
   )
 }
 
-export function SignInSkeleton() {
+// `providers`: how many social buttons the page shows (GET /v1/auth/providers). The skeleton never calls the API (B6 I9), so it shows the typical
+// two; a deployment with none configured sees the form slightly shorter once loaded.
+export function SignInSkeleton({ providers = 2 }: { providers?: number }) {
   return (
     <SkGroup label="Loading sign in" className="auth-form">
       <Head />
-      <div className="auth-sso">
-        <Sk h={48} r={14} />
-        <Sk h={48} r={14} />
-      </div>
-      <p className="auth-or"><Sk w={130} h={11} lh={20} style={{ margin: "0 auto" }} /></p>
+      {providers > 0 && (
+        <>
+          <div className="auth-sso">
+            {Array.from({ length: providers }, (_, i) => <Sk key={i} h={48} r={14} />)}
+          </div>
+          <p className="auth-or"><Sk w={130} h={11} lh={20} style={{ margin: "0 auto" }} /></p>
+        </>
+      )}
       <FieldSk />
-      <FieldSk hint />
+      <FieldSk />
       <div className="auth-row"><Sk w={120} h={13} lh={20} /></div>
       <ButtonSk />
       <Sk w="70%" h={13} lh={20} style={{ margin: "0 auto" }} />
+    </SkGroup>
+  )
+}
+
+export function VerifyEmailSkeleton() {
+  return (
+    <SkGroup label="Loading email verification" className="auth-form">
+      <Head />
+      <ButtonSk />
+      <Sk w={110} h={13} lh={20} />
+    </SkGroup>
+  )
+}
+
+export function ResetPasswordSkeleton() {
+  return (
+    <SkGroup label="Loading password reset" className="auth-form">
+      <Head wrap={false} />
+      <FieldSk />
+      {/* .auth-strength: the progress bar, then the four rules in two columns */}
+      <div className="auth-strength">
+        <div suppressHydrationWarning className="progress"><Sk h={6} r={6} /></div>
+        <ul className="auth-rules">
+          {Array.from({ length: 4 }, (_, i) => <li key={i}><Sk w="80%" h={11} lh={19} /></li>)}
+        </ul>
+      </div>
+      <FieldSk />
+      <ButtonSk />
     </SkGroup>
   )
 }

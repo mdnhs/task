@@ -17,8 +17,11 @@ const METHODS = new Set(["GET", "POST", "PUT", "PATCH", "DELETE"])
 export const MAX_BODY_BYTES = 2 * 1024 * 1024
 export const UPSTREAM_TIMEOUT_MS = 30_000
 
-/** Always refused, whatever the route handler passes: /list-sessions returns raw session tokens (B1 follow-up; the safe list is GET /v1/me/sessions). */
-const ALWAYS_DENIED: Record<BffOptions["prefix"], RegExp[]> = { "/v1": [], "/api/auth": [/^\/api\/auth\/list-sessions\/?$/i] }
+/**
+ * Always refused, whatever the route handler passes: /list-sessions returns raw session tokens (B1 follow-up; the safe list is GET /v1/me/sessions) and
+ * /get-session returns the current session row INCLUDING its token (the app asks GET /v1/me instead). Neither token may be readable by page JS.
+ */
+const ALWAYS_DENIED: Record<BffOptions["prefix"], RegExp[]> = { "/v1": [], "/api/auth": [/^\/api\/auth\/(?:list-sessions|get-session)\/?$/i] }
 
 // Request headers that never cross: identity the browser must not choose, hop-by-hop headers, and the ones rebuilt below.
 const DROP_EXACT = new Set([

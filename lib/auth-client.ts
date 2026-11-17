@@ -13,6 +13,7 @@ export type AuthClientOptions = {
 }
 
 const Ok = z.object({}).loose()
+const SocialStart = z.object({ url: z.string() })
 const SignIn = z.object({ twoFactorRedirect: z.boolean().optional() }).loose()
 const TotpEnabled = z.object({ totpURI: z.string(), backupCodes: z.array(z.string()) })
 const TotpUri = z.object({ totpURI: z.string() })
@@ -46,6 +47,18 @@ export function makeAuthClient(o: AuthClientOptions) {
       const r = await send("POST", "/sign-in/email", SignIn, b)
       return r.twoFactorRedirect === true ? { twoFactorRedirect: true } : {}
     },
+    /** Starts a social sign-in: resolves the provider's authorize URL (https only) for the page to navigate to. The session cookie is set when the provider sends the visitor back. */
+    async signInSocial(provider: "google" | "microsoft", callbackURL: string): Promise<{ url: string }> {
+      const r = await send("POST", "/sign-in/social", SocialStart, { provider, callbackURL })
+      let u: URL
+      try {
+        u = new URL(r.url)
+      } catch {
+        throw new ApiError(502, "bad_response", "")
+      }
+      if (u.protocol !== "https:" && u.protocol !== "http:") throw new ApiError(502, "bad_response", "")
+      return { url: u.href }
+    },
     async signUpEmail(b: { name: string; email: string; password: string }): Promise<void> {
       await send("POST", "/sign-up/email", Ok, b)
     },
@@ -76,6 +89,10 @@ export function makeAuthClient(o: AuthClientOptions) {
     async signOut(): Promise<void> {
       await send("POST", "/sign-out", Ok, {})
     },
+    /** Ends every session of the user except this one (an MFA-protected endpoint: a password-only session of a 2FA user gets 403 mfa_required). */
+    async revokeOtherSessions(): Promise<void> {
+      await send("POST", "/revoke-other-sessions", Ok, {})
+    },
   }
 }
 
@@ -83,4 +100,4 @@ export type AuthClient = ReturnType<typeof makeAuthClient>
 
 /** The browser's client: same-origin /api/auth through the BFF. */
 const browserAuth = makeAuthClient({ baseUrl: "/api/auth" })
-export const { signInEmail, signUpEmail, verifyEmail, resendVerification, requestPasswordReset, resetPassword, verifyTotp, verifyBackupCode, enableTotp, disableTotp, getTotpUri, generateBackupCodes, signOut } = browserAuth
+export const { signInEmail, signInSocial, signUpEmail, verifyEmail, resendVerification, requestPasswordReset, resetPassword, verifyTotp, verifyBackupCode, enableTotp, disableTotp, getTotpUri, generateBackupCodes, signOut, revokeOtherSessions } = browserAuth

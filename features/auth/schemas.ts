@@ -33,14 +33,4 @@ export const ownerSchema = z.object({
   password: z.string().refine((p) => passwordScore(p) === PASSWORD_RULES.length, "Password needs to meet every rule listed below"),
 })
 
-/** "Northgate Facility Services" -> "northgate-facility-services" (subdomain preview). */
-export function slugify(name: string): string {
-  return name
-    .toLowerCase()
-    .normalize("NFKD")
-    .replace(/[̀-ͯ]/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 40)
-}
-
+export { slugify } from "@/lib/slug"

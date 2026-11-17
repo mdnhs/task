@@ -3,7 +3,7 @@ import Link from "next/link"
 import { Icon } from "@/components/icons"
 import { hasModule } from "@/lib/entitlements"
 import { can, moduleForHref } from "@/lib/permissions"
-import { getSession } from "@/lib/session"
+import { getPlatformSession, peekSession } from "@/lib/session"
 
 import { getNavigation } from "../api"
 
@@ -12,7 +12,8 @@ import { getNavigation } from "../api"
 // this shows the "Not in your plan" variant with a link to billing instead of the permission message.
 // `home`: where the way-out button goes (the platform console sends staff back to its overview).
 export async function AccessRestricted({ moduleLabel, home = { href: "/", label: "Back to Dashboard" } }: { moduleLabel: string; home?: { href: string; label: string } }) {
-  const [session, nav] = await Promise.all([getSession(), getNavigation()])
+  // Inside the console a staff person may have no company at all, so a missing company session falls back to the console session.
+  const [session, nav] = await Promise.all([peekSession().then((s) => s ?? getPlatformSession()), getNavigation()])
   const href = [...nav.menu, ...nav.general].find((n) => n.label === moduleLabel)?.href
   const mod = href ? moduleForHref(href) : null
   const original = session.roles.find((r) => r.id === session.role.id) ?? session.role

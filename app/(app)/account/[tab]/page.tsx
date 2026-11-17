@@ -29,16 +29,16 @@ export async function generateMetadata({ params }: { params: Promise<{ tab: stri
 export default async function Page({ params }: { params: Promise<{ tab: string }> }) {
   const { tab } = await params
   if (!isTab(tab)) notFound()
-  const [session, org, user, profile, security, prefs] = await Promise.all([getSession(), getOrg(), getUser(), getProfile(), getSecurity(), getNotificationPrefs()])
-  const mfa = await getMfaState(session)
-  const people = await getPeople()
-  // Same title rule as the user menu: the default owner keeps the person's own title, other roles show the previewed role.
-  const role = session.role.id === "owner" ? user.role : session.role.label
+  const [session, org, user, profile, prefs] = await Promise.all([getSession(), getOrg(), getUser(), getProfile(), getNotificationPrefs()])
+  // While two-step verification is outstanding the layout shows the gate instead of this page, and the API refuses its data.
+  if (session.mfa !== "ok") return null
+  const [mfa, security, people] = await Promise.all([getMfaState(session), getSecurity({ timezone: org.timezone, twoFactorEnabled: session.twoFactorEnabled }), getPeople()])
+  const role = session.role.label
   const scopeKey = `${session.tenant.id}:${session.role.id}:${mfa.enrolled ? "mfa" : "nomfa"}`
 
   const panels: Record<AccountTabId, React.ReactNode> = {
     profile: <ProfilePanel data={profile} name={user.name} email={user.email} initials={user.initials} role={role} tzLabel={org.tzLabel} scopeKey={scopeKey} />,
-    security: <SecurityPanel data={{ ...security, mfa: mfa.enrolled }} mfaRequired={mfa.required} email={user.email} today={org.today} timezone={org.timezone} tzLabel={org.tzLabel} scopeKey={scopeKey} />,
+    security: <SecurityPanel data={security} mfaRequired={mfa.required} email={user.email} today={org.today} tzLabel={org.tzLabel} />,
     notifications: <AccountNotificationsPanel data={prefs} scopeKey={scopeKey} todayUser={todayUserId(session, people, user.name)} />,
   }
 

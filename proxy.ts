@@ -1,16 +1,17 @@
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 import { appOrigin } from "@/lib/api/config"
+import { hasSessionCookie } from "@/lib/api/cookies"
 import { violatesSameOrigin } from "@/lib/csrf"
 
 // 1. The mock data store lives in public/data so lib/data.ts can read it from disk, but it is never served over HTTP:
 //    it holds every module's and every tenant's records, which would bypass role gating (lib/data.ts reads the files directly).
 // 2. Next server actions (a POST carrying `next-action`) get an Origin check of their own (B6 I6 layer 3, defence in depth): Next compares Origin
 //    with Host but lets a request with NO Origin through with a warning. A browser always sends Origin on a POST, so a missing one is refused.
-// 3. Signed-out visitors never get app pages (tenant or platform console): a real redirect before render, so no data streams into the HTML.
-//    This is an optimistic check only (Next docs: proxy is not an authorisation layer); the real check is the session lookup in the (app) layout.
+// 3. Visitors without a Better Auth session cookie never get app pages (tenant or platform console): a real redirect before render, so no data streams into the HTML.
+//    This is an optimistic check only (Next docs: proxy is not an authorisation layer); the real check is getSession() in the (app) layout (lib/session.ts).
 // /v1/* and /api/* are not matched at all: their route handlers (lib/api/bff.ts) own the tenant, cookie and CSRF rules.
-const PUBLIC_PAGE = /^\/(?:sign-in|forgot-password|sign-up|onboarding)(?:\/|$)/
+const PUBLIC_PAGE = /^\/(?:sign-in|forgot-password|sign-up|verify-email|reset-password)(?:\/|$)/
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
@@ -25,7 +26,17 @@ export function proxy(request: NextRequest) {
     if (violatesSameOrigin(request.headers, { origin, host })) return new NextResponse("Forbidden", { status: 403 })
   }
 
-  if (!PUBLIC_PAGE.test(pathname) && request.cookies.get("od-auth")?.value === "out") return NextResponse.redirect(new URL("/sign-in", request.url))
+  // OPTIMISTIC: the mere presence of Better Auth's session cookie (not its validity). Only page navigations are redirected; a server action carries its own
+  // session check (getSession), and /api and /v1 are not matched at all. The page's layout then asks the API who this is, so a forged or dead cookie gets no data.
+  if ((request.method === "GET" || request.method === "HEAD") && !PUBLIC_PAGE.test(pathname) && !hasSessionCookie(request.cookies.getAll().map((c) => c.name))) {
+    const to = new URL("/sign-in", request.url)
+    // `_rsc` is Next's own client-navigation marker: it must never travel into a post-sign-in redirect (the page would answer with the raw payload).
+    const query = new URLSearchParams(request.nextUrl.search)
+    query.delete("_rsc")
+    const qs = query.toString()
+    if (pathname !== "/" || qs) to.searchParams.set("next", `${pathname}${qs ? `?${qs}` : ""}`)
+    return NextResponse.redirect(to)
+  }
 
   // loading.tsx gets no route params or search params: pass the pathname (a detail skeleton looks the record up) and the
   // query (a list skeleton opens on the same saved view) on (lib/request-path.ts).

@@ -9,11 +9,10 @@ export const isTab = (id: string): id is AccountTabId => ACCOUNT_TABS.some((t) =
 
 export type ProfileData = { department: string; nameMin: number; nameMax: number }
 
-export type DeviceSession = { id: string; device: string; kind: "laptop" | "phone"; location: string; lastActive: string; current: boolean }
+/** A sign-in session (GET /v1/me/sessions): the device label and last activity. No location (no GeoIP) and never a token. */
+export type DeviceSession = { id: string; device: string; kind: "laptop" | "phone"; lastActive: string; current: boolean }
 export type ActivityItem = { id: string; text: string; at: string }
 export type SecurityData = { mfa: boolean; resetLinkMinutes: number; sessions: DeviceSession[]; activity: ActivityItem[] }
-/** The part of the security data the user changes (kept in one store). */
-export type SecurityState = Pick<SecurityData, "mfa" | "sessions" | "activity">
 
 type Option = { value: string; label: string }
 export type NotificationPrefsData = {

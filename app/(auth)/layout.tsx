@@ -1,16 +1,15 @@
 import { IconSprite } from "@/components/icons"
-import { getSession } from "@/lib/session"
+import { DEFAULT_BRAND } from "@/lib/brand"
 
-// Auth pages have no AppShell: a centred card on --panel, branded with the tenant's own logo.
-export default async function AuthLayout({ children }: { children: React.ReactNode }) {
-  const { tenant } = await getSession()
+// Auth pages have no AppShell and no company yet (nobody is signed in): a centred card on --panel with the product mark.
+export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
     <main className="auth">
       <IconSprite />
       <div className="auth-card">
         <div className="auth-logo">
-          <span className="auth-logo-mark" style={{ background: tenant.brand }} aria-hidden="true">{tenant.initials}</span>
-          <span className="auth-logo-name">{tenant.name}</span>
+          <span className="auth-logo-mark" style={{ background: DEFAULT_BRAND }} aria-hidden="true">OD</span>
+          <span className="auth-logo-name">OpsDesk</span>
         </div>
         {children}
       </div>

@@ -1,80 +1,107 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useTransition } from "react"
+import { useRouter } from "next/navigation"
 import { AlertDialog as AlertDialogPrimitive } from "@base-ui/react/alert-dialog"
 import { Monitor } from "lucide-react"
 import { toast } from "sonner"
 
-import { disableMfa } from "@/app/actions/security"
-
 import { ConfirmDialog } from "@/components/confirm-dialog"
 import { DataPagination } from "@/components/data-pagination"
+import { Field } from "@/components/field"
 import { Icon } from "@/components/icons"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
 import { When } from "@/components/when"
 import { AlertDialog, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
-import { nowInTz } from "@/lib/dates"
+import { userMessage } from "@/lib/api/problem"
+import { apiBrowser } from "@/lib/api/browser"
+import { disableTotp, requestPasswordReset, revokeOtherSessions } from "@/lib/auth-client"
 import { paginate } from "@/lib/paginate"
 import { ACTIVITY_PAGE_SIZE } from "../constants"
-import { securityStore } from "../store"
 import type { SecurityData } from "../types"
+import { disableTotpFlow } from "../totp-flow"
 import { TotpSetup } from "./totp-setup"
 
-// Security (FR-AUTH-04/05/06): verified password reset, MFA, active sessions. Every action lands in the activity list and a toast.
+// Security (FR-AUTH-04/05/06): verified password reset, MFA (Better Auth), active sessions (GET/DELETE /v1/me/sessions, no tokens, no locations).
+// The page data is server-rendered; each action calls the API and refreshes the page. The activity list is the last five sign-ins.
 export function SecurityPanel({
   data,
   email,
   today,
-  timezone,
   tzLabel,
-  scopeKey,
   mfaRequired = false,
 }: {
   data: SecurityData
   email: string
   today: string
-  timezone: string
   tzLabel: string
-  scopeKey: string
   /** The workspace requires two-step verification for this person (FR-M0-04): it cannot be switched off. */
   mfaRequired?: boolean
 }) {
-  const [state, setState] = securityStore.useStore({ mfa: data.mfa, sessions: data.sessions, activity: data.activity }, scopeKey)
+  const router = useRouter()
+  const [removed, setRemoved] = useState<Set<string>>(new Set())
+  const [mfaOn, setMfaOn] = useState(data.mfa)
   const [resetOpen, setResetOpen] = useState(false)
   const [mfaNext, setMfaNext] = useState<boolean | null>(null)
   const [setupOpen, setSetupOpen] = useState(false)
+  const [disablePw, setDisablePw] = useState("")
+  const [disableError, setDisableError] = useState<string>()
   const [signOutAll, setSignOutAll] = useState(false)
   const [page, setPage] = useState(1)
+  const [pending, start] = useTransition()
 
-  const log = (text: string) => setState((p) => ({ ...p, activity: [{ id: `a${Date.now()}`, text, at: nowInTz(today, timezone) }, ...p.activity] }))
-  const others = state.sessions.filter((s) => !s.current)
-  const paged = paginate(state.activity, page, ACTIVITY_PAGE_SIZE)
+  const sessions = data.sessions.filter((s) => !removed.has(s.id))
+  const others = sessions.filter((s) => !s.current)
+  const paged = paginate(data.activity, page, ACTIVITY_PAGE_SIZE)
 
   function sendReset() {
-    log("Password reset link emailed")
-    toast.success("Reset link sent", { description: `Check ${email}` })
-    setResetOpen(true)
+    start(async () => {
+      try {
+        await requestPasswordReset(email, "/reset-password")
+        toast.success("Reset link sent", { description: `Check ${email}` })
+        setResetOpen(true)
+      } catch (e) {
+        toast.error(userMessage(e).text)
+      }
+    })
   }
-  async function applyMfa() {
-    if (mfaNext !== false) return
-    const r = await disableMfa()
-    if (!r.ok) return toast.error("Two-step verification is required for your role")
-    setState((p) => ({ ...p, mfa: false }))
-    log("Two-step verification turned off")
-    toast.success("Two-step verification off")
+  function applyMfaOff() {
+    start(async () => {
+      const r = await disableTotpFlow(disableTotp, disablePw)
+      setDisablePw("")
+      if (!r.ok) return setDisableError(r.message)
+      setDisableError(undefined)
+      setMfaNext(null)
+      setMfaOn(false)
+      toast.success("Two-step verification off")
+      router.refresh()
+    })
   }
-  function signOutOne(id: string) {
-    const s = state.sessions.find((x) => x.id === id)
-    if (!s) return
-    setState((p) => ({ ...p, sessions: p.sessions.filter((x) => x.id !== id) }))
-    log(`Signed out ${s.device}`)
-    toast.success("Session signed out", { description: s.device })
+  function signOutOne(id: string, device: string) {
+    start(async () => {
+      try {
+        await apiBrowser.delete("/v1/me/sessions/{id}", { path: { id } })
+        setRemoved((p) => new Set(p).add(id))
+        toast.success("Session signed out", { description: device })
+        router.refresh()
+      } catch (e) {
+        toast.error(userMessage(e).text)
+      }
+    })
   }
   function signOutOthers() {
-    setState((p) => ({ ...p, sessions: p.sessions.filter((x) => x.current) }))
-    log(`Signed out of ${others.length} other ${others.length === 1 ? "session" : "sessions"}`)
-    toast.success("Signed out of other sessions")
+    start(async () => {
+      try {
+        await revokeOtherSessions()
+        setRemoved(new Set(others.map((x) => x.id)))
+        toast.success("Signed out of other sessions")
+        router.refresh()
+      } catch (e) {
+        toast.error(userMessage(e).text)
+      }
+    })
   }
 
   return (
@@ -85,18 +112,18 @@ export function SecurityPanel({
             <h2 id="acc-pw-h">Password</h2>
             <div className="sub">We email a verified reset link, so the new password is never typed here</div>
           </div>
-          <button type="button" className="btn btn-outline set-sm" onClick={sendReset}>Change password</button>
+          <button type="button" className="btn btn-outline set-sm" disabled={pending} onClick={sendReset}>Change password</button>
         </div>
         <label className="set-switch-row acc-mfa">
           <Switch
-            checked={state.mfa}
+            checked={mfaOn}
             aria-label="Two-step verification"
-            disabled={mfaRequired && state.mfa}
+            disabled={mfaRequired && mfaOn}
             onCheckedChange={(on) => (on ? setSetupOpen(true) : setMfaNext(false))}
           />
           <span className="acc-mfa-text">
             <span>Two-step verification</span>
-            <span className="tm">{state.mfa ? (mfaRequired ? "On: required by your workspace administrator" : "On: a code is asked at every new sign-in") : "Off: add a code step to protect your account"}</span>
+            <span className="tm">{mfaOn ? (mfaRequired ? "On: required by your workspace administrator" : "On: a code is asked at every new sign-in") : "Off: add a code step to protect your account"}</span>
           </span>
         </label>
       </section>
@@ -105,14 +132,14 @@ export function SecurityPanel({
         <div className="card-head">
           <div>
             <h2 id="acc-sess-h">Active sessions</h2>
-            <div className="sub">{state.sessions.length} signed in</div>
+            <div className="sub">{sessions.length} signed in</div>
           </div>
-          <button type="button" className="btn btn-outline set-sm" disabled={others.length === 0} onClick={() => setSignOutAll(true)}>
+          <button type="button" className="btn btn-outline set-sm" disabled={others.length === 0 || pending} onClick={() => setSignOutAll(true)}>
             Sign out of all other sessions
           </button>
         </div>
         <ul className="set-list">
-          {state.sessions.map((s) => (
+          {sessions.map((s) => (
             <li key={s.id} className="acc-sess">
               <span className="acc-sess-ico">{s.kind === "phone" ? <Icon name="phone" /> : <Monitor className="ico" strokeWidth={1.8} aria-hidden="true" />}</span>
               <div className="acc-sess-main">
@@ -120,12 +147,10 @@ export function SecurityPanel({
                   <b>{s.device}</b>
                   {s.current && <span className="st ok">This device</span>}
                 </span>
-                <span className="tm">
-                  {s.location} · <When iso={s.lastActive} today={today} tzLabel={tzLabel} />
-                </span>
+                <span className="tm"><When iso={s.lastActive} today={today} tzLabel={tzLabel} /></span>
               </div>
               {!s.current && (
-                <button type="button" className="btn btn-outline set-sm" onClick={() => signOutOne(s.id)} aria-label={`Sign out ${s.device}`}>
+                <button type="button" className="btn btn-outline set-sm" disabled={pending} onClick={() => signOutOne(s.id, s.device)} aria-label={`Sign out ${s.device}`}>
                   Sign out
                 </button>
               )}
@@ -175,21 +200,26 @@ export function SecurityPanel({
             account={email}
             onDone={() => {
               setSetupOpen(false)
-              setState((p) => ({ ...p, mfa: true }))
-              log("Two-step verification turned on")
+              setMfaOn(true)
+              router.refresh()
             }}
           />
         </DialogContent>
       </Dialog>
-      <ConfirmDialog
-        open={mfaNext !== null}
-        onOpenChange={(o) => !o && setMfaNext(null)}
-        title="Turn off two-step verification?"
-        text="Your account will be protected by your password alone. We recommend keeping it on."
-        confirmLabel="Turn off"
-        destructive
-        onConfirm={applyMfa}
-      />
+      <Dialog open={mfaNext !== null} onOpenChange={(o) => { if (!o) { setMfaNext(null); setDisablePw(""); setDisableError(undefined) } }}>
+        <DialogContent className="od-dialog od-form-dialog">
+          <DialogHeader>
+            <DialogTitle>Turn off two-step verification?</DialogTitle>
+            <DialogDescription>Your account will be protected by your password alone. We recommend keeping it on. Confirm your password to turn it off.</DialogDescription>
+          </DialogHeader>
+          <form className="mfa-steps" onSubmit={(e) => { e.preventDefault(); applyMfaOff() }} noValidate>
+            <Field label="Password" htmlFor="mfa-off-pw" error={disableError} required>
+              <Input id="mfa-off-pw" type="password" autoComplete="current-password" value={disablePw} onChange={(e) => { setDisablePw(e.target.value); setDisableError(undefined) }} />
+            </Field>
+            <div><button type="submit" className="btn btn-danger" disabled={pending}>Turn off</button></div>
+          </form>
+        </DialogContent>
+      </Dialog>
       <ConfirmDialog
         open={signOutAll}
         onOpenChange={setSignOutAll}
