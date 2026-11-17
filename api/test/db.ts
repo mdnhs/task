@@ -70,3 +70,9 @@ export async function resetDb(): Promise<void> {
 export async function closeTestDbs(): Promise<void> {
   await ownerPool?.end()
 }
+
+let ownerDbShared: Db | undefined
+/** Lazily-created app_owner Drizzle db (pool size 2): the demo seed wipes and re-seeds a tenant as the table owner. */
+export function ownerDb(): Db {
+  return (ownerDbShared ??= makeDb(need("TEST_DATABASE_OWNER_URL"), { max: 2 }))
+}

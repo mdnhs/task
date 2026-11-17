@@ -1,3 +1,7 @@
+# Local backing services for the API (Postgres, Redis, MinIO, ClamAV, Mailpit). Start: docker compose -f docker-compose.dev.yml up -d --wait
+# Demo data: after migrating (see .claude/docs/deploy/demo-seed.md) run
+#   ALLOW_DEMO_SEED=1 SEED_DEMO_PASSWORD=<12+ chars> npm -w api run seed:demo
+# It refuses a database that holds any tenant outside the three demo tenants, and never runs without ALLOW_DEMO_SEED=1.
 services:
   postgres:
     image: postgres:16

@@ -18,11 +18,9 @@ COPY --from=deps --chown=opsdesk:nodejs /app/node_modules ./node_modules
 COPY --chown=opsdesk:nodejs package.json ./
 COPY --chown=opsdesk:nodejs api ./api
 COPY --chown=opsdesk:nodejs packages/domain ./packages/domain
-# Tenant defaults and role templates are data (FR-M0-20), read at runtime from /app/public/data.
-COPY --chown=opsdesk:nodejs public/data/auth/onboarding-defaults.json ./public/data/auth/onboarding-defaults.json
-COPY --chown=opsdesk:nodejs public/data/shell/roles.json ./public/data/shell/roles.json
-COPY --chown=opsdesk:nodejs public/data/billing/entitlements.json ./public/data/billing/entitlements.json
-COPY --chown=opsdesk:nodejs public/data/billing/plans.json ./public/data/billing/plans.json
+# The mock JSON under public/data is DATA the API reads at runtime (tenant defaults and role templates, FR-M0-20; plans and entitlements) and what the demo
+# seed (npm -w api run seed:demo) loads. None of it is secret, so the whole folder is copied.
+COPY --chown=opsdesk:nodejs public/data ./public/data
 USER opsdesk
 WORKDIR /app/api
 EXPOSE 8080
