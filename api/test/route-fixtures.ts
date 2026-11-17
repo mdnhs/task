@@ -21,7 +21,7 @@ import { notify, withTenantAfterCommit } from "../src/modules/notifications"
 export type Fixture = { kind: "id" | "static"; value: string }
 export type TenantFixtures = Record<string, Record<string, Fixture>>
 
-type Resource = "role" | "member" | "team" | "device" | "feature" | "notification" | "pushToken" | "file" | "integration" | "dataRequest" | "supportGrant" | "apiKey" | "webhook"
+type Resource = "role" | "member" | "team" | "device" | "feature" | "notification" | "pushToken" | "file" | "integration" | "dataRequest" | "supportGrant" | "apiKey" | "webhook" | "task"
 
 /** path template -> param -> which resource that param names on that route. */
 export const ROUTE_PARAMS: Record<string, Record<string, Resource>> = {
@@ -48,6 +48,11 @@ export const ROUTE_PARAMS: Record<string, Record<string, Resource>> = {
   "/v1/settings/support-grants/{id}": { id: "supportGrant" },
   "/v1/api-keys/{id}": { id: "apiKey" },
   "/v1/webhooks/{id}": { id: "webhook" },
+  "/v1/tasks/{id}": { id: "task" },
+  "/v1/tasks/{id}/assignees": { id: "task" },
+  "/v1/tasks/{id}/status": { id: "task" },
+  "/v1/tasks/{id}/complete": { id: "task" },
+  "/v1/tasks/{id}/history": { id: "task" },
 }
 
 export type Actor = { userId: string; cookie: string; slug: string }
@@ -113,7 +118,11 @@ export async function fixtureIds(t: { app: AppType; deps: Deps }, tenant: { id: 
   const hookRes = await call(t.app, "POST", "/v1/webhooks", { cookie: owner.cookie, tenant: tenant.slug, body: { url: `https://hooks-${uniq}.example.com/in`, events: ["team.created"] } })
   if (hookRes.status !== 201) throw new Error(`fixture webhook failed: ${hookRes.status} ${await hookRes.text()}`)
   const hook = (await hookRes.json()) as { id: string }
-  const resources = { apiKey: apiKey.id, webhook: hook.id, supportGrant: String(sg.id), dataRequest: dsr.id, integration: String(integ.id), file: file.fileId, role: await roleIdOf(t.deps, tenant.id, "employee"), member: staff.userId, team: team.id, device: device.id, notification: String(notif.id), pushToken: ((await tokRes.json()) as { id: string }).id }
+  // a task of the tenant (B4), made through the real API as its owner: assigned to the staff member
+  const taskRes = await call(t.app, "POST", "/v1/tasks", { cookie: owner.cookie, tenant: tenant.slug, body: { title: `Task ${uniq}`, description: `Desc ${uniq}`, start: "2026-11-20T09:00:00", due: "2026-11-20T17:00:00", primary: staff.userId } })
+  if (taskRes.status !== 201) throw new Error(`fixture task failed: ${taskRes.status} ${await taskRes.text()}`)
+  const task = (await taskRes.json()) as { id: string; ref: string }
+  const resources = { task: task.id, apiKey: apiKey.id, webhook: hook.id, supportGrant: String(sg.id), dataRequest: dsr.id, integration: String(integ.id), file: file.fileId, role: await roleIdOf(t.deps, tenant.id, "employee"), member: staff.userId, team: team.id, device: device.id, notification: String(notif.id), pushToken: ((await tokRes.json()) as { id: string }).id }
   const fixtures: TenantFixtures = {}
   for (const [path, params] of Object.entries(ROUTE_PARAMS)) {
     fixtures[path] = {}
@@ -121,5 +130,5 @@ export async function fixtureIds(t: { app: AppType; deps: Deps }, tenant: { id: 
       fixtures[path][param] = res === "feature" ? { kind: "static", value: "drive" } : { kind: "id", value: resources[res] }
     }
   }
-  return { fixtures, resources, marks: [tenant.id, tenant.slug, String(integ.id), `drive-${uniq}@example.com`, team.id, device.id, file.fileId, dsr.id, `Fix ${uniq}`, `Support ${uniq}`, String(sg.id), `File ${uniq}.pdf`, staff.userId, owner.userId, `Team ${uniq}`, `Device ${uniq}`, apiKey.id, apiKey.prefix, `Key ${uniq}`, hook.id, `hooks-${uniq}.example.com`] }
+  return { fixtures, resources, marks: [tenant.id, tenant.slug, String(integ.id), `drive-${uniq}@example.com`, team.id, device.id, file.fileId, dsr.id, `Fix ${uniq}`, `Support ${uniq}`, String(sg.id), `File ${uniq}.pdf`, staff.userId, owner.userId, `Team ${uniq}`, `Device ${uniq}`, apiKey.id, apiKey.prefix, `Key ${uniq}`, hook.id, `hooks-${uniq}.example.com`, task.id, `Task ${uniq}`, `Desc ${uniq}`] }
 }

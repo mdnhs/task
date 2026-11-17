@@ -7,6 +7,7 @@ import { registerGdpr, SWEEP_JOB } from "./modules/gdpr"
 import { registerIntegrations } from "./modules/integrations"
 import { NOTIFICATION_SWEEP_JOB, registerNotifications } from "./modules/notifications"
 import { registerSearchIndexers } from "./modules/search"
+import { registerTasks } from "./modules/tasks"
 import { registerWebhooks, SWEEP_JOB as WEBHOOK_SWEEP_JOB } from "./modules/webhooks-out"
 import { parseEnv, type Env } from "./env"
 import { makeDeps } from "./server"
@@ -20,6 +21,7 @@ export async function startWorkerProcess(env: Env = parseEnv(process.env)) {
   registerIntegrations() // integration.refresh job (token refresh is otherwise lazy, see getAccessToken)
   registerWebhooks() // webhook.deliver + webhook.sweep jobs and the event fan-out subscriber (T3.6)
   registerGdpr() // core DSR handlers + dsr.export / dsr.erase / dsr.export-expire jobs
+  registerTasks() // tasks DSR handler (after the core ones: it runs before the membership is removed by the erase job)
   registerJob("events.relay", async (_data, d) => {
     await relayOnce(d)
   })

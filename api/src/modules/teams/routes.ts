@@ -1,6 +1,7 @@
 import { createRoute, z } from "@hono/zod-openapi"
 import { Forbidden } from "../../core/errors"
 import { requirePermission } from "../../core/middleware/permission"
+import { subjectUserId } from "../../core/middleware/principal"
 import { requireModule } from "../../core/middleware/module"
 import { requireTenant } from "../../core/middleware/tenant"
 import { newRouter } from "../../core/router"
@@ -98,7 +99,7 @@ export const teamRoutes = newRouter()
   .openapi(peopleRoute, async (c) => {
     const t = c.get("tenant")!
     // an API key sees what its CREATOR would (scope is resolved from the creator's role; the creator is the `person` for team/own scope)
-    const me = c.get("apiKey")?.creatorId ?? c.get("member")!.userId
+    const me = subjectUserId(c)
     const role = c.get("role")! // loaded by requirePermission
     const rows = await withTenant(c.get("deps").db, t.id, async (tx) => {
       const scope = resolveScope(await peopleAccess(tx, t.id, role, me), c.req.valid("query").scope)

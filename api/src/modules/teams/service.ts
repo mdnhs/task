@@ -3,7 +3,7 @@ import { reportScope, type ReportAccess } from "@opsdesk/domain/permissions"
 import type { ResolvedRole } from "../../core/context"
 import { AppError, Conflict, NotFound } from "../../core/errors"
 import { publish } from "../../core/events"
-import { memberships, reportingLines, roles, teamMembers, teams, user } from "../../db/schema"
+import { memberships, reportingLines, roles, tasks, teamMembers, teams, user } from "../../db/schema"
 import type { TenantTx } from "../../db/tenant-tx"
 import { recordAudit } from "../audit"
 import { lockActor } from "../rbac"
@@ -81,6 +81,7 @@ export async function deleteTeam(tx: TenantTx, tenantId: string, actor: Actor, i
   await begin(tx, tenantId, actor)
   const cur = await teamIn(tx, tenantId, id)
   const memberIds = await memberIdsOf(tx, tenantId, id)
+  await tx.update(tasks).set({ teamId: null }).where(and(eq(tasks.tenantId, tenantId), eq(tasks.teamId, id))) // tasks keep existing without a department (composite FK has no SET NULL on one column)
   await tx.delete(teams).where(and(eq(teams.id, id), eq(teams.tenantId, tenantId))) // team_members rows cascade
   await recordAudit(tx, tenantId, { action: "team.deleted", entity: "team", entityId: id, actorId: actor.userId, before: { name: cur.name, kind: cur.kind, userIds: memberIds }, after: null }, now)
   await publish(tx, { tenantId, type: "team.deleted", payload: { teamId: id }, actorId: actor.userId }, now)
@@ -149,6 +150,11 @@ const RANK: Record<Scope, number> = { own: 0, team: 1, all: 2 }
  * so a clone of `manager` keeps its team ceiling instead of widening to "all".
  */
 export async function peopleAccess(tx: TenantTx, tenantId: string, role: ResolvedRole, meId: string): Promise<ReportAccess | null> {
+  return reportScope({ ...role, person: meId, reportScope: await effectiveReportScope(tx, tenantId, role) }, meId)
+}
+
+/** The role template's `reportScope` ("team"), following `cloned_from` (up to 5 levels) so a clone of `manager` keeps its team ceiling. Shared by people and tasks. */
+export async function effectiveReportScope(tx: TenantTx, tenantId: string, role: ResolvedRole): Promise<"team" | undefined> {
   let key = role.key
   let id: string | null = role.id
   for (let i = 0; i < 5 && id; i++) {
@@ -160,7 +166,7 @@ export async function peopleAccess(tx: TenantTx, tenantId: string, role: Resolve
     id = src.id
     key = src.key
   }
-  return reportScope({ ...role, person: meId, reportScope: templateReportScope(key) }, meId)
+  return templateReportScope(key)
 }
 
 /** The widest scope the role may request, or null when it has no reports access. `requested` above that ceiling returns "forbidden". */

@@ -134,3 +134,8 @@ export function withholdDriveLinks<T extends { evidence: { kind: string; name: s
     }
   })
 }
+
+const DRIVE_URL_IN_TEXT = /https?:\/\/(?:drive|docs)\.google\.com\/[^\s<>"')\]]*/gi
+
+/** Free text (a description, a comment) for a device that may not see Drive links: each Drive URL becomes "Google Drive link" (D22). */
+export const withholdDriveText = (text: string): string => text.replace(DRIVE_URL_IN_TEXT, WITHHELD_DRIVE_NAME)

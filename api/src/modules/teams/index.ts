@@ -1,2 +1,2 @@
 export { teamRoutes } from "./routes"
-export { directReports } from "./service"
+export { directReports, effectiveReportScope } from "./service"

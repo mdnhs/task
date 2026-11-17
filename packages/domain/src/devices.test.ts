@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { canUse, describePolicy, parseDevices, parsePolicies, resolveDevice, unregisteredDevice, withholdDriveLinks, WITHHELD_DRIVE_NAME } from "./devices"
+import { canUse, describePolicy, parseDevices, parsePolicies, resolveDevice, unregisteredDevice, withholdDriveLinks, withholdDriveText, WITHHELD_DRIVE_NAME } from "./devices"
 import type { Device, DevicePolicy } from "./devices"
 
 const pc: Device = { id: "d1", userId: "u1", type: "pc", owner: "company", label: "Work PC", trusted: true, lastSeen: null }
@@ -82,5 +82,15 @@ describe("withholdDriveLinks (FR-M1-52)", () => {
     ])
     expect(out[1]).toBe(tasks[1])
     expect(JSON.stringify(out)).not.toContain("google.com")
+  })
+})
+
+describe("withholdDriveText (ruling D22)", () => {
+  it("turns every Drive URL in free text into 'Google Drive link' and leaves the rest alone", () => {
+    expect(withholdDriveText("See https://drive.google.com/file/d/abc/view and https://docs.google.com/document/d/x then https://example.com/a")).toBe(
+      "See Google Drive link and Google Drive link then https://example.com/a",
+    )
+    expect(withholdDriveText("no links here")).toBe("no links here")
+    expect(withholdDriveText("")).toBe("")
   })
 })

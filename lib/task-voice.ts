@@ -1,3 +1,4 @@
+import type { VoiceNote } from "@opsdesk/domain/task-model"
 import type { TodayTask } from "./today"
 
 // Spoken task instructions (product owner change request, 30 Oct 2026; not in the BA's SRS). Recorded on the New task page,
@@ -5,20 +6,7 @@ import type { TodayTask } from "./today"
 // Pure helpers plus a module-level hand-off like lib/task-inbox.ts (written on the client only; survives client navigation,
 // resets on reload).
 
-/**
- * The recording on a task. In this front-end mock `url` is a `blob:` object URL that lives only in this browser tab, so it is
- * gone on reload like every mock edit. With the backend it becomes a stored file (tenant storage, signed URL) with a retention
- * rule; see .claude/docs/features/tasks.md → Voice instructions.
- */
-export type VoiceNote = {
-  url: string
-  durationSec: number
-  mime: string
-  /** Display name of who recorded it. */
-  recordedBy: string
-  /** YYYY-MM-DDTHH:mm:ss, tenant time. */
-  recordedAt: string
-}
+export type { VoiceNote }
 
 /** Hard limit: the recorder stops by itself here. */
 export const VOICE_MAX_SEC = 120

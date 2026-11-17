@@ -1,5 +1,6 @@
 import type { Access, Module } from "@opsdesk/domain/permissions"
-import type { ResolvedRole } from "../context"
+import type { Context } from "hono"
+import type { AppEnv, ResolvedRole } from "../context"
 
 /**
  * Leaf module (no imports of services or middleware, so permission.ts and api-key.ts can both use it without an import cycle):
@@ -31,4 +32,15 @@ export function apiKeyRole(k: { access: Record<Module, Access>; role: CreatorRol
     id: k.role.id, key: k.role.key, label: "API key", description: "Scopes of the key, limited by its creator's current role.",
     home: k.role.home, access: k.access, fieldRules: Object.freeze({ ...k.role.fieldRules }) as Record<string, string[]>,
   })
+}
+
+/** Whose data "me" means: the creator for an API key (a key sees what its creator would), else the signed-in member (or the support staff id). */
+export function subjectUserId(c: Context<AppEnv>): string {
+  return c.get("apiKey")?.creatorId ?? c.get("member")!.userId
+}
+
+/** Who DID it, for history and audit rows: `apikey:<id>` for a key, else the member's user id. */
+export function actorIdOf(c: Context<AppEnv>): string {
+  const k = c.get("apiKey")
+  return k ? apiKeyActor(k.id) : c.get("member")!.userId
 }

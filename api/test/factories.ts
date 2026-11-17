@@ -193,3 +193,16 @@ export async function makeStaff(deps: Deps, role: PlatformRole, over: { email?: 
   await deps.db.insert(platformStaff).values({ userId: u.userId, role, status: over.status ?? "active", addedBy: "test", addedAt: deps.clock.now() })
   return u
 }
+
+// ---- API keys (B4): staff-home roles have no settings:write, so keys for them are minted through the service ----
+import { createApiKey } from "../src/modules/api-keys"
+
+/** An API key created by `userId` (any role) with `scopes` limited by that member's CURRENT role, exactly like POST /v1/api-keys. */
+export async function makeApiKey(deps: Deps, tenantId: string, userId: string, scopes: string[]): Promise<{ key: string; id: string }> {
+  const access = await withTenant(deps.db, tenantId, async (tx) => {
+    const [r] = await tx.select({ access: roles.access }).from(memberships).innerJoin(roles, eq(roles.id, memberships.roleId)).where(and(eq(memberships.tenantId, tenantId), eq(memberships.userId, userId)))
+    return r.access
+  })
+  const out = await createApiKey(deps, tenantId, { userId, access }, { name: "test", scopes })
+  return { key: out.key, id: out.view.id }
+}
