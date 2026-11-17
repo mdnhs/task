@@ -26,8 +26,9 @@ export async function indexTask(tx: TenantTx, tenantId: string, taskId: string, 
   const [t] = await tx.select().from(tasks).where(and(eq(tasks.id, taskId), eq(tasks.tenantId, tenantId)))
   if (!t || t.archivedAt) return removeDocument(tx, tenantId, "task", taskId)
   const people = await tx.select({ u: taskAssignees.userId }).from(taskAssignees).where(and(eq(taskAssignees.tenantId, tenantId), eq(taskAssignees.taskId, taskId)))
-  const audience = [...new Set([...people.map((p) => p.u), ...(t.creatorId ? [t.creatorId] : []), ...(t.evidenceRule.reviewer ? [t.evidenceRule.reviewer] : [])])].sort()
-  const body = [t.labels.join(" "), searchText(t.description).slice(0, BODY_CHARS)].filter(Boolean).join(" ")
+  // Role-tagged (ruling E4): `a:` = assignee, `o:` = creator or named reviewer, so the team scope can match only assignees who report to me (D5).
+  const audience = [...new Set([...people.map((p) => `a:${p.u}`), ...(t.creatorId ? [`o:${t.creatorId}`] : []), ...(t.evidenceRule.reviewer ? [`o:${t.evidenceRule.reviewer}`] : [])])].sort()
+  const body = [searchText(t.labels.join(" ")), searchText(t.description).slice(0, BODY_CHARS)].filter(Boolean).join(" ")
   await indexDocument(tx, { tenantId, entity: "task", entityId: taskId, module: "tasks", title: searchText(`TSK-${t.refNo} ${t.title}`), body, audience }, now)
 }
 
@@ -46,7 +47,7 @@ export function registerTaskSearchIndexers(): void {
 }
 
 /**
- * The search row scope for tasks (ruling D12) from the caller's task scope: own → themself; team → themself + direct reports; all → no filter.
+ * The search row scope for tasks (ruling D12) from the caller's task scope: own → themself (either role); team → themself + direct reports as assignees only; all → no filter.
  * "Me" is subjectUserId (the creator for an API key). null = no scope entry (all) — and a caller with no task scope sees none (module gate).
  */
 export async function taskSearchScope(c: Context<AppEnv>, tx: TenantTx): Promise<SearchScopes> {
@@ -54,6 +55,8 @@ export async function taskSearchScope(c: Context<AppEnv>, tx: TenantTx): Promise
   const me = subjectUserId(c)
   const scope = taskScope({ ...role, reportScope: await effectiveReportScope(tx, c.get("tenant")!.id, role) }, me)
   if (!scope || scope.kind === "all") return scope ? { tasks: null } : { tasks: { audience: [] } }
-  if (scope.kind === "own") return { tasks: { audience: [scope.personId] } }
-  return { tasks: { audience: [scope.managerId, ...(await directReports(tx, scope.managerId))] } }
+  if (scope.kind === "own") return { tasks: { audience: [`a:${scope.personId}`, `o:${scope.personId}`] } }
+  // own tasks (any role) plus tasks with an ASSIGNEE who reports to me; a report who is only creator or reviewer does not widen it (D5, ruling E4)
+  const reports = await directReports(tx, scope.managerId)
+  return { tasks: { audience: [`a:${scope.managerId}`, `o:${scope.managerId}`, ...reports.map((r) => `a:${r}`)] } }
 }

@@ -41,7 +41,7 @@ export const tasksDsrHandler: DsrHandler = {
     await tx.update(taskComments).set({ authorId: null }).where(and(eq(taskComments.tenantId, tenantId), eq(taskComments.authorId, userId)))
     await tx.update(taskComments).set({ mentions: sql`array_remove(${taskComments.mentions}, ${userId})` }).where(and(eq(taskComments.tenantId, tenantId), sql`${userId} = any(${taskComments.mentions})`))
     await tx.update(taskFiles).set({ createdBy: null }).where(and(eq(taskFiles.tenantId, tenantId), eq(taskFiles.createdBy, userId)))
-    await tx.execute(sql`update search_documents set audience = array_remove(audience, ${userId}) where tenant_id = ${tenantId} and entity = 'task' and ${userId} = any(audience)`)
+    await tx.execute(sql`update search_documents set audience = array_remove(array_remove(audience, ${`a:${userId}`}), ${`o:${userId}`}) where tenant_id = ${tenantId} and entity = 'task' and (${`a:${userId}`} = any(audience) or ${`o:${userId}`} = any(audience))`)
     await tx.delete(taskAssignees).where(and(eq(taskAssignees.tenantId, tenantId), eq(taskAssignees.userId, userId)))
   },
 }

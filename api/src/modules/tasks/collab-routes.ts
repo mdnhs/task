@@ -33,7 +33,7 @@ const checklistDelete = createRoute({
 })
 const subtaskAdd = createRoute({
   method: "post", path: "/v1/tasks/{id}/subtasks", middleware: write, request: { params: IdParam, body: reqBody(SubtaskBody) },
-  responses: { 201: { description: "The child task: same team, project and due date, no evidence. 403 forbidden; 404 task_not_found; 422 subtask_depth", content: content(TaskDtoSchema) } },
+  responses: { 201: { description: "The child task: same team, project and due date, no evidence. Its assignee is the parent's primary when the caller may assign that person (staff: themself; a team manager: themself or a direct report), otherwise the caller. 403 forbidden; 404 task_not_found; 422 subtask_depth", content: content(TaskDtoSchema) } },
 })
 const commentList = createRoute({
   method: "get", path: "/v1/tasks/{id}/comments", middleware: read, request: { params: IdParam, query: CommentQuery },

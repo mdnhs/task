@@ -217,31 +217,37 @@ export async function addComment(tx: TenantTx, env: TaskEnv, ctx: TaskCtx, id: s
     .insert(taskComments)
     .values({ tenantId: ctx.tenantId, taskId: row.id, authorId: ctx.actorId, body: input.body, mentions, attachmentFileIds: fileIds, createdAt: ctx.now })
     .returning()
-  await writeHistory(tx, ctx, row.id, { kind: "comment", text: "Comment added" }) // no `notified`: it would show who could see the task
   const notMe = (u: string) => u !== ctx.me && u !== ctx.actorId
   const mentioned = (await canSee(tx, ctx, row, assignees, mentions)).filter(notMe).sort()
+  const others = changeRecipients(ctx, row, assignees).filter((u) => !mentioned.includes(u))
+  // `notified` lists the assignees and creator only: mention recipients stay out of it (it would show who could see the task)
+  await writeHistory(tx, ctx, row.id, { kind: "comment", text: "Comment added", notified: others })
   await notifyTask(tx, env, ctx, row, mentioned, "You were mentioned")
-  await notifyTask(tx, env, ctx, row, changeRecipients(ctx, row, assignees).filter((u) => !mentioned.includes(u)), "New comment")
+  await notifyTask(tx, env, ctx, row, others, "New comment")
   const [dto] = await commentDtos(tx, ctx, [c])
   await publishTaskEvent(tx, ctx, { type: "task.comment_added", payload: { taskId: row.id, commentId: c.id } })
   return dto
 }
 
-/** GET /v1/tasks/{id}/comments: oldest first, keyset on (created_at, id) via task_comments_task_idx. */
-export async function listComments(tx: TenantTx, ctx: TaskCtx, id: string, o: { limit: number; cursor?: string }): Promise<{ items: CommentDto[]; nextCursor: string | null }> {
-  const row = await getTask(tx, ctx, id)
-  const after = o.cursor ? decodeCursor(o.cursor) : null
-  const rows = await tx
+/** The comments list statement (exported so the EXPLAIN test plans the exact query). */
+export function buildCommentsQuery(tx: TenantTx, tenantId: string, taskId: string, after: { at: Date; id: string } | null, take: number) {
+  return tx
     .select()
     .from(taskComments)
     .where(
       and(
-        eq(taskComments.tenantId, ctx.tenantId), eq(taskComments.taskId, row.id), isNull(taskComments.deletedAt),
+        eq(taskComments.tenantId, tenantId), eq(taskComments.taskId, taskId), isNull(taskComments.deletedAt),
         after ? or(gt(taskComments.createdAt, after.at), and(eq(taskComments.createdAt, after.at), gt(taskComments.id, after.id))) : undefined,
       ),
     )
     .orderBy(asc(taskComments.createdAt), asc(taskComments.id))
-    .limit(o.limit + 1)
+    .limit(take)
+}
+
+/** GET /v1/tasks/{id}/comments: oldest first, keyset on (created_at, id) via task_comments_task_idx. */
+export async function listComments(tx: TenantTx, ctx: TaskCtx, id: string, o: { limit: number; cursor?: string }): Promise<{ items: CommentDto[]; nextCursor: string | null }> {
+  const row = await getTask(tx, ctx, id)
+  const rows = await buildCommentsQuery(tx, ctx.tenantId, row.id, o.cursor ? decodeCursor(o.cursor) : null, o.limit + 1)
   const page = rows.slice(0, o.limit)
   const last = page[page.length - 1]
   return { items: await commentDtos(tx, ctx, page), nextCursor: rows.length > o.limit && last ? encodeCursor(last.createdAt, last.id) : null }

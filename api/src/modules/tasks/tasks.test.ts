@@ -9,6 +9,7 @@ import { runJob } from "../../core/queue/queue"
 import { registerFiles } from "../files"
 import { registerNotifications } from "../notifications"
 import { registerSearchIndexers } from "../search"
+import { buildCommentsQuery } from "./collab"
 import { withTenant } from "../../db/tenant-tx"
 import { clearModuleOverride } from "../entitlements"
 import { applyTaskUpdate, buildListQuery, type TaskCtx } from "."
@@ -1096,15 +1097,61 @@ describe("collaboration (T4.2)", () => {
     expect(await code(r)).toBe("api_key_forbidden_route")
   })
 
+  test("team search (ruling E4): a report who is only the creator or the reviewer does not surface the task; an assignee report does; own scope unchanged", async () => {
+    const w = await world()
+    await w.manages(w.manager, w.staff)
+    await w.manages(w.manager, w.staff2)
+    const rule = { mode: "optional", types: ["note"], min: 0, instruction: "", review: "named", reviewer: w.staff2.userId }
+    const byReport = await w.mk(w.staff, { title: "Wombat creator-only", primary: w.staff.userId }) // staff creates for themself: a report as assignee
+    const creatorOnly = await w.mk(w.ops, { title: "Wombat made-by-ops", primary: w.owner.userId })
+    await w.q("update tasks set creator_id = $1 where id = $2", [w.staff.userId, creatorOnly.id]) // a report is only the creator
+    const reviewerOnly = await w.mk(w.owner, { title: "Wombat reviewer-only", primary: w.owner.userId, evidenceRule: rule }) // staff2 is only the named reviewer
+    const assigneeReport = await w.mk(w.owner, { title: "Wombat assignee", primary: w.staff2.userId })
+    for (const t of [creatorOnly, reviewerOnly, assigneeReport]) await withTenant(w.deps.db, w.tenant.id, (tx) => publish(tx, { tenantId: w.tenant.id, type: "task.updated", payload: { taskId: t.id, historyId: "h", fields: [] }, actorId: null }, w.clock.now()))
+    await relay(w)
+    const titles = async (as: Who) => (((await w.json(await w.req("GET", "/v1/search?q=wombat", as))).hits as Json[]) ?? []).map((h) => (h.title as string).replace(/^TSK-\d+ /, "")).sort()
+    const mine = await titles(w.manager)
+    expect(mine).toEqual(["Wombat assignee", "Wombat creator-only"]) // assignee reports only
+    for (const t of [creatorOnly, reviewerOnly]) expect((await w.req("GET", `/v1/tasks/${t.id}`, w.manager)).status).toBe(404) // search and GET agree (D5)
+    expect(byReport.id).toBeTruthy()
+    // own scope: a creator-only or reviewer-only staff member still finds their own
+    expect(await titles(w.staff)).toEqual(["Wombat creator-only", "Wombat made-by-ops"])
+    expect(await titles(w.staff2)).toEqual(["Wombat assignee", "Wombat reviewer-only"])
+  })
+
+  test("comments: the history line lists assignees and creator as notified, never mention recipients; the list query uses task_comments_task_idx", async () => {
+    const w = await world()
+    const t = await w.mk(w.owner)
+    await w.req("POST", `/v1/tasks/${t.id}/comments`, w.staff, { body: "hi @ops", mentions: [w.ops.userId, w.staff2.userId] })
+    const [h] = await w.q("select notified from task_history where task_id = $1 and kind = 'comment'", [t.id])
+    expect(h.notified).toEqual([w.owner.userId]) // the creator; staff is the author; ops and staff2 (mentions) stay out
+    await w.q("insert into task_comments (tenant_id, task_id, author_id, body, created_at) select $1, $2, $3, 'c' || g, now() + g * interval '1 second' from generate_series(1, 300) g", [w.tenant.id, t.id, w.owner.userId])
+    await ownerQuery("analyze task_comments")
+    const c = new pg.Client({ connectionString: process.env.TEST_DATABASE_OWNER_URL })
+    await c.connect()
+    try {
+      const plan = await withTenant(w.deps.db, w.tenant.id, async (tx) => buildCommentsQuery(tx, w.tenant.id, t.id, { at: new Date("2026-01-01T00:00:00Z"), id: "00000000-0000-4000-8000-000000000000" }, 26).toSQL())
+      await c.query("begin")
+      await c.query("select set_config('app.tenant_id', $1, true)", [w.tenant.id])
+      await c.query("set local enable_seqscan = off")
+      const text = (await c.query(`explain ${plan.sql}`, plan.params as unknown[])).rows.map((r) => r["QUERY PLAN"] as string).join("\n")
+      await c.query("rollback")
+      expect(text).toContain("task_comments_task_idx")
+      expect(text).not.toMatch(/Seq Scan on task_comments/)
+    } finally {
+      await c.end()
+    }
+  })
+
   test("search body never contains a Drive URL or an email", async () => {
     const w = await world()
     const url = "https://drive.google.com/file/d/abc123/view"
-    await w.mk(w.owner, { title: "Mail ann@example.com", description: `See ${url} or write bob@example.org today`, labels: ["Safety", "fire"] })
+    await w.mk(w.owner, { title: "Mail ann@example.com", description: `See ${url} or write bob@example.org today`, labels: ["Safety", "fire", "ops@example.com", "https://drive.google.com/x/y"] })
     await relay(w)
     const [doc] = await w.q("select title, body, audience from search_documents where entity = 'task'")
     expect(doc.body).toContain("safety fire")
-    expect(`${doc.title} ${doc.body}`).not.toMatch(/drive\.google\.com|@|example\.(com|org)/)
-    expect(doc.audience).toEqual([w.owner.userId, w.staff.userId].sort())
+    expect(`${doc.title} ${doc.body}`).not.toMatch(/drive\.google\.com|@|example\.(com|org)/) // labels are cleaned too
+    expect(doc.audience).toEqual([`a:${w.staff.userId}`, `o:${w.owner.userId}`].sort()) // role-tagged (ruling E4)
     const long = await w.mk(w.owner, { title: "Longform", description: "word ".repeat(400) })
     await relay(w)
     const [d2] = await w.q("select body from search_documents where entity_id = $1", [long.id])
