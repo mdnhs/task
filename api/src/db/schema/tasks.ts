@@ -83,7 +83,9 @@ export const tasks = pgTable(
     foreignKey({ columns: [t.tenantId, t.parentId], foreignColumns: [t.tenantId, t.id], name: "tasks_parent_fk" }),
     // No cascade: the service unlinks a project's / milestone's tasks (with a history line each) before it deletes them.
     foreignKey({ columns: [t.tenantId, t.projectId], foreignColumns: [projects.tenantId, projects.id], name: "tasks_project_fk" }),
-    foreignKey({ columns: [t.tenantId, t.milestoneId], foreignColumns: [projectMilestones.tenantId, projectMilestones.id], name: "tasks_milestone_fk" }),
+    // A task's milestone must belong to the task's own project (MATCH SIMPLE: skipped while milestone_id is null; the check forbids a milestone without a project).
+    foreignKey({ columns: [t.tenantId, t.projectId, t.milestoneId], foreignColumns: [projectMilestones.tenantId, projectMilestones.projectId, projectMilestones.id], name: "tasks_milestone_fk" }),
+    check("tasks_milestone_needs_project", sql`${t.milestoneId} is null or ${t.projectId} is not null`),
     index("tasks_project_idx").on(t.tenantId, t.projectId).where(sql`${t.archivedAt} is null`),
     index("tasks_milestone_idx").on(t.tenantId, t.milestoneId).where(sql`${t.milestoneId} is not null`),
     index("tasks_live_due_idx").on(t.tenantId, t.dueAt, t.id).where(sql`${t.archivedAt} is null`),

@@ -48,15 +48,24 @@ export type DateMove = { ref: string; title: string; from: { start: string; due:
  * FR-M1-14 (simple version): moving `ref` to new dates pushes every open dependant that would now start before its
  * dependency is due. A pushed task moves by whole days (start and due together, so its length and times stay), and the
  * push carries on down the chain. Tasks are only ever pushed later, never pulled earlier. Archived, completed and cancelled
- * dependants are never pushed. The moved task itself is not listed.
+ * dependants are never pushed. More than KNOCK_ON_LIMIT tasks walked throws KnockOnTooLarge. The moved task itself is not listed.
  */
+/** The most tasks one knock-on may walk. Past it the push is refused (RangeError) instead of being cut short without telling anyone. */
+export const KNOCK_ON_LIMIT = 500
+export class KnockOnTooLarge extends RangeError {
+  constructor() {
+    super("knock_on_too_large")
+  }
+}
+
 export function knockOn(tasks: readonly PlanTask[], ref: string, to: { start: string; due: string }): DateMove[] {
   const byRef = new Map(tasks.map((t) => [t.ref, t]))
   const dates = new Map<string, { start: string; due: string }>([[ref, to]])
   const moves = new Map<string, DateMove>()
   const queue = [ref]
-  let guard = 0
-  while (queue.length && guard++ < 500) {
+  let walked = 0
+  while (queue.length) {
+    if (walked++ >= KNOCK_ON_LIMIT) throw new KnockOnTooLarge()
     const cur = queue.shift()!
     const due = dates.get(cur)!.due
     for (const d of dependantsOf(tasks, cur)) {

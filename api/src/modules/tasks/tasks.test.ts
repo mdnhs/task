@@ -1339,10 +1339,14 @@ describe("projects, milestones, dependencies, knock-on and date proposals (T4.3)
     await w.manages(w.manager, w.staff)
     const { a, b, c } = await chain(w, [w.staff, w.staff, w.staff2]) // C belongs to someone the manager does not manage
     const p = await preview(w, a.id, "2026-11-20T09:00:00", "2026-11-22T17:00:00", w.manager)
-    const byRef = Object.fromEntries((p.moves as Json[]).map((m) => [m.ref, m]))
-    expect(byRef[b.ref].outOfScope).toBe(false)
-    expect(byRef[c.ref].outOfScope).toBe(true)
-    expect(byRef[c.ref].title).toBe("") // the title of a task the manager may not open is withheld
+    // Ruling E7: the task outside the manager's scope is opaque: only { outOfScope: true } and a count, no id, ref, title or date
+    const shown = (p.moves as Json[]).filter((m) => !m.outOfScope)
+    const hiddenOnes = (p.moves as Json[]).filter((m) => m.outOfScope)
+    expect(shown.map((m) => m.ref)).toEqual([b.ref])
+    expect(hiddenOnes).toEqual([{ outOfScope: true }])
+    expect(p.hiddenMoves).toBe(1)
+    const raw = JSON.stringify(p)
+    for (const secret of [c.id, c.ref, "Task C", "2026-11-24", "2026-11-23T09:00:00".replace("11-23", "11-25")]) expect(raw).not.toContain(secret)
     const before = [await tt(w, a.id), await tt(w, b.id), await tt(w, c.id)]
     const r = await resched(w, a.id, { version: 1, start: "2026-11-20T09:00:00", due: "2026-11-22T17:00:00", knockOn: { apply: true, previewHash: p.previewHash } }, w.manager)
     expect(r.status).toBe(409)
@@ -1613,7 +1617,7 @@ describe("projects, milestones, dependencies, knock-on and date proposals (T4.3)
     expect(await code(await w.req("GET", "/v1/projects/6f1c0d52-8d3a-4b7e-9c41-2a5b7e90d3f8", w.staff))).toBe("project_not_found")
     expect(((await w.json(await w.req("GET", "/v1/projects", w.staff))).items as Json[]).map((i) => i.name)).toEqual(["Shared project"])
     expect(((await w.json(await w.req("GET", "/v1/projects", w.manager))).items as Json[]).map((i) => i.name).sort()).toEqual(["Nobody's project", "Shared project"])
-    // a staff member with no task there sees nothing of it at all
+    // a staff member who has a task there sees the project too (staff2 has two), but only the counts of their own scope
     expect(((await w.json(await w.req("GET", "/v1/projects", w.staff2))).items as Json[]).map((i) => i.name)).toEqual(["Shared project"])
     // Drive links in the description are withheld off the company PC (ruling D22)
     expect((await w.json(await w.req("GET", `/v1/projects/${p.id}`, w.ops))).description).toContain("drive.google.com")
@@ -1711,6 +1715,219 @@ describe("projects, milestones, dependencies, knock-on and date proposals (T4.3)
     expect((err as { cause?: { code?: string } })?.cause?.code).toBe("42501")
     expect((await w.q("select name from projects where id = $1", [p.id]))[0].name).toBe("Mine")
   })
+
+  test("deleting a department that is a project's team works: the project's team is cleared (no FK 500)", async () => {
+    const w = await world()
+    const dept = await w.json(await w.req("POST", "/v1/teams", w.owner, { name: "Cleaning", kind: "department" }))
+    const p = await w.json(await w.req("POST", "/v1/projects", w.ops, { name: "Dept project", teamId: dept.id }))
+    expect(p.teamId).toBe(dept.id)
+    const del = await w.req("DELETE", `/v1/teams/${dept.id}`, w.owner)
+    expect(del.status, await del.clone().text()).toBe(204)
+    const after = await w.json(await w.req("GET", `/v1/projects/${p.id}`, w.ops))
+    expect(after.teamId).toBeNull()
+    expect(after.dept).toBe("")
+  })
+
+  test("PUT dependencies drops edges to archived tasks, keeps live out-of-scope ones, and the cycle check still sees archived tasks while their edge exists", async () => {
+    const w = await world()
+    await w.manages(w.manager, w.staff)
+    const a = await w.mk(w.ops, { title: "A", primary: w.staff.userId })
+    const x = await w.mk(w.ops, { title: "X", primary: w.staff.userId })
+    expect((await putDeps(w, a.id, [x.id])).status).toBe(200) // a depends on x
+    await w.q("update tasks set archived_at = now() where id = $1", [x.id])
+    expect((await w.q("select count(*)::int n from task_dependencies where task_id = $1", [a.id]))[0].n).toBe(1) // still there, but invisible
+    const gone = await putDeps(w, a.id, [], w.ops, 2)
+    expect(gone.status, await gone.clone().text()).toBe(200)
+    expect((await w.json(gone)).version).toBe(3)
+    expect((await w.q("select count(*)::int n from task_dependencies where task_id = $1", [a.id]))[0].n).toBe(0)
+    // a loop through an archived task is still refused while the edges exist: b depends on a, c on b, then b is archived; a cannot depend on c
+    const b = await w.mk(w.ops, { title: "B", primary: w.staff.userId })
+    const c = await w.mk(w.ops, { title: "C", primary: w.staff.userId })
+    expect((await putDeps(w, b.id, [a.id])).status).toBe(200)
+    expect((await putDeps(w, c.id, [b.id])).status).toBe(200)
+    await w.q("update tasks set archived_at = now() where id = $1", [b.id])
+    const loop = await putDeps(w, a.id, [c.id], w.ops, 3)
+    expect(loop.status).toBe(422)
+    expect(await code(loop)).toBe("dependency_cycle")
+    // a live task outside a team manager's scope keeps its edge through the manager's replace (E5), an archived one does not
+    const hid = await w.mk(w.ops, { title: "Hidden", primary: w.staff2.userId })
+    const d = await w.mk(w.ops, { title: "D", primary: w.staff.userId })
+    const arch = await w.mk(w.ops, { title: "Arch", primary: w.staff.userId })
+    expect((await putDeps(w, d.id, [hid.id, arch.id])).status).toBe(200)
+    await w.q("update tasks set archived_at = now() where id = $1", [arch.id])
+    expect((await putDeps(w, d.id, [], w.manager, 2)).status).toBe(200)
+    expect((await w.q("select depends_on_id from task_dependencies where task_id = $1", [d.id])).map((r) => r.depends_on_id)).toEqual([hid.id])
+  })
+
+  test("the cap of 20 dependencies counts the kept hidden edges too (422 invalid_dependency)", async () => {
+    const w = await world()
+    await w.manages(w.manager, w.staff)
+    const b = await w.mk(w.ops, { title: "B", primary: w.staff.userId })
+    const hid = await w.mk(w.ops, { title: "Hidden", primary: w.staff2.userId })
+    expect((await putDeps(w, b.id, [hid.id])).status).toBe(200)
+    const many: string[] = []
+    for (let i = 0; i < 20; i++) many.push((await w.mk(w.ops, { title: `Dep ${i}`, primary: w.staff.userId })).id)
+    const over = await putDeps(w, b.id, many, w.manager, 2) // 20 asked + 1 kept hidden edge = 21
+    expect(over.status).toBe(422)
+    expect(await code(over)).toBe("invalid_dependency")
+    expect((await putDeps(w, b.id, many.slice(0, 19), w.manager, 2)).status).toBe(200) // 19 + 1 = 20 fits
+  }, 60_000)
+
+  test("team-scope managers keep project and milestone create/edit, but project delete, milestone delete and a milestone date change are 403 forbidden (E6)", async () => {
+    const w = await world()
+    await w.manages(w.manager, w.staff)
+    const p = await w.json(await w.req("POST", "/v1/projects", w.manager, { name: "Team project" }))
+    const m = await w.json(await w.req("POST", `/v1/projects/${p.id}/milestones`, w.manager, { name: "Phase", due: "2026-12-04" }))
+    expect((await w.req("PATCH", `/v1/projects/${p.id}`, w.manager, { version: 1, name: "Renamed" })).status).toBe(200)
+    expect((await w.req("PATCH", `/v1/projects/${p.id}/milestones/${m.id}`, w.manager, { name: "Phase 1" })).status).toBe(200)
+    for (const [method, path, body] of [
+      ["PATCH", `/v1/projects/${p.id}/milestones/${m.id}`, { due: "2026-12-11" }],
+      ["DELETE", `/v1/projects/${p.id}/milestones/${m.id}`, undefined],
+      ["DELETE", `/v1/projects/${p.id}`, undefined],
+    ] as [string, string, unknown][]) {
+      const r = await w.req(method, path, w.manager, body)
+      expect(r.status, `${method} ${path}`).toBe(403)
+      expect(await code(r)).toBe("forbidden")
+    }
+    expect((await w.q("select due_date::text d from project_milestones where id = $1", [m.id]))[0].d).toBe("2026-12-04")
+    expect((await w.req("PATCH", `/v1/projects/${p.id}/milestones/${m.id}`, w.ops, { due: "2026-12-11" })).status).toBe(200) // an all-scope manager may
+    expect((await w.req("DELETE", `/v1/projects/${p.id}`, w.ops)).status).toBe(204)
+  })
+
+  test("unlinking by a project or milestone delete and a milestone date change publish ids-only task.updated like a PATCH", async () => {
+    const w = await world()
+    const p = await w.json(await w.req("POST", "/v1/projects", w.ops, { name: "Evented" }))
+    const m = await w.json(await w.req("POST", `/v1/projects/${p.id}/milestones`, w.ops, { name: "Mile", due: "2026-12-04" }))
+    const t = await w.mk(w.ops, { title: "Secret title" })
+    expect((await w.req("PATCH", `/v1/tasks/${t.id}`, w.ops, { version: 1, projectId: p.id, milestoneId: m.id })).status).toBe(200)
+    const count = async () => (await w.q("select count(*)::int n from domain_events where type = 'task.updated' and payload->>'taskId' = $1", [t.id]))[0].n
+    expect(await count()).toBe(1)
+    expect((await w.req("PATCH", `/v1/projects/${p.id}/milestones/${m.id}`, w.ops, { due: "2026-12-11" })).status).toBe(200)
+    expect(await count()).toBe(2)
+    expect((await w.req("DELETE", `/v1/projects/${p.id}/milestones/${m.id}`, w.ops)).status).toBe(204)
+    expect(await count()).toBe(3)
+    expect((await w.req("PATCH", `/v1/tasks/${t.id}`, w.ops, { version: 3, milestoneId: null })).status).toBe(200)
+    const m2 = await w.json(await w.req("POST", `/v1/projects/${p.id}/milestones`, w.ops, { name: "Mile 2", due: "2026-12-06" }))
+    void m2
+    expect((await w.req("DELETE", `/v1/projects/${p.id}`, w.ops)).status).toBe(204)
+    expect(await count()).toBe(4) // PATCH, date change, milestone delete, project delete (the explicit milestoneId:null PATCH was a no-op: already unlinked)
+    const ev = await w.q("select payload from domain_events where type = 'task.updated' and payload->>'taskId' = $1", [t.id])
+    expect(JSON.stringify(ev)).not.toContain("Secret title")
+    for (const e of ev) expect(Object.keys(e.payload as object).sort()).toEqual(["fields", "historyId", "taskId"])
+  })
+
+  test("a task's milestone must belong to its project (composite FK) and cannot exist without a project (check)", async () => {
+    const w = await world()
+    const p1 = await w.json(await w.req("POST", "/v1/projects", w.ops, { name: "One" }))
+    const p2 = await w.json(await w.req("POST", "/v1/projects", w.ops, { name: "Two" }))
+    const m2 = await w.json(await w.req("POST", `/v1/projects/${p2.id}/milestones`, w.ops, { name: "Of two", due: "2026-12-05" }))
+    const t = await w.mk(w.ops)
+    await w.q("update tasks set project_id = $2 where id = $1", [t.id, p1.id])
+    await expect(w.q("update tasks set milestone_id = $2 where id = $1", [t.id, m2.id])).rejects.toMatchObject({ code: "23503" })
+    await expect(w.q("update tasks set project_id = null, milestone_id = $2 where id = $1", [t.id, m2.id])).rejects.toMatchObject({ code: "23514" })
+  })
+
+  test("staff reschedule and preview are 403 dates_manager_only", async () => {
+    const w = await world()
+    const t = await w.mk(w.ops)
+    const r = await resched(w, t.id, { version: 1, start: "2026-11-20T09:00:00", due: "2026-11-21T17:00:00", knockOn: { apply: false } }, w.staff)
+    expect(r.status).toBe(403)
+    expect(await code(r)).toBe("dates_manager_only")
+    const pr = await w.req("POST", `/v1/tasks/${t.id}/reschedule/preview`, w.staff, { start: "2026-11-20T09:00:00", due: "2026-11-21T17:00:00" })
+    expect(await code(pr)).toBe("dates_manager_only")
+  })
+
+  test("a knock-on larger than 500 tasks is refused: 422 knock_on_too_large (preview and apply), nothing moves", async () => {
+    const w = await world()
+    const a = await w.mk(w.ops, { title: "Root", start: "2026-11-20T09:00:00", due: "2026-11-20T17:00:00" })
+    await w.q(
+      `insert into tasks (tenant_id, ref_no, title, evidence_rule, start_at, due_at, created_at, updated_at)
+       select $1::uuid, 3000 + g, 'Chain ' || g, $2::jsonb, '2026-11-21T09:00:00Z', '2026-11-21T17:00:00Z', now(), now() from generate_series(1, 502) g`,
+      [w.tenant.id, JSON.stringify(NO_EVIDENCE)],
+    )
+    await w.q(
+      `insert into task_dependencies (tenant_id, task_id, depends_on_id)
+       select t.tenant_id, t.id, p.id from tasks t join tasks p on p.tenant_id = t.tenant_id and p.ref_no = case when t.ref_no = 3001 then $1::int else t.ref_no - 1 end where t.ref_no between 3001 and 3502`,
+      [Number(a.ref.slice(4))],
+    )
+    const pr = await w.req("POST", `/v1/tasks/${a.id}/reschedule/preview`, w.ops, { start: "2026-11-20T09:00:00", due: "2026-12-25T17:00:00" })
+    expect(pr.status).toBe(422)
+    expect(await code(pr)).toBe("knock_on_too_large")
+    const ap = await resched(w, a.id, { version: 1, start: "2026-11-20T09:00:00", due: "2026-12-25T17:00:00", knockOn: { apply: true, previewHash: "0".repeat(64) } })
+    expect(await code(ap)).toBe("knock_on_too_large")
+    expect((await tt(w, a.id)).version).toBe(1)
+    // apply:false is still fine
+    expect((await resched(w, a.id, { version: 1, start: "2026-11-20T09:00:00", due: "2026-12-25T17:00:00", knockOn: { apply: false } })).status).toBe(200)
+  }, 60_000)
+
+  test("DST: a reschedule and a knock-on into the 28 Mar 2027 spring-forward gap (Europe/Dublin) land at 01:30Z and show 02:30", async () => {
+    const w = await world({ timezone: "Europe/Dublin" })
+    const a = await w.mk(w.ops, { title: "A", start: "2027-03-26T09:00:00", due: "2027-03-26T17:00:00" })
+    const b = await w.mk(w.ops, { title: "B", start: "2027-03-27T01:30:00", due: "2027-03-27T17:00:00" })
+    expect((await putDeps(w, b.id, [a.id])).status).toBe(200)
+    expect((await tt(w, b.id)).start_at.toISOString()).toBe("2027-03-27T01:30:00.000Z") // GMT
+    const p = await preview(w, a.id, "2027-03-26T09:00:00", "2027-03-27T09:00:00")
+    expect(p.moves[0].to).toEqual({ start: "2027-03-28T01:30:00", due: "2027-03-28T17:00:00" })
+    const r = await resched(w, a.id, { version: 1, start: "2027-03-26T09:00:00", due: "2027-03-28T01:30:00", knockOn: { apply: false } })
+    const moved = await w.json(r)
+    expect(moved.dueAt).toBe("2027-03-28T01:30:00.000Z") // 01:30 does not exist: it moves forward
+    expect(moved.due).toBe("2027-03-28T02:30:00")
+    const r2 = await resched(w, a.id, { version: 2, start: "2027-03-26T09:00:00", due: "2027-03-27T09:00:00", knockOn: { apply: true, previewHash: p.previewHash } })
+    expect(r2.status, await r2.clone().text()).toBe(200)
+    const after = await tt(w, b.id)
+    expect(after.start_at.toISOString()).toBe("2027-03-28T01:30:00.000Z")
+    expect((await getT(w, b.id)).start).toBe("2027-03-28T02:30:00")
+    expect(after.due_at.toISOString()).toBe("2027-03-28T16:00:00.000Z") // 17:00 BST
+  })
+
+  test("projects list for a staff context and the progress aggregate use their indexes (EXPLAIN)", async () => {
+    const w = await world()
+    await w.mk(w.owner)
+    await w.q(`insert into projects (tenant_id, name, created_at, updated_at) select $1::uuid, 'P ' || g, now() + (g || ' seconds')::interval, now() from generate_series(1, 3000) g`, [w.tenant.id])
+    await w.q(
+      `with pp as (select id, row_number() over (order by id) rn from projects)
+       insert into tasks (tenant_id, ref_no, title, evidence_rule, start_at, due_at, created_at, updated_at, creator_id, project_id)
+       select $1::uuid, 5000 + g, 'T ' || g, $2::jsonb, now(), now() + interval '1 day', now(), now(), $3, pp.id from generate_series(1, 4000) g join pp on pp.rn = (g % 3000) + 1`,
+      [w.tenant.id, JSON.stringify(NO_EVIDENCE), w.owner.userId],
+    )
+    await w.q("insert into task_assignees (tenant_id, task_id, user_id, is_primary) select tenant_id, id, $1, true from tasks where ref_no >= 5000 and ref_no % 50 = 0", [w.staff.userId])
+    await ownerQuery("analyze projects")
+    await ownerQuery("analyze tasks")
+    await ownerQuery("analyze task_assignees")
+    const { buildProjectsQuery, buildProgressQuery } = await import("../projects/service")
+    const staffCtx: TaskCtx = { ...ctxFor(w, w.staff), role: { home: "staff", access: { tasks: "write" } } as never, scope: { kind: "own", personId: w.staff.userId } }
+    const ids = (await w.q<{ id: string }>("select id from projects order by id limit 10")).map((r) => r.id)
+    const plans = await withTenant(w.deps.db, w.tenant.id, async (tx) => ({
+      staff: buildProjectsQuery(tx, staffCtx, undefined, 26).toSQL(),
+      byProject: buildProgressQuery(tx, staffCtx, "project", ids).toSQL(),
+      byMilestone: buildProgressQuery(tx, staffCtx, "milestone", ids).toSQL(),
+    }))
+    const c = new pg.Client({ connectionString: process.env.TEST_DATABASE_OWNER_URL })
+    await c.connect()
+    try {
+      const explain = async (q: { sql: string; params: unknown[] }) => {
+        await c.query("begin")
+        await c.query("select set_config('app.tenant_id', $1, true)", [w.tenant.id])
+        const rows = (await c.query(`explain ${q.sql}`, q.params)).rows.map((r) => r["QUERY PLAN"] as string).join("\n")
+        await c.query("rollback")
+        return rows
+      }
+      const staff = await explain(plans.staff)
+      expect(staff).toContain("projects_created_idx")
+      // The own-scope predicate (creator OR reviewer OR assignee) has no index, so the visibility subquery is ONE hashed pass over the tenant's
+      // live tasks, never a per-project probe (no N+1). The projects side stays on its index. The aggregates below use the project/milestone indexes.
+      expect(staff).toMatch(/hashed SubPlan/)
+      expect(staff).not.toMatch(/Seq Scan on projects/)
+      const byProject = await explain(plans.byProject)
+      expect(byProject).toContain("tasks_project_idx")
+      expect(byProject).not.toMatch(/Seq Scan on tasks/)
+      const byMilestone = await explain(plans.byMilestone)
+      expect(byMilestone).toContain("tasks_milestone_idx")
+      expect(byMilestone).not.toMatch(/Seq Scan on tasks/)
+    } finally {
+      await c.end()
+    }
+  }, 60_000)
 
   test("M1 gate: project and planning routes are 403 module_not_entitled without M1; rows untouched", async () => {
     const w = await world()

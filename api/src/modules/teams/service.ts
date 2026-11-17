@@ -3,7 +3,7 @@ import { reportScope, type ReportAccess } from "@opsdesk/domain/permissions"
 import type { ResolvedRole } from "../../core/context"
 import { AppError, Conflict, NotFound } from "../../core/errors"
 import { publish } from "../../core/events"
-import { memberships, reportingLines, roles, tasks, teamMembers, teams, user } from "../../db/schema"
+import { memberships, projects, reportingLines, roles, tasks, teamMembers, teams, user } from "../../db/schema"
 import type { TenantTx } from "../../db/tenant-tx"
 import { recordAudit } from "../audit"
 import { lockActor } from "../rbac"
@@ -82,6 +82,7 @@ export async function deleteTeam(tx: TenantTx, tenantId: string, actor: Actor, i
   const cur = await teamIn(tx, tenantId, id)
   const memberIds = await memberIdsOf(tx, tenantId, id)
   await tx.update(tasks).set({ teamId: null }).where(and(eq(tasks.tenantId, tenantId), eq(tasks.teamId, id))) // tasks keep existing without a department (composite FK has no SET NULL on one column)
+  await tx.update(projects).set({ teamId: null }).where(and(eq(projects.tenantId, tenantId), eq(projects.teamId, id))) // projects_team_fk has no SET NULL either
   await tx.delete(teams).where(and(eq(teams.id, id), eq(teams.tenantId, tenantId))) // team_members rows cascade
   await recordAudit(tx, tenantId, { action: "team.deleted", entity: "team", entityId: id, actorId: actor.userId, before: { name: cur.name, kind: cur.kind, userIds: memberIds }, after: null }, now)
   await publish(tx, { tenantId, type: "team.deleted", payload: { teamId: id }, actorId: actor.userId }, now)

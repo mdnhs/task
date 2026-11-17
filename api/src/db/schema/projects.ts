@@ -53,6 +53,7 @@ export const projectMilestones = pgTable(
   },
   (t) => [
     unique("project_milestones_tenant_id_id").on(t.tenantId, t.id),
+    unique("project_milestones_tenant_project_id").on(t.tenantId, t.projectId, t.id),
     check("project_milestones_name_check", sql`char_length(${t.name}) BETWEEN 1 AND 120`),
     foreignKey({ columns: [t.tenantId, t.projectId], foreignColumns: [projects.tenantId, projects.id], name: "project_milestones_project_fk" }).onDelete("cascade"),
     index("project_milestones_project_idx").on(t.tenantId, t.projectId, t.dueDate, t.id),

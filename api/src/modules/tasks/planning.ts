@@ -4,7 +4,7 @@ import { z } from "@hono/zod-openapi"
 import { withholdDriveText } from "@opsdesk/domain/devices"
 import { can } from "@opsdesk/domain/permissions"
 import { diffFields } from "@opsdesk/domain/task-history"
-import { knockOn, wouldCycle, type PlanTask } from "@opsdesk/domain/task-planning"
+import { KnockOnTooLarge, knockOn, wouldCycle, type PlanTask } from "@opsdesk/domain/task-planning"
 import { AppError, Conflict, Forbidden } from "../../core/errors"
 import type { ResolvedRole } from "../../core/context"
 import { memberships, reportingLines, roles, taskDependencies, tasks } from "../../db/schema"
@@ -46,11 +46,12 @@ export const ApproveBody = z.object({ version: Version, knockOn: KnockOn }).open
 export const DeclineBody = z.object({ version: Version, reason: z.string().trim().max(500).optional() }).openapi({ example: { version: 1, reason: "Not possible this week" } })
 
 const Moved = z.object({
-  taskId: z.uuid(), ref: z.string(), title: z.string(), from: z.object({ start: z.string(), due: z.string() }), to: z.object({ start: z.string(), due: z.string() }), outOfScope: z.boolean(),
+  taskId: z.uuid(), ref: z.string(), title: z.string(), from: z.object({ start: z.string(), due: z.string() }), to: z.object({ start: z.string(), due: z.string() }), outOfScope: z.literal(false),
 })
+const Hidden = z.object({ outOfScope: z.literal(true) }).openapi({ description: "A task outside the caller's scope: nothing about it is shown, only that it would move" })
 export const PreviewSchema = z
-  .object({ moves: z.array(Moved), previewHash: z.string() })
-  .openapi({ example: { moves: [{ taskId: TID, ref: "TSK-1001", title: "Paint the hall", from: { start: "2026-11-21T09:00:00", due: "2026-11-21T17:00:00" }, to: { start: "2026-11-23T09:00:00", due: "2026-11-23T17:00:00" }, outOfScope: false }], previewHash: HASH_EX } })
+  .object({ moves: z.array(z.union([Moved, Hidden])), hiddenMoves: z.number().int(), previewHash: z.string() })
+  .openapi({ example: { moves: [{ taskId: TID, ref: "TSK-1001", title: "Paint the hall", from: { start: "2026-11-21T09:00:00", due: "2026-11-21T17:00:00" }, to: { start: "2026-11-23T09:00:00", due: "2026-11-23T17:00:00" }, outOfScope: false }, { outOfScope: true }], hiddenMoves: 1, previewHash: HASH_EX } })
 export type RescheduleInput = z.infer<typeof RescheduleBody>
 type KnockOnInput = z.infer<typeof KnockOn>
 
@@ -78,8 +79,13 @@ export async function setDependencies(tx: TenantTx, env: TaskEnv, ctx: TaskCtx, 
   const edges = await tx.select({ taskId: taskDependencies.taskId, on: taskDependencies.dependsOnId }).from(taskDependencies).where(eq(taskDependencies.tenantId, ctx.tenantId))
   const mine = edges.filter((e) => e.taskId === row.id).map((e) => e.on)
   const seen = new Map((await visibleFor(mine)).map((t) => [t.id, t.refNo]))
-  const hidden = mine.filter((m) => !seen.has(m)) // edges to archived or out-of-scope tasks: the caller cannot see them, so a replace keeps them
+  // Ruling E5: the edges a replace keeps without being asked are only those to LIVE tasks outside the caller's scope (they cannot see or
+  // name them). Edges to ARCHIVED tasks are dropped by every PUT, so a dependency on an archived task can always be removed. The cycle
+  // check below still looks at every edge of the tenant, archived tasks included, while an edge exists.
+  const live = mine.length ? new Set((await tx.select({ id: tasks.id }).from(tasks).where(and(eq(tasks.tenantId, ctx.tenantId), inArray(tasks.id, mine), sql`${tasks.archivedAt} is null`))).map((t) => t.id)) : new Set<string>()
+  const hidden = mine.filter((m) => live.has(m) && !seen.has(m))
   const next = [...wanted, ...hidden]
+  if (next.length > 20) throw unprocessable("invalid_dependency") // the cap of 20 covers the kept hidden edges too
   // Cycle check over EVERY edge of the tenant (archived tasks included: a restore must never close a loop), with this task's own edges replaced.
   const others = new Map<string, string[]>()
   for (const e of edges) if (e.taskId !== row.id) others.set(e.taskId, [...(others.get(e.taskId) ?? []), e.on])
@@ -91,7 +97,8 @@ export async function setDependencies(tx: TenantTx, env: TaskEnv, ctx: TaskCtx, 
   const toMap = new Map(found.map((t) => [t.id, t.refNo]))
   const toRefs = refsOf(toMap, wanted)
   const changes = diffFields({ dependsOn: fromRefs }, { dependsOn: toRefs })
-  if (changes.length === 0) return detail(tx, ctx, row)
+  const droppedArchived = mine.some((m) => !next.includes(m) && !seen.has(m))
+  if (changes.length === 0 && !droppedArchived) return detail(tx, ctx, row)
   await tx.delete(taskDependencies).where(and(eq(taskDependencies.tenantId, ctx.tenantId), eq(taskDependencies.taskId, row.id)))
   if (next.length) await tx.insert(taskDependencies).values(next.map((on) => ({ tenantId: ctx.tenantId, taskId: row.id, dependsOnId: on })))
   const [updated] = await tx.update(tasks).set({ version: row.version + 1, updatedAt: ctx.now }).where(and(eq(tasks.id, row.id), eq(tasks.tenantId, ctx.tenantId))).returning()
@@ -130,7 +137,15 @@ async function plan(tx: TenantTx, ctx: TaskCtx, rootId: string, to: { start: str
   const nodes: PlanTask[] = live.map((r) => ({
     ref: r.id, title: r.title, start: wallOf(r.startAt, ctx.tz), due: wallOf(r.dueAt, ctx.tz), status: r.status, dependsOn: edges.filter((e) => e.taskId === r.id).map((e) => e.on),
   }))
-  const raw = o.withMoves ? knockOn(nodes, rootId, to) : []
+  let raw: ReturnType<typeof knockOn> = []
+  if (o.withMoves) {
+    try {
+      raw = knockOn(nodes, rootId, to)
+    } catch (e) {
+      if (e instanceof KnockOnTooLarge) throw unprocessable("knock_on_too_large")
+      throw e
+    }
+  }
   const people = new Map<string, string[]>()
   const byId = new Map(live.map((r) => [r.id, r]))
   const assigned = await assigneesOf(tx, ctx.tenantId, [rootId, ...raw.map((m) => m.ref)])
@@ -155,12 +170,15 @@ const checkRange = (ctx: TaskCtx, start: string, due: string) => {
 export async function previewReschedule(tx: TenantTx, ctx: TaskCtx, id: string, input: { start: string; due: string }): Promise<z.infer<typeof PreviewSchema>> {
   const row = await getTask(tx, ctx, id)
   const a = allAssignees((await assigneesOf(tx, ctx.tenantId, [row.id])).get(row.id)!)
-  if (!canManage(ctx, row, a)) throw Forbidden("forbidden")
+  if (!canManage(ctx, row, a)) throw Forbidden("dates_manager_only")
   const to = { start: full(input.start), due: full(input.due) }
   checkRange(ctx, to.start, to.due)
   const p = await plan(tx, ctx, id, to, { withMoves: true, lock: false })
-  // A task outside the caller's scope is flagged, and its title is withheld (the ref and dates explain the push; nothing else leaks).
-  return { moves: p.moves.map((m) => ({ taskId: m.taskId, ref: m.ref, from: m.from, to: m.to, outOfScope: m.outOfScope, title: m.outOfScope ? "" : ctx.drive ? m.title : withholdDriveText(m.title) })), previewHash: p.previewHash }
+  // Ruling E7: a task outside the caller's scope is opaque ({ outOfScope: true } only, counted in hiddenMoves): no id, ref, title or date leaks.
+  // The hash still covers the full, unredacted moves.
+  const visible = p.moves.filter((m) => !m.outOfScope).map((m) => ({ taskId: m.taskId, ref: m.ref, from: m.from, to: m.to, outOfScope: false as const, title: ctx.drive ? m.title : withholdDriveText(m.title) }))
+  const hidden = p.moves.filter((m) => m.outOfScope).map(() => ({ outOfScope: true as const }))
+  return { moves: [...visible, ...hidden], hiddenMoves: hidden.length, previewHash: p.previewHash }
 }
 
 /**
@@ -174,7 +192,7 @@ async function rescheduleLocked(
 ): Promise<TaskDto> {
   const row0 = await getTask(tx, ctx, id) // 404 when out of scope or archived, before anything is locked
   const a0 = allAssignees((await assigneesOf(tx, ctx.tenantId, [row0.id])).get(row0.id)!)
-  if (!canManage(ctx, row0, a0)) throw Forbidden("forbidden")
+  if (!canManage(ctx, row0, a0)) throw Forbidden("dates_manager_only")
   staleVersion(row0, input.version)
   let to: { start: string; due: string }
   if (mode === "approve") {

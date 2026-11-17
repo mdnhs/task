@@ -34,6 +34,14 @@ type MilestoneRow = typeof projectMilestones.$inferSelect
 const requireManager = (ctx: TaskCtx) => {
   if (ctx.role.home !== "manager" || !can(ctx.role, "tasks", "write")) throw Forbidden("forbidden")
 }
+/**
+ * Ruling E6: deleting a project or milestone, and moving a milestone date, rewrite tasks of EVERY team (unlink, history, notices), so they
+ * are for all-scope managers. A team-scope manager keeps the other project and milestone writes.
+ */
+const requireAllScope = (ctx: TaskCtx) => {
+  requireManager(ctx)
+  if (ctx.scope.kind !== "all") throw Forbidden("forbidden")
+}
 
 const visibleWhere = (ctx: TaskCtx): SQL =>
   ctx.role.home === "manager"
@@ -50,15 +58,19 @@ async function getProject(tx: TenantTx, ctx: TaskCtx, id: string, o: { forUpdate
 // ---------- DTOs ----------
 
 /** Progress of live, non-cancelled tasks in the caller's scope, grouped by project or by milestone: one aggregate query each, no per-row queries. */
-async function progressBy(tx: TenantTx, ctx: TaskCtx, col: "project" | "milestone", ids: string[]): Promise<Map<string, Progress>> {
-  const out = new Map<string, Progress>()
-  if (ids.length === 0) return out
+export function buildProgressQuery(tx: TenantTx, ctx: TaskCtx, col: "project" | "milestone", ids: string[]) {
   const key = col === "project" ? tasks.projectId : tasks.milestoneId
-  const rows = await tx
+  return tx
     .select({ id: key, total: sql<number>`(count(*) filter (where ${tasks.status} <> 'cancelled'))::int`, done: sql<number>`(count(*) filter (where ${tasks.status} = 'completed'))::int` })
     .from(tasks)
     .where(and(eq(tasks.tenantId, ctx.tenantId), inArray(key, ids), sql`${tasks.archivedAt} is null`, taskScopeWhere(ctx.scope, ctx.reports)))
     .groupBy(key)
+}
+
+async function progressBy(tx: TenantTx, ctx: TaskCtx, col: "project" | "milestone", ids: string[]): Promise<Map<string, Progress>> {
+  const out = new Map<string, Progress>()
+  if (ids.length === 0) return out
+  const rows = await buildProgressQuery(tx, ctx, col, ids)
   for (const r of rows) out.set(r.id!, progressOf(r.done, r.total))
   return out
 }
@@ -157,32 +169,35 @@ export async function patchProject(tx: TenantTx, ctx: TaskCtx, id: string, input
  * Takes the tasks that point at a project or milestone (row locks in id order), clears the link, bumps their version and writes one
  * history line each. The tasks (archived ones included, the foreign key demands it) stay; nothing is deleted.
  */
-async function unlinkTasks(tx: TenantTx, ctx: TaskCtx, by: { projectId: string } | { milestoneId: string }, text: string): Promise<number> {
+async function unlinkTasks(tx: TenantTx, ctx: TaskCtx, by: { projectId: string } | { milestoneId: string }, text: string): Promise<{ count: number; events: TaskUpdated[] }> {
   const where = "projectId" in by ? eq(tasks.projectId, by.projectId) : eq(tasks.milestoneId, by.milestoneId)
   const rows = await tx.select().from(tasks).where(and(eq(tasks.tenantId, ctx.tenantId), where)).orderBy(asc(tasks.id)).for("update", { of: [tasks] })
-  if (rows.length === 0) return 0
+  if (rows.length === 0) return { count: 0, events: [] }
   const set = "projectId" in by ? { projectId: null, milestoneId: null } : { milestoneId: null }
   await tx.update(tasks).set({ ...set, version: sql`${tasks.version} + 1`, updatedAt: ctx.now }).where(and(eq(tasks.tenantId, ctx.tenantId), inArray(tasks.id, rows.map((r) => r.id))))
-  await tx.insert(taskHistory).values(
-    rows.map((r) => ({
-      tenantId: ctx.tenantId, taskId: r.id, at: ctx.now, actorId: ctx.actorId, kind: "updated", text, notified: [] as string[],
-      changes: [
-        ...("projectId" in by && r.projectId ? [{ field: "projectId", from: r.projectId, to: null }] : []),
-        ...(r.milestoneId ? [{ field: "milestoneId", from: r.milestoneId, to: null }] : []),
-      ],
-    })),
-  )
-  return rows.length
+  const lines = rows.map((r) => ({
+    tenantId: ctx.tenantId, taskId: r.id, at: ctx.now, actorId: ctx.actorId, kind: "updated", text, notified: [] as string[],
+    changes: [
+      ...("projectId" in by && r.projectId ? [{ field: "projectId", from: r.projectId, to: null }] : []),
+      ...(r.milestoneId ? [{ field: "milestoneId", from: r.milestoneId, to: null }] : []),
+    ],
+  }))
+  const ids = await tx.insert(taskHistory).values(lines).returning({ id: taskHistory.id, taskId: taskHistory.taskId })
+  const hist = new Map(ids.map((h) => [h.taskId, h.id]))
+  // ids-only task.updated for each unlinked task, as a PATCH would publish (the caller publishes them last)
+  return { count: rows.length, events: lines.map((l) => ({ taskId: l.taskId, historyId: hist.get(l.taskId)!, fields: l.changes.map((c) => c.field) })) }
 }
+type TaskUpdated = { taskId: string; historyId: string; fields: string[] }
 
 /** DELETE /v1/projects/{id}: unlinks its tasks, deletes its milestones with it, and is audited (ruling D7). */
 export async function deleteProject(tx: TenantTx, env: TaskEnv, ctx: TaskCtx, id: string): Promise<void> {
-  requireManager(ctx)
+  requireAllScope(ctx)
   const row = await getProject(tx, ctx, id, { forUpdate: true })
   const ms = await tx.select({ id: projectMilestones.id }).from(projectMilestones).where(and(eq(projectMilestones.tenantId, ctx.tenantId), eq(projectMilestones.projectId, row.id)))
-  const unlinked = await unlinkTasks(tx, ctx, { projectId: row.id }, `Project "${row.name}" was deleted`)
+  const { count: unlinked, events } = await unlinkTasks(tx, ctx, { projectId: row.id }, `Project "${row.name}" was deleted`)
   await tx.delete(projects).where(and(eq(projects.id, row.id), eq(projects.tenantId, ctx.tenantId))) // milestones go with it (cascade)
   await recordAudit(tx, ctx.tenantId, { action: "project.deleted", entity: "project", entityId: row.id, actorId: ctx.actorId, before: { ...snapshot(row), milestones: ms.length, unlinkedTasks: unlinked }, after: null }, ctx.now)
+  for (const e of events) await publishTaskEvent(tx, ctx, { type: "task.updated", payload: e })
   await publishTaskEvent(tx, ctx, { type: "project.deleted", payload: { projectId: row.id } })
 }
 
@@ -210,6 +225,7 @@ export async function patchMilestone(tx: TenantTx, env: TaskEnv, ctx: TaskCtx, p
   requireManager(ctx)
   await getProject(tx, ctx, projectId, { forUpdate: true })
   const m = await getMilestone(tx, ctx, projectId, id)
+  if (input.due && input.due !== m.dueDate) requireAllScope(ctx) // a new date rewrites the tasks of every team (ruling E6)
   const [updated] = await tx
     .update(projectMilestones)
     .set({ name: input.name ?? m.name, dueDate: input.due ?? m.dueDate, position: input.position ?? m.position })
@@ -218,23 +234,27 @@ export async function patchMilestone(tx: TenantTx, env: TaskEnv, ctx: TaskCtx, p
   if (input.due && input.due !== m.dueDate) {
     const linked = await tx.select({ id: tasks.id, refNo: tasks.refNo, title: tasks.title }).from(tasks).where(and(eq(tasks.tenantId, ctx.tenantId), eq(tasks.milestoneId, m.id), sql`${tasks.archivedAt} is null`, inArray(tasks.status, OPEN))).orderBy(asc(tasks.id))
     const people = await assigneesOf(tx, ctx.tenantId, linked.map((t) => t.id))
+    const events: TaskUpdated[] = []
     for (const t of linked) {
       const p = people.get(t.id)!
       const recipients = [...new Set([...(p.primary ? [p.primary] : []), ...p.others])].filter((u) => u !== ctx.me && u !== ctx.actorId).sort()
       const text = `Milestone "${m.name}" due date changed ${m.dueDate} to ${updated.dueDate}`
-      await tx.insert(taskHistory).values({ tenantId: ctx.tenantId, taskId: t.id, at: ctx.now, actorId: ctx.actorId, kind: "milestone", text, changes: [], notified: recipients })
+      const [h] = await tx.insert(taskHistory).values({ tenantId: ctx.tenantId, taskId: t.id, at: ctx.now, actorId: ctx.actorId, kind: "milestone", text, changes: [], notified: recipients }).returning({ id: taskHistory.id })
+      events.push({ taskId: t.id, historyId: h.id, fields: ["milestoneDue"] })
       for (const userId of recipients) await notify(tx, ctx.tenantId, { userId, kind: "task", title: "Milestone date changed", body: `TSK-${t.refNo} ${t.title}: ${m.name} ${m.dueDate} to ${updated.dueDate}`, link: `/tasks/TSK-${t.refNo}` }, env.deps, env.enqueue)
     }
+    for (const e of events) await publishTaskEvent(tx, ctx, { type: "task.updated", payload: e })
   }
   await publishTaskEvent(tx, ctx, { type: "project.updated", payload: { projectId } })
   return dtoOf(tx, ctx, updated)
 }
 
 export async function deleteMilestone(tx: TenantTx, ctx: TaskCtx, projectId: string, id: string): Promise<void> {
-  requireManager(ctx)
+  requireAllScope(ctx)
   await getProject(tx, ctx, projectId, { forUpdate: true })
   const m = await getMilestone(tx, ctx, projectId, id)
-  await unlinkTasks(tx, ctx, { milestoneId: m.id }, `Milestone "${m.name}" was deleted`)
+  const { events } = await unlinkTasks(tx, ctx, { milestoneId: m.id }, `Milestone "${m.name}" was deleted`)
   await tx.delete(projectMilestones).where(and(eq(projectMilestones.id, m.id), eq(projectMilestones.tenantId, ctx.tenantId)))
+  for (const e of events) await publishTaskEvent(tx, ctx, { type: "task.updated", payload: e })
   await publishTaskEvent(tx, ctx, { type: "project.updated", payload: { projectId } })
 }
