@@ -46,6 +46,7 @@ export const HistoryItem = z
 
 const ChecklistItemDto = z.object({ id: z.string(), text: z.string(), done: z.boolean() }).openapi({ example: { id: TID, text: "Ground floor", done: true } })
 const SubtaskDto = z.object({ id: z.string(), ref: z.string(), title: z.string(), status: Status }).openapi({ example: { id: TID, ref: "TSK-1002", title: "Stairwell", status: "not_started" } })
+const DepDto = z.object({ id: z.string(), ref: z.string(), title: z.string(), status: Status }).openapi({ example: { id: TID, ref: "TSK-1000", title: "Paint the hall", status: "in_progress" } })
 const NoteDto = z
   .object({ at: z.string(), by: z.string(), text: z.string(), changes: z.array(FieldChangeSchema).optional(), notified: z.array(z.string()).optional(), updateId: z.string().optional() })
   .openapi({ example: { at: WALL_EX, by: "Ann Byrne", text: "Called the landlord" } })
@@ -79,6 +80,7 @@ export const TaskDtoSchema = z
     status: Status, evidenceRule: EvidenceRuleSchema, client: z.string().optional(), tags: z.array(z.string()), estimate: z.number().int().optional(),
     projectId: z.string().optional(), milestoneId: z.string().optional(), parentRef: z.string().optional(), parentId: z.string().nullable(),
     checklist: z.array(ChecklistItemDto), subtasks: z.array(SubtaskDto), dependsOn: z.array(z.string()), dependsOnIds: z.array(z.string()),
+    dependencies: z.array(DepDto), hiddenDependencies: z.number().int(), blocks: z.array(DepDto), hiddenBlocks: z.number().int(),
     archivedAt: z.string().optional(), archivedBy: z.string().optional(), proposal: ProposalDto.optional(), round: z.number().int(),
     repeat: RepeatRuleDto.optional(), seriesId: z.string().optional(), submittedAt: z.string().optional(), completedAt: z.string().optional(),
     notes: z.array(NoteDto), evidence: z.array(EvidenceItemDto), timeline: z.array(HistoryItem),
@@ -90,7 +92,7 @@ export const TaskDtoSchema = z
       id: TID, ref: "TSK-1001", version: 1, title: "Check fire exits", description: "Walk every floor.", dept: "Cleaning", teamId: null,
       assignee: UID, assignees: [], creator: UID, priority: 2, start: "2026-11-20T09:00:00", due: WALL_EX, startAt: "2026-11-20T09:00:00.000Z", dueAt: UTC_EX,
       status: "not_started", evidenceRule: { mode: "none", types: [], min: 0, instruction: "", review: "manager" }, tags: ["safety"], parentId: null,
-      checklist: [], subtasks: [], dependsOn: [], dependsOnIds: [], round: 1, notes: [], evidence: [], timeline: [], timeEntries: [], evidenceState: null, voiceNote: null,
+      checklist: [], subtasks: [], dependsOn: [], dependsOnIds: [], dependencies: [], hiddenDependencies: 0, blocks: [], hiddenBlocks: 0, round: 1, notes: [], evidence: [], timeline: [], timeEntries: [], evidenceState: null, voiceNote: null,
     },
   })
 export type TaskDto = z.infer<typeof TaskDtoSchema>
@@ -128,14 +130,39 @@ export async function taskDtos(tx: TenantTx, ctx: TaskCtx, rows: TaskRow[], time
   // Dependencies the caller may see (their scope applies to the tasks they point at, so no ref of an unseen task leaks), live ones only.
   const depRows = ids.length
     ? await tx
-        .select({ taskId: taskDependencies.taskId, id: tasks.id, refNo: tasks.refNo })
+        .select({ taskId: taskDependencies.taskId, id: tasks.id, refNo: tasks.refNo, title: tasks.title, status: tasks.status })
         .from(taskDependencies)
         .innerJoin(tasks, and(eq(tasks.tenantId, taskDependencies.tenantId), eq(tasks.id, taskDependencies.dependsOnId)))
         .where(and(eq(taskDependencies.tenantId, ctx.tenantId), inArray(taskDependencies.taskId, ids), sql`${tasks.archivedAt} is null`, taskScopeWhere(ctx.scope, ctx.reports)))
         .orderBy(asc(tasks.refNo))
     : []
-  const deps = new Map<string, { id: string; ref: string }[]>()
-  for (const d of depRows) deps.set(d.taskId, [...(deps.get(d.taskId) ?? []), { id: d.id, ref: ref(d.refNo) }])
+  const deps = new Map<string, { id: string; ref: string; title: string; status: z.infer<typeof Status> }[]>()
+  for (const d of depRows) deps.set(d.taskId, [...(deps.get(d.taskId) ?? []), { id: d.id, ref: ref(d.refNo), title: free(d.title), status: d.status as z.infer<typeof Status> }])
+  // How many live dependencies the caller may NOT see: a number only, never a ref, title or status (D5, E7). One grouped statement for the page (task_dependencies_pkey).
+  const allDeps = ids.length
+    ? await tx
+        .select({ taskId: taskDependencies.taskId, n: sql<number>`count(*)::int` })
+        .from(taskDependencies)
+        .innerJoin(tasks, and(eq(tasks.tenantId, taskDependencies.tenantId), eq(tasks.id, taskDependencies.dependsOnId)))
+        .where(and(eq(taskDependencies.tenantId, ctx.tenantId), inArray(taskDependencies.taskId, ids), sql`${tasks.archivedAt} is null`))
+        .groupBy(taskDependencies.taskId)
+    : []
+  const allDepCount = new Map(allDeps.map((r) => [r.taskId, r.n]))
+  // The reverse edges (tasks waiting on these): the same scope rule, with the visible rows and a count of the rest (task_deps_on_idx).
+  const blockRows = ids.length
+    ? await tx
+        .select({ onId: taskDependencies.dependsOnId, id: tasks.id, refNo: tasks.refNo, title: tasks.title, status: tasks.status, visible: sql<boolean>`${taskScopeWhere(ctx.scope, ctx.reports)}` })
+        .from(taskDependencies)
+        .innerJoin(tasks, and(eq(tasks.tenantId, taskDependencies.tenantId), eq(tasks.id, taskDependencies.taskId)))
+        .where(and(eq(taskDependencies.tenantId, ctx.tenantId), inArray(taskDependencies.dependsOnId, ids), sql`${tasks.archivedAt} is null`))
+        .orderBy(asc(tasks.refNo))
+    : []
+  const blocks = new Map<string, { id: string; ref: string; title: string; status: z.infer<typeof Status> }[]>()
+  const hiddenBlocks = new Map<string, number>()
+  for (const b of blockRows) {
+    if (b.visible) blocks.set(b.onId, [...(blocks.get(b.onId) ?? []), { id: b.id, ref: ref(b.refNo), title: free(b.title), status: b.status as z.infer<typeof Status> }])
+    else hiddenBlocks.set(b.onId, (hiddenBlocks.get(b.onId) ?? 0) + 1)
+  }
   // Evidence of the whole page in ONE query (and one names lookup); items that are still scanning, infected or deleted do not count toward the state (ruling D10).
   const evidenceBy = await loadEvidence(tx, ctx.tenantId, ids)
   const evidenceDto = new Map((await evidenceDtos(tx, ctx, [...evidenceBy.values()].flat())).map((d) => [d.id, d]))
@@ -154,6 +181,7 @@ export async function taskDtos(tx: TenantTx, ctx: TaskCtx, rows: TaskRow[], time
       ...(r.projectId ? { projectId: r.projectId } : {}), ...(r.milestoneId ? { milestoneId: r.milestoneId } : {}),
       ...(r.parentId && parentRef.has(r.parentId) ? { parentRef: parentRef.get(r.parentId)! } : {}), parentId: r.parentId && parentRef.has(r.parentId) ? r.parentId : null, // a parent outside the caller's scope is dropped (no ref or id leaks)
       checklist: checklists.get(r.id) ?? [], subtasks: children.get(r.id) ?? [], dependsOn: (deps.get(r.id) ?? []).map((d) => d.ref), dependsOnIds: (deps.get(r.id) ?? []).map((d) => d.id), round: r.round,
+      dependencies: deps.get(r.id) ?? [], hiddenDependencies: (allDepCount.get(r.id) ?? 0) - (deps.get(r.id) ?? []).length, blocks: blocks.get(r.id) ?? [], hiddenBlocks: hiddenBlocks.get(r.id) ?? 0,
       ...(r.archivedAt ? { archivedAt: wallOf(r.archivedAt, ctx.tz) } : {}), ...(r.archivedBy ? { archivedBy: r.archivedBy } : {}),
       ...(r.proposal ? { proposal: (ctx.drive ? r.proposal : { ...r.proposal, reason: withholdDriveText(String(r.proposal.reason ?? "")) }) as DateProposalDto } : {}), ...(r.repeat ? { repeat: r.repeat } : {}), ...(r.seriesId ? { seriesId: r.seriesId } : {}),
       ...(r.submittedAt ? { submittedAt: wallOf(r.submittedAt, ctx.tz) } : {}), ...(r.completedAt ? { completedAt: wallOf(r.completedAt, ctx.tz) } : {}),

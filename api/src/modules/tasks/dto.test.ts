@@ -16,7 +16,7 @@ const full = (): Json => ({
   status: "in_progress", evidenceRule: { mode: "required", types: ["photo"], min: 1, instruction: "", review: "manager" }, tags: ["safety"], parentId: null,
   checklist: [{ id: UUID, text: "Ground floor", done: true }],
   subtasks: [{ id: UUID, ref: "TSK-1002", title: "Stairwell", status: "not_started" }],
-  dependsOn: ["TSK-1000"], dependsOnIds: [UUID], round: 2,
+  dependsOn: ["TSK-1000"], dependsOnIds: [UUID], dependencies: [{ id: UUID, ref: "TSK-1000", title: "Paint", status: "in_progress" }], hiddenDependencies: 0, blocks: [], hiddenBlocks: 0, round: 2,
   proposal: { start: "2026-11-21T09:00:00", due: "2026-11-21T17:00:00", reason: "Waiting on keys", by: "Ann Byrne", at: "2026-11-19T10:00:00" },
   repeat: { freq: "weekly", days: [1, 3], until: "2026-12-31" },
   notes: [{ at: "2026-11-19T10:00:00", by: "Ann Byrne", text: "Called the landlord" }],

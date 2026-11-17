@@ -2032,6 +2032,49 @@ describe("b4 fix wave (I1, I4, M8)", () => {
     expect(asOps.columns.flatMap((c: Json) => c.items).find((i: Json) => i.id === child.id).parentId).toBe(parent.id)
   })
 
+  test("N2: dependencies carry their status and blocks lists the reverse edges; both are scoped (an out-of-scope task is only a count), archived ones are left out", async () => {
+    const w = await world()
+    const a = await w.mk(w.ops, { primary: w.staff.userId, title: "A" })
+    const b = await w.mk(w.ops, { primary: w.staff.userId, title: "B" })
+    const c = await w.mk(w.ops, { primary: w.staff2.userId, title: "Secret C" })
+    const d = await w.mk(w.ops, { primary: w.staff.userId, title: "D archived" })
+    const put = async (t: Json, ids: string[]) => expect((await w.req("PUT", `/v1/tasks/${t.id}/dependencies`, w.ops, { version: t.version, dependsOnIds: ids })).status).toBe(200)
+    await put(a, [b.id, c.id, d.id])
+    await put(c, [b.id]) // C (staff2's) also waits on B
+    expect((await w.req("POST", `/v1/tasks/${d.id}/archive`, w.ops, { version: d.version })).status).toBe(200)
+    // staff sees B (status, ref, title) and a COUNT for C; D is archived: not listed, not counted
+    const asStaff = await w.json(await w.req("GET", `/v1/tasks/${a.id}`, w.staff))
+    expect(asStaff.dependencies).toEqual([{ id: b.id, ref: b.ref, title: "B", status: "not_started" }])
+    expect(asStaff.hiddenDependencies).toBe(1)
+    expect(asStaff.dependsOn).toEqual([b.ref])
+    // (the history line "Updated Depends on" names every ref the MANAGER typed: a pre-existing leak, reported, so only the dependency fields are checked here)
+    const fields = (t: Json) => JSON.stringify([t.dependencies, t.blocks, t.dependsOn, t.dependsOnIds])
+    expect(fields(asStaff)).not.toContain("Secret C")
+    expect(fields(asStaff)).not.toContain(c.ref)
+    // B blocks A (visible) and C (hidden from staff)
+    const bStaff = await w.json(await w.req("GET", `/v1/tasks/${b.id}`, w.staff))
+    expect(bStaff.blocks).toEqual([{ id: a.id, ref: a.ref, title: "A", status: "not_started" }])
+    expect(bStaff.hiddenBlocks).toBe(1)
+    expect(fields(bStaff)).not.toContain(c.ref)
+    // ops sees everything
+    const bOps = await w.json(await w.req("GET", `/v1/tasks/${b.id}`, w.ops))
+    expect(bOps.blocks.map((x: Json) => x.ref).sort()).toEqual([a.ref, c.ref].sort())
+    expect(bOps.hiddenBlocks).toBe(0)
+    // a team manager whose team is staff only: C is hidden from them too
+    await w.manages(w.manager, w.staff)
+    const aMgr = await w.json(await w.req("GET", `/v1/tasks/${a.id}`, w.manager))
+    expect(aMgr.hiddenDependencies).toBe(1)
+    expect(aMgr.dependencies.map((x: Json) => x.ref)).toEqual([b.ref])
+    // lists carry the fields too (one batch, no per row query)
+    const list = await w.json(await w.req("GET", "/v1/tasks?limit=50", w.staff))
+    expect(list.items.find((x: Json) => x.id === a.id).hiddenDependencies).toBe(1)
+    // an API key acts with its creator's scope
+    const key = await makeApiKey(w.deps, w.tenant.id, w.staff.userId, ["tasks:read"])
+    const viaKey = await w.json(await call(w.app, "GET", `/v1/tasks/${a.id}`, { headers: { authorization: `Bearer ${key.key}` } }))
+    expect(viaKey.hiddenDependencies).toBe(1)
+    expect(fields(viaKey)).not.toContain(c.ref)
+  })
+
   test("M8: an assignee needs tasks:read (422 invalid_assignee): a role without it cannot be assigned, on create or reassign", async () => {
     const w = await world()
     await w.q(`update roles set access = access || '{"tasks":"none"}'::jsonb where key = 'payroll'`)

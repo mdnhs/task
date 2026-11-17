@@ -1355,6 +1355,22 @@ export interface paths {
                                 }[];
                                 dependsOn: string[];
                                 dependsOnIds: string[];
+                                dependencies: {
+                                    id: string;
+                                    ref: string;
+                                    title: string;
+                                    /** @enum {string} */
+                                    status: "not_started" | "in_progress" | "blocked" | "submitted" | "changes_requested" | "completed" | "cancelled";
+                                }[];
+                                hiddenDependencies: number;
+                                blocks: {
+                                    id: string;
+                                    ref: string;
+                                    title: string;
+                                    /** @enum {string} */
+                                    status: "not_started" | "in_progress" | "blocked" | "submitted" | "changes_requested" | "completed" | "cancelled";
+                                }[];
+                                hiddenBlocks: number;
                                 archivedAt?: string;
                                 archivedBy?: string;
                                 /**
@@ -1618,6 +1634,22 @@ export interface paths {
                             }[];
                             dependsOn: string[];
                             dependsOnIds: string[];
+                            dependencies: {
+                                id: string;
+                                ref: string;
+                                title: string;
+                                /** @enum {string} */
+                                status: "not_started" | "in_progress" | "blocked" | "submitted" | "changes_requested" | "completed" | "cancelled";
+                            }[];
+                            hiddenDependencies: number;
+                            blocks: {
+                                id: string;
+                                ref: string;
+                                title: string;
+                                /** @enum {string} */
+                                status: "not_started" | "in_progress" | "blocked" | "submitted" | "changes_requested" | "completed" | "cancelled";
+                            }[];
+                            hiddenBlocks: number;
                             archivedAt?: string;
                             archivedBy?: string;
                             /**
@@ -1830,6 +1862,22 @@ export interface paths {
                             }[];
                             dependsOn: string[];
                             dependsOnIds: string[];
+                            dependencies: {
+                                id: string;
+                                ref: string;
+                                title: string;
+                                /** @enum {string} */
+                                status: "not_started" | "in_progress" | "blocked" | "submitted" | "changes_requested" | "completed" | "cancelled";
+                            }[];
+                            hiddenDependencies: number;
+                            blocks: {
+                                id: string;
+                                ref: string;
+                                title: string;
+                                /** @enum {string} */
+                                status: "not_started" | "in_progress" | "blocked" | "submitted" | "changes_requested" | "completed" | "cancelled";
+                            }[];
+                            hiddenBlocks: number;
                             archivedAt?: string;
                             archivedBy?: string;
                             /**
@@ -2091,6 +2139,22 @@ export interface paths {
                             }[];
                             dependsOn: string[];
                             dependsOnIds: string[];
+                            dependencies: {
+                                id: string;
+                                ref: string;
+                                title: string;
+                                /** @enum {string} */
+                                status: "not_started" | "in_progress" | "blocked" | "submitted" | "changes_requested" | "completed" | "cancelled";
+                            }[];
+                            hiddenDependencies: number;
+                            blocks: {
+                                id: string;
+                                ref: string;
+                                title: string;
+                                /** @enum {string} */
+                                status: "not_started" | "in_progress" | "blocked" | "submitted" | "changes_requested" | "completed" | "cancelled";
+                            }[];
+                            hiddenBlocks: number;
                             archivedAt?: string;
                             archivedBy?: string;
                             /**
@@ -2312,6 +2376,22 @@ export interface paths {
                             }[];
                             dependsOn: string[];
                             dependsOnIds: string[];
+                            dependencies: {
+                                id: string;
+                                ref: string;
+                                title: string;
+                                /** @enum {string} */
+                                status: "not_started" | "in_progress" | "blocked" | "submitted" | "changes_requested" | "completed" | "cancelled";
+                            }[];
+                            hiddenDependencies: number;
+                            blocks: {
+                                id: string;
+                                ref: string;
+                                title: string;
+                                /** @enum {string} */
+                                status: "not_started" | "in_progress" | "blocked" | "submitted" | "changes_requested" | "completed" | "cancelled";
+                            }[];
+                            hiddenBlocks: number;
                             archivedAt?: string;
                             archivedBy?: string;
                             /**
@@ -2539,6 +2619,22 @@ export interface paths {
                             }[];
                             dependsOn: string[];
                             dependsOnIds: string[];
+                            dependencies: {
+                                id: string;
+                                ref: string;
+                                title: string;
+                                /** @enum {string} */
+                                status: "not_started" | "in_progress" | "blocked" | "submitted" | "changes_requested" | "completed" | "cancelled";
+                            }[];
+                            hiddenDependencies: number;
+                            blocks: {
+                                id: string;
+                                ref: string;
+                                title: string;
+                                /** @enum {string} */
+                                status: "not_started" | "in_progress" | "blocked" | "submitted" | "changes_requested" | "completed" | "cancelled";
+                            }[];
+                            hiddenBlocks: number;
                             archivedAt?: string;
                             archivedBy?: string;
                             /**
@@ -2763,6 +2859,22 @@ export interface paths {
                             }[];
                             dependsOn: string[];
                             dependsOnIds: string[];
+                            dependencies: {
+                                id: string;
+                                ref: string;
+                                title: string;
+                                /** @enum {string} */
+                                status: "not_started" | "in_progress" | "blocked" | "submitted" | "changes_requested" | "completed" | "cancelled";
+                            }[];
+                            hiddenDependencies: number;
+                            blocks: {
+                                id: string;
+                                ref: string;
+                                title: string;
+                                /** @enum {string} */
+                                status: "not_started" | "in_progress" | "blocked" | "submitted" | "changes_requested" | "completed" | "cancelled";
+                            }[];
+                            hiddenBlocks: number;
                             archivedAt?: string;
                             archivedBy?: string;
                             /**
@@ -3002,6 +3114,22 @@ export interface paths {
                             }[];
                             dependsOn: string[];
                             dependsOnIds: string[];
+                            dependencies: {
+                                id: string;
+                                ref: string;
+                                title: string;
+                                /** @enum {string} */
+                                status: "not_started" | "in_progress" | "blocked" | "submitted" | "changes_requested" | "completed" | "cancelled";
+                            }[];
+                            hiddenDependencies: number;
+                            blocks: {
+                                id: string;
+                                ref: string;
+                                title: string;
+                                /** @enum {string} */
+                                status: "not_started" | "in_progress" | "blocked" | "submitted" | "changes_requested" | "completed" | "cancelled";
+                            }[];
+                            hiddenBlocks: number;
                             archivedAt?: string;
                             archivedBy?: string;
                             /**
@@ -3285,6 +3413,22 @@ export interface paths {
                             }[];
                             dependsOn: string[];
                             dependsOnIds: string[];
+                            dependencies: {
+                                id: string;
+                                ref: string;
+                                title: string;
+                                /** @enum {string} */
+                                status: "not_started" | "in_progress" | "blocked" | "submitted" | "changes_requested" | "completed" | "cancelled";
+                            }[];
+                            hiddenDependencies: number;
+                            blocks: {
+                                id: string;
+                                ref: string;
+                                title: string;
+                                /** @enum {string} */
+                                status: "not_started" | "in_progress" | "blocked" | "submitted" | "changes_requested" | "completed" | "cancelled";
+                            }[];
+                            hiddenBlocks: number;
                             archivedAt?: string;
                             archivedBy?: string;
                             /**
@@ -3503,6 +3647,22 @@ export interface paths {
                             }[];
                             dependsOn: string[];
                             dependsOnIds: string[];
+                            dependencies: {
+                                id: string;
+                                ref: string;
+                                title: string;
+                                /** @enum {string} */
+                                status: "not_started" | "in_progress" | "blocked" | "submitted" | "changes_requested" | "completed" | "cancelled";
+                            }[];
+                            hiddenDependencies: number;
+                            blocks: {
+                                id: string;
+                                ref: string;
+                                title: string;
+                                /** @enum {string} */
+                                status: "not_started" | "in_progress" | "blocked" | "submitted" | "changes_requested" | "completed" | "cancelled";
+                            }[];
+                            hiddenBlocks: number;
                             archivedAt?: string;
                             archivedBy?: string;
                             /**
@@ -3847,6 +4007,22 @@ export interface paths {
                             }[];
                             dependsOn: string[];
                             dependsOnIds: string[];
+                            dependencies: {
+                                id: string;
+                                ref: string;
+                                title: string;
+                                /** @enum {string} */
+                                status: "not_started" | "in_progress" | "blocked" | "submitted" | "changes_requested" | "completed" | "cancelled";
+                            }[];
+                            hiddenDependencies: number;
+                            blocks: {
+                                id: string;
+                                ref: string;
+                                title: string;
+                                /** @enum {string} */
+                                status: "not_started" | "in_progress" | "blocked" | "submitted" | "changes_requested" | "completed" | "cancelled";
+                            }[];
+                            hiddenBlocks: number;
                             archivedAt?: string;
                             archivedBy?: string;
                             /**
@@ -4377,6 +4553,22 @@ export interface paths {
                             }[];
                             dependsOn: string[];
                             dependsOnIds: string[];
+                            dependencies: {
+                                id: string;
+                                ref: string;
+                                title: string;
+                                /** @enum {string} */
+                                status: "not_started" | "in_progress" | "blocked" | "submitted" | "changes_requested" | "completed" | "cancelled";
+                            }[];
+                            hiddenDependencies: number;
+                            blocks: {
+                                id: string;
+                                ref: string;
+                                title: string;
+                                /** @enum {string} */
+                                status: "not_started" | "in_progress" | "blocked" | "submitted" | "changes_requested" | "completed" | "cancelled";
+                            }[];
+                            hiddenBlocks: number;
                             archivedAt?: string;
                             archivedBy?: string;
                             /**
@@ -4587,6 +4779,22 @@ export interface paths {
                             }[];
                             dependsOn: string[];
                             dependsOnIds: string[];
+                            dependencies: {
+                                id: string;
+                                ref: string;
+                                title: string;
+                                /** @enum {string} */
+                                status: "not_started" | "in_progress" | "blocked" | "submitted" | "changes_requested" | "completed" | "cancelled";
+                            }[];
+                            hiddenDependencies: number;
+                            blocks: {
+                                id: string;
+                                ref: string;
+                                title: string;
+                                /** @enum {string} */
+                                status: "not_started" | "in_progress" | "blocked" | "submitted" | "changes_requested" | "completed" | "cancelled";
+                            }[];
+                            hiddenBlocks: number;
                             archivedAt?: string;
                             archivedBy?: string;
                             /**
@@ -4860,6 +5068,22 @@ export interface paths {
                             }[];
                             dependsOn: string[];
                             dependsOnIds: string[];
+                            dependencies: {
+                                id: string;
+                                ref: string;
+                                title: string;
+                                /** @enum {string} */
+                                status: "not_started" | "in_progress" | "blocked" | "submitted" | "changes_requested" | "completed" | "cancelled";
+                            }[];
+                            hiddenDependencies: number;
+                            blocks: {
+                                id: string;
+                                ref: string;
+                                title: string;
+                                /** @enum {string} */
+                                status: "not_started" | "in_progress" | "blocked" | "submitted" | "changes_requested" | "completed" | "cancelled";
+                            }[];
+                            hiddenBlocks: number;
                             archivedAt?: string;
                             archivedBy?: string;
                             /**
@@ -5181,6 +5405,22 @@ export interface paths {
                             }[];
                             dependsOn: string[];
                             dependsOnIds: string[];
+                            dependencies: {
+                                id: string;
+                                ref: string;
+                                title: string;
+                                /** @enum {string} */
+                                status: "not_started" | "in_progress" | "blocked" | "submitted" | "changes_requested" | "completed" | "cancelled";
+                            }[];
+                            hiddenDependencies: number;
+                            blocks: {
+                                id: string;
+                                ref: string;
+                                title: string;
+                                /** @enum {string} */
+                                status: "not_started" | "in_progress" | "blocked" | "submitted" | "changes_requested" | "completed" | "cancelled";
+                            }[];
+                            hiddenBlocks: number;
                             archivedAt?: string;
                             archivedBy?: string;
                             /**
@@ -5411,6 +5651,22 @@ export interface paths {
                             }[];
                             dependsOn: string[];
                             dependsOnIds: string[];
+                            dependencies: {
+                                id: string;
+                                ref: string;
+                                title: string;
+                                /** @enum {string} */
+                                status: "not_started" | "in_progress" | "blocked" | "submitted" | "changes_requested" | "completed" | "cancelled";
+                            }[];
+                            hiddenDependencies: number;
+                            blocks: {
+                                id: string;
+                                ref: string;
+                                title: string;
+                                /** @enum {string} */
+                                status: "not_started" | "in_progress" | "blocked" | "submitted" | "changes_requested" | "completed" | "cancelled";
+                            }[];
+                            hiddenBlocks: number;
                             archivedAt?: string;
                             archivedBy?: string;
                             /**
@@ -5646,6 +5902,22 @@ export interface paths {
                             }[];
                             dependsOn: string[];
                             dependsOnIds: string[];
+                            dependencies: {
+                                id: string;
+                                ref: string;
+                                title: string;
+                                /** @enum {string} */
+                                status: "not_started" | "in_progress" | "blocked" | "submitted" | "changes_requested" | "completed" | "cancelled";
+                            }[];
+                            hiddenDependencies: number;
+                            blocks: {
+                                id: string;
+                                ref: string;
+                                title: string;
+                                /** @enum {string} */
+                                status: "not_started" | "in_progress" | "blocked" | "submitted" | "changes_requested" | "completed" | "cancelled";
+                            }[];
+                            hiddenBlocks: number;
                             archivedAt?: string;
                             archivedBy?: string;
                             /**
@@ -5871,6 +6143,22 @@ export interface paths {
                             }[];
                             dependsOn: string[];
                             dependsOnIds: string[];
+                            dependencies: {
+                                id: string;
+                                ref: string;
+                                title: string;
+                                /** @enum {string} */
+                                status: "not_started" | "in_progress" | "blocked" | "submitted" | "changes_requested" | "completed" | "cancelled";
+                            }[];
+                            hiddenDependencies: number;
+                            blocks: {
+                                id: string;
+                                ref: string;
+                                title: string;
+                                /** @enum {string} */
+                                status: "not_started" | "in_progress" | "blocked" | "submitted" | "changes_requested" | "completed" | "cancelled";
+                            }[];
+                            hiddenBlocks: number;
                             archivedAt?: string;
                             archivedBy?: string;
                             /**
@@ -6113,6 +6401,22 @@ export interface paths {
                             }[];
                             dependsOn: string[];
                             dependsOnIds: string[];
+                            dependencies: {
+                                id: string;
+                                ref: string;
+                                title: string;
+                                /** @enum {string} */
+                                status: "not_started" | "in_progress" | "blocked" | "submitted" | "changes_requested" | "completed" | "cancelled";
+                            }[];
+                            hiddenDependencies: number;
+                            blocks: {
+                                id: string;
+                                ref: string;
+                                title: string;
+                                /** @enum {string} */
+                                status: "not_started" | "in_progress" | "blocked" | "submitted" | "changes_requested" | "completed" | "cancelled";
+                            }[];
+                            hiddenBlocks: number;
                             archivedAt?: string;
                             archivedBy?: string;
                             /**
@@ -6492,6 +6796,22 @@ export interface paths {
                             }[];
                             dependsOn: string[];
                             dependsOnIds: string[];
+                            dependencies: {
+                                id: string;
+                                ref: string;
+                                title: string;
+                                /** @enum {string} */
+                                status: "not_started" | "in_progress" | "blocked" | "submitted" | "changes_requested" | "completed" | "cancelled";
+                            }[];
+                            hiddenDependencies: number;
+                            blocks: {
+                                id: string;
+                                ref: string;
+                                title: string;
+                                /** @enum {string} */
+                                status: "not_started" | "in_progress" | "blocked" | "submitted" | "changes_requested" | "completed" | "cancelled";
+                            }[];
+                            hiddenBlocks: number;
                             archivedAt?: string;
                             archivedBy?: string;
                             /**
@@ -6719,6 +7039,22 @@ export interface paths {
                             }[];
                             dependsOn: string[];
                             dependsOnIds: string[];
+                            dependencies: {
+                                id: string;
+                                ref: string;
+                                title: string;
+                                /** @enum {string} */
+                                status: "not_started" | "in_progress" | "blocked" | "submitted" | "changes_requested" | "completed" | "cancelled";
+                            }[];
+                            hiddenDependencies: number;
+                            blocks: {
+                                id: string;
+                                ref: string;
+                                title: string;
+                                /** @enum {string} */
+                                status: "not_started" | "in_progress" | "blocked" | "submitted" | "changes_requested" | "completed" | "cancelled";
+                            }[];
+                            hiddenBlocks: number;
                             archivedAt?: string;
                             archivedBy?: string;
                             /**
