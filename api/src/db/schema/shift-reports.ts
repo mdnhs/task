@@ -186,3 +186,41 @@ export const shiftReportAlerts = pgTable(
     tenantPolicy(),
   ],
 ).enableRLS()
+
+/**
+ * A shift-report export (PDF, Excel or CSV, T5.5, FR-M1-31): a request row the `report.export` job works through and a pointer to the generated file in Files (purpose `report_export`).
+ * Only the requester reads or downloads it. `filters` is what was asked (range, team, person, status, or the single `reportId`) plus the report `scope` the requester had when asking: the job re-resolves the
+ * scope when it runs and refuses (`forbidden`) when it is now narrower. `claimed_until` is the worker lease (a crashed worker's `running` row is re-claimed after it, by the sweep). `expires_at` is set when the
+ * file is written (completion + 7 days). `row_count` is the number of reports in the file. The file's name and the audit rows never carry a person's name.
+ */
+export const reportExports = pgTable(
+  "report_exports",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    tenantId: uuid("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    requestedBy: text("requested_by").notNull(),
+    format: text("format").notNull(),
+    filters: jsonb("filters").$type<Record<string, unknown>>().notNull(),
+    reportId: uuid("report_id"),
+    status: text("status").notNull().default("queued"),
+    fileId: uuid("file_id"),
+    rowCount: integer("row_count"),
+    errorCode: text("error_code"),
+    claimedUntil: ts("claimed_until"),
+    createdAt: ts("created_at").notNull(),
+    startedAt: ts("started_at"),
+    completedAt: ts("completed_at"),
+    expiresAt: ts("expires_at"),
+  },
+  (t) => [
+    foreignKey({ columns: [t.tenantId, t.requestedBy], foreignColumns: [memberships.tenantId, memberships.userId], name: "report_exports_requester_fk" }).onDelete("cascade"),
+    foreignKey({ columns: [t.tenantId, t.fileId], foreignColumns: [files.tenantId, files.id], name: "report_exports_file_fk" }),
+    foreignKey({ columns: [t.tenantId, t.reportId], foreignColumns: [shiftReports.tenantId, shiftReports.id], name: "report_exports_report_fk" }),
+    check("report_exports_format_check", sql`${t.format} IN ('pdf','xlsx','csv')`),
+    check("report_exports_status_check", sql`${t.status} IN ('queued','running','done','failed')`),
+    index("report_exports_user_idx").on(t.tenantId, t.requestedBy, t.createdAt.desc()),
+    index("report_exports_sweep_idx").on(t.status, t.createdAt).where(sql`${t.status} in ('queued','running')`),
+    index("report_exports_expiry_idx").on(t.tenantId, t.expiresAt).where(sql`${t.status} = 'done'`),
+    tenantPolicy(),
+  ],
+).enableRLS()

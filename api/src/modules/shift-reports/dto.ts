@@ -1,4 +1,5 @@
 import { z } from "@hono/zod-openapi"
+import { EXPORT_FORMATS } from "@opsdesk/domain/report-export"
 
 const RID = "9b1c0d52-8d3a-4b7e-9c41-2a5b7e90d3f8"
 const TID = "6f1c0d52-8d3a-4b7e-9c41-2a5b7e90d3f8"
@@ -186,3 +187,24 @@ export const TemplateBody = z.strictObject({ departments: z.array(TemplateDepart
 export const TemplateOut = z
   .object({ custom: z.boolean(), departments: z.array(z.object({ dept: z.string(), sections: z.array(z.object({ id: z.string(), title: z.string(), enabled: z.boolean(), fields: z.array(z.object({ id: z.string(), label: z.string(), required: z.boolean() })) })) })) })
   .openapi({ example: { custom: true, ...TEMPLATE_EXAMPLE } })
+
+// ---------- exports (T5.5) ----------
+const XID = "4d1c0d52-8d3a-4b7e-9c41-2a5b7e90d3f8"
+export const ExportIdParam = z.object({ id: z.uuid().openapi({ param: { name: "id", in: "path" }, example: XID }) })
+export const ExportBody = z
+  .strictObject({
+    format: z.enum(EXPORT_FORMATS),
+    reportId: z.uuid().optional(),
+    from: date.optional(),
+    to: date.optional(),
+    team: z.uuid().optional(),
+    person: z.string().min(1).max(100).optional(),
+    status: z.enum(INBOX_STATUSES).optional(),
+  })
+  .refine((b) => !b.reportId || (b.from === undefined && b.to === undefined && b.team === undefined && b.person === undefined && b.status === undefined), "a single report takes no range or filters")
+  .openapi({ example: { format: "xlsx", from: "2026-10-19", to: "2026-10-25", team: "5e1c0d52-8d3a-4b7e-9c41-2a5b7e90d3f8", status: "all" } })
+export const ExportCreated = z.object({ id: z.uuid() }).openapi({ example: { id: XID } })
+export const ExportOut = z
+  .object({ id: z.uuid(), status: z.enum(["queued", "running", "done", "failed"]), format: z.enum(EXPORT_FORMATS), rowCount: z.number().int().nullable(), expiresAt: z.string().nullable(), errorCode: z.string().nullable() })
+  .openapi({ example: { id: XID, status: "done", format: "xlsx", rowCount: 42, expiresAt: "2026-11-02T12:34:00.000Z", errorCode: null } })
+export type ExportDto = z.infer<typeof ExportOut>

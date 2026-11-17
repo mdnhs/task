@@ -46,7 +46,7 @@ export function inboxRange(now: Date, tz: string, q: { from?: string; to?: strin
 const userC = sql`${shiftReports.userId} collate "C"`
 
 /** The state filter in SQL, the same rules as `stateOf` (instants and `now`; `late` = FIRST submission after the due time). */
-function stateWhere(status: InboxStatus, now: Date): SQL | undefined {
+export function stateWhere(status: InboxStatus, now: Date): SQL | undefined {
   switch (status) {
     case "all": return undefined
     case "draft": return and(eq(shiftReports.status, "draft"), gte(shiftReports.dueAt, now))
@@ -104,7 +104,7 @@ type Virtual = Key & { teamId: string; shiftName: string; startAt: Date; endAt: 
  * 250-member, 31-day window costs one or two chunks, not thirty-one days).
  */
 const CHUNK_DAYS = 3
-async function virtualRows(tx: TenantTx, ctx: ReportCtx, f: InboxFilter, limit: number): Promise<Virtual[]> {
+export async function virtualRows(tx: TenantTx, ctx: ReportCtx, f: InboxFilter, limit: number): Promise<Virtual[]> {
   let people: string[] | undefined = ctx.access.kind === "all" ? undefined : ctx.access.kind === "own" ? [ctx.access.personId] : [ctx.access.managerId, ...ctx.reports]
   if (f.person) people = people ? people.filter((p) => p === f.person) : [f.person]
   if (people && people.length === 0) return []

@@ -219,6 +219,14 @@ export async function reportFileDownloadUrl(deps: Deps, tenantId: string, id: st
   return scopedDownloadUrl(deps, tenantId, id, (p) => p === "report_attachment")
 }
 
+/**
+ * The 60 s download URL of a shift-report EXPORT (purpose `report_export`, ruling F16). The report-exports module has already proved the caller is the requester and the export is
+ * ready and not expired; any other purpose is a missing file. The file is `clean` (server generated, never scanned).
+ */
+export async function reportExportDownloadUrl(deps: Deps, tenantId: string, id: string): Promise<string> {
+  return scopedDownloadUrl(deps, tenantId, id, (p) => p === "report_export")
+}
+
 async function scopedDownloadUrl(deps: Deps, tenantId: string, id: string, ok: (purpose: string | null) => boolean): Promise<string> {
   const row = await withTenant(deps.db, tenantId, async (tx) => {
     const r = await liveFile(tx, tenantId, id, false, "*")
@@ -244,13 +252,13 @@ export async function deleteFile(deps: Deps, tenantId: string, actor: Actor, id:
 }
 
 /**
- * A file the SERVER generated (a DSR export): written straight to the final key `t/<tenant>/<id>` and recorded as
+ * A file the SERVER generated (a DSR export or a shift-report export): written straight to the final key `t/<tenant>/<id>` and recorded as
  * `clean` with no scan, because we produced the bytes ourselves (never a client upload). Deterministic ids make a
  * re-run overwrite the same key and keep the same row (ON CONFLICT DO NOTHING), so there are no orphans.
  */
 export async function storeGeneratedFile(
   deps: Deps, tx: TenantTx,
-  f: { tenantId: string; id: string; ownerUserId: string | null; name: string; mime: string; body: Buffer; purpose: "dsr_export" },
+  f: { tenantId: string; id: string; ownerUserId: string | null; name: string; mime: string; body: Buffer; purpose: "dsr_export" | "report_export" },
 ): Promise<void> {
   const key = fileKey(f.tenantId, f.id)
   await deps.storage.put(key, f.body, { contentType: f.mime })

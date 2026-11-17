@@ -164,6 +164,9 @@ const SPECS: Record<string, Spec> = {
   "POST /v1/shift-reports/{id}/uploads": { actor: "owner", expect: "report_not_found" },
   "POST /v1/shift-reports/{id}/uploads/{fileId}/complete": { actor: "owner", expect: "report_not_found" },
   "GET /v1/shift-reports/{id}/files/{fileId}/download": { actor: "owner", expect: "report_not_found" },
+  // T5.5: A's owner's own export (controls: status 200, download 409 export_not_ready: the walker's queue never runs the job); B's id is 404 report_export_not_found
+  "GET /v1/report-exports/{id}": { actor: "owner", expect: "report_export_not_found" },
+  "GET /v1/report-exports/{id}/download": { actor: "owner", expect: "report_export_not_found" },
 }
 
 let t: ReturnType<typeof testApp>
@@ -189,7 +192,7 @@ const bodyExample = (op: Json): { present: boolean; example?: unknown } => {
 const substitute = (path: string, params: Record<string, string>) => path.replace(/\{(\w+)\}/g, (_, p) => encodeURIComponent(params[p]))
 
 /** Tenant tables whose rows are hashed before and after the walk: any change in the OTHER tenant is a cross-tenant mutation. */
-const HASHED_TABLES = ["roles", "memberships", "teams", "team_members", "reporting_lines", "devices", "device_policies", "invites", "audit_events", "tenant_settings", "notifications", "notification_preferences", "push_tokens", "notification_deliveries", "files", "integration_connections", "oauth_states", "public_holidays", "data_requests", "support_grants", "api_keys", "webhook_endpoints", "webhook_deliveries", "tasks", "task_assignees", "task_history", "task_time_entries", "task_counters", "task_checklist_items", "task_comments", "task_files", "task_templates", "task_voice_access", "projects", "project_milestones", "task_dependencies", "task_evidence", "shift_patterns", "shift_assignments", "shift_reporting_teams", "shift_reporting_people", "shift_reports", "shift_report_items", "shift_report_versions", "shift_report_comments", "shift_report_files", "shift_report_alerts"]
+const HASHED_TABLES = ["roles", "memberships", "teams", "team_members", "reporting_lines", "devices", "device_policies", "invites", "audit_events", "tenant_settings", "notifications", "notification_preferences", "push_tokens", "notification_deliveries", "files", "integration_connections", "oauth_states", "public_holidays", "data_requests", "support_grants", "api_keys", "webhook_endpoints", "webhook_deliveries", "tasks", "task_assignees", "task_history", "task_time_entries", "task_counters", "task_checklist_items", "task_comments", "task_files", "task_templates", "task_voice_access", "projects", "project_milestones", "task_dependencies", "task_evidence", "shift_patterns", "shift_assignments", "shift_reporting_teams", "shift_reporting_people", "shift_reports", "shift_report_items", "shift_report_versions", "shift_report_comments", "shift_report_files", "shift_report_alerts", "report_exports"]
 
 async function hashes(tenantId: string): Promise<Record<string, string>> {
   const out: Record<string, string> = {}
@@ -232,10 +235,10 @@ const operations = (): Op[] =>
   })
 
 describe("AC-M0-01 cross-tenant isolation walker", () => {
-  test("every M1 task/project/shift/report tenant table (migrations 0027-0035 and later) is in the mutation-hash list", async () => {
+  test("every M1 task/project/shift/report tenant table (migrations 0027-0038 and later) is in the mutation-hash list", async () => {
     const rows = await ownerQuery("select table_name from information_schema.columns where table_schema = 'public' and column_name = 'tenant_id' and table_name ~ '^(tasks?|task_.*|projects?|project_.*|shift_.*|report_.*)$' order by 1")
     const tenantTables = rows.map((r) => String((r as { table_name: string }).table_name))
-    expect(tenantTables.length).toBeGreaterThanOrEqual(17)
+    expect(tenantTables.length).toBeGreaterThanOrEqual(25)
     expect(tenantTables.filter((x) => !HASHED_TABLES.includes(x))).toEqual([])
   })
 

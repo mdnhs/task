@@ -1,5 +1,5 @@
-import { and, asc, eq, inArray, sql } from "drizzle-orm"
-import { shiftReportComments, shiftReportFiles, shiftReportItems, shiftReportVersions, shiftReports } from "../../db/schema"
+import { and, asc, eq, inArray, isNotNull, sql } from "drizzle-orm"
+import { reportExports, shiftReportComments, shiftReportFiles, shiftReportItems, shiftReportVersions, shiftReports } from "../../db/schema"
 import { expireFile } from "../files"
 import type { DsrHandler } from "../gdpr/registry"
 import { removeDocument } from "../search/service"
@@ -22,7 +22,7 @@ function scrub(v: unknown, key = ""): unknown {
 /**
  * Data-subject requests for shift reports (FR-M0-18, ruling F22). Export: the subject's reports (with rows, versions and attachment names) and the comments they wrote.
  * Erase (runs BEFORE the membership is removed, in the same tx): the free text of their reports, rows, unplanned work, extra answers and version snapshots is replaced by
- * "[erased]" (counts, refs, status and times stay: the manager keeps the record, not the narrative), their attachments are expired (object removal queued), the `by_user`
+ * "[erased]" (counts, refs, status and times stay: the manager keeps the record, not the narrative), their attachments are expired (object removal queued), and so are the files of the exports they requested (T5.5), the `by_user`
  * links of the versions and comments they wrote are nulled; the report's own `user_id` becomes NULL when the membership is deleted (composite FK ON DELETE SET NULL, run
  * as the table owner), and `shift_assignments` / `shift_reporting_people` go with the membership (FK cascade). Idempotent: a re-run finds nothing to change.
  */
@@ -64,6 +64,9 @@ export const shiftReportsDsrHandler: DsrHandler = {
       const fs = await tx.select({ fileId: shiftReportFiles.fileId }).from(shiftReportFiles).where(and(eq(shiftReportFiles.tenantId, tenantId), inArray(shiftReportFiles.reportId, ids))).orderBy(asc(shiftReportFiles.fileId))
       for (const f of fs) await expireFile(tx, tenantId, f.fileId, enqueue ?? (() => {})) // without a queue the hourly retention sweep re-queues the object removal
     }
+    // the exports the subject requested hold OTHER people's report data: their files go now (the export rows leave with the membership)
+    const exps = await tx.select({ fileId: reportExports.fileId }).from(reportExports).where(and(eq(reportExports.tenantId, tenantId), eq(reportExports.requestedBy, userId), isNotNull(reportExports.fileId))).orderBy(asc(reportExports.id))
+    for (const e of exps) await expireFile(tx, tenantId, e.fileId!, enqueue ?? (() => {}))
     // the version and comment authors, and the uploader link of files the subject put on anybody's report
     await tx.update(shiftReportVersions).set({ byUser: null }).where(and(eq(shiftReportVersions.tenantId, tenantId), eq(shiftReportVersions.byUser, userId)))
     await tx.update(shiftReportComments).set({ byUser: null }).where(and(eq(shiftReportComments.tenantId, tenantId), eq(shiftReportComments.byUser, userId)))

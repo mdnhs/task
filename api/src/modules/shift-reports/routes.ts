@@ -11,10 +11,11 @@ import { withTenant, type TenantTx } from "../../db/tenant-tx"
 import { withTenantAfterCommit, type Enqueue } from "../notifications"
 import type { Deps } from "../../deps"
 import { currentItem, openReport, saveDraft } from "./draft"
+import { exportDownload, exportStatus, requestExport } from "./exports"
 import { decodeInboxCursor, inboxPage, inboxRange } from "./inbox"
 import { reviewReport } from "./review"
 import { saveTemplate, templatesInScope } from "./template"
-import { AcceptBody, CurrentOut, DraftBody, FileParams, IdParam, InboxOut, InboxQuery, OpenBody, ReportFileSchema, ReportSchema, ReturnBody, SubmitBody, TemplateBody, TemplateOut, UploadBody, UploadIntent, VersionsOut } from "./dto"
+import { AcceptBody, CurrentOut, DraftBody, ExportBody, ExportCreated, ExportIdParam, ExportOut, FileParams, IdParam, InboxOut, InboxQuery, OpenBody, ReportFileSchema, ReportSchema, ReturnBody, SubmitBody, TemplateBody, TemplateOut, UploadBody, UploadIntent, VersionsOut } from "./dto"
 import { getReport, loadReportCtx, type ReportCtx } from "./scope"
 import { submitReport } from "./submit"
 import { completeReportUpload, reportFileDownload, reportUploadIntent } from "./uploads"
@@ -101,6 +102,21 @@ const downloadR = createRoute({
   responses: { 302: { description: "Redirect to a 60 s presigned GET after the scan gate. Never for an API key or a support session. 404 report_not_found | report_file_not_found; 409 file_not_ready; 410 file_infected" } },
 })
 
+const exportCreateR = createRoute({
+  method: "post", path: "/v1/report-exports", middleware: guard("read"), request: { body: body(ExportBody) },
+  responses: {
+    202: json(ExportCreated, "Queued: PDF, Excel or CSV of ONE report (`reportId`, in the caller's scope) or of a range (`from`/`to`, at most 92 days, default the last 7 days; `team`, `person`, `status` as in the inbox, rows equal the inbox rows), written to Files by a job and kept 7 days. A person only (never an API key). Every cap is checked first: 422 range_too_long | invalid_range | export_too_large (over 5000 reports or 50000 task rows) | pdf_too_large (over 500 reports) ; 404 report_not_found; 409 export_limit (3 active per requester); 403 human_required"),
+  },
+})
+const exportGetR = createRoute({
+  method: "get", path: "/v1/report-exports/{id}", middleware: guard("read"), request: { params: ExportIdParam },
+  responses: { 200: json(ExportOut, "The requester's export: queued | running | done | failed (`errorCode` when failed, `forbidden` when the requester's access was reduced before it ran), the report count and when the file expires. Anybody else, in the same tenant or another: 404 report_export_not_found") },
+})
+const exportDownloadR = createRoute({
+  method: "get", path: "/v1/report-exports/{id}/download", middleware: guard("read"), request: { params: ExportIdParam },
+  responses: { 302: { description: "Redirect to a 60 s presigned GET of the file. The requester only (404 report_export_not_found for anybody else, an API key or a support session is refused earlier); 409 export_not_ready; 404 once the 7 days are over" } },
+})
+
 export const shiftReportRoutes = newRouter()
   .openapi(currentR, async (c) => c.json({ item: await read(c, (tx, ctx) => currentItem(tx, ctx)) }, 200))
   .openapi(inboxR, async (c) => {
@@ -158,6 +174,13 @@ export const shiftReportRoutes = newRouter()
   .openapi(downloadR, async (c) => {
     const { id, fileId } = c.req.valid("param")
     const url = await reportFileDownload(c, id, fileId)
+    c.header("Cache-Control", "no-store")
+    return c.redirect(url, 302)
+  })
+  .openapi(exportCreateR, async (c) => c.json(await requestExport(c, c.req.valid("json")), 202))
+  .openapi(exportGetR, async (c) => c.json(await exportStatus(c, c.req.valid("param").id), 200))
+  .openapi(exportDownloadR, async (c) => {
+    const url = await exportDownload(c, c.req.valid("param").id)
     c.header("Cache-Control", "no-store")
     return c.redirect(url, 302)
   })

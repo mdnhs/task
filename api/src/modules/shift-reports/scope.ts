@@ -26,10 +26,11 @@ export type ReportCtx = { tenantId: string; tz: string; me: string; actorId: str
  * The caller's context. For a mutation pass `need: "write"`: the actor's membership, role and `reports:write` are re-read inside the tx with FOR SHARE (R25; API keys
  * go through lockApiKeyActor) and the scope is computed from THAT role, never the request cache. A role with no reports access at all is 404 (the guard answered 403 first).
  */
-export async function loadReportCtx(c: Context<AppEnv>, tx: TenantTx, need: "read" | "write" = "read"): Promise<ReportCtx> {
+export async function loadReportCtx(c: Context<AppEnv>, tx: TenantTx, need: "read" | "write" | "lock" = "read"): Promise<ReportCtx> {
   const tenant = c.get("tenant")!
   const actorId = actorIdOf(c)
-  const role = need === "write" ? await lockActor(tx, tenant.id, actorId, "reports", "write") : c.get("role")!
+  // "lock": a mutation that needs only reports:read (a report export request): the same FOR SHARE re-read, `reports:read` is enough
+  const role = need === "write" ? await lockActor(tx, tenant.id, actorId, "reports", "write") : need === "lock" ? await lockActor(tx, tenant.id, actorId, "reports", "read") : c.get("role")!
   const me = subjectUserId(c)
   const access = await peopleAccess(tx, tenant.id, role, me)
   if (!access) throw ReportNotFound()
