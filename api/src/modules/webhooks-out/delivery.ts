@@ -9,6 +9,7 @@ import { withTenant } from "../../db/tenant-tx"
 import type { Deps } from "../../deps"
 import { recordAudit } from "../audit"
 import { notify, withTenantAfterCommit } from "../notifications"
+import { isScopedPurpose } from "../files"
 import { envelope, isWebhookEvent } from "./events"
 import { webhookAad } from "./service"
 
@@ -59,11 +60,11 @@ export function registerWebhooks(): void {
       // Ruling C14: a suspended tenant's events are not sent (no delivery rows are created, so nothing is replayed on reactivation).
       const [tn] = await tx.select({ status: tenants.status }).from(tenants).where(eq(tenants.id, e.tenantId))
       if (tn?.status !== "active") return
-      // Ruling D14: task files (evidence, attachments, voice) are never announced to outside endpoints (their id, mime and size are task metadata). Fail closed: a file event whose row cannot be classified is dropped too.
+      // Rulings D14, F16: task files (evidence, attachments, voice) and report attachments are never announced to outside endpoints (their id, mime and size are task metadata). Fail closed: a file event whose row cannot be classified is dropped too.
       if (type.startsWith("file.")) {
         const fileId = typeof e.payload.fileId === "string" ? e.payload.fileId : null
         const [f] = fileId ? await tx.select({ purpose: files.purpose }).from(files).where(and(eq(files.tenantId, e.tenantId), eq(files.id, fileId))) : []
-        if (!f || f.purpose?.startsWith("task_")) return
+        if (!f || isScopedPurpose(f.purpose)) return
       }
       const endpoints = await tx
         .select({ id: webhookEndpoints.id })

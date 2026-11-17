@@ -1,5 +1,6 @@
 export class AppError extends Error {
-  constructor(public status: number, public code: string, public title: string) {
+  /** `extra`: machine-readable members merged into the problem body (e.g. `errors` of a 422 report_invalid). Never user free text. */
+  constructor(public status: number, public code: string, public title: string, public extra?: Record<string, unknown>) {
     super(code)
   }
 }
@@ -10,8 +11,8 @@ export const Conflict = (code: string) => new AppError(409, code, "Conflict")
 
 export type ProblemBody = { type: string; title: string; status: number; code: string; requestId: string }
 
-export function problem(status: number, code: string, title: string, requestId: string): Response {
-  const body: ProblemBody = { type: "about:blank", title, status, code, requestId }
+export function problem(status: number, code: string, title: string, requestId: string, extra?: Record<string, unknown>): Response {
+  const body: ProblemBody & Record<string, unknown> = { ...extra, type: "about:blank", title, status, code, requestId }
   return new Response(JSON.stringify(body), {
     status,
     headers: { "content-type": "application/problem+json", "x-request-id": requestId },

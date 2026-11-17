@@ -3,7 +3,7 @@ import { sql } from "drizzle-orm"
 import { call, resetDb, testApp } from "./harness"
 import { ownerTenantQuery, ownerQuery } from "./db"
 import { makeMember, makeTenant, signIn } from "./factories"
-import { actorIn, fixtureIds, ROUTE_PARAMS, type Actor, type World } from "./route-fixtures"
+import { actorIn, fixtureFutureUntil, fixtureIds, ROUTE_PARAMS, type Actor, type World } from "./route-fixtures"
 import { memberships, roles } from "../src/db/schema"
 
 /**
@@ -148,10 +148,19 @@ const SPECS: Record<string, Spec> = {
   // team defaults (control: 200) and per-person overrides (control: 200; the ghost user id is 404 not_a_member)
   "PATCH /v1/shifts/patterns/{id}": { actor: "owner", expect: "shift_pattern_not_found" },
   "DELETE /v1/shifts/patterns/{id}": { actor: "owner", expect: "shift_pattern_not_found" },
-  "PATCH /v1/shifts/assignments/{id}": { actor: "owner", expect: "shift_assignment_not_found", body: () => ({ until: "2027-12-31" }) },
+  "PATCH /v1/shifts/assignments/{id}": { actor: "owner", expect: "shift_assignment_not_found", body: () => ({ until: fixtureFutureUntil() }) },
   "DELETE /v1/shifts/assignments/{id}": { actor: "owner", expect: "shift_assignment_not_found" },
   "PUT /v1/shifts/reporting/teams/{teamId}": { actor: "owner", expect: "team_not_found" },
   "PUT /v1/shifts/reporting/people/{userId}": { actor: "owner", expect: "not_a_member" },
+  // T5.2: shift reports of A's owner (controls: GET 200, PUT draft 422 item_not_in_shift for the example's unknown task, submit 409 version_conflict for the example's version 2,
+  // versions 200, upload intent 201, complete 409 upload_missing for the never-PUT fixture file, download 409 file_not_ready)
+  "GET /v1/shift-reports/{id}": { actor: "owner", expect: "report_not_found" },
+  "PUT /v1/shift-reports/{id}/draft": { actor: "owner", expect: "report_not_found" },
+  "POST /v1/shift-reports/{id}/submit": { actor: "owner", expect: "report_not_found" },
+  "GET /v1/shift-reports/{id}/versions": { actor: "owner", expect: "report_not_found" },
+  "POST /v1/shift-reports/{id}/uploads": { actor: "owner", expect: "report_not_found" },
+  "POST /v1/shift-reports/{id}/uploads/{fileId}/complete": { actor: "owner", expect: "report_not_found" },
+  "GET /v1/shift-reports/{id}/files/{fileId}/download": { actor: "owner", expect: "report_not_found" },
 }
 
 let t: ReturnType<typeof testApp>
@@ -177,7 +186,7 @@ const bodyExample = (op: Json): { present: boolean; example?: unknown } => {
 const substitute = (path: string, params: Record<string, string>) => path.replace(/\{(\w+)\}/g, (_, p) => encodeURIComponent(params[p]))
 
 /** Tenant tables whose rows are hashed before and after the walk: any change in the OTHER tenant is a cross-tenant mutation. */
-const HASHED_TABLES = ["roles", "memberships", "teams", "team_members", "reporting_lines", "devices", "device_policies", "invites", "audit_events", "tenant_settings", "notifications", "notification_preferences", "push_tokens", "notification_deliveries", "files", "integration_connections", "oauth_states", "public_holidays", "data_requests", "support_grants", "api_keys", "webhook_endpoints", "webhook_deliveries", "tasks", "task_assignees", "task_history", "task_time_entries", "task_counters", "task_checklist_items", "task_comments", "task_files", "task_templates", "task_voice_access", "projects", "project_milestones", "task_dependencies", "task_evidence", "shift_patterns", "shift_assignments", "shift_reporting_teams", "shift_reporting_people"]
+const HASHED_TABLES = ["roles", "memberships", "teams", "team_members", "reporting_lines", "devices", "device_policies", "invites", "audit_events", "tenant_settings", "notifications", "notification_preferences", "push_tokens", "notification_deliveries", "files", "integration_connections", "oauth_states", "public_holidays", "data_requests", "support_grants", "api_keys", "webhook_endpoints", "webhook_deliveries", "tasks", "task_assignees", "task_history", "task_time_entries", "task_counters", "task_checklist_items", "task_comments", "task_files", "task_templates", "task_voice_access", "projects", "project_milestones", "task_dependencies", "task_evidence", "shift_patterns", "shift_assignments", "shift_reporting_teams", "shift_reporting_people", "shift_reports", "shift_report_items", "shift_report_versions", "shift_report_comments", "shift_report_files"]
 
 async function hashes(tenantId: string): Promise<Record<string, string>> {
   const out: Record<string, string> = {}

@@ -36,6 +36,9 @@ export const SUPPORT_DENIED_ROUTES: readonly DenyRule[] = [
   { prefix: "/v1/audit/export", why: "bulk audit export (download)" },
   { pattern: /^\/v1\/files\/[^/]+\/download$/, why: "file download (presigned GET)" },
   { pattern: /^\/v1\/tasks\/[^/]+\/voice-note$/, why: "personal audio (presigned GET)" },
+  // F21: a shift report is free-text staff narrative about work (and its attachments are personal files): not support material. The id routes are denied by shape (the
+  // route template `/v1/shift-reports/:id...` or a uuid segment); `/v1/shift-reports/current` and lists that carry no free text stay readable.
+  { pattern: /^\/v1\/shift-reports\/(:[a-z]+|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(\/|$)/, why: "shift report content and attachments (free text, personal files)" },
   EXPORT_OR_DOWNLOAD,
   { prefix: "/v1/integrations", why: "integrations: OAuth tokens and connection status" },
   { prefix: "/v1/settings/support-grants", why: "support must not see or alter its own grants from the tenant side" },

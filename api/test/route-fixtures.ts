@@ -21,7 +21,7 @@ import { notify, withTenantAfterCommit } from "../src/modules/notifications"
 export type Fixture = { kind: "id" | "static"; value: string }
 export type TenantFixtures = Record<string, Record<string, Fixture>>
 
-type Resource = "role" | "member" | "team" | "device" | "feature" | "notification" | "pushToken" | "file" | "integration" | "dataRequest" | "supportGrant" | "apiKey" | "webhook" | "task" | "checklistItem" | "comment" | "taskFile" | "project" | "milestone" | "template" | "evidence" | "pattern" | "assignment"
+type Resource = "role" | "member" | "team" | "device" | "feature" | "notification" | "pushToken" | "file" | "integration" | "dataRequest" | "supportGrant" | "apiKey" | "webhook" | "task" | "checklistItem" | "comment" | "taskFile" | "project" | "milestone" | "template" | "evidence" | "pattern" | "assignment" | "report" | "reportFile"
 
 /** path template -> param -> which resource that param names on that route. */
 export const ROUTE_PARAMS: Record<string, Record<string, Resource>> = {
@@ -83,6 +83,13 @@ export const ROUTE_PARAMS: Record<string, Record<string, Resource>> = {
   "/v1/shifts/assignments/{id}": { id: "assignment" },
   "/v1/shifts/reporting/teams/{teamId}": { teamId: "team" },
   "/v1/shifts/reporting/people/{userId}": { userId: "member" },
+  "/v1/shift-reports/{id}": { id: "report" },
+  "/v1/shift-reports/{id}/draft": { id: "report" },
+  "/v1/shift-reports/{id}/submit": { id: "report" },
+  "/v1/shift-reports/{id}/versions": { id: "report" },
+  "/v1/shift-reports/{id}/uploads": { id: "report" },
+  "/v1/shift-reports/{id}/uploads/{fileId}/complete": { id: "report", fileId: "reportFile" },
+  "/v1/shift-reports/{id}/files/{fileId}/download": { id: "report", fileId: "reportFile" },
   "/v1/projects/{id}": { id: "project" },
   "/v1/projects/{id}/milestones": { id: "project" },
   "/v1/projects/{id}/milestones/{milestoneId}": { id: "project", milestoneId: "milestone" },
@@ -100,6 +107,14 @@ export type World = {
 }
 
 let n = 0
+
+const DAY_MS = 86_400_000
+/** A date that is always comfortably in the future of the REAL clock (the walker runs on it): the control DELETE of an assignment is only allowed while it has not started (409 assignment_started). */
+export const fixtureFutureFrom = (): string => new Date(Date.now() + 400 * DAY_MS).toISOString().slice(0, 10)
+/** The end date the PATCH control sends: after `fixtureFutureFrom` whatever today is. */
+export const fixtureFutureUntil = (): string => new Date(Date.now() + 430 * DAY_MS).toISOString().slice(0, 10)
+/** A day that is always in the past of the real clock (a shift that has started, so a report can be opened for it). */
+const fixturePastDay = (): string => new Date(Date.now() - 3 * DAY_MS).toISOString().slice(0, 10)
 
 /** One member with a signed-in session in `tenant`. */
 export async function actorIn(t: { app: AppType; deps: Deps }, tenant: { id: string; slug: string }, roleKey: string): Promise<Actor & { email: string }> {
@@ -182,10 +197,27 @@ export async function fixtureIds(t: { app: AppType; deps: Deps }, tenant: { id: 
   const patRes = await call(t.app, "POST", "/v1/shifts/patterns", { cookie: owner.cookie, tenant: tenant.slug, body: { name: `Pattern ${uniq}`, teamId: team.id, start: "22:00", end: "06:00", days: [1, 2, 3] } })
   if (patRes.status !== 201) throw new Error(`fixture pattern failed: ${patRes.status} ${await patRes.text()}`)
   const pattern = (await patRes.json()) as { id: string }
-  const asgRes = await call(t.app, "POST", "/v1/shifts/assignments", { cookie: owner.cookie, tenant: tenant.slug, body: { userId: staff.userId, patternId: pattern.id, from: "2027-06-01" } })
+  const asgRes = await call(t.app, "POST", "/v1/shifts/assignments", { cookie: owner.cookie, tenant: tenant.slug, body: { userId: staff.userId, patternId: pattern.id, from: fixtureFutureFrom() } })
   if (asgRes.status !== 201) throw new Error(`fixture assignment failed: ${asgRes.status} ${await asgRes.text()}`)
   const assignment = (await asgRes.json()) as { id: string }
-  const resources = { pattern: pattern.id, assignment: assignment.id, evidence: evItem.id!, template: template.id, project: project.id, milestone: milestone.id, checklistItem: item.id!, comment: comment.id!, taskFile: taskFile.fileId!, task: task.id, apiKey: apiKey.id, webhook: hook.id, supportGrant: String(sg.id), dataRequest: dsr.id, integration: String(integ.id), file: file.fileId, role: await roleIdOf(t.deps, tenant.id, "employee"), member: staff.userId, team: team.id, device: device.id, notification: String(notif.id), pushToken: ((await tokRes.json()) as { id: string }).id }
+  // T5.2: a report of the OWNER (opened through the real API on a shift that has started on the real clock: an all-day pattern assigned from long ago, reporting on for the team) and one attachment intent of it
+  const rpatRes = await call(t.app, "POST", "/v1/shifts/patterns", { cookie: owner.cookie, tenant: tenant.slug, body: { name: `Report pattern ${uniq}`, teamId: team.id, start: "07:00", end: "15:00", days: [0, 1, 2, 3, 4, 5, 6] } })
+  if (rpatRes.status !== 201) throw new Error(`fixture report pattern failed: ${rpatRes.status} ${await rpatRes.text()}`)
+  const rpat = (await rpatRes.json()) as { id: string }
+  for (const [path, method, body] of [
+    ["/v1/shifts/assignments", "POST", { userId: owner.userId, patternId: rpat.id, from: "2020-01-01" }],
+    [`/v1/shifts/reporting/teams/${team.id}`, "PUT", { on: true }],
+  ] as [string, string, unknown][]) {
+    const r = await call(t.app, method, path, { cookie: owner.cookie, tenant: tenant.slug, body })
+    if (r.status !== 201 && r.status !== 200) throw new Error(`fixture report setup ${path} failed: ${r.status} ${await r.text()}`)
+  }
+  const repRes = await call(t.app, "POST", "/v1/shift-reports/open", { cookie: owner.cookie, tenant: tenant.slug, body: { patternId: rpat.id, date: fixturePastDay() } })
+  if (repRes.status !== 201) throw new Error(`fixture report failed: ${repRes.status} ${await repRes.text()}`)
+  const report = (await repRes.json()) as { id: string }
+  const rfRes = await call(t.app, "POST", `/v1/shift-reports/${report.id}/uploads`, { cookie: owner.cookie, tenant: tenant.slug, body: { name: `Shot ${uniq}.pdf`, mime: "application/pdf", sizeBytes: 1000 } })
+  if (rfRes.status !== 201) throw new Error(`fixture report file failed: ${rfRes.status} ${await rfRes.text()}`)
+  const reportFile = (await rfRes.json()) as { fileId: string }
+  const resources = { pattern: pattern.id, assignment: assignment.id, report: report.id, reportFile: reportFile.fileId, evidence: evItem.id!, template: template.id, project: project.id, milestone: milestone.id, checklistItem: item.id!, comment: comment.id!, taskFile: taskFile.fileId!, task: task.id, apiKey: apiKey.id, webhook: hook.id, supportGrant: String(sg.id), dataRequest: dsr.id, integration: String(integ.id), file: file.fileId, role: await roleIdOf(t.deps, tenant.id, "employee"), member: staff.userId, team: team.id, device: device.id, notification: String(notif.id), pushToken: ((await tokRes.json()) as { id: string }).id }
   const fixtures: TenantFixtures = {}
   for (const [path, params] of Object.entries(ROUTE_PARAMS)) {
     fixtures[path] = {}
@@ -193,5 +225,5 @@ export async function fixtureIds(t: { app: AppType; deps: Deps }, tenant: { id: 
       fixtures[path][param] = res === "feature" ? { kind: "static", value: "drive" } : { kind: "id", value: resources[res] }
     }
   }
-  return { fixtures, resources, marks: [tenant.id, tenant.slug, String(integ.id), `drive-${uniq}@example.com`, team.id, device.id, file.fileId, dsr.id, `Fix ${uniq}`, `Support ${uniq}`, String(sg.id), `File ${uniq}.pdf`, staff.userId, owner.userId, `Team ${uniq}`, `Device ${uniq}`, apiKey.id, apiKey.prefix, `Key ${uniq}`, hook.id, `hooks-${uniq}.example.com`, task.id, `Task ${uniq}`, `Desc ${uniq}`, item.id!, comment.id!, taskFile.fileId!, `Item ${uniq}`, `Comment ${uniq}`, `Attach ${uniq}.pdf`, project.id, milestone.id, template.id, `Template ${uniq}`, `Blueprint ${uniq}`, `Steps ${uniq}`, evItem.id!, evFile.fileId!, `Evid ${uniq}.pdf`, `Project ${uniq}`, `Plan ${uniq}`, pattern.id, assignment.id, `Pattern ${uniq}`, `Milestone ${uniq}`] }
+  return { fixtures, resources, marks: [tenant.id, tenant.slug, String(integ.id), `drive-${uniq}@example.com`, team.id, device.id, file.fileId, dsr.id, `Fix ${uniq}`, `Support ${uniq}`, String(sg.id), `File ${uniq}.pdf`, staff.userId, owner.userId, `Team ${uniq}`, `Device ${uniq}`, apiKey.id, apiKey.prefix, `Key ${uniq}`, hook.id, `hooks-${uniq}.example.com`, task.id, `Task ${uniq}`, `Desc ${uniq}`, item.id!, comment.id!, taskFile.fileId!, `Item ${uniq}`, `Comment ${uniq}`, `Attach ${uniq}.pdf`, project.id, milestone.id, template.id, `Template ${uniq}`, `Blueprint ${uniq}`, `Steps ${uniq}`, evItem.id!, evFile.fileId!, `Evid ${uniq}.pdf`, `Project ${uniq}`, `Plan ${uniq}`, pattern.id, assignment.id, `Pattern ${uniq}`, rpat.id, `Report pattern ${uniq}`, report.id, reportFile.fileId, `Shot ${uniq}.pdf`, `Milestone ${uniq}`] }
 }

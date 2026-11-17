@@ -18,6 +18,15 @@
   ],
   "deadline": "17:30",
   "reportDueAfterMinutes": 60,
+  "reportTemplate": {
+    "sections": [
+      { "id": "tasks", "title": "Tasks in the shift", "enabled": true, "fields": [{ "id": "time", "label": "Time spent on done and in-progress tasks", "required": true }, { "id": "note", "label": "Note on blocked tasks", "required": true }] },
+      { "id": "summary", "title": "Summary", "enabled": true, "fields": [{ "id": "summary", "label": "Shift summary", "required": true }] },
+      { "id": "blockers", "title": "Blockers", "enabled": true, "fields": [{ "id": "blockers", "label": "Blockers", "required": false }] },
+      { "id": "unplanned", "title": "Unplanned work", "enabled": true, "fields": [{ "id": "unplanned", "label": "Unplanned work rows", "required": false }] },
+      { "id": "attachments", "title": "Attachments", "enabled": true, "fields": [{ "id": "attachments", "label": "Photos and files", "required": false }] }
+    ]
+  },
   "departments": ["Security", "Cleaning"],
   "reportSections": [
     "Staff / Attendance",

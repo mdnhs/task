@@ -9,7 +9,7 @@ import { runJob } from "../../core/queue/queue"
 import type { MalwareScanner } from "../../core/scan/scanner"
 import { fakeScanner } from "../../core/scan/fake-scanner"
 import { registerNotifications } from "../notifications"
-import { ALLOWED_MIMES, registerFiles } from "."
+import { ALLOWED_MIMES, isScopedPurpose, registerFiles } from "."
 import { fileKey, stagingKey } from "../../core/storage/storage"
 
 const EICAR = "X5O!P%@AP[4\\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*"
@@ -541,3 +541,8 @@ test("complete when the staging object vanishes between HEAD and copy is 409 upl
 })
 const tenantIdHolder = { id: "" }
 const fileIdHolder = { id: "" }
+
+test("isScopedPurpose (rulings D9, F16): task_ and report_ purposes are scoped, an ordinary file and a DSR export are not", () => {
+  for (const p of ["task_evidence", "task_attachment", "task_voice", "report_attachment", "report_export"]) expect(isScopedPurpose(p), p).toBe(true)
+  for (const p of [null, undefined, "", "dsr_export", "tasks", "reports", "my_report_x"]) expect(isScopedPurpose(p), String(p)).toBe(false)
+})

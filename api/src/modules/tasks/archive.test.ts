@@ -672,7 +672,7 @@ describe("retention extras", () => {
     const mkFiles = (n: number, attempts: number) =>
       w.q(
         `insert into files (id, tenant_id, purpose, key, name, mime, size_bytes, status, created_at, object_removal_attempts, object_removal_attempted_at)
-         select g.id, $1::uuid, 'task_attachment', 't/' || $1 || '/' || g.id, 'x.pdf', 'application/pdf', 1, 'deleted', now(), $2, case when $2 > 0 then $3::timestamptz end from (select gen_random_uuid() id from generate_series(1, $4::int)) g`,
+         select g.id, $1::uuid, case when random() < 0.5 then 'task_attachment' else 'report_attachment' end, 't/' || $1 || '/' || g.id, 'x.pdf', 'application/pdf', 1, 'deleted', now(), $2, case when $2 > 0 then $3::timestamptz end from (select gen_random_uuid() id from generate_series(1, $4::int)) g`,
         [w.tenant.id, attempts, w.clock.now(), n],
       )
     await mkFiles(250, 0)

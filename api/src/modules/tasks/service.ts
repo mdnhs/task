@@ -13,7 +13,7 @@ import type { TenantTx } from "../../db/tenant-tx"
 import { decodeCursor, encodeCursor } from "./cursor"
 import { applyCompletion, evidenceFilter, settleCompletion } from "./evidence"
 import { taskDtos, type CreateInput, type ListQueryInput, type PatchInput, type TaskDto } from "./dto"
-import { publishTaskEvent } from "./events"
+import { publishTaskEvent, type TaskEvent } from "./events"
 import { listHistory, recentHistory, writeHistory } from "./history"
 import { changeRecipients, notifyTask, type TaskEnv } from "./notify"
 import { allAssignees, assigneesOf, replaceAssignees } from "./repo"
@@ -399,9 +399,9 @@ const REF = /^TSK-(\d{1,9})$/
  * A task change made outside /tasks (end-of-shift report FR-M1-26, Today card FR-M1-74), idempotent on `u.id`: a repeat is
  * "duplicate" and writes nothing. Status moves like taskStatusFor (never backwards); Done goes through completeTarget, so a Required
  * task without evidence stays open and gets the line "Report marked done; evidence still needed". Minutes are logged once per update id.
- * The caller names the person (ctx.me/actorId): the task must be in their scope and they must be an assignee or a manager of it, else 404 task_not_found. Archived tasks are skipped.
+ * `o.events` collects the domain events instead of publishing them (the caller publishes them after its own audit entry). The caller names the person (ctx.me/actorId): the task must be in their scope and they must be an assignee or a manager of it, else 404 task_not_found. Archived tasks are skipped.
  */
-export async function applyTaskUpdate(tx: TenantTx, ctx: TaskCtx, u: TaskUpdate): Promise<"applied" | "duplicate" | "skipped_archived"> {
+export async function applyTaskUpdate(tx: TenantTx, ctx: TaskCtx, u: TaskUpdate, o: { events?: TaskEvent[] } = {}): Promise<"applied" | "duplicate" | "skipped_archived"> {
   const m = REF.exec(u.ref)
   if (!m) throw TaskNotFound()
   // Scope and authority first, and every refusal is the same 404 (an unknown ref, another person's task and a task you may not report on look alike).
@@ -452,7 +452,8 @@ export async function applyTaskUpdate(tx: TenantTx, ctx: TaskCtx, u: TaskUpdate)
     const event = status === "completed" ? ({ type: "task.completed", payload: { taskId: row.id } } as const)
       : status === "submitted" ? ({ type: "task.submitted", payload: { taskId: row.id, round: row.round } } as const)
       : ({ type: "task.status_changed", payload: { taskId: row.id, from: row.status as TaskStatus, to: status } } as const)
-    await publishTaskEvent(tx, ctx, event)
+    if (o.events) o.events.push(event) // the caller publishes them LAST (a shift report submit records its audit entry first: the audit advisory lock before the relay-hint lock)
+    else await publishTaskEvent(tx, ctx, event)
   }
   return "applied"
 }

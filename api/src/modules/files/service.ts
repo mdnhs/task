@@ -33,15 +33,19 @@ type Actor = { userId: string }
  * behaviour is the ordinary /v1/files one.
  */
 export type UploadPolicy = {
-  purpose: "task_evidence" | "task_attachment" | "task_voice"
+  purpose: "task_evidence" | "task_attachment" | "task_voice" | "report_attachment"
   mimes: readonly string[]
   maxBytes: (mime: string) => number
   lock: (tx: TenantTx) => Promise<void>
   stripMimeParams?: boolean
   after?: (tx: TenantTx, fileId: string, mime: string) => Promise<void>
 }
-/** Files created through a task policy carry a `task_` purpose and are invisible to /v1/files (ruling D9). */
-const isTaskFile = (r: { purpose: string | null }): boolean => r.purpose?.startsWith("task_") ?? false
+/**
+ * Files created through a module's own upload policy carry a SCOPED purpose (`task_%` ruling D9, `report_%` ruling F16): they are reachable only through
+ * their module's routes, so /v1/files, the search index and the webhook fan-out all treat them as absent. THE one predicate; never test a prefix elsewhere.
+ */
+export const isScopedPurpose = (p: string | null | undefined): boolean => (p?.startsWith("task_") || p?.startsWith("report_")) ?? false
+const isScopedFile = (r: { purpose: string | null }): boolean => isScopedPurpose(r.purpose)
 /** A caller that may read: the role decides files:read, and who may open a DSR export. */
 export type FileReader = { userId: string; role: ResolvedRole }
 type Row = typeof files.$inferSelect
@@ -85,7 +89,7 @@ const dsrAllowed = (row: Row, who: FileReader): boolean => row.purpose !== "dsr_
 async function readableFile(tx: TenantTx, tenantId: string, id: string, who: FileReader): Promise<Row> {
   const canRead = can(who.role, "files", "read")
   const [row] = await tx.select().from(files).where(and(eq(files.id, id), eq(files.tenantId, tenantId)))
-  if (!row || isTaskFile(row)) throw canRead ? NotFoundFile() : Forbidden("forbidden") // a task file looks like a missing one: only task routes serve it
+  if (!row || isScopedFile(row)) throw canRead ? NotFoundFile() : Forbidden("forbidden") // a task file looks like a missing one: only task routes serve it
   if (row.purpose === "dsr_export") {
     if (!dsrAllowed(row, who)) throw NotFoundFile()
   } else if (!canRead) throw Forbidden("forbidden")
@@ -101,7 +105,7 @@ async function liveFile(tx: TenantTx, tenantId: string, id: string, lock = false
   const q = tx.select().from(files).where(and(eq(files.id, id), eq(files.tenantId, tenantId)))
   const [row] = lock ? await q.for("update") : await q
   if (!row || row.status === "deleted") throw NotFoundFile()
-  if (purpose === null ? isTaskFile(row) : purpose !== "*" && row.purpose !== purpose) throw NotFoundFile()
+  if (purpose === null ? isScopedFile(row) : purpose !== "*" && row.purpose !== purpose) throw NotFoundFile()
   return row
 }
 
@@ -204,9 +208,21 @@ export async function downloadUrl(deps: Deps, tenantId: string, id: string, who:
  * task and that the file belongs to it; this only adds the scan gate: 410 file_infected, 409 file_not_ready, else a presigned GET.
  */
 export async function taskFileDownloadUrl(deps: Deps, tenantId: string, id: string): Promise<string> {
+  return scopedDownloadUrl(deps, tenantId, id, (p) => p?.startsWith("task_") ?? false)
+}
+
+/**
+ * The 60 s download URL of a REPORT attachment (purpose `report_attachment`, ruling F16). The shift-reports module has already proved the caller may see the
+ * report and that the file belongs to it; this adds the scan gate (410 file_infected, 409 file_not_ready). Any other purpose is a missing file.
+ */
+export async function reportFileDownloadUrl(deps: Deps, tenantId: string, id: string): Promise<string> {
+  return scopedDownloadUrl(deps, tenantId, id, (p) => p === "report_attachment")
+}
+
+async function scopedDownloadUrl(deps: Deps, tenantId: string, id: string, ok: (purpose: string | null) => boolean): Promise<string> {
   const row = await withTenant(deps.db, tenantId, async (tx) => {
     const r = await liveFile(tx, tenantId, id, false, "*")
-    if (!isTaskFile(r)) throw NotFoundFile()
+    if (!ok(r.purpose)) throw NotFoundFile()
     return r
   })
   if (row.status === "infected") throw new AppError(410, "file_infected", "Gone")
@@ -254,6 +270,11 @@ export async function storeGeneratedFile(
 export async function expireFile(tx: TenantTx, tenantId: string, id: string, enqueue: (name: string, data: unknown, o?: { key?: string }) => void): Promise<boolean> {
   const [row] = await tx.select({ status: files.status }).from(files).where(and(eq(files.id, id), eq(files.tenantId, tenantId))).for("update")
   if (!row || row.status === "deleted") return false
+  // `files_signature_check` ties status `infected` to its signature, so an infected file cannot become `deleted`: it stays infected (nobody can read it) and only its object is removed
+  if (row.status === "infected") {
+    enqueue(DELETE_OBJECT_JOB, { fileId: id, tenantId }, { key: `${id}-${crypto.randomUUID()}` })
+    return false
+  }
   await tx.update(files).set({ status: "deleted" }).where(and(eq(files.id, id), eq(files.tenantId, tenantId)))
   enqueue(DELETE_OBJECT_JOB, { fileId: id, tenantId }, { key: `${id}-${crypto.randomUUID()}` })
   return true

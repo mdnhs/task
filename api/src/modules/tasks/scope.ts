@@ -27,15 +27,25 @@ export const TaskNotFound = () => NotFound("task_not_found")
  * the tx with FOR SHARE (R25; API keys go through lockApiKeyActor), and scope is computed from THAT role, never the request cache.
  */
 export async function loadTaskCtx(c: Context<AppEnv>, tx: TenantTx, need?: "read" | "write"): Promise<TaskCtx> {
+  const actorId = actorIdOf(c)
+  const role = need ? await lockActor(tx, c.get("tenant")!.id, actorId, "tasks", need) : c.get("role")!
+  const ctx = await taskCtxOf(c, tx, role)
+  if (!ctx) throw TaskNotFound() // no tasks:read: nothing is visible (the route guard already answered 403)
+  return ctx
+}
+
+/**
+ * The task context of a caller whose `role` the CALLER has already resolved (and, for a mutation, locked: a shift report submit locks the actor on the
+ * `reports` module, not `tasks`). Null when the role has no tasks:read at all (nothing is visible then), never a throw: the reports module treats it as "no task rows".
+ */
+export async function taskCtxOf(c: Context<AppEnv>, tx: TenantTx, role: ResolvedRole): Promise<TaskCtx | null> {
   const deps = c.get("deps")
   const tenant = c.get("tenant")!
-  const actorId = actorIdOf(c)
-  const role = need ? await lockActor(tx, tenant.id, actorId, "tasks", need) : c.get("role")!
   const me = subjectUserId(c)
   const resolved = taskScope({ ...role, reportScope: await effectiveReportScope(tx, tenant.id, role) }, me)
-  if (!resolved || !can(role, "tasks")) throw TaskNotFound() // no tasks:read: nothing is visible (the route guard already answered 403)
+  if (!resolved || !can(role, "tasks")) return null
   const reports = resolved.kind === "team" ? await directReports(tx, me) : []
-  return { tenantId: tenant.id, tz: tenant.timezone, me, actorId, role, scope: resolved, reports, drive: driveAllowed(c), now: deps.clock.now() }
+  return { tenantId: tenant.id, tz: tenant.timezone, me, actorId: actorIdOf(c), role, scope: resolved, reports, drive: driveAllowed(c), now: deps.clock.now() }
 }
 
 /** A person is a task's creator, an assignee, or its named evidence reviewer ("own" scope). `assigneeIds` are the task's assignees. */

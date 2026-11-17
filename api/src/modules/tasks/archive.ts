@@ -268,7 +268,7 @@ async function requeueObjects(deps: Deps, tenantId: string): Promise<void> {
     const picked = await tx.execute(sql`
       with due as (
         select id from files
-        where tenant_id = ${tenantId} and status = 'deleted' and object_removed_at is null and purpose like 'task!_%' escape '!'
+        where tenant_id = ${tenantId} and status = 'deleted' and object_removed_at is null and (purpose like 'task!_%' escape '!' or purpose like 'report!_%' escape '!')
           and object_removal_attempts < ${REMOVAL_MAX_ATTEMPTS}
           and (object_removal_attempted_at is null or object_removal_attempted_at + (interval '1 hour' * power(2, object_removal_attempts)) <= ${now}::timestamptz)
         order by object_removal_attempted_at nulls first, created_at, id
@@ -278,7 +278,7 @@ async function requeueObjects(deps: Deps, tenantId: string): Promise<void> {
       from due where f.id = due.id and f.tenant_id = ${tenantId}
       returning f.id`)
     for (const r of picked.rows as { id: string }[]) enqueue(DELETE_OBJECT_JOB, { fileId: r.id, tenantId }, { key: `${r.id}-${crypto.randomUUID()}` })
-    const stuck = await tx.execute(sql`select count(*)::int n from files where tenant_id = ${tenantId} and status = 'deleted' and object_removed_at is null and purpose like 'task!_%' escape '!' and object_removal_attempts >= ${REMOVAL_MAX_ATTEMPTS}`)
+    const stuck = await tx.execute(sql`select count(*)::int n from files where tenant_id = ${tenantId} and status = 'deleted' and object_removed_at is null and (purpose like 'task!_%' escape '!' or purpose like 'report!_%' escape '!') and object_removal_attempts >= ${REMOVAL_MAX_ATTEMPTS}`)
     const n = (stuck.rows[0] as { n: number }).n
     if (n > 0) deps.logger.error({ tenantId, files: n }, "task file objects could not be removed after the maximum attempts")
   })

@@ -529,7 +529,7 @@ describe("task files (M5, ruling D14)", () => {
     }
     const emit = (type: "file.uploaded" | "file.scanned" | "file.deleted", fileId: string) =>
       withTenant(w.deps.db, w.tenant.id, (tx) => publish(tx, { tenantId: w.tenant.id, type, payload: { fileId, mime: "image/png", sizeBytes: 10, status: "clean" }, actorId: null }, w.clock.now()))
-    for (const purpose of ["task_evidence", "task_attachment", "task_voice"]) {
+    for (const purpose of ["task_evidence", "task_attachment", "task_voice", "report_attachment", "report_export"]) { // F16: report files are scoped like task files
       const id = await mkFile(purpose)
       for (const t of ["file.uploaded", "file.scanned", "file.deleted"] as const) await emit(t, id)
     }

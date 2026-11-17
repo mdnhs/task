@@ -31,6 +31,7 @@ import { evidenceRoutes } from "./modules/task-evidence"
 import { projectRoutes } from "./modules/projects"
 import { templateRoutes } from "./modules/task-templates"
 import { shiftRoutes } from "./modules/shifts"
+import { shiftReportRoutes } from "./modules/shift-reports"
 import { teamRoutes } from "./modules/teams"
 import { tenantRoutes } from "./modules/tenants"
 
@@ -46,7 +47,7 @@ export function createApp(deps: Deps) {
 
   app.onError((err, c) => {
     const rid = c.get("requestId") ?? crypto.randomUUID()
-    if (err instanceof AppError) return problem(err.status, err.code, err.title, rid)
+    if (err instanceof AppError) return problem(err.status, err.code, err.title, rid, err.extra)
     if (err instanceof HTTPException) {
       return problem(err.status, statusCode(err.status), statusTitle(err.status), rid)
     }
@@ -87,6 +88,7 @@ export function createApp(deps: Deps) {
   app.route("/", projectRoutes)
   app.route("/", templateRoutes)
   app.route("/", shiftRoutes)
+  app.route("/", shiftReportRoutes)
   app.route("/", mfaRoutes)
   app.route("/", auditRoutes)
   app.route("/", deviceRoutes)
