@@ -12,7 +12,7 @@ import { registerFiles } from "../files"
 import { registerNotifications } from "../notifications"
 import { registerSearchIndexers } from "../search"
 import { applyTaskUpdate, registerTasks, type TaskCtx } from "."
-import { expiredPageQuery } from "./archive"
+import { expiredPageQuery, lockTaskSet } from "./archive"
 import { archiveQuery, boardCountsQuery, boardItemsQuery, calendarQuery, dayFor } from "./views"
 
 // T4.5: archive, restore, audited purge, retention job and the board / calendar / archive queries. Rulings D3, D5, D6, D7, D13, D14, D21, E4, E5.
@@ -71,6 +71,16 @@ const drain = async (w: W) => {
 }
 const sweep = (w: W, deps = w.deps) => runJob("tasks.archive-purge", {}, deps)
 const ids = (r: Json) => (r.items as Json[]).map((i) => i.id)
+/** Polls pg_locks until `n` lock requests are waiting (not granted) (a row lock or an advisory lock), or throws after `ms`. */
+async function waitBlocked(n = 1, ms = 10_000): Promise<void> {
+  const until = Date.now() + ms
+  for (;;) {
+    const [r] = await ownerQuery("select count(*)::int n from pg_locks where not granted")
+    if ((r as { n: number }).n >= n) return
+    if (Date.now() > until) throw new Error(`no backend blocked on a lock after ${ms} ms`)
+    await new Promise((res) => setTimeout(res, 25))
+  }
+}
 const exists = async (w: W, id: string) => (await w.q("select 1 from tasks where id = $1", [id])).length === 1
 
 /** Intent → browser-style PUT → complete (the object is in its final place). Returns the file id. */
@@ -506,7 +516,7 @@ describe("purge (manual)", () => {
       await c.query("select id from tasks where id = $1 for update", [t.id]) // what a purge in progress holds
       let settled = false
       const pending = w.req("POST", `/v1/tasks/${t.id}/uploads`, w.ops, { purpose: "attachment", name: "a.pdf", mime: "application/pdf", sizeBytes: 5 }).then((r) => ((settled = true), r))
-      await new Promise((res) => setTimeout(res, 600))
+      await waitBlocked() // deterministic: a backend is waiting on a lock (pg_locks, not granted), no fixed sleep
       expect(settled).toBe(false) // blocked on the row lock
       await c.query("delete from tasks where id = $1", [t.id])
       await c.query("commit")
@@ -942,4 +952,87 @@ describe("grants", () => {
     expect((res as { rowCount?: number }).rowCount ?? 0).toBe(0)
     expect(await exists(w, t.id)).toBe(true)
   })
+})
+
+describe("b4 fix wave (M6a, M7)", () => {
+  const GRAPH_NS = 0x74677270
+
+  test("M6a: archive and restore take the task-graph advisory lock first: while a dependency edit (or any graph writer) holds it, both wait and finish when it is released", async () => {
+    const w = await world()
+    const t = await w.mk(w.ops)
+    const c = new pg.Client({ connectionString: process.env.TEST_DATABASE_OWNER_URL })
+    await c.connect()
+    try {
+      await c.query("begin")
+      await c.query("select pg_advisory_xact_lock($1::int, hashtext($2::text))", [GRAPH_NS, w.tenant.id])
+      let settled = false
+      const pending = archive(w, t.id).then((r) => ((settled = true), r))
+      await waitBlocked()
+      expect(settled).toBe(false)
+      await c.query("commit")
+      expect((await pending).status).toBe(200)
+      await c.query("begin")
+      await c.query("select pg_advisory_xact_lock($1::int, hashtext($2::text))", [GRAPH_NS, w.tenant.id])
+      settled = false
+      const back = restore(w, t.id).then((r) => ((settled = true), r))
+      await waitBlocked()
+      expect(settled).toBe(false)
+      await c.query("commit")
+      expect((await back).status).toBe(200)
+    } finally {
+      await c.end()
+    }
+  }, 60_000)
+
+  test("M6a: PUT /dependencies (P depends on C, C has the lower id) racing archive(P) and archive(C), many rounds: never a 5xx, never a deadlock", async () => {
+    const w = await world()
+    for (let round = 0; round < 6; round++) {
+      const a = await w.mk(w.ops, { title: `A${round}` })
+      const b = await w.mk(w.ops, { title: `B${round}` })
+      const [c, p] = a.id < b.id ? [a, b] : [b, a] // C has the lower id
+      const edge = () => w.req("PUT", `/v1/tasks/${p.id}/dependencies`, w.ops, { version: 1, dependsOnIds: [c.id] })
+      const results = await Promise.all([edge(), archive(w, p.id, w.ops, 1), archive(w, c.id, w.ops, 1), edge()])
+      for (const r of results) expect([200, 404, 409, 422], `round ${round}: ${await r.clone().text()}`).toContain(r.status)
+      expect(results.filter((r) => r.status >= 500)).toHaveLength(0)
+    }
+  }, 120_000)
+
+  test("M6c: lockTaskSet makes ONE ordered lock pass; a row that appears meanwhile is 409 retry (never a second, out-of-order pass)", async () => {
+    const w = await world()
+    const a = await w.mk(w.ops)
+    const b = await w.mk(w.ops)
+    const [lo, hi] = a.id < b.id ? [a.id, b.id] : [b.id, a.id]
+    let calls = 0
+    const grew = withTenant(w.deps.db, w.tenant.id, (tx) => lockTaskSet(tx, w.tenant.id, async () => (++calls === 1 ? [hi] : [lo, hi])))
+    await expect(grew).rejects.toMatchObject({ status: 409, code: "retry" })
+    expect(calls).toBe(2) // resolved, locked once, re-resolved: no third look, no second lock pass
+    const stable = await withTenant(w.deps.db, w.tenant.id, (tx) => lockTaskSet(tx, w.tenant.id, async () => [hi, lo]))
+    expect(stable.map((r) => r.id)).toEqual([lo, hi]) // in id order
+  })
+
+  test("M7/E12: an attachment whose only comment is soft-deleted is no longer downloadable (404 file_not_found); one still referenced, or not yet attached, is; purge still removes it", async () => {
+    const w = await world()
+    const t = await w.mk(w.ops)
+    const dl = (f: string) => w.req("GET", `/v1/tasks/${t.id}/files/${f}/download`, w.ops)
+    const f1 = await attach(w, w.ops, t.id)
+    const f2 = await attach(w, w.ops, t.id)
+    const f3 = await attach(w, w.ops, t.id) // never attached to a comment
+    await drain(w) // the scans
+    const post = async (files: string[]) => (await w.json(await w.req("POST", `/v1/tasks/${t.id}/comments`, w.ops, { body: "see", attachmentFileIds: files }))).id as string
+    const c1 = await post([f1, f2])
+    const c2 = await post([f2])
+    for (const f of [f1, f2, f3]) expect((await dl(f)).status).toBe(302)
+    expect((await w.req("DELETE", `/v1/tasks/${t.id}/comments/${c1}`, w.ops)).status).toBe(204)
+    const gone = await dl(f1)
+    expect(gone.status).toBe(404)
+    expect(await code(gone)).toBe("file_not_found")
+    expect((await dl(f2)).status).toBe(302) // c2 still holds it
+    expect((await dl(f3)).status).toBe(302)
+    expect((await w.req("DELETE", `/v1/tasks/${t.id}/comments/${c2}`, w.ops)).status).toBe(204)
+    expect((await dl(f2)).status).toBe(404)
+    await arch(w, t.id)
+    expect((await purge(w, t.id)).status).toBe(204)
+    await drain(w)
+    expect((await w.q("select count(*)::int n from files where status <> 'deleted'"))[0].n).toBe(0)
+  }, 60_000)
 })

@@ -1,10 +1,10 @@
-import { and, eq } from "drizzle-orm"
+import { and, eq, sql } from "drizzle-orm"
 import { z } from "@hono/zod-openapi"
 import type { Context } from "hono"
 import type { AppEnv } from "../../core/context"
 import { Forbidden, NotFound } from "../../core/errors"
 import { subjectUserId } from "../../core/middleware/principal"
-import { taskFiles } from "../../db/schema"
+import { taskComments, taskFiles } from "../../db/schema"
 import { withTenant, type TenantTx } from "../../db/tenant-tx"
 import { ALLOWED_MIMES, completeUpload, createUpload, taskFileDownloadUrl, TASK_VIDEO_MIMES, TASK_VOICE_MIMES, type UploadPolicy } from "../files"
 import { allAssignees, assigneesOf } from "./repo"
@@ -109,7 +109,15 @@ export async function completeTaskUpload(c: Context<AppEnv>, taskId: string, fil
 /** GET /v1/tasks/{id}/files/{fileId}/download: needs access to the TASK, then the scan gate; returns the 60 s presigned GET. */
 export async function taskFileDownload(c: Context<AppEnv>, taskId: string, fileId: string): Promise<string> {
   const tenantId = c.get("tenant")!.id
-  const f = await withTenant(c.get("deps").db, tenantId, async (tx) => taskFileOf(tx, await loadTaskCtx(c, tx), taskId, fileId))
+  const f = await withTenant(c.get("deps").db, tenantId, async (tx) => {
+    const found = await taskFileOf(tx, await loadTaskCtx(c, tx), taskId, fileId)
+    if (found.purpose === "task_attachment") {
+      // Ruling E12: an attachment whose comments are ALL soft-deleted is gone for readers (404). One that no comment references yet (just uploaded) is still served.
+      const refs = await tx.select({ deletedAt: taskComments.deletedAt }).from(taskComments).where(and(eq(taskComments.tenantId, tenantId), eq(taskComments.taskId, taskId), sql`${fileId}::uuid = any(${taskComments.attachmentFileIds})`))
+      if (refs.length > 0 && refs.every((r) => r.deletedAt !== null)) throw FileNotFound()
+    }
+    return found
+  })
   // A voice note is personal audio: it is served ONLY by GET /voice-note, which logs every play (ruling D21). Here it looks like a missing file.
   if (f.purpose === "task_voice") throw FileNotFound()
   return taskFileDownloadUrl(c.get("deps"), tenantId, fileId)

@@ -47,3 +47,20 @@ test("malformed JSON body is 400 problem+json, not 500", async () => {
   expect(bad.headers.get("content-type")).toMatch(/application\/problem\+json/)
   expect(await bad.json()).toMatchObject({ status: 400, code: "bad_request", requestId: expect.any(String) })
 })
+
+test("M6c: Postgres 40P01 (deadlock) and 40001 (serialisation failure), read from .cause.code, are a retryable 409 `retry`; other SQLSTATEs stay 500", async () => {
+  const { app } = testApp()
+  const pgErr = (code: string) => Object.assign(new Error("query failed secret detail"), { cause: Object.assign(new Error("pg"), { code }) })
+  app.get("/v1/_deadlock", () => { throw pgErr("40P01") })
+  app.get("/v1/_serial", () => { throw pgErr("40001") })
+  app.get("/v1/_unique", () => { throw pgErr("23505") })
+  for (const path of ["/v1/_deadlock", "/v1/_serial"]) {
+    const r = await call(app, "GET", path)
+    expect(r.status).toBe(409)
+    expect(r.headers.get("content-type")).toMatch(/application\/problem\+json/)
+    expect(await r.json()).toMatchObject({ status: 409, code: "retry", requestId: expect.any(String) })
+  }
+  const other = await call(app, "GET", "/v1/_unique")
+  expect(other.status).toBe(500)
+  expect(await other.text()).not.toContain("secret detail")
+})

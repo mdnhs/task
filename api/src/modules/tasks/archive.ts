@@ -59,19 +59,17 @@ const safeCode = (e: unknown): string => {
  * Ruling E8: EVERY multi-row task lock in archive, restore, purge and the retention job goes through here. The set the operation touches is resolved with
  * a plain read, then locked in ONE statement, `ORDER BY id FOR UPDATE`, so two operations on overlapping sets (restore a child vs purge its parent, two
  * restores of one batch) always take their common rows in the same (id) order and can never deadlock (40P01). The set is then re-resolved under the lock;
- * a row that appeared meanwhile (a new subtask, a batch that changed) is added and the lock statement repeats, so the locked set always covers the current
- * one. Rows that vanished (purged) are simply absent from the result. Callers re-check the state of their entry row on the locked rows.
+ * a row that appeared meanwhile fails the call with 409 `retry` (never a second, out-of-order lock pass). Rows that vanished (purged) are simply absent from the result. Callers re-check the state of their entry row on the locked rows.
  */
 export async function lockTaskSet(tx: TenantTx, tenantId: string, resolve: () => Promise<string[]>): Promise<TaskRow[]> {
-  let ids = await resolve()
-  for (let attempt = 0; attempt < 5; attempt++) {
-    const rows = ids.length ? await tx.select().from(tasks).where(and(eq(tasks.tenantId, tenantId), inArray(tasks.id, ids))).orderBy(asc(tasks.id)).for("update", { of: [tasks] }) : []
-    const have = new Set(rows.map((r) => r.id))
-    const again = await resolve()
-    if (again.every((id) => have.has(id))) return rows
-    ids = [...new Set([...ids, ...again])]
-  }
-  throw Conflict("version_conflict") // the set kept changing under us: the client retries
+  const ids = await resolve()
+  const rows = ids.length ? await tx.select().from(tasks).where(and(eq(tasks.tenantId, tenantId), inArray(tasks.id, ids))).orderBy(asc(tasks.id)).for("update", { of: [tasks] }) : []
+  const have = new Set(rows.map((r) => r.id))
+  // A row that appeared meanwhile (a new subtask, a batch that changed) cannot be added to a lock pass that is already running: a lower id would be
+  // locked AFTER higher ones and break the order (ruling E8). One conflicting pass is therefore final: 409 `retry`, the transaction rolls back and
+  // the client repeats the request, which then resolves the bigger set and locks it in order from the start.
+  if ((await resolve()).some((id) => !have.has(id))) throw Conflict("retry")
+  return rows
 }
 
 const idsWhere = async (tx: TenantTx, tenantId: string, cond: SQL): Promise<string[]> =>

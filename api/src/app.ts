@@ -49,7 +49,13 @@ export function createApp(deps: Deps) {
     if (err instanceof HTTPException) {
       return problem(err.status, statusCode(err.status), statusTitle(err.status), rid)
     }
-    logger.error({ ...errorInfo(err), requestId: rid }, "unhandled error") // never the message or object: Drizzle messages carry query params
+    // Postgres 40P01 (deadlock detected) and 40001 (serialisation failure) roll the transaction back and are transient: 409 `retry`, the client repeats the request (R9: the SQLSTATE is read from .cause.code).
+    const info = errorInfo(err)
+    if (info.code === "40P01" || info.code === "40001") {
+      logger.warn({ ...info, requestId: rid }, "transient database conflict")
+      return problem(409, "retry", "Conflict", rid)
+    }
+    logger.error({ ...info, requestId: rid }, "unhandled error") // never the message or object: Drizzle messages carry query params
     return problem(500, "internal", "Internal Server Error", rid)
   })
   app.notFound((c) => problem(404, "not_found", "Not Found", c.get("requestId")))

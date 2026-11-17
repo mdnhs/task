@@ -1951,3 +1951,79 @@ describe("projects, milestones, dependencies, knock-on and date proposals (T4.3)
     expect((await w.req("GET", `/v1/projects/${p.id}`, w.ops)).status).toBe(200)
   })
 })
+
+describe("b4 fix wave (I1, I4, M8)", () => {
+  const url = "https://drive.google.com/file/d/abc123/view"
+
+  test("I1/E13: a Drive URL in a task title or checklist text never reaches a notification body or a history text, even for a member with Drive access", async () => {
+    const w = await world()
+    const t = await w.mk(w.owner, { title: `Plan ${url}` }) // assigned to staff, created by owner
+    expect((await w.req("POST", `/v1/tasks/${t.id}/checklist`, w.owner, { text: `Read ${url}` })).status).toBe(201)
+    expect((await w.req("PATCH", `/v1/tasks/${t.id}`, w.owner, { version: 1, priority: 3 })).status).toBe(200)
+    const notes = await w.q("select body from notifications")
+    expect(notes.length).toBeGreaterThan(0)
+    expect(JSON.stringify(notes)).not.toContain("drive.google.com")
+    expect(JSON.stringify(notes)).toContain("Google Drive link")
+    expect(JSON.stringify(await w.q("select text from task_history"))).not.toContain("drive.google.com")
+    // the task row itself stays raw (the DTO withholds per device)
+    expect((await w.q("select title from tasks"))[0].title).toContain("drive.google.com")
+    expect((await w.json(await w.req("GET", `/v1/tasks/${t.id}`, w.owner))).title).toContain("drive.google.com")
+  })
+
+  test("I1/E13: a Drive URL in a milestone name or a linked task title stays out of the milestone notice and the history lines", async () => {
+    const w = await world()
+    const p = await w.json(await w.req("POST", "/v1/projects", w.ops, { name: "Fit-out" }))
+    const m = await w.json(await w.req("POST", `/v1/projects/${p.id}/milestones`, w.ops, { name: `Phase ${url}`, due: "2026-12-04" }))
+    const t = await w.mk(w.ops, { title: `Paint ${url}` })
+    expect((await w.req("PATCH", `/v1/tasks/${t.id}`, w.ops, { version: 1, projectId: p.id, milestoneId: m.id })).status).toBe(200)
+    await w.q("delete from notifications")
+    expect((await w.req("PATCH", `/v1/projects/${p.id}/milestones/${m.id}`, w.ops, { due: "2026-12-10" })).status).toBe(200)
+    const notes = await w.q("select body from notifications where title = 'Milestone date changed'")
+    expect(notes).toHaveLength(1)
+    expect(JSON.stringify(notes)).not.toContain("drive.google.com")
+    const hist = await w.q("select text from task_history where kind = 'milestone'")
+    expect(hist).toHaveLength(1)
+    expect(JSON.stringify(hist)).not.toContain("drive.google.com")
+    expect((await w.req("DELETE", `/v1/projects/${p.id}/milestones/${m.id}`, w.ops)).status).toBe(204)
+    expect(JSON.stringify(await w.q("select text from task_history"))).not.toContain("drive.google.com")
+  })
+
+  test("I4: staff see a subtask but neither its parent's ref nor id; the parent's history names no child; a team manager reading the parent's history sees no out-of-scope child title", async () => {
+    const w = await world()
+    await w.manages(w.manager, w.staff2) // the manager's team is staff2 only
+    const parent = await w.mk(w.ops, { primary: w.staff2.userId })
+    const r = await w.req("POST", `/v1/tasks/${parent.id}/subtasks`, w.ops, { title: "Secret child title" })
+    const child = await w.json(r)
+    await w.q("update task_assignees set user_id = $1 where task_id = $2", [w.staff.userId, child.id]) // the child now belongs to staff
+    const asStaff = await w.json(await w.req("GET", `/v1/tasks/${child.id}`, w.staff))
+    expect(asStaff.title).toBe("Secret child title")
+    expect(asStaff.parentRef).toBeUndefined()
+    expect(asStaff.parentId).toBeNull()
+    expect(JSON.stringify(asStaff)).not.toContain(parent.ref)
+    expect(JSON.stringify(asStaff)).not.toContain(parent.id)
+    // someone who may see the parent still gets it
+    const asOps = await w.json(await w.req("GET", `/v1/tasks/${child.id}`, w.ops))
+    expect(asOps).toMatchObject({ parentRef: parent.ref, parentId: parent.id })
+    // the manager sees the parent (a report is assigned) but not the child: its title and ref are in no history line
+    expect((await w.req("GET", `/v1/tasks/${child.id}`, w.manager)).status).toBe(404)
+    const hist = await w.json(await w.req("GET", `/v1/tasks/${parent.id}/history`, w.manager))
+    expect(hist.items.some((i: Json) => i.kind === "subtask")).toBe(true)
+    expect(JSON.stringify(hist)).not.toContain("Secret child title")
+    expect(JSON.stringify(hist)).not.toContain(child.ref)
+    const childHist = await w.q("select text from task_history where task_id = $1", [child.id])
+    expect(JSON.stringify(childHist)).not.toContain(parent.ref)
+  })
+
+  test("M8: an assignee needs tasks:read (422 invalid_assignee): a role without it cannot be assigned, on create or reassign", async () => {
+    const w = await world()
+    await w.q(`update roles set access = access || '{"tasks":"none"}'::jsonb where key = 'payroll'`)
+    const noTasks = await w.who("payroll")
+    expect(await code(await w.req("POST", "/v1/tasks", w.ops, w.base({ primary: noTasks.userId })))).toBe("invalid_assignee")
+    expect(await code(await w.req("POST", "/v1/tasks", w.ops, w.base({ others: [noTasks.userId] })))).toBe("invalid_assignee")
+    const t = await w.mk(w.ops)
+    const put = await w.req("PUT", `/v1/tasks/${t.id}/assignees`, w.ops, { version: 1, primary: noTasks.userId, others: [] })
+    expect(put.status).toBe(422)
+    expect(await code(put)).toBe("invalid_assignee")
+    expect((await w.q("select count(*)::int n from notifications where user_id = $1", [noTasks.userId]))[0].n).toBe(0)
+  })
+})

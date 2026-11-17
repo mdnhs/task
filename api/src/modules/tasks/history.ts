@@ -12,11 +12,11 @@ export type HistoryInput = { kind: string; text?: string | null; changes?: RawCh
 export type HistoryDto = { id: string; at: string; atUtc: string; actorId: string | null; by: string; kind: string; text: string; changes: FieldChange[]; notified: string[]; updateId?: string }
 type HistoryRow = typeof taskHistory.$inferSelect
 
-/** Appends one history line (tenant-time instant = ctx.now). Returns its id. A repeated (task, update_id) is a unique violation: callers check first. */
+/** Appends one history line (tenant-time instant = ctx.now). The text is device-agnostic, so a Drive link in it is always withheld at write time (ruling E13).  Returns its id. A repeated (task, update_id) is a unique violation: callers check first. */
 export async function writeHistory(tx: TenantTx, ctx: Pick<TaskCtx, "tenantId" | "actorId" | "now">, taskId: string, h: HistoryInput): Promise<string> {
   const [row] = await tx
     .insert(taskHistory)
-    .values({ tenantId: ctx.tenantId, taskId, at: ctx.now, actorId: ctx.actorId, kind: h.kind, text: h.text ?? null, changes: h.changes ?? [], notified: h.notified ?? [], updateId: h.updateId ?? null })
+    .values({ tenantId: ctx.tenantId, taskId, at: ctx.now, actorId: ctx.actorId, kind: h.kind, text: h.text == null ? null : withholdDriveText(h.text), changes: h.changes ?? [], notified: h.notified ?? [], updateId: h.updateId ?? null })
     .returning({ id: taskHistory.id })
   return row.id
 }

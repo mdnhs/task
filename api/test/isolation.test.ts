@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, test } from "vitest"
 import { sql } from "drizzle-orm"
 import { call, resetDb, testApp } from "./harness"
-import { ownerTenantQuery } from "./db"
+import { ownerTenantQuery, ownerQuery } from "./db"
 import { makeMember, makeTenant, signIn } from "./factories"
 import { actorIn, fixtureIds, ROUTE_PARAMS, type Actor, type World } from "./route-fixtures"
 import { memberships, roles } from "../src/db/schema"
@@ -168,9 +168,12 @@ const bodyExample = (op: Json): { present: boolean; example?: unknown } => {
 
 const substitute = (path: string, params: Record<string, string>) => path.replace(/\{(\w+)\}/g, (_, p) => encodeURIComponent(params[p]))
 
+/** Tenant tables whose rows are hashed before and after the walk: any change in the OTHER tenant is a cross-tenant mutation. */
+const HASHED_TABLES = ["roles", "memberships", "teams", "team_members", "reporting_lines", "devices", "device_policies", "invites", "audit_events", "tenant_settings", "notifications", "notification_preferences", "push_tokens", "notification_deliveries", "files", "integration_connections", "oauth_states", "public_holidays", "data_requests", "support_grants", "api_keys", "webhook_endpoints", "webhook_deliveries", "tasks", "task_assignees", "task_history", "task_time_entries", "task_counters", "task_checklist_items", "task_comments", "task_files", "task_templates", "task_voice_access", "projects", "project_milestones", "task_dependencies", "task_evidence"]
+
 async function hashes(tenantId: string): Promise<Record<string, string>> {
   const out: Record<string, string> = {}
-  for (const tbl of ["roles", "memberships", "teams", "team_members", "reporting_lines", "devices", "device_policies", "invites", "audit_events", "tenant_settings", "notifications", "notification_preferences", "push_tokens", "notification_deliveries", "files", "integration_connections", "oauth_states", "public_holidays", "data_requests", "support_grants", "api_keys", "webhook_endpoints", "webhook_deliveries", "tasks", "task_assignees", "task_history", "task_time_entries", "task_counters", "task_checklist_items", "task_comments", "task_files", "task_templates", "task_voice_access"]) {
+  for (const tbl of HASHED_TABLES) {
     const [r] = await ownerTenantQuery(tenantId, `select count(*)::text || ':' || coalesce(md5(string_agg(to_jsonb(x)::text, ',' order by to_jsonb(x)::text)), '') as h from ${tbl} x`)
     out[tbl] = String(r.h)
   }
@@ -209,6 +212,13 @@ const operations = (): Op[] =>
   })
 
 describe("AC-M0-01 cross-tenant isolation walker", () => {
+  test("every M1 task/project tenant table (migrations 0027-0034 and later) is in the mutation-hash list", async () => {
+    const rows = await ownerQuery("select table_name from information_schema.columns where table_schema = 'public' and column_name = 'tenant_id' and table_name ~ '^(tasks?|task_.*|projects?|project_.*)$' order by 1")
+    const tenantTables = rows.map((r) => String((r as { table_name: string }).table_name))
+    expect(tenantTables.length).toBeGreaterThanOrEqual(13)
+    expect(tenantTables.filter((x) => !HASHED_TABLES.includes(x))).toEqual([])
+  })
+
   test("the walk is not vacuous: parameterised routes exist, every one has fixtures and a body example", () => {
     const ops = operations()
     expect(ops.length).toBeGreaterThanOrEqual(10)

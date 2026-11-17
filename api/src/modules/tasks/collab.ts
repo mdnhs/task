@@ -128,6 +128,8 @@ export async function deleteChecklistItem(tx: TenantTx, ctx: TaskCtx, id: string
 }
 
 // ---------- subtasks (ruling D24) ----------
+// History lines name no ref or title of the other task: a viewer of the parent may not see the child (and the reverse), so the lines say
+// only that a subtask was added; the visible subtasks (scope-checked) and parentRef come from the DTO.
 
 /**
  * POST /v1/tasks/{id}/subtasks: one level deep (422 subtask_depth). Copies team, project, milestone, priority and due date; the primary
@@ -151,8 +153,8 @@ export async function createSubtask(tx: TenantTx, env: TaskEnv, ctx: TaskCtx, pa
     .returning()
   await replaceAssignees(tx, ctx.tenantId, row.id, primary, [])
   const recipients = changeRecipients(ctx, row, [primary])
-  await writeHistory(tx, ctx, row.id, { kind: "created", text: `Created as a subtask of TSK-${parent.refNo}`, notified: recipients })
-  await writeHistory(tx, ctx, parent.id, { kind: "subtask", text: `Subtask TSK-${refNo} added: ${input.title}` })
+  await writeHistory(tx, ctx, row.id, { kind: "created", text: "Created as a subtask", notified: recipients })
+  await writeHistory(tx, ctx, parent.id, { kind: "subtask", text: "Subtask added" })
   await notifyTask(tx, env, ctx, row, recipients, "New task")
   const dto = await taskDetailDto(tx, ctx, row)
   await publishTaskEvent(tx, ctx, { type: "task.created", payload: { taskId: row.id, parentId: parent.id, projectId: row.projectId, seriesId: null } })

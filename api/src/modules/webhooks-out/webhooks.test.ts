@@ -517,3 +517,28 @@ describe("delivery", () => {
 })
 
 export type { W }
+
+describe("task files (M5, ruling D14)", () => {
+  test("file.* events of task files (task_ purpose) create no delivery; an ordinary file's events still do", async () => {
+    const w = await world()
+    await w.mint({ events: ["file.uploaded", "file.scanned", "file.deleted"] })
+    const mkFile = async (purpose: string | null) => {
+      const id = randomUUID()
+      await ownerTenantQuery(w.tenant.id, "insert into files (id, tenant_id, owner_user_id, purpose, key, name, mime, size_bytes, status, created_at) values ($1, $2, $3, $4, $5, 'f.bin', 'image/png', 10, 'clean', now())", [id, w.tenant.id, w.owner.userId, purpose, `t/${w.tenant.id}/${id}`])
+      return id
+    }
+    const emit = (type: "file.uploaded" | "file.scanned" | "file.deleted", fileId: string) =>
+      withTenant(w.deps.db, w.tenant.id, (tx) => publish(tx, { tenantId: w.tenant.id, type, payload: { fileId, mime: "image/png", sizeBytes: 10, status: "clean" }, actorId: null }, w.clock.now()))
+    for (const purpose of ["task_evidence", "task_attachment", "task_voice"]) {
+      const id = await mkFile(purpose)
+      for (const t of ["file.uploaded", "file.scanned", "file.deleted"] as const) await emit(t, id)
+    }
+    await emit("file.uploaded", randomUUID()) // an unknown file cannot be classified: dropped too
+    const plain = await mkFile(null)
+    for (const t of ["file.uploaded", "file.scanned", "file.deleted"] as const) await emit(t, plain)
+    await w.relay()
+    const rows = await w.deliveries()
+    expect(rows).toHaveLength(3)
+    expect(rows.every((r) => (r.payload as Json).data.fileId === plain)).toBe(true)
+  })
+})

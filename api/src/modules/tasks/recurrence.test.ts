@@ -63,6 +63,8 @@ async function series(w: W, rule: Json, over: Json = {}, as: Who = w.ops): Promi
   expect(r.status, await r.clone().text()).toBe(200)
   return { ...(await w.json(r)), id: t.id as string }
 }
+/** Pretends the rule was set long ago (before the dates the test replays): a rule set NOW starts at yesterday (I3), so older dates would never be produced. */
+const aged = (w: W, id: string) => w.q("update tasks set repeat_cursor = null where id = $1", [id])
 const instances = (w: W, id: string) => w.q<{ d: string; due: string; start: string; ref_no: number }>("select occurrence_date::text d, due_at::text due, start_at::text start, ref_no from tasks where series_id = $1 order by occurrence_date", [id])
 const iso = (v: string) => new Date(v).toISOString()
 const tick = async (w: W, from: string, to: string, parallel = 1) => {
@@ -73,6 +75,7 @@ describe("recurrence job", () => {
   test("recurrence creates exactly one instance per local date across the October DST change, even with two concurrent runs", async () => {
     const w = await world()
     const s = await series(w, { freq: "daily" })
+    await aged(w, s.id)
     await tick(w, "2026-10-24T22:00:00Z", "2026-10-26T03:00:00Z", 2) // 01:30 happens twice on the 25th (BST 00:30Z, then GMT 01:30Z)
     const rows = await instances(w, s.id)
     expect(rows.map((r) => r.d)).toEqual(["2026-10-25", "2026-10-26"])
@@ -85,6 +88,7 @@ describe("recurrence job", () => {
   test("eight truly concurrent runs at one tick: exactly one instance, one ref, one history line, no gaps", async () => {
     const w = await world()
     const s = await series(w, { freq: "daily" })
+    await aged(w, s.id)
     await Promise.all(Array.from({ length: 8 }, () => rec(w, "2026-10-25T10:00:00Z")))
     expect((await instances(w, s.id)).map((r) => r.d)).toEqual(["2026-10-25"])
     expect((await w.q("select count(*)::int n from task_history h join tasks t on t.id = h.task_id where t.series_id = $1", [s.id]))[0].n).toBe(1)
@@ -123,6 +127,7 @@ describe("recurrence job", () => {
   test("catch-up is capped at 7 days and logs the skipped count once", async () => {
     const w = await world()
     const s = await series(w, { freq: "daily" }, { start: "2026-11-01T08:00:00", due: "2026-11-01T09:00:00" })
+    await aged(w, s.id)
     await rec(w, "2026-11-20T10:00:00Z") // 19 days after the first due date: 7 days are created, the 12 older ones are skipped
     expect((await instances(w, s.id)).map((r) => r.d)).toEqual(["2026-11-14", "2026-11-15", "2026-11-16", "2026-11-17", "2026-11-18", "2026-11-19", "2026-11-20"])
     const skipped = async () => (await w.q("select text from task_history where task_id = $1 and text like '%skipped%'", [s.id])).map((r) => r.text)
@@ -273,6 +278,26 @@ describe("PUT /v1/tasks/{id}/repeat", () => {
     expect((await w.json(clear)).repeat).toBeUndefined()
     await rec(w, "2026-11-25T10:00:00Z")
     expect(await instances(w, t.id)).toHaveLength(1) // cleared: nothing new
+  })
+
+  test("I3: a rule set on an overdue task produces only today's instance (no stale back-instances), also after clear and re-add", async () => {
+    const w = await world() // fake clock reads 2026-11-16 09:00Z
+    const t = await w.mk(w.ops, { start: "2026-11-10T08:00:00", due: "2026-11-11T09:00:00" }) // overdue by 5 days
+    const set = async (version: number, rule: Json | null) => {
+      const r = await w.req("PUT", `/v1/tasks/${t.id}/repeat`, w.ops, { version, rule })
+      expect(r.status).toBe(200)
+      return (await w.json(r)).version as number
+    }
+    let v = await set(t.version, { freq: "daily" })
+    expect((await w.q("select repeat_cursor::text c from tasks where id = $1", [t.id]))[0].c).toBe("2026-11-15")
+    await w.q("delete from notifications")
+    await rec(w, "2026-11-16T10:00:00Z")
+    expect((await instances(w, t.id)).map((r) => r.d)).toEqual(["2026-11-16"])
+    expect(await w.q("select title from notifications where title = 'New task'")).toHaveLength(1) // staff, for today's instance only
+    v = await set(v, null)
+    await set(v, { freq: "daily" })
+    await rec(w, "2026-11-16T11:00:00Z")
+    expect((await instances(w, t.id)).map((r) => r.d)).toEqual(["2026-11-16"]) // still today only, nothing back-filled
   })
 
   test("a team manager manages a report's series; staff cannot see another person's series or its instances", async () => {

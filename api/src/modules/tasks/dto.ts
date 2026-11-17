@@ -84,7 +84,7 @@ export async function taskDtos(tx: TenantTx, ctx: TaskCtx, rows: TaskRow[], time
   const teamRows = teamIds.length ? await tx.select({ id: teams.id, name: teams.name }).from(teams).where(and(eq(teams.tenantId, ctx.tenantId), inArray(teams.id, teamIds))) : []
   const teamName = new Map(teamRows.map((t) => [t.id, t.name]))
   const parentIds = [...new Set(rows.flatMap((r) => (r.parentId ? [r.parentId] : [])))]
-  const parentRows = parentIds.length ? await tx.select({ id: tasks.id, refNo: tasks.refNo }).from(tasks).where(and(eq(tasks.tenantId, ctx.tenantId), inArray(tasks.id, parentIds))) : []
+  const parentRows = parentIds.length ? await tx.select({ id: tasks.id, refNo: tasks.refNo }).from(tasks).where(and(eq(tasks.tenantId, ctx.tenantId), inArray(tasks.id, parentIds), taskScopeWhere(ctx.scope, ctx.reports))) : []
   const parentRef = new Map(parentRows.map((p) => [p.id, ref(p.refNo)]))
   const ids = rows.map((r) => r.id)
   const free = (v: string) => (ctx.drive ? v : withholdDriveText(v))
@@ -126,7 +126,7 @@ export async function taskDtos(tx: TenantTx, ctx: TaskCtx, rows: TaskRow[], time
       status: r.status as TaskDto["status"], evidenceRule: r.evidenceRule, tags: r.labels,
       ...(r.client ? { client: r.client } : {}), ...(r.estimateMin ? { estimate: r.estimateMin } : {}),
       ...(r.projectId ? { projectId: r.projectId } : {}), ...(r.milestoneId ? { milestoneId: r.milestoneId } : {}),
-      ...(r.parentId ? { parentRef: parentRef.get(r.parentId) ?? "" } : {}), parentId: r.parentId,
+      ...(r.parentId && parentRef.has(r.parentId) ? { parentRef: parentRef.get(r.parentId)! } : {}), parentId: r.parentId && parentRef.has(r.parentId) ? r.parentId : null, // a parent outside the caller's scope is dropped (no ref or id leaks)
       checklist: checklists.get(r.id) ?? [], subtasks: children.get(r.id) ?? [], dependsOn: (deps.get(r.id) ?? []).map((d) => d.ref), dependsOnIds: (deps.get(r.id) ?? []).map((d) => d.id), round: r.round,
       ...(r.archivedAt ? { archivedAt: wallOf(r.archivedAt, ctx.tz) } : {}), ...(r.archivedBy ? { archivedBy: r.archivedBy } : {}),
       ...(r.proposal ? { proposal: ctx.drive ? r.proposal : { ...r.proposal, reason: withholdDriveText(String(r.proposal.reason ?? "")) } } : {}), ...(r.repeat ? { repeat: r.repeat as Record<string, unknown> } : {}), ...(r.seriesId ? { seriesId: r.seriesId } : {}),

@@ -90,7 +90,8 @@ export async function setRepeat(tx: TenantTx, env: TaskEnv, ctx: TaskCtx, id: st
   const changes = diffFields({ repeat: row.repeat }, { repeat: rule })
   if (changes.length === 0) return taskDetailDto(tx, ctx, row)
   const yesterday = addDays(wallOf(ctx.now, ctx.tz).slice(0, 10), -1)
-  const repeatCursor = rule === null ? null : row.repeatCursor && row.repeatCursor > yesterday ? yesterday : row.repeatCursor
+  // a newly set rule (cursor null, also after a removal) starts at yesterday: only today and later are produced, never stale back-instances of an overdue task
+  const repeatCursor = rule === null ? null : row.repeatCursor && row.repeatCursor < yesterday ? row.repeatCursor : yesterday
   const [next] = await tx.update(tasks).set({ repeat: rule, repeatCursor, version: row.version + 1, updatedAt: ctx.now }).where(and(eq(tasks.id, row.id), eq(tasks.tenantId, ctx.tenantId))).returning()
   const recipients = changeRecipients(ctx, row, assignees)
   const historyId = await writeHistory(tx, ctx, row.id, { kind: "updated", text: "Updated Repeat", changes, notified: recipients })

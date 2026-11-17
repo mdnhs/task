@@ -42,7 +42,7 @@ export async function checkTeam(tx: TenantTx, ctx: TaskCtx, teamId: string | nul
 }
 
 /**
- * Assignees must be ACTIVE members of this tenant (a foreign, inactive or unknown id is the same 422 invalid_assignee) and distinct;
+ * Assignees must be ACTIVE members of this tenant with tasks:read (a foreign, inactive or unknown id is the same 422 invalid_assignee) and distinct;
  * a team-scope manager may only pick themself or a direct report (422 assignee_out_of_scope, the same for any other id).
  */
 export async function checkAssignees(tx: TenantTx, ctx: TaskCtx, primary: string, others: string[]): Promise<void> {
@@ -50,8 +50,13 @@ export async function checkAssignees(tx: TenantTx, ctx: TaskCtx, primary: string
   if (new Set(ids).size !== ids.length) throw unprocessable("invalid_assignee")
   // Ruling E2: a team-scope manager assigns only themself or their direct reports; all-scope managers assign anyone.
   if (ctx.scope.kind === "team" && ids.some((id) => id !== ctx.me && !ctx.reports.includes(id))) throw unprocessable("assignee_out_of_scope")
-  const rows = await tx.select({ u: memberships.userId }).from(memberships).where(and(eq(memberships.tenantId, ctx.tenantId), eq(memberships.status, "active"), inArray(memberships.userId, ids)))
-  if (rows.length !== ids.length) throw unprocessable("invalid_assignee")
+  // An assignee must also hold tasks:read: otherwise they get the "New task" notice (with the title) and can never open the task.
+  const rows = await tx
+    .select({ u: memberships.userId, access: roles.access })
+    .from(memberships)
+    .innerJoin(roles, eq(roles.id, memberships.roleId))
+    .where(and(eq(memberships.tenantId, ctx.tenantId), eq(memberships.status, "active"), inArray(memberships.userId, ids)))
+  if (rows.length !== ids.length || rows.some((r) => !can({ access: r.access } as never, "tasks", "read"))) throw unprocessable("invalid_assignee")
 }
 
 /**

@@ -176,7 +176,7 @@ async function unlinkTasks(tx: TenantTx, ctx: TaskCtx, by: { projectId: string }
   const set = "projectId" in by ? { projectId: null, milestoneId: null } : { milestoneId: null }
   await tx.update(tasks).set({ ...set, version: sql`${tasks.version} + 1`, updatedAt: ctx.now }).where(and(eq(tasks.tenantId, ctx.tenantId), inArray(tasks.id, rows.map((r) => r.id))))
   const lines = rows.map((r) => ({
-    tenantId: ctx.tenantId, taskId: r.id, at: ctx.now, actorId: ctx.actorId, kind: "updated", text, notified: [] as string[],
+    tenantId: ctx.tenantId, taskId: r.id, at: ctx.now, actorId: ctx.actorId, kind: "updated", text: withholdDriveText(text), notified: [] as string[],
     changes: [
       ...("projectId" in by && r.projectId ? [{ field: "projectId", from: r.projectId, to: null }] : []),
       ...(r.milestoneId ? [{ field: "milestoneId", from: r.milestoneId, to: null }] : []),
@@ -238,10 +238,10 @@ export async function patchMilestone(tx: TenantTx, env: TaskEnv, ctx: TaskCtx, p
     for (const t of linked) {
       const p = people.get(t.id)!
       const recipients = [...new Set([...(p.primary ? [p.primary] : []), ...p.others])].filter((u) => u !== ctx.me && u !== ctx.actorId).sort()
-      const text = `Milestone "${m.name}" due date changed ${m.dueDate} to ${updated.dueDate}`
+      const text = withholdDriveText(`Milestone "${m.name}" due date changed ${m.dueDate} to ${updated.dueDate}`)
       const [h] = await tx.insert(taskHistory).values({ tenantId: ctx.tenantId, taskId: t.id, at: ctx.now, actorId: ctx.actorId, kind: "milestone", text, changes: [], notified: recipients }).returning({ id: taskHistory.id })
       events.push({ taskId: t.id, historyId: h.id, fields: ["milestoneDue"] })
-      for (const userId of recipients) await notify(tx, ctx.tenantId, { userId, kind: "task", title: "Milestone date changed", body: `TSK-${t.refNo} ${t.title}: ${m.name} ${m.dueDate} to ${updated.dueDate}`, link: `/tasks/TSK-${t.refNo}` }, env.deps, env.enqueue)
+      for (const userId of recipients) await notify(tx, ctx.tenantId, { userId, kind: "task", title: "Milestone date changed", body: withholdDriveText(`TSK-${t.refNo} ${t.title}: ${m.name} ${m.dueDate} to ${updated.dueDate}`), link: `/tasks/TSK-${t.refNo}` }, env.deps, env.enqueue)
     }
     for (const e of events) await publishTaskEvent(tx, ctx, { type: "task.updated", payload: e })
   }

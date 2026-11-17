@@ -45,8 +45,8 @@ export const taskViewRoutes = newRouter()
   .openapi(calendarR, async (c) => c.json(await read1(c, (tx, ctx) => calendarView(tx, ctx, c.req.valid("query"))), 200))
 
 export const archiveRoutes = newRouter()
-  .openapi(archiveR, async (c) => c.json(await mutate(c, (tx, env, ctx) => archiveTask(tx, env, ctx, c.req.valid("param").id, c.req.valid("json"))), 200))
-  .openapi(restoreR, async (c) => c.json(await mutate(c, (tx, env, ctx) => restoreTask(tx, env, ctx, c.req.valid("param").id)), 200))
+  .openapi(archiveR, async (c) => c.json(await mutate(c, (tx, env, ctx) => archiveTask(tx, env, ctx, c.req.valid("param").id, c.req.valid("json")), { graphLock: true }), 200)) // the graph lock first: PUT /dependencies takes KEY SHARE on the tasks it links, so archive and restore queue behind it instead of crossing it (M6a)
+  .openapi(restoreR, async (c) => c.json(await mutate(c, (tx, env, ctx) => restoreTask(tx, env, ctx, c.req.valid("param").id), { graphLock: true }), 200))
   .openapi(purgeR, async (c) => {
     await purgeTask(c, c.req.valid("param").id)
     return c.body(null, 204)
