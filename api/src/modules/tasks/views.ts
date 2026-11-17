@@ -125,6 +125,9 @@ const realDay = (d: string | undefined): d is string => {
   return !Number.isNaN(t.getTime()) && t.toISOString().startsWith(d)
 }
 
+/** The range day a card belongs to: its own tenant-local due day, or (defensively, it should never differ) the nearest day of the range, so no card is dropped silently. */
+export const dayFor = (day: string, dates: string[]): string => (dates.includes(day) ? day : day < dates[0] ? dates[0] : dates[dates.length - 1])
+
 /** Tasks due in [lo, hi) (UTC instants made from tenant-local midnights, so a DST day is 23 or 25 hours long): tasks_live_due_idx. */
 export const calendarQuery = (tx: TenantTx, ctx: TaskCtx, lo: Date, hi: Date, take: number) =>
   tx
@@ -144,7 +147,7 @@ export async function calendarView(tx: TenantTx, ctx: TaskCtx, q: z.infer<typeof
   const rows = await calendarQuery(tx, ctx, lo, hi, CALENDAR_CAP + 1)
   const page = rows.slice(0, CALENDAR_CAP)
   const byDay = new Map<string, TaskCard[]>(dates.map((d) => [d, []]))
-  for (const card of await taskCards(tx, ctx, page)) byDay.get(card.due.slice(0, 10))?.push(card) // the tenant-local day of the due instant
+  for (const card of await taskCards(tx, ctx, page)) byDay.get(dayFor(card.due.slice(0, 10), dates))!.push(card) // the tenant-local day of the due instant
   return { days: dates.map((date) => ({ date, tasks: byDay.get(date)! })), truncated: rows.length > CALENDAR_CAP }
 }
 

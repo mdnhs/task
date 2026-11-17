@@ -2,7 +2,7 @@ import { sql } from "drizzle-orm"
 import pg from "pg"
 import { afterEach, beforeEach, describe, expect, test } from "vitest"
 import { ownerQuery, ownerTenantQuery } from "../../../test/db"
-import { makeApiKey, makeMember, makeTenant, signIn } from "../../../test/factories"
+import { makeApiKey, makeMember, makeStaff, makeTenant, signIn } from "../../../test/factories"
 import { call, resetDb, testApp } from "../../../test/harness"
 import { relayOnce, resetSubscribers } from "../../core/events"
 import { runJob } from "../../core/queue/queue"
@@ -12,7 +12,8 @@ import { registerFiles } from "../files"
 import { registerNotifications } from "../notifications"
 import { registerSearchIndexers } from "../search"
 import { applyTaskUpdate, registerTasks, type TaskCtx } from "."
-import { archiveQuery, boardCountsQuery, boardItemsQuery, calendarQuery } from "./views"
+import { expiredPageQuery } from "./archive"
+import { archiveQuery, boardCountsQuery, boardItemsQuery, calendarQuery, dayFor } from "./views"
 
 // T4.5: archive, restore, audited purge, retention job and the board / calendar / archive queries. Rulings D3, D5, D6, D7, D13, D14, D21, E4, E5.
 
@@ -450,6 +451,50 @@ describe("purge (manual)", () => {
     }
   }, 120_000)
 
+  test("E8: restore(child) vs purge(parent), restore(child A) vs restore(child B), restore(parent) vs purge(parent): no deadlock, no 500, one consistent outcome", async () => {
+    const w = await world()
+    const family = async () => {
+      const p = await w.mk(w.ops, { title: "Parent" })
+      const kids: Json[] = []
+      for (const title of ["A", "B"]) kids.push(await w.json(await w.req("POST", `/v1/tasks/${p.id}/subtasks`, w.ops, { title })))
+      await arch(w, p.id) // parent + both open children: one batch
+      return { p, a: kids[0], b: kids[1] }
+    }
+    const state = async (ids: string[]) => (await w.q<{ id: string; archived_at: string | null; parent_id: string | null }>("select id, archived_at, parent_id from tasks where id = any($1::uuid[])", [ids]))
+    for (let round = 0; round < 8; round++) {
+      // restore(child) vs purge(parent)
+      {
+        const { p, a, b } = await family()
+        const [r, d] = await Promise.all([restore(w, a.id), purge(w, p.id)])
+        expect([r.status, d.status], `child/parent round ${round}`).toSatisfy((s: number[]) => (s[0] === 200 && [204, 409].includes(s[1])))
+        const rows = await state([p.id, a.id, b.id])
+        if (d.status === 204) {
+          expect(rows.find((x) => x.id === p.id)).toBeUndefined() // purged: its children are detached, never left pointing at it
+          for (const x of rows) expect(x.parent_id).toBeNull()
+          expect(rows.find((x) => x.id === a.id)!.archived_at).toBeNull() // the restore still brought its task back
+        } else {
+          for (const x of rows) expect(x.archived_at).toBeNull() // restored first: the whole batch is live, so the purge was refused
+        }
+      }
+      // restore(child A) vs restore(child B) of one batch
+      {
+        const { p, a, b } = await family()
+        const [r1, r2] = await Promise.all([restore(w, a.id), restore(w, b.id)])
+        expect([r1.status, r2.status].sort(), `A/B round ${round}`).toEqual([200, 409])
+        for (const x of await state([p.id, a.id, b.id])) expect(x.archived_at).toBeNull()
+      }
+      // restore(parent) vs purge(parent)
+      {
+        const { p, a, b } = await family()
+        const [r, d] = await Promise.all([restore(w, p.id), purge(w, p.id)])
+        expect([r.status, d.status], `parent round ${round}`).toSatisfy((s: number[]) => (s[0] === 404 && s[1] === 204) || (s[0] === 200 && s[1] === 409))
+        const rows = await state([p.id, a.id, b.id])
+        if (d.status === 204) expect(rows.find((x) => x.id === p.id)).toBeUndefined()
+        else for (const x of rows) expect(x.archived_at).toBeNull()
+      }
+    }
+  }, 280_000)
+
   test("an upload intent takes the task row FOR SHARE: while the task is being removed it waits and answers 404, never a foreign key 500", async () => {
     const w = await world()
     const t = await w.mk(w.ops)
@@ -609,6 +654,113 @@ describe("retention job tasks.archive-purge", () => {
     await sweep(w)
     expect(w.queue.jobs).toHaveLength(0) // nothing left to retry
   }, 60_000)
+})
+
+describe("retention extras", () => {
+  test("object removal retries are capped and rotate: failing rows back off (1h, 2h, ...) and stop at 8 attempts, so they never starve later rows", async () => {
+    const w = await world()
+    const mkFiles = (n: number, attempts: number) =>
+      w.q(
+        `insert into files (id, tenant_id, purpose, key, name, mime, size_bytes, status, created_at, object_removal_attempts, object_removal_attempted_at)
+         select g.id, $1::uuid, 'task_attachment', 't/' || $1 || '/' || g.id, 'x.pdf', 'application/pdf', 1, 'deleted', now(), $2, case when $2 > 0 then $3::timestamptz end from (select gen_random_uuid() id from generate_series(1, $4::int)) g`,
+        [w.tenant.id, attempts, w.clock.now(), n],
+      )
+    await mkFiles(250, 0)
+    const queued = () => w.queue.jobs.filter((j) => j.name === "file.delete-object").map((j) => (j.data as Json).fileId as string)
+    await sweep(w)
+    const first = queued()
+    expect(first).toHaveLength(200) // PURGE_BATCH per run
+    w.queue.jobs.length = 0
+    await sweep(w) // the 200 are now backing off: the other 50 are next
+    const second = queued()
+    expect(second).toHaveLength(50)
+    expect(new Set([...first, ...second]).size).toBe(250)
+    w.queue.jobs.length = 0
+    await sweep(w)
+    expect(queued()).toHaveLength(0) // everything is waiting its 2h
+    w.clock.advance({ hours: 2 })
+    await sweep(w)
+    expect(queued()).toHaveLength(200) // oldest attempt first again
+    // rows at the cap are never queued again
+    await w.q("update files set object_removal_attempts = 8")
+    w.queue.jobs.length = 0
+    w.clock.advance({ days: 30 })
+    await sweep(w)
+    expect(queued()).toHaveLength(0)
+    // and a healthy row behind 200 stuck ones still gets its turn
+    await mkFiles(1, 0)
+    await sweep(w)
+    expect(queued()).toHaveLength(1)
+  }, 60_000)
+
+  test("retention page and manager-scope board use tasks_archived_idx / tasks_live_status_due_idx (EXPLAIN at 10k)", async () => {
+    const w = await world()
+    await w.manages(w.manager, w.staff)
+    await w.mk(w.owner)
+    await w.q(
+      `insert into tasks (tenant_id, ref_no, title, evidence_rule, status, start_at, due_at, created_at, updated_at, creator_id, archived_at, archived_by, archive_batch_id)
+       select $1::uuid, 2000 + g, 'Seed ' || g, $2::jsonb, (array['not_started','in_progress','blocked','completed'])[1 + g % 4], now(), date_trunc('milliseconds', now()) + (g || ' minutes')::interval, now(), now(), $3,
+         case when g % 10 = 0 then now() - (g || ' days')::interval end, case when g % 10 = 0 then 'x' end, case when g % 10 = 0 then gen_random_uuid() end
+       from generate_series(1, 10000) g`,
+      [w.tenant.id, JSON.stringify(NO_EVIDENCE), w.owner.userId],
+    )
+    await w.q("insert into task_assignees (tenant_id, task_id, user_id, is_primary) select tenant_id, id, $1::text, true from tasks where ref_no % 7 = 0", [w.staff.userId])
+    await ownerQuery("vacuum analyze tasks")
+    await ownerQuery("vacuum analyze task_assignees")
+    const mctx: TaskCtx = { tenantId: w.tenant.id, tz: "Europe/Dublin", me: w.manager.userId, actorId: w.manager.userId, role: null as never, scope: { kind: "team", managerId: w.manager.userId }, reports: [w.staff.userId], drive: true, now: w.clock.now() }
+    const plans = await withTenant(w.deps.db, w.tenant.id, async (tx) => ({
+      board: boardItemsQuery(tx, mctx, {}, "in_progress", 51).toSQL(),
+      retention: expiredPageQuery(tx, w.tenant.id, new Date(w.clock.now().getTime() - 30 * 86_400_000), null, 200).toSQL(),
+    }))
+    const c = new pg.Client({ connectionString: process.env.TEST_DATABASE_OWNER_URL })
+    await c.connect()
+    try {
+      const explain = async (p: { sql: string; params: unknown[] }) => {
+        await c.query("begin")
+        await c.query("select set_config('app.tenant_id', $1, true)", [w.tenant.id])
+        const rows = (await c.query(`explain ${p.sql}`, p.params as unknown[])).rows.map((r) => r["QUERY PLAN"] as string).join("\n")
+        await c.query("rollback")
+        return rows
+      }
+      const board = await explain(plans.board)
+      expect(board).toContain("tasks_live_status_due_idx")
+      expect(board).not.toMatch(/Seq Scan on tasks/)
+      const ret = await explain(plans.retention)
+      expect(ret).toContain("tasks_archived_idx")
+      expect(ret).not.toMatch(/Seq Scan on tasks/)
+    } finally {
+      await c.end()
+    }
+  }, 120_000)
+
+  test("support-grant principal and platform staff cannot archive, restore or purge (nothing changes)", async () => {
+    const w = await world()
+    const t = await w.mk(w.ops)
+    const t2 = await w.mk(w.ops, { title: "Archived one" })
+    await arch(w, t2.id)
+    const support = await makeStaff(w.deps, "support")
+    const platOwner = await makeStaff(w.deps, "owner")
+    const outsider = await makeStaff(w.deps, "viewer")
+    const g = await w.req("POST", `/v1/platform/tenants/${w.tenant.id}/support-grants`, platOwner as { cookie: string }, { reason: "Ticket 4411: totals look wrong", hours: 2 })
+    expect(g.status).toBe(201)
+    const calls = (as: { cookie?: string }) => [
+      w.req("POST", `/v1/tasks/${t.id}/archive`, as as { cookie: string }, { version: 1 }),
+      w.req("POST", `/v1/tasks/${t2.id}/restore`, as as { cookie: string }, {}),
+      w.req("DELETE", `/v1/tasks/${t2.id}`, as as { cookie: string }),
+    ]
+    for (const r of await Promise.all(calls(platOwner))) expect(r.status, "holder of an active grant: read-only").toBe(403)
+    for (const r of await Promise.all(calls(support))) expect(r.status, "support staff without a grant").toBe(404)
+    for (const r of await Promise.all(calls(outsider))) expect(r.status, "staff without a grant").toBe(404) // not a member: the tenant does not exist for them
+    expect((await w.q("select archived_at is not null as a from tasks order by ref_no")).map((r) => r.a)).toEqual([false, true])
+    expect((await w.q("select count(*)::int n from audit_events where action like 'task.%'"))[0].n).toBe(1) // only the setup archive
+  })
+
+  test("dayFor never drops a card: a day outside the range lands on the nearest day of it", () => {
+    const dates = ["2026-11-16", "2026-11-17", "2026-11-18"]
+    expect(dayFor("2026-11-17", dates)).toBe("2026-11-17")
+    expect(dayFor("2026-11-15", dates)).toBe("2026-11-16")
+    expect(dayFor("2026-11-19", dates)).toBe("2026-11-18")
+  })
 })
 
 describe("archive list", () => {

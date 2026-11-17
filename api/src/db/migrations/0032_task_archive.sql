@@ -1,4 +1,6 @@
 ALTER TABLE "files" ADD COLUMN "object_removed_at" timestamp with time zone;--> statement-breakpoint
+ALTER TABLE "files" ADD COLUMN "object_removal_attempts" integer DEFAULT 0 NOT NULL;--> statement-breakpoint
+ALTER TABLE "files" ADD COLUMN "object_removal_attempted_at" timestamp with time zone;--> statement-breakpoint
 CREATE INDEX "files_removal_pending_idx" ON "files" USING btree ("tenant_id","created_at") WHERE "files"."status" = 'deleted' and "files"."object_removed_at" is null;--> statement-breakpoint
 CREATE INDEX "tasks_archived_idx" ON "tasks" USING btree ("tenant_id","archived_at","id") WHERE "tasks"."archived_at" is not null;--> statement-breakpoint
 CREATE INDEX "tasks_archive_batch_idx" ON "tasks" USING btree ("tenant_id","archive_batch_id") WHERE "tasks"."archive_batch_id" is not null;

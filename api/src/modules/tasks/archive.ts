@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, sql } from "drizzle-orm"
+import { and, asc, eq, inArray, sql, type SQL } from "drizzle-orm"
 import { z } from "@hono/zod-openapi"
 import type { Context } from "hono"
 import { ARCHIVE_DAYS } from "@opsdesk/domain/task-planning"
@@ -56,6 +56,28 @@ const safeCode = (e: unknown): string => {
   return typeof c === "string" && /^[A-Za-z0-9_.-]{1,64}$/.test(c) ? c : "error"
 }
 
+/**
+ * Ruling E8: EVERY multi-row task lock in archive, restore, purge and the retention job goes through here. The set the operation touches is resolved with
+ * a plain read, then locked in ONE statement, `ORDER BY id FOR UPDATE`, so two operations on overlapping sets (restore a child vs purge its parent, two
+ * restores of one batch) always take their common rows in the same (id) order and can never deadlock (40P01). The set is then re-resolved under the lock;
+ * a row that appeared meanwhile (a new subtask, a batch that changed) is added and the lock statement repeats, so the locked set always covers the current
+ * one. Rows that vanished (purged) are simply absent from the result. Callers re-check the state of their entry row on the locked rows.
+ */
+export async function lockTaskSet(tx: TenantTx, tenantId: string, resolve: () => Promise<string[]>): Promise<TaskRow[]> {
+  let ids = await resolve()
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const rows = ids.length ? await tx.select().from(tasks).where(and(eq(tasks.tenantId, tenantId), inArray(tasks.id, ids))).orderBy(asc(tasks.id)).for("update", { of: [tasks] }) : []
+    const have = new Set(rows.map((r) => r.id))
+    const again = await resolve()
+    if (again.every((id) => have.has(id))) return rows
+    ids = [...new Set([...ids, ...again])]
+  }
+  throw Conflict("version_conflict") // the set kept changing under us: the client retries
+}
+
+const idsWhere = async (tx: TenantTx, tenantId: string, cond: SQL): Promise<string[]> =>
+  (await tx.select({ id: tasks.id }).from(tasks).where(and(eq(tasks.tenantId, tenantId), cond))).map((r) => r.id)
+
 /** Restore window: 30 full days from the archive instant (UTC instants, so DST never shifts it). */
 export const archiveExpired = (archivedAt: Date, now: Date): boolean => now.getTime() - archivedAt.getTime() >= ARCHIVE_DAYS * DAY_MS
 
@@ -68,7 +90,9 @@ type Env = { enqueue: Enqueue }
 
 /** POST /v1/tasks/{id}/archive: managers only (D6). Row lock → permission → archived? → version → cascade → history → search → audit → publish. */
 export async function archiveTask(tx: TenantTx, _env: Env, ctx: TaskCtx, id: string, input: { version: number }): Promise<TaskDto> {
-  const row = await getTask(tx, ctx, id, { forUpdate: true, includeArchived: true }) // 404 for another tenant, unknown and out of scope
+  await getTask(tx, ctx, id, { includeArchived: true }) // 404 for another tenant, unknown and out of scope, before anything is locked
+  await lockTaskSet(tx, ctx.tenantId, () => idsWhere(tx, ctx.tenantId, sql`(${tasks.id} = ${id} or ${tasks.parentId} = ${id})`)) // the task and its subtasks, in id order
+  const row = await getTask(tx, ctx, id, { forUpdate: true, includeArchived: true }) // re-checked on the locked row
   const assignees = allAssignees((await assigneesOf(tx, ctx.tenantId, [row.id])).get(row.id)!)
   if (!canManage(ctx, row, assignees)) throw Forbidden("forbidden")
   if (row.archivedAt) throw Conflict("task_archived")
@@ -78,8 +102,7 @@ export async function archiveTask(tx: TenantTx, _env: Env, ctx: TaskCtx, id: str
     .select()
     .from(tasks)
     .where(and(eq(tasks.tenantId, ctx.tenantId), eq(tasks.parentId, row.id), sql`${tasks.archivedAt} is null`, inArray(tasks.status, OPEN_STATUSES)))
-    .orderBy(asc(tasks.id))
-    .for("update", { of: [tasks] })
+    .orderBy(asc(tasks.id)) // already locked above
   const members = [row, ...kids]
   const batch = crypto.randomUUID()
   await tx
@@ -107,7 +130,12 @@ export async function archiveTask(tx: TenantTx, _env: Env, ctx: TaskCtx, id: str
 
 /** POST /v1/tasks/{id}/restore: managers only; the whole archive batch comes back; 410 archive_expired after 30 days. */
 export async function restoreTask(tx: TenantTx, _env: Env, ctx: TaskCtx, id: string): Promise<TaskDto> {
-  const row = await getTask(tx, ctx, id, { forUpdate: true, includeArchived: true })
+  await getTask(tx, ctx, id, { includeArchived: true })
+  // the whole archive batch of the entry task, locked together in id order (ruling E8)
+  await lockTaskSet(tx, ctx.tenantId, () =>
+    idsWhere(tx, ctx.tenantId, sql`(${tasks.id} = ${id} or (${tasks.archiveBatchId} is not null and ${tasks.archiveBatchId} = (select t2.archive_batch_id from tasks t2 where t2.id = ${id})))`),
+  )
+  const row = await getTask(tx, ctx, id, { forUpdate: true, includeArchived: true }) // re-checked on the locked row: a purge or restore that won is 404 / 409 here
   const assignees = allAssignees((await assigneesOf(tx, ctx.tenantId, [row.id])).get(row.id)!)
   if (!canManage(ctx, row, assignees)) throw Forbidden("forbidden")
   if (!row.archivedAt) throw Conflict("task_not_archived")
@@ -117,8 +145,7 @@ export async function restoreTask(tx: TenantTx, _env: Env, ctx: TaskCtx, id: str
         .select()
         .from(tasks)
         .where(and(eq(tasks.tenantId, ctx.tenantId), eq(tasks.archiveBatchId, row.archiveBatchId), sql`${tasks.archivedAt} is not null`, sql`${tasks.id} <> ${row.id}`))
-        .orderBy(asc(tasks.id))
-        .for("update", { of: [tasks] })
+        .orderBy(asc(tasks.id)) // already locked above
     : []
   const members = [row, ...others]
   await tx
@@ -145,8 +172,12 @@ export async function restoreTask(tx: TenantTx, _env: Env, ctx: TaskCtx, id: str
 
 type Who = { tenantId: string; actorId: string; now: Date }
 
+/** What a purge of `id` rewrites: the task, its subtasks (parent link) and its recurring instances (series link). Locked together, in id order (ruling E8). */
+export const purgeSet = (tx: TenantTx, tenantId: string, id: string) =>
+  lockTaskSet(tx, tenantId, () => idsWhere(tx, tenantId, sql`(${tasks.id} = ${id} or ${tasks.parentId} = ${id} or ${tasks.seriesId} = ${id})`))
+
 /**
- * Deletes ONE archived task for good. The caller holds the graph and purge locks and the task row FOR UPDATE, and has checked that it is archived
+ * Deletes ONE archived task for good. The caller holds the graph and purge locks and the whole purge set FOR UPDATE (purgeSet), and has checked that it is archived
  * (and, for the job, past 30 days). Everything is in the caller's tx: a failure anywhere rolls the whole purge back (nothing half-deleted, no audit row,
  * no file marked deleted); the delete-object jobs are only queued after the commit.
  *  - Subtasks (any state) lose their parent link (parent_id has no cascade: a child is a task of its own and is purged on its own clock);
@@ -156,7 +187,7 @@ type Who = { tenantId: string; actorId: string; now: Date }
  */
 export async function purgeArchivedTask(tx: TenantTx, enqueue: Enqueue, who: Who, row: TaskRow): Promise<void> {
   const { tenantId, now } = who
-  const kids = await tx.select({ id: tasks.id }).from(tasks).where(and(eq(tasks.tenantId, tenantId), eq(tasks.parentId, row.id))).orderBy(asc(tasks.id)).for("update", { of: [tasks] })
+  const kids = await tx.select({ id: tasks.id }).from(tasks).where(and(eq(tasks.tenantId, tenantId), eq(tasks.parentId, row.id))).orderBy(asc(tasks.id)) // locked with the task by purgeSet
   if (kids.length > 0) {
     await tx.update(tasks).set({ parentId: null, version: sql`${tasks.version} + 1`, updatedAt: now }).where(and(eq(tasks.tenantId, tenantId), inArray(tasks.id, kids.map((k) => k.id))))
     for (const k of kids) await writeHistory(tx, who, k.id, { kind: "detached", text: `${ref(row.refNo)} was removed; this is now a task of its own` })
@@ -196,7 +227,9 @@ export async function purgeTask(c: Context<AppEnv>, id: string): Promise<void> {
     await lockTaskPurge(tx, tenantId)
     await lockActor(tx, tenantId, actorIdOf(c), "settings", "write") // R25: the permission is re-read under lock
     const ctx = await loadTaskCtx(c, tx, "read")
-    const row = await getTask(tx, ctx, id, { forUpdate: true, includeArchived: true }) // 404: unknown, another tenant's, out of the caller's scope
+    await getTask(tx, ctx, id, { includeArchived: true }) // 404: unknown, another tenant's, out of the caller's scope
+    await purgeSet(tx, tenantId, id)
+    const row = await getTask(tx, ctx, id, { forUpdate: true, includeArchived: true }) // re-checked on the locked row (a restore or purge that won is 409 / 404)
     if (!row.archivedAt) throw Conflict("task_not_archived")
     await purgeArchivedTask(tx, enqueue, { tenantId, actorId: ctx.actorId, now: ctx.now }, row)
   })
@@ -204,30 +237,57 @@ export async function purgeTask(c: Context<AppEnv>, id: string): Promise<void> {
 
 // ---------- the retention job ----------
 
+/** The retention job's page: archived at or before the cutoff, oldest first, keyset on (archived_at, id): tasks_archived_idx. Exported for the EXPLAIN test. */
+export const expiredPageQuery = (tx: TenantTx, tenantId: string, cutoff: Date, after: { at: Date; id: string } | null, take: number) =>
+  tx
+    .select({ id: tasks.id, at: tasks.archivedAt })
+    .from(tasks)
+    .where(and(eq(tasks.tenantId, tenantId), sql`${tasks.archivedAt} is not null`, sql`${tasks.archivedAt} <= ${cutoff.toISOString()}::timestamptz`, after ? sql`(${tasks.archivedAt}, ${tasks.id}) > (${after.at.toISOString()}::timestamptz, ${after.id}::uuid)` : undefined))
+    .orderBy(asc(tasks.archivedAt), asc(tasks.id))
+    .limit(take)
+
 /** One expired task in its own transaction; re-checked under the locks, so an id that was purged, restored or never expired is a no-op. */
 async function purgeIfExpired(deps: Deps, tenantId: string, id: string, cutoff: Date): Promise<boolean> {
   return withTenantAfterCommit(deps, tenantId, async (tx, enqueue) => {
     await lockTaskGraph(tx, tenantId)
     await lockTaskPurge(tx, tenantId)
-    const [row] = await tx
-      .select()
-      .from(tasks)
-      .where(and(eq(tasks.id, id), eq(tasks.tenantId, tenantId), sql`${tasks.archivedAt} is not null`, sql`${tasks.archivedAt} <= ${cutoff.toISOString()}::timestamptz`))
-      .for("update", { of: [tasks] })
+    const expired = and(eq(tasks.id, id), eq(tasks.tenantId, tenantId), sql`${tasks.archivedAt} is not null`, sql`${tasks.archivedAt} <= ${cutoff.toISOString()}::timestamptz`)
+    if ((await tx.select({ id: tasks.id }).from(tasks).where(expired)).length === 0) return false
+    await purgeSet(tx, tenantId, id)
+    const [row] = await tx.select().from(tasks).where(expired).for("update", { of: [tasks] }) // re-checked under the lock
     if (!row) return false
     await purgeArchivedTask(tx, enqueue, { tenantId, actorId: RETENTION_ACTOR, now: deps.clock.now() }, row)
     return true
   })
 }
 
-/** Re-queues `file.delete-object` for task files that were deleted but whose object removal never completed (a lost enqueue, a failed job). */
+/** A deleted task file whose object removal keeps failing is retried at most this many times, with doubling gaps (1 h, 2 h, 4 h ...), then left for an operator. */
+export const REMOVAL_MAX_ATTEMPTS = 8
+
+/**
+ * Re-queues `file.delete-object` for task files that were deleted but whose object removal never completed (a lost enqueue, a failed job). Never-tried
+ * rows come first, then the longest-waiting; each pick records an attempt, and a row waits 2^attempts hours before the next one, so rows that fail for
+ * good rotate out of the first 200 instead of starving the rest. Rows past the cap are only counted and logged.
+ */
 async function requeueObjects(deps: Deps, tenantId: string): Promise<void> {
+  const now = deps.clock.now().toISOString()
   await withTenantAfterCommit(deps, tenantId, async (tx, enqueue) => {
-    const rows = await tx.execute(sql`
-      select id from files
-      where tenant_id = ${tenantId} and status = 'deleted' and object_removed_at is null and purpose like 'task!_%' escape '!'
-      order by created_at, id limit ${PURGE_BATCH}`)
-    for (const r of rows.rows as { id: string }[]) enqueue(DELETE_OBJECT_JOB, { fileId: r.id, tenantId }, { key: `${r.id}-${crypto.randomUUID()}` })
+    const picked = await tx.execute(sql`
+      with due as (
+        select id from files
+        where tenant_id = ${tenantId} and status = 'deleted' and object_removed_at is null and purpose like 'task!_%' escape '!'
+          and object_removal_attempts < ${REMOVAL_MAX_ATTEMPTS}
+          and (object_removal_attempted_at is null or object_removal_attempted_at + (interval '1 hour' * power(2, object_removal_attempts)) <= ${now}::timestamptz)
+        order by object_removal_attempted_at nulls first, created_at, id
+        limit ${PURGE_BATCH}
+        for update skip locked)
+      update files f set object_removal_attempts = f.object_removal_attempts + 1, object_removal_attempted_at = ${now}::timestamptz
+      from due where f.id = due.id and f.tenant_id = ${tenantId}
+      returning f.id`)
+    for (const r of picked.rows as { id: string }[]) enqueue(DELETE_OBJECT_JOB, { fileId: r.id, tenantId }, { key: `${r.id}-${crypto.randomUUID()}` })
+    const stuck = await tx.execute(sql`select count(*)::int n from files where tenant_id = ${tenantId} and status = 'deleted' and object_removed_at is null and purpose like 'task!_%' escape '!' and object_removal_attempts >= ${REMOVAL_MAX_ATTEMPTS}`)
+    const n = (stuck.rows[0] as { n: number }).n
+    if (n > 0) deps.logger.error({ tenantId, files: n }, "task file objects could not be removed after the maximum attempts")
   })
 }
 
@@ -248,14 +308,7 @@ export async function runArchivePurge(_data: unknown, deps: Deps): Promise<void>
       const cutoff = new Date(now.getTime() - ARCHIVE_DAYS * DAY_MS)
       let after: { at: Date; id: string } | null = null
       for (let batch = 0; batch < MAX_BATCHES; batch++) {
-        const page: { id: string; at: Date | null }[] = await withTenant(deps.db, tenantId, (tx) =>
-          tx
-            .select({ id: tasks.id, at: tasks.archivedAt })
-            .from(tasks)
-            .where(and(eq(tasks.tenantId, tenantId), sql`${tasks.archivedAt} is not null`, sql`${tasks.archivedAt} <= ${cutoff.toISOString()}::timestamptz`, after ? sql`(${tasks.archivedAt}, ${tasks.id}) > (${after.at.toISOString()}::timestamptz, ${after.id}::uuid)` : undefined))
-            .orderBy(asc(tasks.archivedAt), asc(tasks.id))
-            .limit(PURGE_BATCH),
-        )
+        const page: { id: string; at: Date | null }[] = await withTenant(deps.db, tenantId, (tx) => expiredPageQuery(tx, tenantId, cutoff, after, PURGE_BATCH))
         for (const t of page) {
           try {
             await purgeIfExpired(deps, tenantId, t.id, cutoff)

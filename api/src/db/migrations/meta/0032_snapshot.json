@@ -1,5 +1,5 @@
 {
-  "id": "ef5647b8-f3a5-4031-9433-0e4bc0de7055",
+  "id": "e9313bb9-b873-4a87-9834-2faf3804e12a",
   "prevId": "8a6c48d3-9f4f-43a1-9054-a9110249c33c",
   "version": "7",
   "dialect": "postgresql",
@@ -3083,6 +3083,19 @@
         },
         "object_removed_at": {
           "name": "object_removed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "object_removal_attempts": {
+          "name": "object_removal_attempts",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "object_removal_attempted_at": {
+          "name": "object_removal_attempted_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false

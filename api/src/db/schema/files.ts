@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm"
-import { bigint, foreignKey, index, pgPolicy, pgTable, text, timestamp, unique, uuid } from "drizzle-orm/pg-core"
+import { bigint, foreignKey, integer, index, pgPolicy, pgTable, text, timestamp, unique, uuid } from "drizzle-orm/pg-core"
 import { memberships, tenants } from "./tenants"
 
 // Standard RLS template (R8); FORCE and the CHECK constraints are appended by hand in the migration.
@@ -37,6 +37,9 @@ export const files = pgTable(
     scannedAt: timestamp("scanned_at", { withTimezone: true }),
     // Set by the file.delete-object job once the object is really gone from storage; a `deleted` row without it is retried by the task retention job (T4.5).
     objectRemovedAt: timestamp("object_removed_at", { withTimezone: true }),
+    // Retry bookkeeping of the task retention job for deleted files whose object is still there: attempts and the last attempt (exponential spacing, capped).
+    objectRemovalAttempts: integer("object_removal_attempts").notNull().default(0),
+    objectRemovalAttemptedAt: timestamp("object_removal_attempted_at", { withTimezone: true }),
   },
   (t) => [
     // No cascade: removing a membership must not silently drop metadata of objects that still exist in storage.
