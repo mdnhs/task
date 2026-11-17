@@ -23,7 +23,8 @@ export const STATUS_ORDER: TaskStatus[] = ["not_started", "in_progress", "blocke
  * backend it becomes a stored file (tenant storage, signed URL), see .claude/docs/features/tasks.md → Voice instructions.
  */
 export type VoiceNote = {
-  url: string
+  /** Mock-only `blob:` URL (the Today hand-off). A note from the API has none: it is played through the API per play, and no URL is ever kept (D21). */
+  url?: string
   durationSec: number
   mime: string
   /** Display name of who recorded it. */
@@ -50,6 +51,12 @@ export type Evidence = {
   /** Local preview URL for images in this session (mock; real storage is platform storage, FR-M1-47). */
   url?: string
   size?: number
+  /** From the API (B6): the stored file and its malware-scan state (only a clean file counts, D10), when it was captured, and who reviewed it. */
+  fileId?: string
+  fileStatus?: "pending" | "clean" | "infected" | "deleted"
+  capturedAt?: string
+  reviewedBy?: string
+  reviewedAt?: string
 }
 /**
  * FR-TASK-10 repeat rule. `days` are weekdays 0 (Sun) to 6 (Sat); `until` is an optional YYYY-MM-DD end date.
@@ -84,10 +91,23 @@ export type TimelineEvent = { at: string; by: string; text: string; changes?: Fi
 export type ChecklistItem = { id: string; text: string; done: boolean }
 /** A member's proposed new dates (Q8: only managers change timelines; members propose). */
 export type DateProposal = { start: string; due: string; reason: string; by: string; at: string }
-export type Milestone = { id: string; name: string; due: string }
+export type Milestone = { id: string; name: string; due: string; /** From the API (B6): the milestone's own state and task counts. */ state?: "done" | "late" | "open"; done?: number; total?: number }
 /** FR-M1-04 project: tasks may belong to one; milestones have their own dates. */
-export type Project = { id: string; name: string; dept: string; lead: string; description: string; due: string; milestones: Milestone[] }
+export type Project = { id: string; name: string; dept: string; lead: string; description: string; due: string; milestones: Milestone[]; /** From the API (B6). */ version?: number; progress?: { done: number; total: number; pct: number } }
 export type Task = {
+  /** From the API (B6): the uuid every write uses (the `ref` is for display and URLs), the optimistic-lock version (D4) and the UTC instants every comparison reads (I12). */
+  id?: string
+  version?: number
+  startAt?: string
+  dueAt?: string
+  teamId?: string | null
+  /** The parent's uuid, null when the parent is outside the caller's scope (opaque, E15). */
+  parentId?: string | null
+  dependsOnIds?: string[]
+  /** Live subtasks the caller may see. */
+  subtasks?: { id: string; ref: string; title: string; status: TaskStatus }[]
+  /** The API's evidence state (only clean, non-rejected items count): null when no evidence is asked. Components prefer it over computing it from `evidence`. */
+  evidenceState?: string | null
   ref: string
   title: string
   description: string

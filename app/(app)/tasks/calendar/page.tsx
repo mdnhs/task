@@ -1,29 +1,15 @@
-import { TaskCalendar, getProjects, getTaskSeed, ME_ID } from "@/features/tasks"
-import { AccessRestricted, getUser } from "@/features/shell"
-import { getMockOrg } from "@/lib/org"
+import { TaskCalendar, loadCalendar, loadProjects, rangeOf, taskScreenData } from "@/features/tasks"
+import { AccessRestricted } from "@/features/shell"
+import { getOrg } from "@/lib/org"
 import { can } from "@/lib/permissions"
-import { canWrite, getSession } from "@/lib/session"
+import { requireMfaOk } from "@/lib/session"
 
-// Same seed + scopeKey as /tasks, so edits made on any task view show on the others (FR-M1-05).
+// The month the calendar opens on is asked of the API in the TENANT's days (it cuts them in the tenant zone, DST days included). Moving to another month asks again.
 export default async function Page() {
-  const [session, org, user] = await Promise.all([getSession(), getMockOrg(), getUser()])
+  const session = await requireMfaOk()
   if (!can(session.role, "tasks")) return <AccessRestricted moduleLabel="Tasks" />
-  const [{ people, staff, seed, scopeKey, refFloor }, projects] = await Promise.all([getTaskSeed(session), getProjects()])
-  const canEdit = canWrite(session, "tasks")
-  const me = (staff && people.find((p) => p.id === ME_ID)?.name) || user.name
-  return (
-    <TaskCalendar
-      tasks={seed}
-      people={people}
-      projects={projects}
-      today={org.today}
-      tzLabel={org.tzLabel}
-      scopeKey={scopeKey}
-      refFloor={refFloor}
-      onlyAssignee={staff ? ME_ID : undefined}
-      canEdit={canEdit}
-      actor={canEdit && session.role.home === "manager" ? "reviewer" : "assignee"}
-      me={me}
-    />
-  )
+  const [{ api, people }, org] = await Promise.all([taskScreenData(), getOrg()])
+  const range = rangeOf(org.today.slice(0, 10), "month")
+  const [cal, projects] = await Promise.all([loadCalendar(api, range.from, range.to), loadProjects(api)])
+  return <TaskCalendar tasks={cal.tasks} truncated={cal.truncated} range={range} people={people} projects={projects} today={org.today} tzLabel={org.tzLabel} staff={session.role.home === "staff"} />
 }

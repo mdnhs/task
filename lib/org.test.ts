@@ -50,7 +50,7 @@ describe("T6.4 getOrg: the tenant's own values, never a hard-coded zone", () => 
 
   test("Org has no reminders field (nothing consumed it)", async () => {
     const { client } = fakeApi({ "GET /v1/me/tenant": ctx(), "GET /v1/teams": teams })
-    expect(Object.keys(await loadOrg(client, NOW)).sort()).toEqual(["currency", "deadline", "departments", "locale", "timezone", "today", "tzLabel"])
+    expect(Object.keys(await loadOrg(client, NOW)).sort()).toEqual(["currency", "deadline", "departments", "locale", "nowAt", "timezone", "today", "tzLabel"]) // nowAt: the same clock as a UTC instant (T6.6, I12)
   })
 
   test("an unknown zone is a data error, never silently shown as another zone; its label falls back to the zone's own name", () => {

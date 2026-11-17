@@ -10,6 +10,7 @@ import { Dialog, DialogClose, DialogContent, DialogDescription, DialogHeader, Di
 import { Textarea } from "@/components/ui/textarea"
 import { formatDate } from "@/lib/dates"
 import { missingEvidence } from "@/lib/task-evidence"
+import { countable, ruleView } from "../evidence-view"
 import { completeOutcome, isOpen, nextStatuses } from "../lifecycle"
 import { STATUS } from "../types"
 import type { Task, TaskStatus } from "../types"
@@ -60,14 +61,15 @@ export function TaskActions({
   /** May verify / reject this task's evidence (FR-M1-45). */
   canVerify: boolean
   reviewerText: string
-  onStatus(to: TaskStatus): void
-  onComplete(): void
+  /** Each write resolves true only when the API accepted it: the toast and the button's check mark follow the answer, never the click. */
+  onStatus(to: TaskStatus): Promise<boolean>
+  onComplete(): Promise<boolean>
   /** Required evidence is missing: open the upload step (FR-M1-43). */
   onNeedEvidence(): void
-  onVerify(): void
-  onReject(reason: string): void
+  onVerify(): Promise<boolean>
+  onReject(reason: string): Promise<boolean>
   /** Manager tools (FR-M1-11/13): reschedule, reassign, archive. Omitted for members. */
-  manage?: { onReschedule(): void; onReassign(): void; onArchive(): void }
+  manage?: { onReschedule(): void; onReassign(): void; onArchive(): Promise<boolean> }
   /** Member tools (Q8): propose new dates. */
   member?: { onPropose(): void }
 }) {
@@ -77,8 +79,8 @@ export function TaskActions({
   const [reasonErr, setReasonErr] = useState("")
   const next = canEdit ? nextStatuses(task, actor).filter((s) => !(actor === "reviewer" && (s === "completed" || s === "changes_requested"))) : []
   const state = stateLine(task, reviewerText)
-  const outcome = completeOutcome(task)
-  const missing = missingEvidence(task.evidenceRule, task.evidence)
+  const outcome = completeOutcome(ruleView(task))
+  const missing = missingEvidence(task.evidenceRule, countable(task.evidence))
   const hint =
     actor === "assignee" && next.includes("completed") && outcome === "blocked"
       ? `Complete opens the evidence step: ${missing} more item${missing === 1 ? "" : "s"} needed.`
@@ -86,16 +88,24 @@ export function TaskActions({
         ? "Complete sends your evidence for verification."
         : null
 
-  function run(to: TaskStatus) {
-    if (to === "cancelled") return setConfirming("cancel")
-    if (to === "completed") {
-      if (outcome === "blocked") return onNeedEvidence()
-      onComplete()
-      toast.success(outcome === "submitted" ? `${task.ref}: Awaiting verification` : `${task.ref}: Completed`)
-      return
+  /** false = nothing was sent (a dialog opened instead) or the API refused: no check mark, no success toast. */
+  async function run(to: TaskStatus): Promise<boolean> {
+    if (to === "cancelled") {
+      setConfirming("cancel")
+      return false
     }
-    onStatus(to)
-    toast.success(`${task.ref}: ${STATUS[to].label}`)
+    if (to === "completed") {
+      if (outcome === "blocked") {
+        onNeedEvidence()
+        return false
+      }
+      const ok = await onComplete()
+      if (ok) toast.success(outcome === "submitted" ? `${task.ref}: Awaiting verification` : `${task.ref}: Completed`)
+      return ok
+    }
+    const ok = await onStatus(to)
+    if (ok) toast.success(`${task.ref}: ${STATUS[to].label}`)
+    return ok
   }
 
   const open = isOpen(task)
@@ -117,7 +127,7 @@ export function TaskActions({
         <div className="td-btns">
           {verifying && (
             <>
-              <ActionButton className="btn btn-primary" onDone={() => { onVerify(); toast.success(`${task.ref}: verified and completed`) }}>Verify and complete</ActionButton>
+              <ActionButton className="btn btn-primary" onAction={async () => { const ok = await onVerify(); if (ok) toast.success(`${task.ref}: verified and completed`); return ok }}>Verify and complete</ActionButton>
               <button type="button" className="btn btn-outline" onClick={() => setRejecting(true)}>Reject…</button>
             </>
           )}
@@ -128,7 +138,7 @@ export function TaskActions({
               // Opens the upload step instead of moving on (FR-M1-43), so no pending → ✓ animation.
               <button key={s} type="button" className="btn btn-primary" aria-describedby="td-hint" onClick={() => run(s)}>{label(s)}</button>
             ) : (
-              <ActionButton key={s} className="btn btn-primary" aria-describedby={s === "completed" && hint ? "td-hint" : undefined} onDone={() => run(s)}>
+              <ActionButton key={s} className="btn btn-primary" aria-describedby={s === "completed" && hint ? "td-hint" : undefined} onAction={() => run(s)}>
                 {label(s)}
               </ActionButton>
             ),
@@ -161,9 +171,8 @@ export function TaskActions({
         text={`${task.ref} will be closed and can no longer be worked on.`}
         confirmLabel="Cancel task"
         destructive
-        onConfirm={() => {
-          onStatus("cancelled")
-          toast.success(`${task.ref}: Cancelled`)
+        onConfirm={async () => {
+          if (await onStatus("cancelled")) toast.success(`${task.ref}: Cancelled`)
         }}
       />
       <ConfirmDialog
@@ -173,9 +182,8 @@ export function TaskActions({
         text={`${task.ref} moves to the archive. You can restore it for 30 days; after that it is deleted.`}
         confirmLabel="Remove task"
         destructive
-        onConfirm={() => {
-          manage?.onArchive()
-          toast.success(`${task.ref} archived. Restore it from Tasks → Archive within 30 days`)
+        onConfirm={async () => {
+          if (await manage?.onArchive()) toast.success(`${task.ref} archived. Restore it from Tasks → Archive within 30 days`)
         }}
       />
       <Dialog open={rejecting} onOpenChange={(o) => { setRejecting(o); if (!o) { setReason(""); setReasonErr("") } }}>
@@ -187,10 +195,10 @@ export function TaskActions({
           <form
             className="od-form"
             noValidate
-            onSubmit={(e) => {
+            onSubmit={async (e) => {
               e.preventDefault()
               if (reason.trim().length < 3) return setReasonErr("Give a short reason")
-              onReject(reason.trim())
+              if (!(await onReject(reason.trim()))) return
               toast.success(`${task.ref} reopened for the assignee`)
               setRejecting(false)
               setReason("")

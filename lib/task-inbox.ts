@@ -1,5 +1,5 @@
-// Hand-off for tasks created or changed outside /tasks (end-of-shift report FR-M1-26). Features can't import each other, so the creating
-// feature pushes here and the tasks store merges these in when a tasks screen mounts (features/tasks/store.ts).
+// MOCK hand-off kept ONLY for the Today card and the report editor, which are still on mock data until T6.7 (they push task changes here). The tasks screens no longer read it
+// (B6 T6.6: tasks are the API's, and the API applies report-driven changes itself); T6.7 deletes this file with those two callers.
 // Module state like lib/store.ts: survives client navigation, resets on reload.
 import type { TaskUpdate } from "@opsdesk/domain/contracts"
 export type IncomingTask = {

@@ -1,41 +1,38 @@
-import { TaskDetail, getProjects, getTaskSeed, ME_ID } from "@/features/tasks"
-import { AccessRestricted, getUser } from "@/features/shell"
-import { getDeviceContext } from "@/lib/device-session"
-import { getMockOrg } from "@/lib/org"
+import { TaskDetail, loadProjects, loadShiftPatterns, loadTaskByRef, taskScreenData, viewerOf } from "@/features/tasks"
+import { AccessRestricted } from "@/features/shell"
+import { getOrg } from "@/lib/org"
 import { can } from "@/lib/permissions"
-import { canWrite, getSession } from "@/lib/session"
+import { canWrite, requireMfaOk } from "@/lib/session"
 
-// Next 16: `params` is a Promise. The store is seeded exactly like /tasks (same seed, same scopeKey), so a staff user
-// who opens someone else's ref gets "Task not found" from the client lookup (still HTTP 200; no 404 status needed).
+// Next 16: `params` is a Promise. The ref is resolved through the API: a task the caller may not see answers 404 there, and the page shows "Task not found" (the same for
+// another person's task and for a ref that does not exist, so nothing is revealed).
 export default async function Page({ params }: { params: Promise<{ ref: string }> }) {
-  const [{ ref }, session, org, user] = await Promise.all([params, getSession(), getMockOrg(), getUser()])
+  const [{ ref }, session] = await Promise.all([params, requireMfaOk()])
   if (!can(session.role, "tasks")) return <AccessRestricted moduleLabel="Tasks" />
-  const [{ people, staff, seed, scopeKey, refFloor }, projects] = await Promise.all([getTaskSeed(session), getProjects()])
-  const { canDrive } = await getDeviceContext(session)
   let taskRef = ref
   try {
     taskRef = decodeURIComponent(ref)
   } catch {
     // malformed escape: look the raw value up, it simply will not be found
   }
-  const manager = session.role.home === "manager"
+  const [{ api, people }, org] = await Promise.all([taskScreenData(), getOrg()])
+  const [task, projects, patterns] = await Promise.all([loadTaskByRef(api, taskRef), loadProjects(api), loadShiftPatterns(api)])
+  const viewer = viewerOf(session)
   const canEdit = canWrite(session, "tasks")
-  // Staff roles act as "me" (Daniel); managers act as the signed-in user from the shell.
-  const me = (staff && people.find((p) => p.id === ME_ID)?.name) || user.name
   return (
     <TaskDetail
       taskRef={taskRef}
-      seed={seed}
-      scopeKey={scopeKey}
+      task={task}
       people={people}
       projects={projects}
       today={org.today}
+      nowAt={org.nowAt}
       tzLabel={org.tzLabel}
-      actor={canEdit && manager ? "reviewer" : "assignee"}
+      actor={canEdit && viewer.manager ? "reviewer" : "assignee"}
       canEdit={canEdit}
-      me={me}
-      refFloor={refFloor}
-      driveAllowed={canDrive}
+      viewer={{ id: viewer.id, name: viewer.name, manager: viewer.manager, purge: viewer.purge && session.tenant.status !== "suspended" }}
+      driveAllowed={session.drive}
+      patterns={patterns}
     />
   )
 }

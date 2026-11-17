@@ -1,15 +1,17 @@
 "use client"
 
+import { useState } from "react"
 import Link from "next/link"
 
+import { ConfirmDialog } from "@/components/confirm-dialog"
 import { EmptyState } from "@/components/empty-state"
 import { PageHead } from "@/components/page-head"
 import { StatusPill } from "@/components/status-pill"
 import { formatDate } from "@/lib/dates"
 import type { Status } from "@/lib/types"
-import { milestoneState, projectProgress } from "../planning"
-import { useTasksStore } from "../store"
-import type { Person, Project, Task } from "../types"
+import type { Person, Project } from "../types"
+import { createCatalog } from "../catalog"
+import { useTaskWrites } from "../use-task-writes"
 import { TaskViewTabs } from "./task-view-tabs"
 
 const MS: Record<"done" | "late" | "open", Status> = {
@@ -19,8 +21,9 @@ const MS: Record<"done" | "late" | "open", Status> = {
 }
 
 /** Projects with milestones (FR-M1-04): progress from their tasks; "View tasks" opens the list filtered to the project. */
-export function TaskProjects({ tasks, people, projects, today, scopeKey, refFloor }: { tasks: Task[]; people: Person[]; projects: Project[]; today: string; scopeKey: string; refFloor: number }) {
-  const [stored] = useTasksStore(tasks, scopeKey, people, { today, refFloor })
+export function TaskProjects({ people, projects, canDelete }: { people: Person[]; projects: Project[]; /** Project and milestone deletes are for managers who see everything (403 for a team-scope manager). */ canDelete: boolean }) {
+  const { act } = useTaskWrites([])
+  const [asking, setAsking] = useState<{ project: Project; milestone?: Project["milestones"][number] } | null>(null)
   const lead = (id: string) => people.find((p) => p.id === id)?.name ?? id
   return (
     <>
@@ -31,15 +34,18 @@ export function TaskProjects({ tasks, people, projects, today, scopeKey, refFloo
       ) : (
         <div className="pj-grid">
           {projects.map((p) => {
-            const pr = projectProgress(p, stored)
+            const pr = p.progress ?? { done: 0, total: 0, pct: 0 }
             return (
               <section key={p.id} className="card pj-card" aria-labelledby={`pj-${p.id}`}>
                 <div className="card-head">
                   <div>
                     <h2 id={`pj-${p.id}`} className="td-h">{p.name}</h2>
-                    <div className="sub">{lead(p.lead)} · <span className="dep-tag">{p.dept}</span> · due {formatDate(p.due)}</div>
+                    <div className="sub">{lead(p.lead)} · <span className="dep-tag">{p.dept}</span> · {p.due ? `due ${formatDate(p.due)}` : "no due date"}</div>
                   </div>
-                  <Link href={`/tasks?project=${p.id}`} className="tpl-link">View tasks</Link>
+                  <div className="ar-btns">
+                    <Link href={`/tasks?project=${p.id}`} className="tpl-link">View tasks</Link>
+                    {canDelete && <button type="button" className="tpl-link bad" onClick={() => setAsking({ project: p })}>Delete</button>}
+                  </div>
                 </div>
                 <p className="pj-desc">{p.description}</p>
                 <div className="pj-prog">
@@ -50,7 +56,7 @@ export function TaskProjects({ tasks, people, projects, today, scopeKey, refFloo
                 </div>
                 <ol className="pj-ms">
                   {p.milestones.map((m) => {
-                    const s = milestoneState(m, stored, today)
+                    const s = { state: m.state ?? "open", done: m.done ?? 0, total: m.total ?? 0 }
                     return (
                       <li key={m.id}>
                         <span className="pj-ms-dot" data-state={s.state} aria-hidden="true" />
@@ -59,6 +65,7 @@ export function TaskProjects({ tasks, people, projects, today, scopeKey, refFloo
                           <div className="td-tl-meta num">{formatDate(m.due)} · {s.done}/{s.total} tasks</div>
                         </div>
                         <StatusPill status={MS[s.state]} tick={false} />
+                        {canDelete && <button type="button" className="tpl-link bad" aria-label={`Delete milestone ${m.name}`} onClick={() => setAsking({ project: p, milestone: m })}>Delete</button>}
                       </li>
                     )
                   })}
@@ -68,6 +75,19 @@ export function TaskProjects({ tasks, people, projects, today, scopeKey, refFloo
           })}
         </div>
       )}
+      <ConfirmDialog
+        open={!!asking}
+        onOpenChange={(o) => !o && setAsking(null)}
+        title={asking?.milestone ? "Delete this milestone?" : "Delete this project?"}
+        text={asking?.milestone ? `${asking.milestone.name} is removed. Its tasks stay.` : `${asking?.project.name ?? ""} is removed. Its tasks stay, without a project.`}
+        confirmLabel="Delete"
+        destructive
+        onConfirm={async () => {
+          const a = asking
+          if (!a) return
+          await act(`del:${a.milestone?.id ?? a.project.id}`, () => (a.milestone ? createCatalog().deleteMilestone(a.project.id, a.milestone.id) : createCatalog().deleteProject(a.project.id)), { success: a.milestone ? "Milestone deleted" : "Project deleted" })
+        }}
+      />
     </>
   )
 }

@@ -285,3 +285,7 @@
 :root[data-theme="dark"] .nt-form input{color-scheme:dark}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .nt-form input{color-scheme:dark}}
 @media (max-width:640px){.nt-card{padding:20px}}
+/* B6 T6.6: cursor pagination has no page numbers, so a list ends with a "Load more" button; a board column the same, smaller. */
+.tasks-more{display:flex;justify-content:center;padding:16px 0 4px}
+.kb-more-btn{align-self:center;margin:8px 0 0}
+.ko-hidden{color:var(--ink-3)}

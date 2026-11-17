@@ -7,6 +7,8 @@ import { wallInTz, zoneLabel } from "./tz"
 export type Org = {
   /** The server clock as the tenant's local wall time, "YYYY-MM-DDTHH:mm:ss". */
   today: string
+  /** The same moment as a UTC instant (ISO): every comparison with a `dueAt` reads this, never `today` (the repeated DST hour, I12). Absent on mock orgs. */
+  nowAt?: string
   timezone: string
   /** Readable zone name for ghost text and date lines ("New Zealand Time"). */
   tzLabel: string
@@ -21,7 +23,7 @@ export type Org = {
 export type OrgSources = { timezone: string; currency: string; locale: string; reportDeadline: string; departments: string[] }
 
 export function composeOrg(s: OrgSources, now: Date): Org {
-  return { today: wallInTz(now, s.timezone), timezone: s.timezone, tzLabel: zoneLabel(s.timezone, now), currency: s.currency, locale: s.locale, deadline: s.reportDeadline, departments: s.departments }
+  return { today: wallInTz(now, s.timezone), nowAt: now.toISOString(), timezone: s.timezone, tzLabel: zoneLabel(s.timezone, now), currency: s.currency, locale: s.locale, deadline: s.reportDeadline, departments: s.departments }
 }
 
 export async function loadOrg(api: Pick<ApiClient, "get">, now: Date = new Date()): Promise<Org> {

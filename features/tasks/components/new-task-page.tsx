@@ -5,38 +5,32 @@ import { useRouter } from "next/navigation"
 
 import { PageHead } from "@/components/page-head"
 import { useDept } from "@/hooks/use-dept"
-import { useTasksStore } from "../store"
-import type { Person, Project, Task, TaskTemplate } from "../types"
+import type { Person, Project, TaskTemplate } from "../types"
 import { NewTaskForm } from "./new-task-form"
+import type { PatternChoice } from "./repeat-field"
 
-// /tasks/new. Seeds the tasks store with the same seed + scope as /tasks (like the list does), so the task created here is in the
-// list and on /tasks/[ref] after the client navigation. Save returns to `from`, or opens the new task when `openCreated` is set.
+// /tasks/new. Save returns to `from`, or opens the new task when `openCreated` is set. Everything the form offers comes from the API as the signed-in member:
+// the people they may assign (the API enforces it again: 422 assignee_out_of_scope), the department teams, the templates and the projects.
 export function NewTaskPage({
-  seed,
-  scopeKey,
   people,
   departments,
   today,
-  refFloor,
-  creator,
   templates,
   canManageTemplates,
   projects,
+  patterns,
   onlyAssignee,
   from,
   assignee,
   openCreated,
 }: {
-  seed: Task[]
-  scopeKey: string
   people: Person[]
-  departments: string[]
+  departments: { id: string; name: string }[]
   today: string
-  refFloor: number
-  creator: { id: string; name: string }
-  templates: TaskTemplate[]
+  templates: (TaskTemplate & { version: number; teamId: string | null })[]
   canManageTemplates: boolean
   projects: Project[]
+  patterns: PatternChoice[]
   /** Staff roles can only assign to themselves (the picker holds just them). */
   onlyAssignee?: string
   from: string
@@ -46,7 +40,6 @@ export function NewTaskPage({
 }) {
   const router = useRouter()
   const dept = useDept()
-  useTasksStore(seed, scopeKey, people, { today, refFloor })
   const backLabel = from === "/" ? "← Dashboard" : from.startsWith("/tasks") ? "← All tasks" : "← Back"
 
   return (
@@ -57,15 +50,13 @@ export function NewTaskPage({
         <NewTaskForm
           people={onlyAssignee ? people.filter((p) => p.id === onlyAssignee) : people}
           departments={departments}
-          defaultDept={dept !== "all" && departments.includes(dept) ? dept : (departments[0] ?? "")}
+          defaultDept={dept !== "all" && departments.some((d) => d.name === dept) ? dept : (departments[0]?.name ?? "")}
           defaultAssignee={onlyAssignee ?? (assignee || undefined)}
-          creator={creator}
           today={today}
-          refFloor={refFloor}
           templates={templates}
           canManageTemplates={canManageTemplates}
-          scopeKey={scopeKey}
           projects={projects}
+          patterns={patterns}
           cancelHref={from}
           onCreated={(ref) => router.push(openCreated ? `/tasks/${encodeURIComponent(ref)}` : from)}
         />

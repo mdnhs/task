@@ -184,7 +184,18 @@ export function VoiceRecorder({ id, value, onChange, max = VOICE_MAX_SEC, hint }
  * Plays a recording from a URL: play/pause, a scrubbable progress bar, elapsed / total. `durationSec` is the recorded length,
  * shown before the media loads and used when the browser reports no duration (recorded webm). `rate` sets the playback speed.
  */
-export function VoiceNotePlayer({ url, durationSec, rate = 1, label = "voice note" }: { url: string; durationSec: number; rate?: number; label?: string }) {
+export function VoiceNotePlayer({ url, fresh, durationSec, rate = 1, label = "voice note" }: {
+  /** A local recording (a `blob:` URL owned by this tab). */
+  url?: string
+  /**
+   * A note stored on the server: called on EVERY play to make the path for THAT play (the API answers it with a 60 s redirect and logs the play, D21). The element
+   * keeps no source between plays: it is cleared when the note ends or fails, so no URL is cached, stored or replayed.
+   */
+  fresh?: () => string
+  durationSec: number
+  rate?: number
+  label?: string
+}) {
   const audio = useRef<HTMLAudioElement>(null)
   const [playing, setPlaying] = useState(false)
   const [pos, setPos] = useState(0)
@@ -200,7 +211,14 @@ export function VoiceNotePlayer({ url, durationSec, rate = 1, label = "voice not
     if (!a) return
     if (a.paused) {
       a.playbackRate = rate
-      a.play().catch(() => setPlaying(false))
+      if (fresh && (!a.getAttribute("src") || a.ended)) {
+        a.src = fresh()
+        a.load()
+      }
+      a.play().catch(() => {
+        setPlaying(false)
+        if (fresh) a.removeAttribute("src")
+      })
     } else a.pause()
   }
   const seek = (to: number) => {
@@ -214,13 +232,18 @@ export function VoiceNotePlayer({ url, durationSec, rate = 1, label = "voice not
     <div className="vn-player">
       <audio
         ref={audio}
-        src={url}
-        preload="metadata"
+        src={fresh ? undefined : url}
+        preload={fresh ? "none" : "metadata"}
         onPlay={() => setPlaying(true)}
         onPause={() => setPlaying(false)}
+        onError={() => {
+          setPlaying(false)
+          if (fresh) audio.current?.removeAttribute("src")
+        }}
         onEnded={() => {
           setPlaying(false)
           setPos(0)
+          if (fresh) audio.current?.removeAttribute("src")
         }}
         onTimeUpdate={(e) => setPos(e.currentTarget.currentTime)}
         onLoadedMetadata={(e) => setMedia(e.currentTarget.duration)}

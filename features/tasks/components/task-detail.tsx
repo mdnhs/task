@@ -1,120 +1,120 @@
 "use client"
 
-import { useCallback, useMemo, useState } from "react"
+import { useCallback, useMemo, useRef, useState } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 
+import { ConfirmDialog } from "@/components/confirm-dialog"
 import { EmptyState } from "@/components/empty-state"
 import { PageHead } from "@/components/page-head"
 import { StatusPill } from "@/components/status-pill"
-import { VoiceNotePlayer } from "@/components/voice-note"
 import { When } from "@/components/when"
+import { apiBrowser } from "@/lib/api/browser"
+import { userMessage } from "@/lib/api/problem"
 import { formatDate, isOverdue } from "@/lib/dates"
-import { EVIDENCE_STATE, canVerify as mayVerify, evidenceState, reviewerText } from "@/lib/task-evidence"
-import { isLate, isOpen } from "../lifecycle"
+import { EVIDENCE_STATE, reviewerText } from "@/lib/task-evidence"
+import { FileRefused, VoiceTooLong, isKnockOnChanged } from "../client"
+import { canVerifyTask, evState, fileRefusedCopy, type Viewer } from "../evidence-view"
+import { isOpen } from "../lifecycle"
+import { isLateAt } from "../time"
 import {
-  addChecklistItem,
-  addEvidence,
-  addNote,
-  archiveTask,
-  changeStatus,
-  completeTask,
-  declineProposal,
-  makeSubtask,
-  noteSubtask,
-  nowIso,
-  proposeDates,
-  reassign,
-  rejectTask,
-  removeChecklistItem,
-  removeEvidence,
-  reschedule,
-  restoreTask,
-  reviewEvidence,
-  setDependencies,
-  setEvidenceRule,
-  setOverdue,
-  setRepeat,
-  toggleChecklistItem,
-  verifyTask,
-  type NewEvidence,
+  archiveTask, changeStatus, completeTask, declineProposal, nowIso, proposeDates, reassign, rejectTask, reschedule, restoreTask, reviewEvidence, setDependencies, setEvidenceRule, setOverdue, setRepeat, verifyTask,
 } from "../mutations"
-import { archiveDaysLeft, assigneesOf, dependantsOf, waitingOn, type DateMove } from "../planning"
-import { describeRepeat, materialiseRecurring } from "../recurrence"
-import { useTasksStore } from "../store"
+import { archiveDaysLeft, assigneesOf } from "../planning"
+import { describeRepeat } from "../recurrence"
+import { useTaskWrites } from "../use-task-writes"
 import { STATUS } from "../types"
 import type { Person, Project, Task, TaskStatus } from "../types"
-import { EvidencePanel, EvidenceStepDialog } from "./evidence-panel"
-import { nextRef } from "./new-task-form"
+import { EvidencePanel, EvidenceStepDialog, type EvidenceAdds } from "./evidence-panel"
 import { OverdueForm } from "./overdue-form"
 import { RepeatDialog } from "./repeat-dialog"
-import { ProposeDialog, ReassignDialog, RescheduleDialog } from "./schedule-dialogs"
+import type { PatternChoice } from "./repeat-field"
+import { ProposeDialog, ReassignDialog, RescheduleDialog, type PreviewData, type SaveResult } from "./schedule-dialogs"
 import { TaskActions } from "./task-actions"
 import { TaskNotes } from "./task-notes"
 import { ChecklistCard, DependenciesDialog, SubtasksCard } from "./task-plan-cards"
 import { TaskTimeline } from "./task-timeline"
+import { VoiceCard } from "./voice-card"
 
 const PRIO = ["", "Low", "Medium", "High"]
 export const formatEstimate = (m: number) => (m < 60 ? `${m} min` : `${Math.floor(m / 60)} h${m % 60 ? ` ${m % 60} min` : ""}`)
 
 export function TaskDetail({
   taskRef,
-  seed,
-  scopeKey,
+  task: server,
   people,
   projects = [],
   today,
+  nowAt,
   tzLabel,
   actor,
   canEdit,
-  me,
-  refFloor = 0,
+  viewer,
   driveAllowed,
+  patterns = [],
 }: {
   taskRef: string
-  /** Same seed + scopeKey as /tasks, so edits made here show in the list and the other way round. */
-  seed: Task[]
-  scopeKey: string
+  /** The task the API returned for this ref, or null: out of scope looks exactly like "no such task" (404 task_not_found). */
+  task: Task | null
   people: Person[]
   projects?: Project[]
   today: string
+  /** The clock as a UTC instant: lateness compares it with `dueAt` (I12). */
+  nowAt?: string
   tzLabel: string
   actor: "assignee" | "reviewer"
   canEdit: boolean
-  /** Name written on timeline entries: Daniel for staff roles, the signed-in user for managers. */
-  me: string
-  refFloor?: number
+  /** The signed-in member. `name` is written on predicted timeline lines; `purge` is settings:write (permanent delete of an archived task). */
+  viewer: Viewer & { purge: boolean }
   /** Device policy decision for Google Drive (computed on the server). */
   driveAllowed: boolean
+  /** Shift patterns for "Every shift" repeats; empty when the shifts data is not available. */
+  patterns?: PatternChoice[]
 }) {
-  const [tasks, setTasks] = useTasksStore(seed, scopeKey, people, { today, refFloor })
-  const task = tasks.find((t) => t.ref === taskRef)
+  const router = useRouter()
+  const { tasks, write, act, client } = useTaskWrites(useMemo(() => (server ? [server] : []), [server]))
+  const task = tasks[0]
+  const me = viewer.name
   const now = nowIso(today)
   const [dialog, setDialog] = useState<null | "repeat" | "reschedule" | "approve" | "reassign" | "propose" | "deps" | "evidence">(null)
+  const [purging, setPurging] = useState(false)
   const byId = useMemo(() => new Map(people.map((p) => [p.id, p])), [people])
-  const name = useCallback((id: string) => byId.get(id)?.name ?? id, [byId])
-  const meId = people.find((p) => p.name === me)?.id ?? me
+  const name = useCallback((id: string) => byId.get(id)?.name ?? "Member", [byId])
+  const meId = viewer.id
   const manager = actor === "reviewer"
+  const knockOnChanged = useRef(false)
 
-  /**
-   * A change to someone else's task tells the people on it (FR-M1-12, AC-M1-04): the history entry lists who was
-   * notified. (The notices themselves are written by the API; the mock UI has no client outbox any more.)
-   */
-  const withNotice = useCallback(
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars -- `what` fed the deleted client notice; the mock UI keeps the signature until T6.6 rewrites this component
-    (before: Task, after: Task, _what: string): Task => {
-      if (after === before) return after
-      const to = [...new Set([...assigneesOf(before), ...assigneesOf(after)])].filter((id) => id !== meId)
-      const last = after.timeline.at(-1)
-      if (!to.length || !last) return after
-      return { ...after, timeline: [...after.timeline.slice(0, -1), { ...last, notified: to.map(name) }] }
-    },
-    [meId, name],
+  const adds: EvidenceAdds = useMemo(
+    () => ({
+      file: async (f, kind, source, onScanning) => {
+        if (!task) return false
+        const r = await act(`evidence-file:${task.id}:${f.name}:${f.size}`, (c) => c.addFileEvidence(task, kind, f, { source, onScanning }), {
+          handled: (e) => {
+            if (!(e instanceof FileRefused)) return false
+            toast.error(fileRefusedCopy(e.reason, f.name))
+            return true
+          },
+        })
+        return r.ok
+      },
+      text: async (kind, text) => (task ? (await act(`evidence-${kind}:${task.id}`, (c) => (kind === "drive" ? c.addDriveEvidence(task, text) : c.addNoteEvidence(task, text)), { success: kind === "drive" ? "Drive link added" : "Note added" })).ok : false),
+      checklist: async () => (task ? (await act(`evidence-checklist:${task.id}`, (c) => c.addChecklistEvidence(task))).ok : false),
+    }),
+    [act, task],
   )
-  const apply = useCallback((fn: (t: Task) => Task) => setTasks((prev) => prev.map((t) => (t.ref === taskRef ? fn(t) : t))), [setTasks, taskRef])
-  /** Manager edits notify; the member's own edits don't. */
-  const applyManaged = useCallback((fn: (t: Task) => Task, what: string) => apply((t) => (manager ? withNotice(t, fn(t), what) : fn(t))), [apply, manager, withNotice])
-  const onAddEvidence = useCallback((item: NewEvidence) => apply((t) => addEvidence(t, item, me, now)), [apply, me, now])
+
+  const searchTasks = useCallback(
+    async (q: string) => {
+      try {
+        const page = await apiBrowser.get("/v1/tasks", { query: { q, limit: 10 } })
+        return page.items.map((t) => ({ id: t.id, ref: t.ref, title: t.title }))
+      } catch {
+        return []
+      }
+    },
+    [],
+  )
 
   if (!task) {
     return (
@@ -124,46 +124,65 @@ export function TaskDetail({
     )
   }
 
+  /** A change the viewer made to someone else's task tells the people on it (the API writes the notices; the history line lists who). The prediction only needs the line. */
+  const w = <T,>(key: string, request: (c: typeof client) => Promise<T>, predict?: (t: Task) => Task, success?: string) => write(task, key, { request, predict, success })
+  const copyOf = (e: unknown) => userMessage(e)
+
   const people$ = assigneesOf(task).map((id) => byId.get(id) ?? { id, name: id, initials: "?", avatar: "av1" as const, role: "", dept: "" })
   const creator = name(task.creator)
   const open = isOpen(task) && !task.archivedAt
-  const late = isLate(task, now)
-  const overdue = open && isOverdue(task.due, now)
+  const late = isLateAt(task, now, nowAt)
+  const overdue = open && (nowAt && task.dueAt ? Date.parse(task.dueAt) < Date.parse(nowAt) : isOverdue(task.due, now))
   const done = task.status === "submitted" || task.status === "completed"
   const lateLabel = late ? (done ? "Delivered late" : "Late") : "On time"
-  const evState = evidenceState(task.evidenceRule, task.evidence, task.status)
-  const viewer = { id: meId, manager }
-  const canVerify = canEdit && mayVerify(task.evidenceRule, viewer, task)
+  const evS = evState(task)
+  // D8: the check always gets the WHOLE task (primary and every co-assignee), never a partial list; the API still answers 403 self_verification if it is forced.
+  const canVerify = canEdit && canVerifyTask(task, viewer)
   // Members work their own tasks; managers may also act for the assignee (add evidence). Nothing changes while it is under review.
   const canWork = canEdit && open && task.status !== "submitted"
   const project = projects.find((p) => p.id === task.projectId)
   const milestone = project?.milestones.find((m) => m.id === task.milestoneId)
-  const waiting = waitingOn(tasks, task)
-  const blocks = dependantsOf(tasks, task.ref)
-  const subtasks = tasks.filter((t) => t.parentRef === task.ref && !t.archivedAt)
-  const parent = task.parentRef ? tasks.find((t) => t.ref === task.parentRef) : undefined
+  const subtasks = task.subtasks ?? []
+  // A parent outside the caller's scope has no ref in the DTO (E15): no link, no crash.
+  const parentRef = task.parentRef
+  const canVoice = canEdit && open && (manager || meId === task.creator)
 
-  function saveDates(to: { start: string; due: string }, moves: DateMove[], why?: string) {
-    setTasks((prev) =>
-      prev.map((t) => {
-        if (t.ref === taskRef) return withNotice(t, reschedule(t, to, me, now, why), "rescheduled")
-        const m = moves.find((x) => x.ref === t.ref)
-        return m ? withNotice(t, reschedule(t, m.to, me, now, `Moved because ${taskRef} moved (depends on it)`), "rescheduled") : t
-      }),
-    )
+  const preview = async (to: { start: string; due: string }): Promise<PreviewData | null> => {
+    try {
+      const p = await client.previewReschedule(task, to)
+      return { moves: p.moves.flatMap((m) => (m.outOfScope ? [] : [{ ref: m.ref, title: m.title, from: m.from, to: m.to }])), hidden: p.hiddenMoves, hash: p.previewHash }
+    } catch (e) {
+      toast.error(copyOf(e).text)
+      return null
+    }
   }
-
+  const saveDates = async (to: { start: string; due: string }, ko: { apply: false } | { apply: true; previewHash: string }, approve: boolean): Promise<SaveResult> => {
+    knockOnChanged.current = false
+    const ok = await write(task, approve ? "approve" : "reschedule", {
+      predict: approve ? undefined : (t) => reschedule(t, to, me, now),
+      request: (c) => (approve ? c.approveProposal(task, ko) : c.reschedule(task, to, ko)),
+      handled: (e) => {
+        if (!isKnockOnChanged(e)) return false
+        knockOnChanged.current = true // the dialog shows the preview again and the manager decides again
+        return true
+      },
+    })
+    return ok ? "ok" : knockOnChanged.current ? "changed" : "failed"
+  }
   return (
     <>
       <Link href="/tasks" className="td-back">← All tasks</Link>
       <PageHead title={task.title} subtitle={<span className="num">{task.ref}</span>} />
       {task.archivedAt && (
         <div className="td-state mute td-banner" role="status">
-          <strong>Archived {formatDate(task.archivedAt)} by {task.archivedBy}</strong>
+          <strong>Archived {formatDate(task.archivedAt)}{task.archivedBy ? ` by ${name(task.archivedBy)}` : ""}</strong>
           <span>
             Restorable for {archiveDaysLeft(task.archivedAt, today)} more days.{" "}
             {canEdit && manager && (
-              <button type="button" className="tpl-link" onClick={() => { apply((t) => restoreTask(t, me, now)); toast.success(`${task.ref} restored`) }}>Restore</button>
+              <button type="button" className="tpl-link" onClick={() => void w("restore", (c) => c.restore(task), (t) => restoreTask(t, me, now), `${task.ref} restored`)}>Restore</button>
+            )}
+            {canEdit && manager && viewer.purge && (
+              <> · <button type="button" className="tpl-link bad" onClick={() => setPurging(true)}>Delete permanently</button></>
             )}
           </span>
         </div>
@@ -176,7 +195,7 @@ export function TaskDetail({
           </span>
           <span className="td-banner-btns">
             <button type="button" className="btn btn-primary" onClick={() => setDialog("approve")}>Review and approve</button>
-            <button type="button" className="btn btn-outline" onClick={() => { applyManaged((t) => declineProposal(t, me, now), "declined the date change on"); toast.success("Proposal declined") }}>Decline</button>
+            <button type="button" className="btn btn-outline" onClick={() => void w("decline", (c) => c.declineProposal(task), (t) => declineProposal(t, me, now), "Proposal declined")}>Decline</button>
           </span>
         </div>
       )}
@@ -185,7 +204,7 @@ export function TaskDetail({
           <section className="card td-main" aria-label="Task details">
             <div className="td-badges">
               <StatusPill status={STATUS[task.status]} />
-              {evState && <StatusPill status={EVIDENCE_STATE[evState]} />}
+              {evS && <StatusPill status={EVIDENCE_STATE[evS]} />}
               <span className="td-prio">
                 <span className={`prio p${task.priority}`} aria-hidden="true"><i /><i /><i /></span>
                 {PRIO[task.priority]} priority
@@ -193,15 +212,23 @@ export function TaskDetail({
               {task.status !== "cancelled" && <span className={`st ${late ? "bad" : "ok"}`}>{lateLabel}</span>}
             </div>
             <p className="td-desc">{task.description}</p>
-            {task.voiceNote && (
-              <div className="td-voice" role="group" aria-labelledby="td-voice-h">
-                <div className="td-voice-h">
-                  <span id="td-voice-h">Voice instructions</span>
-                  <span className="td-voice-m">Recorded by {task.voiceNote.recordedBy} · {formatDate(task.voiceNote.recordedAt)}</span>
-                </div>
-                <VoiceNotePlayer url={task.voiceNote.url} durationSec={task.voiceNote.durationSec} label="voice instructions" />
-              </div>
-            )}
+            <VoiceCard
+              task={task}
+              canManage={canVoice}
+              canSeePlays={manager && canEdit}
+              today={today}
+              tzLabel={tzLabel}
+              onSet={async (blob, sec) => (await write(task, "voice", { request: (c) => c.setVoice(task, new File([blob], "voice-note", { type: blob.type || "audio/webm" }), sec), handled: (e) => (e instanceof VoiceTooLong ? (toast.error("A voice note can be 2 minutes at most."), true) : false) }))}
+              onClear={() => w("voice-clear", (c) => c.clearVoice(task))}
+              loadPlays={async () => {
+                try {
+                  return (await client.voicePlays(task)).items.map((p) => ({ id: p.id, by: p.by, at: p.at }))
+                } catch (e) {
+                  toast.error(copyOf(e).text)
+                  return null
+                }
+              }}
+            />
             <dl className="td-meta">
               <div>
                 <dt>{people$.length > 1 ? "Assignees" : "Assignee"}</dt>
@@ -225,7 +252,7 @@ export function TaskDetail({
                   </dd>
                 </div>
               )}
-              {parent && <div><dt>Subtask of</dt><dd><Link href={`/tasks/${parent.ref}`} className="tpl-link">{parent.ref}</Link> {parent.title}</dd></div>}
+              {parentRef && <div><dt>Subtask of</dt><dd><Link href={`/tasks/${parentRef}`} className="tpl-link">{parentRef}</Link></dd></div>}
               {(task.dependsOn?.length || (manager && canEdit && open)) && (
                 <div>
                   <dt>Depends on</dt>
@@ -236,18 +263,14 @@ export function TaskDetail({
                         ))
                       : "Nothing"}
                     {manager && canEdit && open && <> · <button type="button" className="tpl-link" onClick={() => setDialog("deps")}>Edit</button></>}
-                    {waiting.length > 0 && open && <div className="td-wait">Waiting on {waiting.map((w) => w.ref).join(", ")} to finish</div>}
                   </dd>
                 </div>
-              )}
-              {blocks.length > 0 && (
-                <div><dt>Blocks</dt><dd>{blocks.map((b, i) => <span key={b.ref}>{i > 0 && ", "}<Link href={`/tasks/${b.ref}`} className="tpl-link">{b.ref}</Link></span>)}</dd></div>
               )}
               {(task.repeat || task.seriesId) && (
                 <div>
                   <dt>Repeat</dt>
                   <dd>
-                    {task.repeat ? describeRepeat(task.repeat) : <>Part of series <Link href={`/tasks/${task.seriesId}`} className="tpl-link">{task.seriesId}</Link></>}
+                    {task.repeat ? describeRepeat(task.repeat) : <>Part of a repeating series</>}
                     {task.repeat && canEdit && manager && <> · <button type="button" className="tpl-link" onClick={() => setDialog("repeat")}>Change</button></>}
                   </dd>
                 </div>
@@ -268,39 +291,34 @@ export function TaskDetail({
             task={task}
             people={people}
             me={me}
+            viewer={viewer}
             canAdd={canWork}
             canVerify={canVerify && task.status === "submitted"}
             canEditRule={canEdit && open && (manager || meId === task.creator)}
             driveAllowed={driveAllowed}
             today={today}
             tzLabel={tzLabel}
-            onAdd={onAddEvidence}
-            onRemove={(id) => apply((t) => removeEvidence(t, id, me, now))}
-            onReview={(id, review, reason) => applyManaged((t) => reviewEvidence(t, id, review, reason, me, now), review === "rejected" ? "rejected evidence on" : "verified evidence on")}
-            onRule={(rule) => applyManaged((t) => setEvidenceRule(t, rule, me, now), "changed the evidence rule of")}
+            adds={adds}
+            onRemove={(id) => w(`evidence-rm:${id}`, (c) => c.removeEvidence(task, id), (t) => ({ ...t, evidence: t.evidence.filter((e) => e.id !== id) }))}
+            onReview={(id, review, reason) =>
+              w(`review:${id}`, (c) => (review === "accepted" ? c.verify(task, [id]) : c.reject(task, reason ?? "", [id])), (t) => reviewEvidence(t, id, review, reason, me, now))
+            }
+            onRule={(rule) => w("rule", (c) => c.setEvidenceRule(task, rule), (t) => setEvidenceRule(t, rule, me, now))}
           />
           <ChecklistCard
             task={task}
             canTick={canEdit && open}
             canEdit={canEdit && open && manager}
-            onToggle={(id) => apply((t) => toggleChecklistItem(t, id, me, now))}
-            onAdd={(text) => applyManaged((t) => addChecklistItem(t, text, me, now), "added a checklist item to")}
-            onRemove={(id) => applyManaged((t) => removeChecklistItem(t, id, me, now), "removed a checklist item from")}
+            onToggle={(id, done) => w(`check:${id}`, (c) => c.setChecklistDone(task, id, done), (t) => ({ ...t, checklist: (t.checklist ?? []).map((i) => (i.id === id ? { ...i, done } : i)) }))}
+            onAdd={(text) => w("check-add", (c) => c.addChecklistItem(task, text))}
+            onRemove={(id) => w(`check-rm:${id}`, (c) => c.removeChecklistItem(task, id), (t) => ({ ...t, checklist: (t.checklist ?? []).filter((i) => i.id !== id) }))}
           />
           <SubtasksCard
             subtasks={subtasks}
             canAdd={canEdit && open && manager && !task.parentRef}
-            onAdd={(title) => {
-              let made = ""
-              setTasks((prev) => {
-                made = nextRef(prev, refFloor)
-                const child = makeSubtask(task, made, title, me, meId, now)
-                return [child, ...prev.map((t) => (t.ref === task.ref ? noteSubtask(t, child, me, now) : t))]
-              })
-              toast.success(`Subtask ${made} added`)
-            }}
+            onAdd={(title) => w("subtask", (c) => c.addSubtask(task, title), undefined, "Subtask added")}
           />
-          <TaskNotes notes={task.notes} canAdd={canEdit && open} today={today} tzLabel={tzLabel} onAdd={(text) => apply((t) => addNote(t, text, me, now))} />
+          <TaskNotes notes={task.notes} canAdd={canEdit && open} today={today} tzLabel={tzLabel} onAdd={(text) => w("comment", (c) => c.comment(task, text))} />
         </div>
         <div className="td-col">
           <TaskActions
@@ -309,15 +327,15 @@ export function TaskDetail({
             canEdit={canEdit}
             canVerify={canVerify}
             reviewerText={reviewerText(task.evidenceRule, creator, (id) => byId.get(id)?.name)}
-            onStatus={(to: TaskStatus) => applyManaged((t) => changeStatus(t, to, me, now), "changed the status of")}
-            onComplete={() => apply((t) => completeTask(t, me, now))}
+            onStatus={(to: TaskStatus) => w(`status:${to}`, (c) => c.setStatus(task, to), (t) => changeStatus(t, to, me, now))}
+            onComplete={() => w("complete", (c) => c.complete(task), (t) => completeTask(t, me, now))}
             onNeedEvidence={() => setDialog("evidence")}
-            onVerify={() => applyManaged((t) => verifyTask(t, me, now), "verified")}
-            onReject={(reason) => applyManaged((t) => rejectTask(t, reason, me, now), "rejected the evidence of")}
+            onVerify={() => w("verify", (c) => c.verify(task), (t) => verifyTask(t, me, now))}
+            onReject={(reason) => w("reject", (c) => c.reject(task, reason), (t) => rejectTask(t, reason, me, now))}
             manage={manager ? {
               onReschedule: () => setDialog("reschedule"),
               onReassign: () => setDialog("reassign"),
-              onArchive: () => applyManaged((t) => archiveTask(t, me, now), "removed (archived)"),
+              onArchive: () => w("archive", (c) => c.archive(task), (t) => archiveTask(t, me, now)),
             } : undefined}
             member={!manager ? { onPropose: () => setDialog("propose") } : undefined}
           />
@@ -328,7 +346,7 @@ export function TaskDetail({
               defaultOwner={people$[0]?.name ?? ""}
               now={now}
               canEdit={canEdit && overdue}
-              onSave={(o) => apply((t) => setOverdue(t, o, me, now))}
+              onSave={(o) => void w("overdue", (c) => c.patch(task, setOverdue(task, o, me, now)), (t) => setOverdue(t, o, me, now))}
             />
           )}
           <TaskTimeline events={task.timeline} today={today} tzLabel={tzLabel} />
@@ -341,7 +359,8 @@ export function TaskDetail({
           rule={task.repeat}
           due={task.due}
           today={today}
-          onSave={(rule) => setTasks((prev) => materialiseRecurring(prev.map((t) => (t.ref === taskRef ? setRepeat(t, rule, me, now) : t)), today, refFloor))}
+          patterns={patterns}
+          onSave={(rule) => w("repeat", (c) => c.setRepeat(task, rule ?? null), (t) => setRepeat(t, rule, me, now))}
         />
       )}
       {(dialog === "reschedule" || dialog === "approve") && (
@@ -349,21 +368,21 @@ export function TaskDetail({
           open
           onOpenChange={(o) => !o && setDialog(null)}
           task={task}
-          tasks={tasks}
           today={today}
           title={dialog === "approve" ? "Approve new dates" : "Reschedule"}
           initial={dialog === "approve" ? task.proposal : undefined}
-          onSave={(to, moves) => saveDates(to, moves, dialog === "approve" ? `Date change from ${task.proposal?.by} approved` : undefined)}
+          onPreview={preview}
+          onSave={(to, ko) => saveDates(to, ko, dialog === "approve")}
         />
       )}
       {dialog === "reassign" && (
-        <ReassignDialog open onOpenChange={(o) => !o && setDialog(null)} task={task} people={people} onSave={(ids) => applyManaged((t) => reassign(t, ids, me, now, name), "reassigned")} />
+        <ReassignDialog open onOpenChange={(o) => !o && setDialog(null)} task={task} people={people} onSave={(primary, others) => w("assign", (c) => c.setAssignees(task, primary, others), (t) => reassign(t, [primary, ...others], me, now, name))} />
       )}
       {dialog === "propose" && (
-        <ProposeDialog open onOpenChange={(o) => !o && setDialog(null)} task={task} today={today} onSave={(p) => apply((t) => proposeDates(t, p, me, now))} />
+        <ProposeDialog open onOpenChange={(o) => !o && setDialog(null)} task={task} today={today} onSave={(p) => w("propose", (c) => c.propose(task, p), (t) => proposeDates(t, p, me, now))} />
       )}
       {dialog === "deps" && (
-        <DependenciesDialog open onOpenChange={(o) => !o && setDialog(null)} task={task} tasks={tasks} onSave={(refs) => applyManaged((t) => setDependencies(t, refs, me, now), "changed the dependencies of")} />
+        <DependenciesDialog open onOpenChange={(o) => !o && setDialog(null)} task={task} search={searchTasks} onSave={(ids) => w("deps", (c) => c.setDependencies(task, ids), (t) => setDependencies(t, [], me, now))} />
       )}
       <EvidenceStepDialog
         open={dialog === "evidence"}
@@ -371,10 +390,26 @@ export function TaskDetail({
         task={task}
         me={me}
         driveAllowed={driveAllowed}
-        onAdd={onAddEvidence}
-        onComplete={() => {
-          apply((t) => completeTask(t, me, now))
-          toast.success(`${task.ref}: ${task.evidenceRule.review === "auto" ? "Completed" : "Awaiting verification"}`)
+        adds={adds}
+        onComplete={async () => {
+          const ok = await w("complete", (c) => c.complete(task), (t) => completeTask(t, me, now))
+          if (ok) toast.success(`${task.ref}: ${task.evidenceRule.review === "auto" ? "Completed" : "Awaiting verification"}`)
+          return ok
+        }}
+      />
+      <ConfirmDialog
+        open={purging}
+        onOpenChange={setPurging}
+        title="Delete permanently?"
+        text={`${task.ref}, its subtasks and files are deleted for good. This can't be undone.`}
+        confirmLabel="Delete permanently"
+        destructive
+        onConfirm={async () => {
+          const r = await act(`purge:${task.id}`, (c) => c.purge(task))
+          if (r.ok) {
+            toast.success(`${task.ref} deleted`)
+            router.push("/tasks/archive")
+          }
         }}
       />
     </>

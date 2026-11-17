@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useRef, useState } from "react"
 import { AnimatePresence, motion } from "motion/react"
 import { Camera, Link2, ListChecks, PenLine, StickyNote, Upload } from "lucide-react"
 import { toast } from "sonner"
@@ -16,11 +16,11 @@ import { Textarea } from "@/components/ui/textarea"
 import { When } from "@/components/when"
 import { isDriveUrl } from "@/lib/devices"
 import { listItem } from "@/lib/motion"
+import { canVerifyItem, countable, evState, ruleView, type Viewer } from "../evidence-view"
 import {
   EVIDENCE_STATE,
   EVIDENCE_TYPE_LABEL,
   describeRule,
-  evidenceState,
   fileType,
   isValidItem,
   missingEvidence,
@@ -31,19 +31,30 @@ import {
   validCount,
 } from "@/lib/task-evidence"
 import type { Status } from "@/lib/types"
-import type { NewEvidence } from "../mutations"
 import type { Evidence, EvidenceRule, Person, Task } from "../types"
 import { EvidenceRuleField } from "./evidence-rule-field"
 import { SignatureDialog } from "./signature-pad"
 
 const reviewPill = (e: Evidence): Status => {
+  // A file item is only evidence once the scan says clean (D10): until then it is "Scanning", and an infected one is refused (the API also rejects it with a reason).
+  if (e.fileStatus === "infected") return { tone: "bad", label: "Infected" }
+  if (e.fileStatus === "pending") return { tone: "info", label: "Scanning" }
+  if (e.fileStatus === "deleted") return { tone: "mute", label: "Removed" }
   if (e.review === "accepted") return { tone: "ok", label: "Verified" }
   if (e.review === "rejected") return { tone: "bad", label: "Rejected" }
   if (e.review === "info_requested") return { tone: "warn", label: "Info requested" }
   return e.locked ? { tone: "info", label: "Awaiting verification" } : { tone: "mute", label: "Not submitted" }
 }
 
-type Upload = { id: number; name: string; kind: NewEvidence["kind"]; pct: number; source: "camera" | "upload"; url?: string; size: number }
+type FileKind = "photo" | "image" | "pdf" | "office" | "video" | "signature"
+type Upload = { id: number; name: string; phase: "uploading" | "scanning" }
+
+/** What the adders do (each resolves true only when the API accepted it): the panel owns no state, so nothing is shown as added before the server says so. */
+export type EvidenceAdds = {
+  file(file: File, kind: FileKind, source: "camera" | "upload", onScanning: () => void): Promise<boolean>
+  text(kind: "note" | "drive", text: string): Promise<boolean>
+  checklist(): Promise<boolean>
+}
 
 const linkSchema = z.string().trim().min(1, "Paste the Drive link").refine(isDriveUrl, "Paste a Google Drive or Docs link (https://drive.google.com/…)")
 const noteSchema = z.string().trim().min(1, "Write the note").max(500, "Keep it under 500 characters")
@@ -58,10 +69,10 @@ const ACCEPT: Partial<Record<EvidenceRule["types"][number], string>> = {
 }
 
 /**
- * The add controls for the allowed types (FR-M1-41): camera photo, file upload, note, Drive link (work PC only, CR-02),
- * signature and the task checklist. Uploads are simulated: the bar fills, then the item is attached locally.
+ * The add controls for the allowed types (FR-M1-41): camera photo, file upload, note, Drive link (work PC only, CR-02), signature and the task checklist.
+ * A file goes up to storage, then is scanned: the row says "Uploading", then "Scanning", and becomes evidence only when the API lists it (clean).
  */
-export function EvidenceAdder({ task, me, driveAllowed, onAdd }: { task: Task; me: string; driveAllowed: boolean; onAdd(item: NewEvidence): void }) {
+export function EvidenceAdder({ task, me, driveAllowed, adds }: { task: Task; me: string; driveAllowed: boolean; adds: EvidenceAdds }) {
   const rule = task.evidenceRule
   const allowed = (t: EvidenceRule["types"][number]) => rule.mode === "none" || rule.types.includes(t)
   const fileTypes = (["image", "pdf", "office", "video"] as const).filter((t) => allowed(t))
@@ -73,31 +84,21 @@ export function EvidenceAdder({ task, me, driveAllowed, onAdd }: { task: Task; m
   const [text, setText] = useState("")
   const [textErr, setTextErr] = useState<string>()
   const [signing, setSigning] = useState(false)
+  const [busy, setBusy] = useState(false)
 
-  const queue = useRef<Upload[]>([])
-  const addRef = useRef(onAdd)
-  useEffect(() => {
-    addRef.current = onAdd
-  })
-  const uploading = uploads.length > 0
-  useEffect(() => {
-    if (!uploading) return
-    const id = window.setInterval(() => {
-      const next = queue.current.map((x) => ({ ...x, pct: Math.min(100, x.pct + 20) }))
-      const done = next.filter((x) => x.pct >= 100)
-      queue.current = next.filter((x) => x.pct < 100)
-      if (done.length) {
-        done.forEach((x) => addRef.current({ kind: x.kind, name: x.name, source: x.source, url: x.url, size: x.size }))
-        toast.success(done.length === 1 ? `${done[0].name} attached` : `${done.length} files attached`)
-      }
-      setUploads(queue.current)
-    }, 140)
-    return () => window.clearInterval(id)
-  }, [uploading])
+  async function send(f: File, kind: FileKind, source: "camera" | "upload") {
+    const id = ++seq.current
+    setUploads((u) => [...u, { id, name: f.name, phase: "uploading" }])
+    try {
+      const ok = await adds.file(f, kind, source, () => setUploads((u) => u.map((x) => (x.id === id ? { ...x, phase: "scanning" } : x))))
+      if (ok) toast.success(`${f.name} attached`)
+    } finally {
+      setUploads((u) => u.filter((x) => x.id !== id))
+    }
+  }
 
   function pickFiles(files: FileList | null, capture = false) {
     if (!files?.length) return
-    const ok: Upload[] = []
     for (const f of Array.from(files)) {
       const kind = fileType(f.name, f.type, capture)
       const err = uploadError(rule, kind, f.size)
@@ -105,21 +106,19 @@ export function EvidenceAdder({ task, me, driveAllowed, onAdd }: { task: Task; m
         toast.error(`${f.name}: ${err}`)
         continue
       }
-      const url = kind === "photo" || kind === "image" ? URL.createObjectURL(f) : undefined
-      ok.push({ id: ++seq.current, name: f.name, kind, pct: 0, source: capture ? "camera" : "upload", url, size: f.size })
+      void send(f, kind as FileKind, capture ? "camera" : "upload")
     }
-    if (!ok.length) return
-    queue.current = [...queue.current, ...ok]
-    setUploads(queue.current)
   }
 
-  function addText(e: React.FormEvent) {
+  async function addText(e: React.FormEvent) {
     e.preventDefault()
     const r = (mode === "drive" ? linkSchema : noteSchema).safeParse(text)
     if (!r.success) return setTextErr(r.error.issues[0].message)
     if (mode === "drive" && !driveAllowed) return setTextErr("Google Drive links are available on your work PC")
-    onAdd({ kind: mode ?? "note", name: r.data })
-    toast.success(mode === "drive" ? "Drive link added" : "Note added")
+    setBusy(true)
+    const ok = await adds.text(mode ?? "note", r.data)
+    setBusy(false)
+    if (!ok) return
     setText("")
     setTextErr(undefined)
     setMode(null)
@@ -145,7 +144,7 @@ export function EvidenceAdder({ task, me, driveAllowed, onAdd }: { task: Task; m
         >
           <input type="file" multiple accept={accept} className="sr-only" onChange={(e) => { pickFiles(e.target.files); e.target.value = "" }} />
           <strong><Upload aria-hidden="true" />Drop files here or browse</strong>
-          <span>{fileTypes.map((t) => EVIDENCE_TYPE_LABEL[t]).join(", ")}. Uploads are simulated in this preview.</span>
+          <span>{fileTypes.map((t) => EVIDENCE_TYPE_LABEL[t]).join(", ")}. Files are scanned before they count.</span>
         </label>
       )}
       <div className="ev-add">
@@ -168,11 +167,13 @@ export function EvidenceAdder({ task, me, driveAllowed, onAdd }: { task: Task; m
           <button
             type="button"
             className="btn btn-outline"
-            disabled={!checklistDone}
+            disabled={!checklistDone || busy}
             title={checklistDone ? undefined : "Tick every checklist item first"}
-            onClick={() => {
-              onAdd({ kind: "checklist", name: `Checklist ${list.length}/${list.length} done` })
-              toast.success("Checklist attached")
+            onClick={async () => {
+              setBusy(true)
+              const ok = await adds.checklist()
+              setBusy(false)
+              if (ok) toast.success("Checklist attached")
             }}
           >
             <ListChecks aria-hidden="true" />
@@ -189,7 +190,7 @@ export function EvidenceAdder({ task, me, driveAllowed, onAdd }: { task: Task; m
               <Textarea id="ev-text" placeholder="e.g. Floor mopped, signs put back" value={text} onChange={(e) => { setText(e.target.value); setTextErr(undefined) }} />
             )}
           </Field>
-          <div className="td-form-foot"><button type="submit" className="btn btn-primary">{mode === "drive" ? "Add link" : "Add note"}</button></div>
+          <div className="td-form-foot"><button type="submit" className="btn btn-primary" disabled={busy}>{mode === "drive" ? "Add link" : "Add note"}</button></div>
         </form>
       )}
       {uploads.length > 0 && (
@@ -198,19 +199,26 @@ export function EvidenceAdder({ task, me, driveAllowed, onAdd }: { task: Task; m
             {uploads.map((u) => (
               <motion.li key={`up-${u.id}`} className="ev-item" {...listItem}>
                 <div className="ev-main">
-                  <span className="dep-tag">{EVIDENCE_TYPE_LABEL[u.kind]}</span>
+                  <span className="dep-tag">{u.phase === "scanning" ? "Scanning" : "Uploading"}</span>
                   <span className="ev-name">{u.name}</span>
-                  <span className="td-muted num">{u.pct}%</span>
                 </div>
-                <div suppressHydrationWarning className="progress ev-prog" role="progressbar" aria-label={`Uploading ${u.name}`} aria-valuenow={u.pct} aria-valuemin={0} aria-valuemax={100}>
-                  <i style={{ width: `${u.pct}%` }} />
+                <div suppressHydrationWarning className="progress ev-prog" role="progressbar" aria-label={`${u.phase === "scanning" ? "Scanning" : "Uploading"} ${u.name}`} aria-valuenow={u.phase === "scanning" ? 70 : 30} aria-valuemin={0} aria-valuemax={100}>
+                  <i style={{ width: u.phase === "scanning" ? "70%" : "30%" }} />
                 </div>
               </motion.li>
             ))}
           </AnimatePresence>
         </ul>
       )}
-      <SignatureDialog open={signing} onOpenChange={setSigning} signer={me} onSave={(url) => { onAdd({ kind: "signature", name: `Signature by ${me}`, url }); toast.success("Signature attached") }} />
+      <SignatureDialog
+        open={signing}
+        onOpenChange={setSigning}
+        signer={me}
+        onSave={async (dataUrl) => {
+          const blob = await (await fetch(dataUrl)).blob()
+          void send(new File([blob], `signature-${me.replace(/\W+/g, "-")}.png`, { type: blob.type || "image/png" }), "signature", "upload")
+        }}
+      />
     </div>
   )
 }
@@ -219,6 +227,7 @@ function EvidenceItem({ e, task, canAdd, canVerify, driveAllowed, today, tzLabel
   e: Evidence
   task: Task
   canAdd: boolean
+  /** Already includes "not the uploader of this item" (canVerifyItem). */
   canVerify: boolean
   driveAllowed: boolean
   today: string
@@ -227,17 +236,14 @@ function EvidenceItem({ e, task, canAdd, canVerify, driveAllowed, today, tzLabel
   onVerify(id: string): void
   onReject(e: Evidence): void
 }) {
-  const waiting = e.locked && isValidItem(e) && e.review !== "accepted" && task.status === "submitted"
+  const waiting = e.locked && isValidItem(e) && e.review !== "accepted" && task.status === "submitted" && (!e.fileId || e.fileStatus === "clean")
   return (
     <motion.li className="ev-item" {...listItem}>
       <div className="ev-main">
-        {e.url && (e.kind === "photo" || e.kind === "image" || e.kind === "signature") && (
-          // eslint-disable-next-line @next/next/no-img-element -- local blob/data preview, not an optimisable asset
-          <img className="ev-thumb" src={e.url} alt="" />
-        )}
         <span className="dep-tag">{EVIDENCE_TYPE_LABEL[e.kind] ?? e.kind}</span>
         {e.kind === "drive" ? (
-          <DriveLink allowed={driveAllowed} href={e.name} className="ev-name" />
+          // The API withholds a Drive link off the company PC (the name is then not a link): shown as is, never rebuilt here.
+          <DriveLink allowed={driveAllowed && isDriveUrl(e.name)} href={e.name} className="ev-name" />
         ) : (
           <span className={`ev-name${e.kind === "note" ? " ev-note" : ""}`}>{e.name}</span>
         )}
@@ -291,14 +297,17 @@ export function EvidencePanel({
   driveAllowed,
   today,
   tzLabel,
-  onAdd,
+  adds,
   onRemove,
   onReview,
   onRule,
+  viewer,
 }: {
   task: Task
   people: Person[]
   me: string
+  /** Who is looking: an item they uploaded is never theirs to verify (D8). */
+  viewer: Viewer
   /** The viewer may attach evidence (open task, write access, assignee side). */
   canAdd: boolean
   /** The viewer may verify / reject (FR-M1-45). */
@@ -309,10 +318,10 @@ export function EvidencePanel({
   driveAllowed: boolean
   today: string
   tzLabel: string
-  onAdd(item: NewEvidence): void
-  onRemove(id: string): void
-  onReview(id: string, review: "accepted" | "rejected", reason?: string): void
-  onRule(rule: EvidenceRule): void
+  adds: EvidenceAdds
+  onRemove(id: string): Promise<boolean>
+  onReview(id: string, review: "accepted" | "rejected", reason?: string): Promise<boolean>
+  onRule(rule: EvidenceRule): Promise<boolean>
 }) {
   const rule = task.evidenceRule
   const [asking, setAsking] = useState<{ id: string; name: string } | null>(null)
@@ -323,30 +332,32 @@ export function EvidencePanel({
   const [draftErr, setDraftErr] = useState<string>()
   const name = (id: string) => people.find((p) => p.id === id)?.name
   const creator = name(task.creator) ?? task.creator
-  const state = evidenceState(rule, task.evidence, task.status)
+  const state = evState(task)
   const current = task.evidence.filter(isValidItem)
   const earlier = task.evidence.filter((e) => !isValidItem(e))
 
-  function confirmReason(e: React.FormEvent) {
+  async function confirmReason(e: React.FormEvent) {
     e.preventDefault()
     const r = reasonSchema.safeParse(reason)
     if (!r.success || !asking) return setReasonErr(r.success ? undefined : r.error.issues[0].message)
-    onReview(asking.id, "rejected", r.data)
-    toast.success("Evidence rejected. The task is reopened for the assignee")
-    closeAsk()
+    if (await onReview(asking.id, "rejected", r.data)) {
+      toast.success("Evidence rejected. The task is reopened for the assignee")
+      closeAsk()
+    }
   }
   function closeAsk() {
     setAsking(null)
     setReason("")
     setReasonErr(undefined)
   }
-  function saveRule(e: React.FormEvent) {
+  async function saveRule(e: React.FormEvent) {
     e.preventDefault()
     const err = ruleError(draft)
     if (err) return setDraftErr(err)
-    onRule(normaliseRule(draft))
-    toast.success("Evidence rule saved")
-    setEditing(false)
+    if (await onRule(normaliseRule(draft))) {
+      toast.success("Evidence rule saved")
+      setEditing(false)
+    }
   }
 
   return (
@@ -368,12 +379,12 @@ export function EvidencePanel({
         <div className="ev-rule">
           {rule.instruction && <p className="ev-ins">{rule.instruction}</p>}
           <p className="td-muted">{reviewerText(rule, creator, name)}</p>
-          <CountLine task={task} />
+          <CountLine task={ruleView(task)} />
         </div>
       )}
       {rule.mode === "none" && task.evidence.length === 0 && <p className="td-muted">Not needed for this task. It closes with one tap.</p>}
 
-      {canAdd && rule.mode !== "none" && <EvidenceAdder task={task} me={me} driveAllowed={driveAllowed} onAdd={onAdd} />}
+      {canAdd && rule.mode !== "none" && <EvidenceAdder task={task} me={me} driveAllowed={driveAllowed} adds={adds} />}
 
       {current.length > 0 && (
         <ul className="ev-list">
@@ -384,12 +395,12 @@ export function EvidencePanel({
                 e={e}
                 task={task}
                 canAdd={canAdd}
-                canVerify={canVerify}
+                canVerify={canVerify && canVerifyItem(e, viewer)}
                 driveAllowed={driveAllowed}
                 today={today}
                 tzLabel={tzLabel}
-                onRemove={onRemove}
-                onVerify={(id) => { onReview(id, "accepted"); toast.success("Evidence verified") }}
+                onRemove={(id) => void onRemove(id)}
+                onVerify={async (id) => { if (await onReview(id, "accepted")) toast.success("Evidence verified") }}
                 onReject={(it) => setAsking({ id: it.id, name: it.name })}
               />
             ))}
@@ -450,16 +461,16 @@ export function EvidencePanel({
  * FR-M1-43: pressing Complete on a Required task below its minimum opens this upload step. Complete stays disabled
  * until the minimum is met, then runs the normal complete (Completed, or Awaiting verification).
  */
-export function EvidenceStepDialog({ open, onOpenChange, task, me, driveAllowed, onAdd, onComplete }: {
+export function EvidenceStepDialog({ open, onOpenChange, task, me, driveAllowed, adds, onComplete }: {
   open: boolean
   onOpenChange(o: boolean): void
   task: Task
   me: string
   driveAllowed: boolean
-  onAdd(item: NewEvidence): void
-  onComplete(): void
+  adds: EvidenceAdds
+  onComplete(): Promise<boolean>
 }) {
-  const missing = missingEvidence(task.evidenceRule, task.evidence)
+  const missing = missingEvidence(task.evidenceRule, countable(task.evidence))
   const items = task.evidence.filter((e) => isValidItem(e) && !e.locked)
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -469,8 +480,8 @@ export function EvidenceStepDialog({ open, onOpenChange, task, me, driveAllowed,
           <DialogDescription>{task.evidenceRule.instruction || describeRule(task.evidenceRule)}</DialogDescription>
         </DialogHeader>
         <div className="od-form">
-          <CountLine task={task} />
-          <EvidenceAdder task={task} me={me} driveAllowed={driveAllowed} onAdd={onAdd} />
+          <CountLine task={ruleView(task)} />
+          <EvidenceAdder task={task} me={me} driveAllowed={driveAllowed} adds={adds} />
           {items.length > 0 && (
             <ul className="ev-list ev-step-list">
               {items.map((e) => (
@@ -482,7 +493,7 @@ export function EvidenceStepDialog({ open, onOpenChange, task, me, driveAllowed,
           )}
           <div className="od-form-foot">
             <DialogClose render={<button type="button" className="btn btn-outline" />}>Later</DialogClose>
-            <button type="button" className="btn btn-primary" disabled={missing > 0} onClick={() => { onComplete(); onOpenChange(false) }}>
+            <button type="button" className="btn btn-primary" disabled={missing > 0} onClick={async () => { if (await onComplete()) onOpenChange(false) }}>
               {missing > 0 ? `${missing} more needed` : "Complete"}
             </button>
           </div>

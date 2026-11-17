@@ -1,12 +1,14 @@
-import { TaskProjects, getProjects, getTaskSeed } from "@/features/tasks"
+import { TaskProjects, loadProjects, taskScreenData, viewerOf } from "@/features/tasks"
 import { AccessRestricted } from "@/features/shell"
-import { getMockOrg } from "@/lib/org"
 import { can } from "@/lib/permissions"
-import { getSession } from "@/lib/session"
+import { canWrite, requireMfaOk } from "@/lib/session"
 
 export default async function Page() {
-  const [session, org] = await Promise.all([getSession(), getMockOrg()])
+  const session = await requireMfaOk()
   if (!can(session.role, "tasks")) return <AccessRestricted moduleLabel="Tasks" />
-  const [{ people, seed, scopeKey, refFloor }, projects] = await Promise.all([getTaskSeed(session), getProjects()])
-  return <TaskProjects tasks={seed} people={people} projects={projects} today={org.today} scopeKey={scopeKey} refFloor={refFloor} />
+  const { api, people } = await taskScreenData()
+  const projects = await loadProjects(api)
+  const v = viewerOf(session)
+  // Project and milestone deletes are for managers who see everything: a team-scope manager would get 403, so the buttons are not offered.
+  return <TaskProjects people={people} projects={projects} canDelete={canWrite(session, "tasks") && v.manager && !v.teamScope} />
 }

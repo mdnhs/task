@@ -5,7 +5,6 @@ import {
   reassign, rejectTask, removeChecklistItem, removeEvidence, reschedule, restoreTask, reviewEvidence, setDependencies, setEvidenceRule, setOverdue,
   toggleChecklistItem, verifyTask,
 } from "./mutations"
-import { tasksStore } from "./store"
 import { legacyRule } from "@/lib/task-evidence"
 import type { Task } from "./types"
 
@@ -75,22 +74,6 @@ describe("notes, overdue, deadline", () => {
     expect(t.timeline.at(-1)?.text).toBe("Deadline changed Tue 20 Oct → Thu 22 Oct")
     const same = task()
     expect(changeDeadline(same, same.due, "Lil", NOW)).toBe(same)
-  })
-})
-
-describe("tasksStore", () => {
-  it("applies an edit to one task immutably and keeps the seed scope", () => {
-    tasksStore.reset()
-    const a = task({ ref: "TSK-1" })
-    const b = task({ ref: "TSK-2" })
-    tasksStore.seed([a, b], "t1:all")
-    tasksStore.set((prev) => prev.map((t) => (t.ref === "TSK-2" ? changeStatus(t, "blocked", "Dan", NOW) : t)))
-    const now = tasksStore.get()!
-    expect(now[0]).toBe(a)
-    expect(now[1].status).toBe("blocked")
-    tasksStore.seed([a, b], "t1:all") // same scope: edits survive
-    expect(tasksStore.get()![1].status).toBe("blocked")
-    tasksStore.reset()
   })
 })
 

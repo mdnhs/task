@@ -1,17 +1,16 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import Link from "next/link"
 import { AnimatePresence, motion } from "motion/react"
 import { toast } from "sonner"
 
 import { Field } from "@/components/field"
-import { FilterSelect } from "@/components/filter-bar"
 import { StatusPill } from "@/components/status-pill"
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { listItem } from "@/lib/motion"
-import { checklistProgress, wouldCycle } from "../planning"
+import { checklistProgress } from "../planning"
 import { STATUS } from "../types"
 import type { Task } from "../types"
 
@@ -20,9 +19,10 @@ export function ChecklistCard({ task, canTick, canEdit, onToggle, onAdd, onRemov
   task: Task
   canTick: boolean
   canEdit: boolean
-  onToggle(id: string): void
-  onAdd(text: string): void
-  onRemove(id: string): void
+  /** `done` is the NEW value (absolute, never a flip): two quick clicks cannot cancel each other out on the server. */
+  onToggle(id: string, done: boolean): Promise<boolean>
+  onAdd(text: string): Promise<boolean>
+  onRemove(id: string): Promise<boolean>
 }) {
   const [text, setText] = useState("")
   const [err, setErr] = useState("")
@@ -42,12 +42,12 @@ export function ChecklistCard({ task, canTick, canEdit, onToggle, onAdd, onRemov
           <AnimatePresence initial={false}>
             {list.map((c) => (
               <motion.li key={c.id} className="cl-item" {...listItem}>
-                <button type="button" role="checkbox" aria-checked={c.done} className="cl-box" disabled={!canTick} onClick={() => onToggle(c.id)}>
+                <button type="button" role="checkbox" aria-checked={c.done} className="cl-box" disabled={!canTick} onClick={() => void onToggle(c.id, !c.done)}>
                   <span className="cl-tick" aria-hidden="true" />
                   <span className="cl-text">{c.text}</span>
                 </button>
                 {canEdit && (
-                  <button type="button" className="tpl-link bad cl-rm" aria-label={`Remove ${c.text}`} onClick={() => onRemove(c.id)}>Remove</button>
+                  <button type="button" className="tpl-link bad cl-rm" aria-label={`Remove ${c.text}`} onClick={() => void onRemove(c.id)}>Remove</button>
                 )}
               </motion.li>
             ))}
@@ -58,11 +58,10 @@ export function ChecklistCard({ task, canTick, canEdit, onToggle, onAdd, onRemov
         <form
           className="cl-add"
           noValidate
-          onSubmit={(e) => {
+          onSubmit={async (e) => {
             e.preventDefault()
             if (text.trim().length < 2) return setErr("Write the item")
-            onAdd(text)
-            setText("")
+            if (await onAdd(text.trim())) setText("")
           }}
         >
           <Field label="New item" htmlFor="cl-new" error={err || undefined}>
@@ -76,7 +75,7 @@ export function ChecklistCard({ task, canTick, canEdit, onToggle, onAdd, onRemov
 }
 
 /** FR-M1-02 subtasks: child tasks with their own status; a manager adds one by title. */
-export function SubtasksCard({ subtasks, canAdd, onAdd }: { subtasks: Task[]; canAdd: boolean; onAdd(title: string): void }) {
+export function SubtasksCard({ subtasks, canAdd, onAdd }: { subtasks: NonNullable<Task["subtasks"]>; canAdd: boolean; onAdd(title: string): Promise<boolean> }) {
   const [text, setText] = useState("")
   const [err, setErr] = useState("")
   if (!subtasks.length && !canAdd) return null
@@ -106,11 +105,10 @@ export function SubtasksCard({ subtasks, canAdd, onAdd }: { subtasks: Task[]; ca
         <form
           className="cl-add"
           noValidate
-          onSubmit={(e) => {
+          onSubmit={async (e) => {
             e.preventDefault()
             if (text.trim().length < 3) return setErr("Enter a title of at least 3 characters")
-            onAdd(text)
-            setText("")
+            if (await onAdd(text.trim())) setText("")
           }}
         >
           <Field label="New subtask" htmlFor="sub-new" error={err || undefined}>
@@ -123,19 +121,33 @@ export function SubtasksCard({ subtasks, canAdd, onAdd }: { subtasks: Task[]; ca
   )
 }
 
-/** Manager edits finish-to-start dependencies; loops are refused (FR-M1-02). */
-export function DependenciesDialog({ open, onOpenChange, task, tasks, onSave }: { open: boolean; onOpenChange(o: boolean): void; task: Task; tasks: Task[]; onSave(refs: string[]): void }) {
-  const [refs, setRefs] = useState<string[]>(task.dependsOn ?? [])
-  const [pick, setPick] = useState("")
-  const [err, setErr] = useState("")
-  const options = tasks.filter((t) => t.ref !== task.ref && !t.archivedAt && !refs.includes(t.ref) && t.status !== "cancelled")
-  function add(ref: string) {
-    setPick("")
-    if (!ref) return
-    if (wouldCycle(tasks, task.ref, ref)) return setErr(`${ref} already depends on ${task.ref}, so this would make a loop`)
-    setRefs((r) => [...r, ref])
-    setErr("")
-  }
+export type DepChoice = { id: string; ref: string; title: string }
+
+/**
+ * Manager edits finish-to-start dependencies (FR-M1-02). Candidates come from the API's own task search (the caller's scope, 25 hits), so nothing is chosen from a list the
+ * page holds; a loop is refused by the API (422 dependency_cycle, shown with its mapped copy).
+ */
+export function DependenciesDialog({ open, onOpenChange, task, search, onSave }: {
+  open: boolean
+  onOpenChange(o: boolean): void
+  task: Task
+  search(q: string): Promise<DepChoice[]>
+  onSave(ids: string[]): Promise<boolean>
+}) {
+  const [chosen, setChosen] = useState<DepChoice[]>(() => (task.dependsOnIds ?? []).map((id, i) => ({ id, ref: task.dependsOn?.[i] ?? id, title: "" })))
+  const [q, setQ] = useState("")
+  const [hits, setHits] = useState<DepChoice[]>([])
+  const [busy, setBusy] = useState(false)
+  const seq = useRef(0)
+  useEffect(() => {
+    const mine = ++seq.current
+    if (q.trim().length < 2) return void Promise.resolve().then(() => mine === seq.current && setHits([]))
+    const t = window.setTimeout(async () => {
+      const found = await search(q.trim())
+      if (mine === seq.current) setHits(found.filter((h) => h.id !== task.id && !chosen.some((c) => c.id === h.id)))
+    }, 200)
+    return () => window.clearTimeout(t)
+  }, [q, search, task.id, chosen])
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="od-dialog od-form-dialog" showCloseButton={false}>
@@ -146,22 +158,35 @@ export function DependenciesDialog({ open, onOpenChange, task, tasks, onSave }: 
         <form
           className="od-form"
           noValidate
-          onSubmit={(e) => {
+          onSubmit={async (e) => {
             e.preventDefault()
-            onSave(refs)
+            setBusy(true)
+            const ok = await onSave(chosen.map((c) => c.id))
+            setBusy(false)
+            if (!ok) return
             toast.success("Dependencies saved")
             onOpenChange(false)
           }}
         >
-          <Field label="Task" htmlFor="dep-add" error={err || undefined}>
-            <FilterSelect label="Task" value={pick} options={[{ value: "", label: "Add a task…" }, ...options.map((t) => ({ value: t.ref, label: `${t.ref} · ${t.title}` }))]} onChange={add} />
+          <Field label="Find a task" htmlFor="dep-add">
+            <Input id="dep-add" placeholder="Search by title or ref…" value={q} onChange={(e) => setQ(e.target.value)} />
           </Field>
-          {refs.length > 0 ? (
+          {hits.length > 0 && (
             <ul className="sub-list">
-              {refs.map((r) => (
-                <li key={r} className="sub-item">
-                  <span className="tt"><span className="num">{r}</span> {tasks.find((t) => t.ref === r)?.title ?? ""}</span>
-                  <button type="button" className="tpl-link bad" onClick={() => setRefs((x) => x.filter((y) => y !== r))}>Remove</button>
+              {hits.map((h) => (
+                <li key={h.id} className="sub-item">
+                  <span className="tt"><span className="num">{h.ref}</span> {h.title}</span>
+                  <button type="button" className="tpl-link" onClick={() => { setChosen((c) => [...c, h]); setQ("") }}>Add</button>
+                </li>
+              ))}
+            </ul>
+          )}
+          {chosen.length > 0 ? (
+            <ul className="sub-list">
+              {chosen.map((r) => (
+                <li key={r.id} className="sub-item">
+                  <span className="tt"><span className="num">{r.ref}</span> {r.title}</span>
+                  <button type="button" className="tpl-link bad" onClick={() => setChosen((x) => x.filter((y) => y.id !== r.id))}>Remove</button>
                 </li>
               ))}
             </ul>
@@ -170,7 +195,7 @@ export function DependenciesDialog({ open, onOpenChange, task, tasks, onSave }: 
           )}
           <div className="od-form-foot">
             <DialogClose render={<button type="button" className="btn btn-outline" />}>Cancel</DialogClose>
-            <button type="submit" className="btn btn-primary">Save</button>
+            <button type="submit" className="btn btn-primary" disabled={busy}>Save</button>
           </div>
         </form>
       </DialogContent>

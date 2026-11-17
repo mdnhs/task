@@ -5,7 +5,7 @@ import { useState } from "react"
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { repeatError } from "../recurrence"
 import type { RepeatRule } from "../types"
-import { RepeatField, draftToRule, ruleToDraft } from "./repeat-field"
+import { RepeatField, draftToRule, ruleToDraft, type PatternChoice } from "./repeat-field"
 
 // Edit the repeat rule of an existing series task (FR-TASK-10).
 export function RepeatDialog({
@@ -15,22 +15,24 @@ export function RepeatDialog({
   due,
   today,
   onSave,
+  patterns,
 }: {
   open: boolean
   onOpenChange(o: boolean): void
   rule?: RepeatRule
   due: string
   today: string
-  onSave(rule: RepeatRule | undefined): void
+  onSave(rule: RepeatRule | undefined): Promise<boolean>
+  patterns?: PatternChoice[]
 }) {
   const [draft, setDraft] = useState(() => ruleToDraft(rule))
   const [error, setError] = useState("")
-  function save(e: React.FormEvent) {
+  async function save(e: React.FormEvent) {
     e.preventDefault()
     const next = draftToRule(draft)
-    const bad = next ? repeatError(next, due.slice(0, 10)) : ""
+    const bad = next ? (next.freq === "per_shift" && !next.patternId ? "Choose a shift" : repeatError(next, due.slice(0, 10))) : ""
     if (bad) return setError(bad)
-    onSave(next)
+    if (!(await onSave(next))) return
     onOpenChange(false)
   }
   return (
@@ -41,7 +43,7 @@ export function RepeatDialog({
           <DialogDescription>New copies of this task are made on each date, starting after the current due date.</DialogDescription>
         </DialogHeader>
         <form className="od-form" onSubmit={save} noValidate>
-          <RepeatField id="rd" value={draft} onChange={(v) => { setDraft(v); setError("") }} today={today} min={due.slice(0, 10)} error={error} />
+          <RepeatField id="rd" value={draft} onChange={(v) => { setDraft(v); setError("") }} today={today} min={due.slice(0, 10)} error={error} patterns={patterns} />
           <div className="od-form-foot">
             <DialogClose render={<button type="button" className="btn btn-outline" />}>Cancel</DialogClose>
             <button type="submit" className="btn btn-primary">Save</button>

@@ -1,15 +1,13 @@
-import { TaskArchiveSkeleton, archivedTasks, getTasks, isAssigned, ME_ID } from "@/features/tasks"
+import { TaskArchiveSkeleton } from "@/features/tasks"
 import { PageSkeleton } from "@/features/shell"
-import { getMockOrg } from "@/lib/org"
 import { can } from "@/lib/permissions"
 import { canWrite } from "@/lib/permissions"
 import { getSkeletonSession } from "@/lib/skeleton-session"
 
+// Static (K1): one typical archived task with its Restore and Delete now buttons.
 export default async function Loading() {
-  const [session, { tasks }, org] = await Promise.all([getSkeletonSession(), getTasks(), getMockOrg()])
+  const session = await getSkeletonSession()
   if (!can(session.role, "tasks")) return <PageSkeleton />
-  const staff = session.role.home === "staff"
-  const archived = archivedTasks(staff ? tasks.filter((t) => isAssigned(t, ME_ID)) : tasks, org.today)
   const actions = (canWrite(session, "tasks") && session.role.home === "manager") || can(session.role, "settings", "write")
-  return <TaskArchiveSkeleton rows={archived.length} actions={actions} tasks={archived.map((t) => ({ ref: t.ref, title: t.title }))} />
+  return <TaskArchiveSkeleton rows={1} actions={actions} />
 }

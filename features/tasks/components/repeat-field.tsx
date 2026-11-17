@@ -8,8 +8,10 @@ import type { RepeatRule } from "../types"
 
 export type RepeatValue = RepeatRule["freq"] | "none"
 
-export type RepeatDraft = { freq: RepeatValue; days: number[]; dayOfMonth: string; until: string }
-export const NO_REPEAT: RepeatDraft = { freq: "none", days: [], dayOfMonth: "", until: "" }
+export type RepeatDraft = { freq: RepeatValue; days: number[]; dayOfMonth: string; until: string; patternId: string }
+export const NO_REPEAT: RepeatDraft = { freq: "none", days: [], dayOfMonth: "", until: "", patternId: "" }
+/** A shift pattern the API lists (GET /v1/shifts): the choice for "Every shift". */
+export type PatternChoice = { id: string; label: string }
 
 const FREQ = [
   { value: "none", label: "Does not repeat" },
@@ -28,11 +30,12 @@ export const draftToRule = (d: RepeatDraft): RepeatRule | undefined =>
         freq: d.freq,
         ...(d.freq === "weekly" ? { days: [...d.days].sort((a, b) => a - b) } : {}),
         ...(d.freq === "monthly" ? { dayOfMonth: Number(d.dayOfMonth) } : {}),
+        ...(d.freq === "per_shift" ? { patternId: d.patternId } : {}),
         ...(d.until ? { until: d.until } : {}),
       }
 
 export const ruleToDraft = (r?: RepeatRule): RepeatDraft =>
-  r ? { freq: r.freq, days: r.days ?? [], dayOfMonth: r.dayOfMonth ? String(r.dayOfMonth) : "", until: r.until ?? "" } : NO_REPEAT
+  r ? { freq: r.freq, days: r.days ?? [], dayOfMonth: r.dayOfMonth ? String(r.dayOfMonth) : "", until: r.until ?? "", patternId: r.patternId ?? "" } : NO_REPEAT
 
 // FR-TASK-10 repeat rule inputs. `id` prefixes the control ids so two of these never clash on a page.
 export function RepeatField({
@@ -42,6 +45,7 @@ export function RepeatField({
   today,
   min,
   error,
+  patterns = [],
 }: {
   id: string
   value: RepeatDraft
@@ -50,12 +54,14 @@ export function RepeatField({
   /** Earliest end date: the first due date. */
   min?: string
   error?: string
+  /** The shift patterns the API lists. "Every shift" is offered only when there is at least one (the shifts data may not be available). */
+  patterns?: PatternChoice[]
 }) {
   const set = (p: Partial<RepeatDraft>) => onChange({ ...value, ...p })
   return (
     <div className="rp-field">
       <Field label="Repeat" htmlFor={`${id}-freq`}>
-        <FilterSelect label="Repeat" value={value.freq} options={FREQ as { value: RepeatValue; label: string }[]} onChange={(v) => set({ freq: v })} />
+        <FilterSelect label="Repeat" value={value.freq} options={(patterns.length || value.freq === "per_shift" ? [...FREQ, { value: "per_shift", label: "Every shift" }] : FREQ) as { value: RepeatValue; label: string }[]} onChange={(v) => set({ freq: v })} />
       </Field>
       {value.freq === "weekly" && (
         <div className="rp-days" role="group" aria-label="Repeat on" id={`${id}-days`}>
@@ -74,6 +80,11 @@ export function RepeatField({
             )
           })}
         </div>
+      )}
+      {value.freq === "per_shift" && (
+        <Field label="Shift" htmlFor={`${id}-pattern`} hint="One copy per shift of the assignee, from the shift's own days">
+          <FilterSelect label="Shift" value={value.patternId} options={[{ value: "", label: "Choose a shift…" }, ...patterns.map((p) => ({ value: p.id, label: p.label }))]} onChange={(v) => set({ patternId: v })} />
+        </Field>
       )}
       {value.freq === "monthly" && (
         <Field label="Day of month" htmlFor={`${id}-dom`} hint="Short months use their last day">

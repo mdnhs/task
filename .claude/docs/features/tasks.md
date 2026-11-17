@@ -56,3 +56,13 @@ Timeline (Gantt) and workload views (Should), custom statuses (FR-M1-06), milest
 
 ## Backend notes (B6 T6.1: typed DTO)
 `TaskDto` (api `modules/tasks/dto.ts`) now types every nested value the web reads, so `lib/api/schema.d.ts` has no `unknown` left: `checklist` `{ id, text, done }`, `subtasks` `{ id, ref, title, status }`, `notes` (timeline-event shape), `evidence` (`EvidenceItemDto`), `timeEntries` `{ id, at, by, minutes, note, source }`, `proposal` `{ start, due, reason, by, at }`, `repeat` (the `RepeatRule` shape), `voiceNote` `{ durationSec, mime, recordedBy, recordedAt }` (metadata only). The API still returns `notes` and `timeEntries` empty. `api/src/modules/tasks/dto.test.ts` parses a fully filled task and rejects each malformed nested value.
+
+## Web on the API (B6 T6.6)
+- Data: `features/tasks/api.ts` (server loaders over `apiServer`), `adapters.ts` (`toTask`, `toCard`, `toPatch`, `toTaskBody`, `toEvidence`, `toTimeline`, `toProject`, `toTemplate`; a missing required field throws), `client.ts` (every write; the uuid in the path, the current `version` in the body; uploads: intent, PUT, complete, wait for clean).
+- Writes: `use-task-writes.ts` = optimistic overlay (`overlay.ts`, pure) + `useApiAction` (one request per key, `409 retry` repeated once, mapped copy plus Ref, refresh after every answer). The server record wins; success is announced only after the API said yes.
+- Scope is the server's: no `isAssigned`, no `ME_ID`. A task the caller may not see is a 404, shown as "Task not found". Lists, board columns and the archive page by cursor; the calendar asks for the tenant's 42-day window.
+- Dates: wall strings are for display, comparisons read `dueAt`/`startAt` (`time.ts`). `PATCH` leaves an unchanged date out (the API's `Wall` refuses a "Z" instant), so the repeated DST hour cannot shift it. Reschedule/approve show the SERVER's preview, send its `previewHash`, and repeat the preview on `409 knock_on_changed`; hidden moves are a count.
+- Evidence (D8, D10): `evidence-view.ts` holds `canVerifyTask(task, viewer)` (whole assignee list, uploader by name), the counted evidence (only clean files) and the Scanning/Infected pills. Drive links are whatever the API sent.
+- Voice (D21): `components/voice-card.tsx`; the player asks for a fresh play path per click (`playUrl`), the API answers with a 60 s redirect and logs the play; no URL is kept.
+- Recurring instances come from the API job; `materialiseRecurring`, `store.ts` and `task-detail-loading.tsx` are gone. `lib/task-inbox.ts` stays only for the Today card and the report editor (T6.7 removes it).
+- Skeletons are static (K1): see `app/(app)/tasks/**/loading.tsx`.

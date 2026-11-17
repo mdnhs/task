@@ -1,6 +1,6 @@
 import { When } from "@/components/when"
 import { PageHeadSkeleton } from "@/components/page-head"
-import { PagerSkeleton, needsPager, pageRows } from "@/components/pager-skeleton"
+import { pageRows } from "@/components/pager-skeleton"
 import { Sk, SkGroup } from "@/components/sk"
 import { TASKS_PAGE_SIZE } from "../filters"
 
@@ -83,7 +83,8 @@ export function TasksSkeleton({ canCreate = true, staff = false, rows = 8, proje
             </tbody>
           </table>
         </div>
-        {needsPager(rows, TASKS_PAGE_SIZE) && <PagerSkeleton rows={rows} size={TASKS_PAGE_SIZE} />}
+        {/* A full first page means the API has more: the "Load more" button replaced the numbered pager (a cursor has no total). */}
+        {rows >= TASKS_PAGE_SIZE && <div className="tasks-more"><Sk w={104} h={40} r="pill" /></div>}
       </div>
     </SkGroup>
   )
@@ -115,6 +116,8 @@ export function TaskDetailSkeleton({ canEdit = true, reviewer = false }: { canEd
               <Sk w={64} h={29.4} r={8} />
             </div>
             <div className="td-desc"><Line w="92%" h={13} lh={23} /><Line w="60%" h={13} lh={23} /></div>
+            {/* Voice instructions: a manager (or the creator) always has the "Add voice instructions" row; with a note the player replaces it (T6.9 measures both). */}
+            {reviewer && <div className="td-voice"><div className="td-voice-h"><Sk w={130} h={12} lh={20} /></div><div className="vn-row"><Sk w={140} h={12} lh={20} /></div></div>}
             <dl className="td-meta">
               {/* Assignee, Created by, Department, Start, Due, Client. The assignee's avatar makes its value 26px (browser-measured) */}
               {[96, 96, 70, 80, 110, 90].map((w, i) => (
@@ -290,7 +293,7 @@ export function TaskCalendarSkeleton({ staff = false, projects = true, weeks }: 
 }
 
 // Mirrors TaskProjects: one .pj-card per project with its milestone rows.
-export function TaskProjectsSkeleton({ milestones = [2, 2], descriptions = [] }: { milestones?: number[]; descriptions?: string[] }) {
+export function TaskProjectsSkeleton({ milestones = [2, 2], descriptions = [], canDelete = true }: { milestones?: number[]; descriptions?: string[]; /** All-scope managers get Delete beside "View tasks" and on each milestone. */ canDelete?: boolean }) {
   return (
     <SkGroup label="Loading projects" className="sk-page">
       <PageHeadSkeleton sub={90} />
@@ -300,13 +303,13 @@ export function TaskProjectsSkeleton({ milestones = [2, 2], descriptions = [] }:
           <section key={i} className="card pj-card">
             <div className="card-head">
               <div><Sk w={180} h={14} lh={24} /><Sk w={220} h={10} lh={19.4} /></div>
-              <Sk w={70} h={12} lh={18.8} />
+              <div className="ar-btns"><Sk w={70} h={12} lh={18.8} />{canDelete && <Sk w={40} h={12} lh={18.8} />}</div>
             </div>
             {descriptions[i] ? <p className="pj-desc"><span className="sk-ghost">{descriptions[i]}</span></p> : <div className="pj-desc"><Sk w="95%" h={12} lh={21} /></div>}
             <div className="pj-prog"><Sk w={170} h={11} lh={20} /><Sk w="100%" h={6} r={6} /></div>
             <ol className="pj-ms">
               {Array.from({ length: n }, (_, j) => (
-                <li key={j}><Sk w={10} h={10} r="circle" /><div className="pj-ms-body"><Line w={150} h={12} lh={20} /><Line w={110} h={10} lh={18} /></div><Sk w={56} h={29.4} r={8} /></li>
+                <li key={j}><Sk w={10} h={10} r="circle" /><div className="pj-ms-body"><Line w={150} h={12} lh={20} /><Line w={110} h={10} lh={18} /></div><Sk w={56} h={29.4} r={8} />{canDelete && <Sk w={40} h={12} lh={18.8} />}</li>
               ))}
             </ol>
           </section>

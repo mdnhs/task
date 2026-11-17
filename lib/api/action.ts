@@ -16,7 +16,14 @@ export function makeActionRunner(deps: ActionDeps) {
     if (inFlight.has(key)) return { ok: false, kind: "in_flight" } // a double click sends nothing
     inFlight.add(key)
     try {
-      const value = await request()
+      let value: T
+      try {
+        value = await request()
+      } catch (first) {
+        // 409 retry (the API was busy with the same record): the SAME request again, once. Any other answer, or a second retry, is final.
+        if (classifyApiError(first).kind !== "retry") throw first
+        value = await request()
+      }
       deps.refresh()
       return { ok: true, value }
     } catch (e) {

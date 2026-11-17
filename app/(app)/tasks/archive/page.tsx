@@ -1,27 +1,28 @@
-import { TaskArchive, getTaskSeed, ME_ID } from "@/features/tasks"
-import { AccessRestricted, getUser } from "@/features/shell"
-import { getMockOrg } from "@/lib/org"
+import { TaskArchive, loadArchive, taskScreenData } from "@/features/tasks"
+import { AccessRestricted } from "@/features/shell"
+import { classifyApiError } from "@/lib/api/problem"
 import { can } from "@/lib/permissions"
-import { canWrite, getSession } from "@/lib/session"
+import { canWrite, requireMfaOk } from "@/lib/session"
 
-// FR-M1-13: managers restore; a tenant admin (settings write) may purge before the 30 days are up.
+// FR-M1-13: the archive list is for managers (the API answers 403 to anyone else: shown as the restricted state). Managers restore; a tenant admin (settings:write) may purge.
 export default async function Page() {
-  const [session, org, user] = await Promise.all([getSession(), getMockOrg(), getUser()])
+  const session = await requireMfaOk()
   if (!can(session.role, "tasks")) return <AccessRestricted moduleLabel="Tasks" />
-  const { people, staff, seed, scopeKey, refFloor } = await getTaskSeed(session)
-  const me = (staff && people.find((p) => p.id === ME_ID)?.name) || user.name
+  const { api, people } = await taskScreenData()
+  let page
+  try {
+    page = await loadArchive(api)
+  } catch (e) {
+    if (classifyApiError(e).kind === "forbidden") return <AccessRestricted moduleLabel="The task archive" />
+    throw e
+  }
   return (
     <TaskArchive
-      tasks={seed}
+      tasks={page.tasks}
+      nextCursor={page.nextCursor}
       people={people}
-      today={org.today}
-      scopeKey={scopeKey}
-      refFloor={refFloor}
-      onlyAssignee={staff ? ME_ID : undefined}
       canRestore={canWrite(session, "tasks") && session.role.home === "manager"}
       canPurge={can(session.role, "settings", "write") && session.tenant.status !== "suspended"}
-      me={me}
-      meRole={session.role.label}
     />
   )
 }

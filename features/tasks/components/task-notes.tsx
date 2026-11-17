@@ -24,16 +24,16 @@ export function TaskNotes({
   canAdd: boolean
   today: string
   tzLabel: string
-  onAdd(text: string): void
+  onAdd(text: string): Promise<boolean>
 }) {
   const [text, setText] = useState("")
   const [error, setError] = useState<string>()
 
-  function submit(e: React.FormEvent) {
+  async function submit(e: React.FormEvent) {
     e.preventDefault()
     const r = schema.safeParse(text)
     if (!r.success) return setError(r.error.issues[0].message)
-    onAdd(r.data)
+    if (!(await onAdd(r.data))) return // the text stays so it can be sent again
     setText("")
     setError(undefined)
     toast.success("Note added")

@@ -1,34 +1,34 @@
 import { redirect } from "next/navigation"
 
-import { TasksView, getProjects, getTaskSeed, ME_ID, parseFilters, parsePage } from "@/features/tasks"
-import { AccessRestricted, getUser } from "@/features/shell"
-import { getMockOrg } from "@/lib/org"
-import { todayUserId } from "@/lib/today-data"
+import { TasksView, TASKS_PAGE_SIZE, listQuery, loadProjects, loadTaskPage, parseFilters, taskScreenData } from "@/features/tasks"
+import { AccessRestricted } from "@/features/shell"
+import { getOrg } from "@/lib/org"
 import { can } from "@/lib/permissions"
-import { canWrite, getSession } from "@/lib/session"
+import { canWrite, requireMfaOk } from "@/lib/session"
 
+// The list is the API's: filters, scope and cursor paging are answered by GET /v1/tasks (staff only get their own tasks from the server; nothing is re-scoped here).
 export default async function Page({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
-  const [sp, session, org, user] = await Promise.all([searchParams, getSession(), getMockOrg(), getUser()])
+  const session = await requireMfaOk()
+  const sp = await searchParams
   if (!can(session.role, "tasks")) return <AccessRestricted moduleLabel="Tasks" />
   // Old "New task" links (/tasks?new=1) now open the New task page.
   if (sp.new === "1" && canWrite(session, "tasks")) redirect("/tasks/new")
-  const [{ people, staff, seed, scopeKey, refFloor }, projects] = await Promise.all([getTaskSeed(session), getProjects()])
-  const initialFilters = parseFilters(sp, people.map((p) => p.id), projects.map((p) => p.id))
-  const page = parsePage(sp)
+  const [{ api, people }, org] = await Promise.all([taskScreenData(), getOrg()])
+  const projects = await loadProjects(api)
+  const filters = parseFilters(sp, people.map((p) => p.id), projects.map((p) => p.id))
+  const page = await loadTaskPage(api, { ...listQuery(filters), limit: TASKS_PAGE_SIZE })
   return (
     <TasksView
-      key={JSON.stringify(initialFilters)}
-      tasks={seed}
+      key={JSON.stringify(filters)}
+      tasks={page.tasks}
+      nextCursor={page.nextCursor}
       people={people}
       today={org.today}
+      nowAt={org.nowAt}
       tzLabel={org.tzLabel}
       canCreate={canWrite(session, "tasks")}
-      initialFilters={initialFilters}
-      initialPage={page}
-      onlyAssignee={staff ? ME_ID : undefined}
-      reviewerId={staff ? undefined : todayUserId(session, people, user.name)}
-      scopeKey={scopeKey}
-      refFloor={refFloor}
+      initialFilters={filters}
+      staff={session.role.home === "staff"}
       projects={projects}
     />
   )

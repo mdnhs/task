@@ -93,3 +93,54 @@ describe("T6.5 a refusal the caller shows itself (a form field) is not toasted",
     expect(notify).toHaveBeenCalledTimes(1)
   })
 })
+
+describe("T6.6 a write refused with 409 retry is repeated ONCE, identically", () => {
+  const mk = () => {
+    const notify = vi.fn()
+    const refresh = vi.fn()
+    return { notify, refresh, run: makeActionRunner({ notify, refresh }) }
+  }
+  test("the second answer wins: one repeat, no toast", async () => {
+    const { run, notify } = mk()
+    const request = vi.fn().mockRejectedValueOnce(new ApiError(409, "retry", "r1")).mockResolvedValueOnce("ok")
+    const r = await run("k", request)
+    expect(r).toEqual({ ok: true, value: "ok" })
+    expect(request).toHaveBeenCalledTimes(2)
+    expect(notify).not.toHaveBeenCalled()
+  })
+  test("a second retry is not repeated again: it is shown and rolled back", async () => {
+    const { run, notify } = mk()
+    const rollback = vi.fn()
+    const request = vi.fn().mockRejectedValue(new ApiError(409, "retry", "r1"))
+    const r = await run("k", request, { rollback })
+    expect(r).toEqual({ ok: false, kind: "retry" })
+    expect(request).toHaveBeenCalledTimes(2)
+    expect(rollback).toHaveBeenCalledTimes(1)
+    expect(notify).toHaveBeenCalledWith({ text: "Busy. Please try again.", ref: "r1" })
+  })
+  test("no other refusal is repeated (version_conflict, 403, 500)", async () => {
+    for (const e of [new ApiError(409, "version_conflict", "r1"), new ApiError(403, "forbidden", "r1"), new ApiError(500, "boom", "r1")]) {
+      const { run } = mk()
+      const request = vi.fn().mockRejectedValue(e)
+      await run("k", request)
+      expect(request).toHaveBeenCalledTimes(1)
+    }
+  })
+  test("a failed request can be retried by the user: the in-flight guard is released", async () => {
+    const { run } = mk()
+    const request = vi.fn().mockRejectedValueOnce(new ApiError(403, "forbidden", "r1")).mockResolvedValueOnce("fine")
+    expect((await run("k", request)).ok).toBe(false)
+    expect(await run("k", request)).toEqual({ ok: true, value: "fine" })
+  })
+  test("a double click sends one request", async () => {
+    const { run } = mk()
+    let release: (v: string) => void = () => {}
+    const request = vi.fn(() => new Promise<string>((r) => (release = r)))
+    const a = run("complete", request)
+    const b = await run("complete", request)
+    expect(b).toEqual({ ok: false, kind: "in_flight" })
+    release("x")
+    await a
+    expect(request).toHaveBeenCalledTimes(1)
+  })
+})

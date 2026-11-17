@@ -61,3 +61,15 @@ export function matchesStatus(t: Task, status: string, today: string, reviewerId
   if (status === "stuck") return isOpen(t) && (t.status === "blocked" || isOverdue(t.due, today))
   return t.status === status
 }
+
+/** The list's query for a set of filters: "all" means no filter. The API does the filtering and the paging (cursor); the page never re-scopes. */
+export const listQuery = (f: TasksFilters) => ({
+  ...(f.status !== "all" ? { status: f.status } : {}),
+  ...(f.due !== "all" ? { due: f.due } : {}),
+  ...(f.priority !== "all" ? { priority: f.priority } : {}),
+  ...(f.assignee !== "all" ? { assignee: f.assignee } : {}),
+  ...(f.repeat !== "all" ? { repeat: f.repeat } : {}),
+  ...(f.project !== "all" ? { project: f.project } : {}),
+  ...(f.q.trim() ? { q: f.q.trim() } : {}),
+})
+

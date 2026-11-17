@@ -6,17 +6,18 @@ import { useRouter } from "next/navigation"
 import { PagedBody } from "@/components/data-pagination"
 import { StatusPill } from "@/components/status-pill"
 import { When } from "@/components/when"
-import { isLate } from "../lifecycle"
+import { evState } from "../evidence-view"
+import { isLateAt } from "../time"
 import { describeRepeat } from "../recurrence"
 import { morphToRecord } from "../record-transition"
-import { EVIDENCE_STATE, evidenceState } from "@/lib/task-evidence"
+import { EVIDENCE_STATE } from "@/lib/task-evidence"
 import { assigneesOf, checklistProgress } from "../planning"
 import { STATUS } from "../types"
 import type { Person, Task } from "../types"
 
 const PRIO = ["", "Low", "Medium", "High"]
 
-export function TaskTable({ tasks, people, today, tzLabel, page }: { tasks: Task[]; people: Map<string, Person>; today: string; tzLabel: string; page: number }) {
+export function TaskTable({ tasks, people, today, nowAt, tzLabel, page }: { tasks: Task[]; people: Map<string, Person>; today: string; /** The clock as a UTC instant: lateness compares it with `dueAt` (I12). */ nowAt?: string; tzLabel: string; page: number }) {
   const router = useRouter()
   return (
     <div className="table-wrap">
@@ -29,9 +30,9 @@ export function TaskTable({ tasks, people, today, tzLabel, page }: { tasks: Task
             {tasks.map((t) => {
               const a = people.get(t.assignee)
               const more = assigneesOf(t).length - 1
-              const ev = evidenceState(t.evidenceRule, t.evidence, t.status)
+              const ev = evState(t)
               const cl = checklistProgress(t)
-              const late = isLate(t, today)
+              const late = isLateAt(t, today, nowAt)
               return (
                 <tr key={t.ref}>
                   <td data-label="Task">
@@ -46,7 +47,7 @@ export function TaskTable({ tasks, people, today, tzLabel, page }: { tasks: Task
                     >
                       {t.title}
                     </Link>
-                    <div className="tm num">{t.ref}{(t.repeat || t.seriesId) && <span className="rp-badge" title={t.repeat ? describeRepeat(t.repeat) : `Repeats from ${t.seriesId}`}><span aria-hidden="true">↻ </span>{t.repeat ? "Repeats" : "Recurring"}</span>}{t.parentRef && <span className="rp-badge">↳ {t.parentRef}</span>}{cl && <span className="rp-badge num">☑ {cl.done}/{cl.total}</span>}</div>
+                    <div className="tm num">{t.ref}{(t.repeat || t.seriesId) && <span className="rp-badge" title={t.repeat ? describeRepeat(t.repeat) : "Part of a repeating series"}><span aria-hidden="true">↻ </span>{t.repeat ? "Repeats" : "Recurring"}</span>}{t.parentRef && <span className="rp-badge">↳ {t.parentRef}</span>}{cl && <span className="rp-badge num">☑ {cl.done}/{cl.total}</span>}</div>
                   </td>
                   <td data-label="Assignee">
                     {a && (
