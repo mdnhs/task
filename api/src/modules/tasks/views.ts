@@ -44,13 +44,18 @@ export async function taskCards(tx: TenantTx, ctx: TaskCtx, rows: TaskRow[]): Pr
   const teamIds = [...new Set(rows.flatMap((r) => (r.teamId ? [r.teamId] : [])))]
   const teamRows = teamIds.length ? await tx.select({ id: teams.id, name: teams.name }).from(teams).where(and(eq(teams.tenantId, ctx.tenantId), inArray(teams.id, teamIds))) : []
   const teamName = new Map(teamRows.map((t) => [t.id, t.name]))
+  // E15: a parent outside the caller's scope is opaque, exactly as in the task DTO (no id of an unseen task leaks).
+  const parentIds = [...new Set(rows.flatMap((r) => (r.parentId ? [r.parentId] : [])))]
+  const visibleParents = new Set(
+    parentIds.length ? (await tx.select({ id: tasks.id }).from(tasks).where(and(eq(tasks.tenantId, ctx.tenantId), inArray(tasks.id, parentIds), taskScopeWhere(ctx.scope, ctx.reports)))).map((p) => p.id) : [],
+  )
   return rows.map((r) => {
     const p = people.get(r.id)!
     return {
       id: r.id, ref: `TSK-${r.refNo}`, version: r.version, title: ctx.drive ? r.title : withholdDriveText(r.title), status: r.status as TaskCard["status"], priority: r.priority,
       dept: r.teamId ? (teamName.get(r.teamId) ?? "") : "", teamId: r.teamId, assignee: p.primary ?? "", assignees: p.others, creator: r.creatorId ?? "",
       start: wallOf(r.startAt, ctx.tz), due: wallOf(r.dueAt, ctx.tz), startAt: r.startAt.toISOString(), dueAt: r.dueAt.toISOString(), tags: r.labels,
-      ...(r.projectId ? { projectId: r.projectId } : {}), parentId: r.parentId,
+      ...(r.projectId ? { projectId: r.projectId } : {}), parentId: r.parentId && visibleParents.has(r.parentId) ? r.parentId : null,
     }
   })
 }

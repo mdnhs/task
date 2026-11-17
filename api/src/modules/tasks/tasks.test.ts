@@ -2015,6 +2015,23 @@ describe("b4 fix wave (I1, I4, M8)", () => {
     expect(JSON.stringify(childHist)).not.toContain(parent.ref)
   })
 
+  test("E15: board and calendar cards null parentId when the parent is outside the caller's scope; a caller who may see the parent still gets it", async () => {
+    const w = await world()
+    const parent = await w.mk(w.ops, { primary: w.staff2.userId })
+    const child = await w.json(await w.req("POST", `/v1/tasks/${parent.id}/subtasks`, w.ops, { title: "Secret child" }))
+    await w.q("update task_assignees set user_id = $1 where task_id = $2", [w.staff.userId, child.id])
+    const board = await w.json(await w.req("GET", "/v1/tasks/board", w.staff))
+    const card = board.columns.flatMap((c: Json) => c.items).find((i: Json) => i.id === child.id)
+    expect(card.parentId).toBeNull()
+    expect(JSON.stringify(board)).not.toContain(parent.id)
+    const cal = await w.json(await w.req("GET", "/v1/tasks/calendar?from=2026-11-16&to=2026-11-29", w.staff))
+    const calCard = cal.days.flatMap((d: Json) => d.tasks).find((i: Json) => i.id === child.id)
+    expect(calCard.parentId).toBeNull()
+    expect(JSON.stringify(cal)).not.toContain(parent.id)
+    const asOps = await w.json(await w.req("GET", "/v1/tasks/board", w.ops))
+    expect(asOps.columns.flatMap((c: Json) => c.items).find((i: Json) => i.id === child.id).parentId).toBe(parent.id)
+  })
+
   test("M8: an assignee needs tasks:read (422 invalid_assignee): a role without it cannot be assigned, on create or reassign", async () => {
     const w = await world()
     await w.q(`update roles set access = access || '{"tasks":"none"}'::jsonb where key = 'payroll'`)
