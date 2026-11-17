@@ -25,6 +25,9 @@ export function canWhileBlocked(s: { role: Role }, area: "billing" | "export"): 
   }
 }
 
+/** Who can open /settings/billing: the API answers its subscription and invoices to the owner or an admin only. */
+export const canOpenBilling = (s: { role: Role }): boolean => s.role.id === "owner" || s.role.id === "admin"
+
 export type BannerInput = {
   status: Tenant["status"]
   billingState: BillingState
@@ -35,26 +38,32 @@ export type BannerInput = {
   tzLabel: string
   /** A write answered 402 in this browser before the page re-read the session. */
   forceBlocked?: boolean
+  /** The viewer may open /settings/billing (the owner or an admin). Anyone else sees the message only: a link they cannot use is noise. */
+  canBilling: boolean
 }
-export type Banner = { tone: "info" | "warn" | "danger"; text: string; action: { href: string; label: string } }
+export type Banner = { tone: "info" | "warn" | "danger"; text: string; action: { href: string; label: string } | null }
 
 const BILLING = "/settings/billing"
 const dayIn = (iso: string, tz: string) => formatDate(wallInTz(iso, tz))
 
 /** The banner above every page, or null. Dates are the tenant's calendar days, not the viewer's or the server's. */
 export function bannerOf(i: BannerInput): Banner | null {
-  if (i.forceBlocked || i.billingState === "blocked" || i.status === "suspended") {
-    return { tone: "danger", text: "Read-only: subscription inactive. You can still export data.", action: { href: BILLING, label: "Reactivate" } }
+  const link = (label: string) => (i.canBilling ? { href: BILLING, label } : null)
+  if (i.forceBlocked || i.billingState === "blocked") {
+    return { tone: "danger", text: "Read-only: subscription inactive. You can still export data.", action: link("Reactivate") }
   }
+  // A "suspended" status with billing still fine is not a billing matter: the company was suspended by the platform (members then get 404 from the API, so this
+  // is a defensive branch). It shows a neutral message and never the billing copy or link.
+  if (i.status === "suspended") return { tone: "danger", text: "This workspace is suspended. Contact support.", action: null }
   if (i.billingState === "grace") {
     const by = i.graceEndsAt ? `by ${dayIn(i.graceEndsAt, i.timezone)} (${i.tzLabel}) ` : "soon "
-    return { tone: "warn", text: `Trial ended. Choose a plan ${by}to keep editing.`, action: { href: BILLING, label: "Choose a plan" } }
+    return { tone: "warn", text: `Trial ended. Choose a plan ${by}to keep editing.`, action: link("Choose a plan") }
   }
   if (i.status === "past_due") {
-    return { tone: "warn", text: "Payment failed. Update billing to keep full access.", action: { href: BILLING, label: "Update billing" } }
+    return { tone: "warn", text: "Payment failed. Update billing to keep full access.", action: link("Update billing") }
   }
   if (i.status === "trial") {
-    return { tone: "info", text: `Trial ends ${i.trialEndsAt ? `${dayIn(i.trialEndsAt, i.timezone)} (${i.tzLabel})` : "soon"}`, action: { href: BILLING, label: "Choose a plan" } }
+    return { tone: "info", text: `Trial ends ${i.trialEndsAt ? `${dayIn(i.trialEndsAt, i.timezone)} (${i.tzLabel})` : "soon"}`, action: link("Choose a plan") }
   }
   return null
 }

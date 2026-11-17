@@ -57,3 +57,20 @@ test("blocked tenant: non-exempt writes are still 402, revoke/disable routes are
     expect(r.status, kind).not.toBe(402)
   }
 })
+
+/** Ruling K5 (B6 T6.5): marking a notification read changes no business data, so a blocked tenant can still dismiss billing notices. */
+test("blocked tenant: notification read and read-all are 2xx, a non-exempt write is still 402", async () => {
+  const w = await world()
+  const list = (await (await w.req("GET", "/v1/notifications")).json()) as Json
+  expect(list.items.length, "the billing notice raised by the cancel is there to read").toBeGreaterThan(0)
+  const id = list.items[0].id as string
+  const one = await w.req("POST", `/v1/notifications/${id}/read`)
+  expect(one.status).toBe(200)
+  const all = await w.req("POST", "/v1/notifications/read-all")
+  expect(all.status).toBe(200)
+  expect(((await (await w.req("POST", "/v1/_probe/write")).json()) as Json).code).toBe("billing_required")
+  // another route that merely ends in /read is not exempt
+  expect((await w.req("POST", `/v1/tasks/${id}/read`)).status).not.toBe(200)
+  // and only POST is exempt: a DELETE on the same path is not
+  expect((await w.req("DELETE", `/v1/notifications/${id}/read`)).status).not.toBe(200)
+})

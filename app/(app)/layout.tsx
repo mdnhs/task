@@ -8,6 +8,7 @@ import { filterByEntitlement, hasProductModule } from "@/lib/entitlements"
 import { getOrg, neutralOrg } from "@/lib/org"
 import { getPlatformNotice } from "@/lib/platform-notice-data"
 import { BillingBanner } from "@/components/billing-banner"
+import { canOpenBilling } from "@/lib/billing-state"
 import { PlatformNoticeBanner } from "@/components/platform-notice"
 import { filterNav } from "@/lib/permissions"
 import { getSession } from "@/lib/session"
@@ -54,6 +55,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <BillingBanner
           status={session.tenant.status}
           billingState={session.billingState}
+          canBilling={canOpenBilling(session)}
           trialEndsAt={session.trialEndsAt}
           graceEndsAt={session.graceEndsAt}
           timezone={org.timezone}

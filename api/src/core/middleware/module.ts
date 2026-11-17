@@ -22,6 +22,9 @@ const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"])
 const BILLING_PREFIX = "/v1/billing" // reserved for T3.3: always open so a blocked tenant can pay
 const DATA_EXPORT = "/v1/me/data-export" // NFR-18: data export on exit stays open
 const DATA_REQUESTS = "/v1/data-requests"
+/** Ruling K5: marking a notification read touches no business data, so a blocked tenant can still dismiss its billing notices. POST only. */
+const NOTIFICATION_READ_ALL = "/v1/notifications/read-all"
+const NOTIFICATION_READ = new RegExp("^/v1/notifications/[^/]+/read$")
 
 const ONE_ID = "[^/]+"
 const REVOKE_DELETES = [
@@ -49,6 +52,7 @@ async function exemptWhenBlocked(c: Context<AppEnv>): Promise<boolean> {
   if (p === DATA_REQUESTS) return true
   // Working an EXISTING request (complete / reject / retry) must not be blocked by billing either.
   if (p.startsWith(`${DATA_REQUESTS}/`)) return true
+  if (c.req.method === "POST" && (p === NOTIFICATION_READ_ALL || NOTIFICATION_READ.test(p))) return true
   if (c.req.method === "DELETE" && REVOKE_DELETES.some((r) => r.test(p))) return true
   if (c.req.method === "PATCH") {
     const rule = DISABLE_PATCHES.find((r) => r.path.test(p))

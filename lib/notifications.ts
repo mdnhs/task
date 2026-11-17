@@ -2,6 +2,7 @@
 // There is NO client outbox: task, report, billing and member notices are written by the API (in the same transaction as the change, redacted by the API),
 // so the bell only lists them. Pure: the API client, the document and the zone are arguments.
 import type { ApiClient } from "./api/client"
+import { userMessage } from "./api/problem"
 import { wallInTz } from "./tz"
 
 export type NotificationKind = "invite" | "member" | "file" | "security" | "dsr" | "billing" | "system" | "task" | "report"
@@ -85,5 +86,27 @@ export function startPolling(o: { load: () => Promise<unknown>; doc: VisibilityD
     o.doc.removeEventListener("visibilitychange", arm)
     if (timer) clearInterval(timer)
     timer = null
+  }
+}
+
+/** What a guarded mark reports: success, or the mapped copy (never the server's text) and the request ref, for a toast. */
+export type MarkResult = { ok: true } | { ok: false; text: string; ref: string | null }
+
+/** Marks one notice read; a failure never throws (the caller reverts its optimistic state and toasts the returned copy). */
+export async function markGuarded(api: Pick<ApiClient, "post">, id: string, timezone: string): Promise<MarkResult> {
+  try {
+    await markRead(api, id, timezone)
+    return { ok: true }
+  } catch (e) {
+    return { ok: false, ...userMessage(e) }
+  }
+}
+
+export async function markAllGuarded(api: Pick<ApiClient, "post">): Promise<MarkResult> {
+  try {
+    await markAllRead(api)
+    return { ok: true }
+  } catch (e) {
+    return { ok: false, ...userMessage(e) }
   }
 }

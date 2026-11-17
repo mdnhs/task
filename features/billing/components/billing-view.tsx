@@ -16,7 +16,7 @@ import { apiBrowser } from "@/lib/api/browser"
 import { paginate } from "@/lib/paginate"
 import type { Status } from "@/lib/types"
 import { wallInTz } from "@/lib/tz"
-import { formatMinor } from "../adapters"
+import { formatMinor, seatProblem } from "../adapters"
 import { makeBillingClient } from "../client"
 import { INVOICES_PAGE_SIZE } from "../constants"
 import type { Invoice, InvoiceStatus, PlanCard, Subscription, SubscriptionStatus } from "../types"
@@ -80,15 +80,15 @@ export function BillingView({
   const trial = sub.status === "trialing"
   const dateLabel = trial ? "Trial ends" : pastDue ? "Payment was due" : sub.cancelAtPeriodEnd ? "Ends on" : "Renews on"
   const dateIso = trial ? sub.trialEndsAt : sub.currentPeriodEnd
-  const seatLimit = plan?.limits.activeUsers ?? sub.seats
 
   const checkout = (planId: string) => run(`checkout:${planId}`, () => (toast(`Opening checkout…`), billing.checkout(planId)))
   const portal = () => run("portal", () => (toast(`Opening billing portal…`), billing.portal()))
   // A company that already has a provider subscription changes plan in the provider's portal; a new one starts a checkout.
   const choose = (planId: string) => (sub.hasProviderSubscription ? portal() : checkout(planId))
 
+  // The plan's maximum is not decided here (the static plan table can drift from a console plan change): the API answers 422 seat_limit_exceeds_plan.
   const seatN = Number(seatText)
-  const seatErr = !/^\d+$/.test(seatText.trim()) ? "Enter a whole number." : seatN < sub.seatsUsed ? "Seats can't be fewer than your active members." : seatN > seatLimit ? "That is more seats than your plan allows." : undefined
+  const seatErr = seatProblem(seatText, sub.seatsUsed)
   const saveSeats = () =>
     void run("seats", () => billing.setSeats(seatN)).then((r) => r.ok && toast.success("Seats updated"))
 
@@ -102,7 +102,7 @@ export function BillingView({
           </div>
           {canManage && (
             <div className="bill-actions">
-              <button type="button" className="btn btn-primary" onClick={() => void choose(plan.id)}>Change plan</button>
+              {plan && <button type="button" className="btn btn-primary" onClick={() => void choose(plan.id)}>Change plan</button>}
               <button type="button" className="btn btn-outline" onClick={() => void portal()}>Manage billing</button>
               {sub.hasProviderSubscription && (sub.cancelAtPeriodEnd
                 ? <button type="button" className="btn btn-outline" onClick={() => void run("resume", () => billing.resume()).then((r) => r.ok && toast.success("Plan resumed"))}>Resume plan</button>
@@ -163,7 +163,7 @@ export function BillingView({
         </ul>
         {canManage && (
           <form className="bill-seat-form" onSubmit={(e) => { e.preventDefault(); if (!seatErr) saveSeats() }}>
-            <Field label="Seat cap" htmlFor="bill-seat-cap" error={seatText !== String(sub.seats) ? seatErr : undefined} hint={`Between ${num(sub.seatsUsed)} and ${num(seatLimit)} on the ${plan?.name ?? sub.planName} plan.`}>
+            <Field label="Seat cap" htmlFor="bill-seat-cap" error={seatText !== String(sub.seats) ? seatErr : undefined} hint={`At least ${num(sub.seatsUsed)}. The ${sub.planName} plan sets the maximum.`}>
               <Input id="bill-seat-cap" inputMode="numeric" value={seatText} onChange={(e) => setSeatText(e.target.value)} />
             </Field>
             <button type="submit" className="btn btn-primary" disabled={!!seatErr || seatN === sub.seats}>Save seats</button>

@@ -47,7 +47,7 @@ describe("T6.4 billingState blocked: read-only, but reading, billing and data ex
 })
 
 describe("T6.4 the banner", () => {
-  const base = { status: "active" as const, billingState: "ok" as const, trialEndsAt: null, graceEndsAt: null, timezone: "Europe/Dublin", tzLabel: "Ireland Time" }
+  const base = { status: "active" as const, billingState: "ok" as const, trialEndsAt: null, graceEndsAt: null, timezone: "Europe/Dublin", tzLabel: "Ireland Time", canBilling: true }
 
   test("blocked: the read-only banner, in the danger tone, pointing at billing (export still possible)", () => {
     expect(bannerOf({ ...base, status: "suspended", billingState: "blocked" })).toEqual({ tone: "danger", text: "Read-only: subscription inactive. You can still export data.", action: { href: "/settings/billing", label: "Reactivate" } })

@@ -27,7 +27,7 @@ export function BillingBanner(props: Omit<BannerInput, "forceBlocked">) {
   return (
     <div className="sub-banner" data-tone={b.tone === "info" ? undefined : b.tone} role="status">
       <span>{b.text}</span>
-      <Link href={b.action.href}>{b.action.label}</Link>
+      {b.action && <Link href={b.action.href}>{b.action.label}</Link>}
     </div>
   )
 }

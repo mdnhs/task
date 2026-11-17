@@ -113,6 +113,8 @@ const CODE_COPY: Record<string, string> = {
   device_policy: "Available on your work PC.",
   self_verification: "You can't verify your own task.",
   evidence_not_ready: "Evidence is still being scanned.",
+  // Invites (B1/B6): the plan's seats are all used.
+  seat_limit: "No seats left. Raise the plan's seats first.",
   // Billing (B3 service): the seat cap is local, the rest are checkout and portal states.
   seat_limit_exceeds_plan: "That is more seats than your plan allows.",
   seats_below_members: "Seats can't be fewer than your active members.",

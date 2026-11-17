@@ -1,13 +1,14 @@
 // The browser side of billing (B6 T6.4, ruling I20): every call goes through the BFF (apiBrowser). A hosted checkout or portal URL the API returns is
-// followed, but only when it is https. Seats are a LOCAL cap: no provider call, no navigation (ruling C10). Errors are ApiErrors: show userMessage(e).
+// followed, but only when it is an allowed provider host or a same-origin path (./redirect.ts). Seats are a LOCAL cap: no provider call, no navigation (ruling C10). Errors are ApiErrors: show userMessage(e).
 import type { ApiClient } from "@/lib/api/client"
 import { toSubscription } from "./adapters"
+import { isAllowedRedirect } from "./redirect"
 import type { Subscription } from "./types"
 
 export type Navigator = { go: (url: string) => void }
 
 function hostedUrl(res: { url: string }): string {
-  if (typeof res.url !== "string" || !/^https:\/\//i.test(res.url)) throw new Error("billing: the provider returned a link that is not https")
+  if (!isAllowedRedirect(res.url)) throw new Error("billing: the provider returned a link that is not on an allowed host")
   return res.url
 }
 

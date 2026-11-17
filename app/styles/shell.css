@@ -101,3 +101,12 @@
 .od-notice-x:hover{background:color-mix(in oklab,currentColor 12%,transparent)}
 .od-notice-x:focus-visible{outline:2px solid currentColor;outline-offset:1px}
 .od-notice-x svg{width:16px;height:16px}
+
+/* ===== Route error page (app/error.tsx): static, centred card inside the root layout ===== */
+.err-page{min-height:100vh;display:grid;place-items:center;padding:24px 16px}
+.err-card{max-width:420px;width:100%;text-align:center;display:flex;flex-direction:column;align-items:center;gap:10px}
+.err-card h1{margin:0;font-size:20px;line-height:28px}
+.err-card p{margin:0 0 6px;color:var(--ink-2);font-size:14px;line-height:21px}
+.err-mark{width:48px;height:48px;border-radius:50%;display:grid;place-items:center;background:var(--bad-bg);color:var(--bad)}
+.err-mark .ico{width:22px;height:22px}
+.err-ref{color:var(--ink-3);font-size:12px;line-height:18px}
