@@ -6,6 +6,7 @@ export type EventType =
   | "member.removed" | "team.created" | "team.updated" | "team.deleted" | "file.deleted"
   | "dsr.requested" | "dsr.completed" | "integration.connected" | "integration.disconnected" | "billing.subscription_changed" | "billing.payment_failed"
   | "task.created" | "task.updated" | "task.assigned" | "task.status_changed" | "task.completed" | "task.submitted"
+  | "task.evidence_added" | "task.evidence_verified" | "task.evidence_rejected"
   | "task.comment_added" | "task.archived" | "task.restored" | "task.purged"
   | "project.created" | "project.updated" | "project.deleted"
 

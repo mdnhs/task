@@ -1,15 +1,17 @@
 import { and, asc, eq, inArray, sql, type SQL } from "drizzle-orm"
 import type { TaskUpdate } from "@opsdesk/domain/contracts"
 import { addDays, wallToEpoch } from "@opsdesk/domain/shifts"
-import { completeTarget, NO_EVIDENCE, normaliseRule, ruleError, type EvidenceRule } from "@opsdesk/domain/task-evidence"
+import { can } from "@opsdesk/domain/permissions"
+import { NO_EVIDENCE, normaliseRule, ruleError, type EvidenceRule } from "@opsdesk/domain/task-evidence"
 import { diffFields, fieldLabel, type RawChange } from "@opsdesk/domain/task-history"
 import { isOpen, nextStatuses } from "@opsdesk/domain/task-lifecycle"
 import { STATUS, type TaskStatus } from "@opsdesk/domain/task-model"
 import { taskStatusFor } from "@opsdesk/domain/shift-report"
 import { AppError, Conflict, Forbidden } from "../../core/errors"
-import { memberships, projectMilestones, projects, taskHistory, taskTemplates, taskTimeEntries, tasks, teams } from "../../db/schema"
+import { memberships, projectMilestones, roles, projects, taskHistory, taskTemplates, taskTimeEntries, tasks, teams } from "../../db/schema"
 import type { TenantTx } from "../../db/tenant-tx"
 import { decodeCursor, encodeCursor } from "./cursor"
+import { applyCompletion, evidenceFilter, settleCompletion } from "./evidence"
 import { taskDtos, type CreateInput, type ListQueryInput, type PatchInput, type TaskDto } from "./dto"
 import { publishTaskEvent } from "./events"
 import { listHistory, recentHistory, writeHistory } from "./history"
@@ -52,13 +54,23 @@ export async function checkAssignees(tx: TenantTx, ctx: TaskCtx, primary: string
   if (rows.length !== ids.length) throw unprocessable("invalid_assignee")
 }
 
+/**
+ * A rule the caller ENTERED (body, template, project, PUT /evidence-rule): judged strictly BEFORE it is normalised, so a Required rule with a
+ * minimum of 0 or no types is refused (422 invalid_evidence_rule) instead of being quietly repaired. A named reviewer must be an ACTIVE member of
+ * THIS tenant whose role has tasks:read, else 422 invalid_reviewer (a person from another tenant looks exactly like an unknown one).
+ */
 export async function checkRule(tx: TenantTx, ctx: TaskCtx, rule: EvidenceRule | undefined): Promise<EvidenceRule> {
   if (!rule) return { ...NO_EVIDENCE }
+  if (ruleError(rule)) throw unprocessable("invalid_evidence_rule")
   const r = normaliseRule(rule)
   if (ruleError(r)) throw unprocessable("invalid_evidence_rule")
   if (r.review === "named" && r.reviewer) {
-    const [m] = await tx.select({ u: memberships.userId }).from(memberships).where(and(eq(memberships.tenantId, ctx.tenantId), eq(memberships.status, "active"), eq(memberships.userId, r.reviewer)))
-    if (!m) throw unprocessable("invalid_reviewer")
+    const [m] = await tx
+      .select({ access: roles.access })
+      .from(memberships)
+      .innerJoin(roles, eq(roles.id, memberships.roleId))
+      .where(and(eq(memberships.tenantId, ctx.tenantId), eq(memberships.status, "active"), eq(memberships.userId, r.reviewer)))
+    if (!m || !can({ access: m.access } as never, "tasks", "read")) throw unprocessable("invalid_reviewer")
   }
   return r
 }
@@ -179,6 +191,7 @@ export function listConditions(ctx: TaskCtx, f: Partial<ListQueryInput> & { afte
   if (f.project) conds.push(f.project === "none" ? sql`${tasks.projectId} is null` : eq(tasks.projectId, f.project))
   if (f.repeat) conds.push(sql`(${tasks.repeat} is not null or ${tasks.seriesId} is not null)`)
   if (f.label) conds.push(sql`${tasks.labels} @> array[${f.label.trim().toLowerCase()}]::text[]`)
+  if (f.evidence) conds.push(evidenceFilter(f.evidence))
   if (f.ref) conds.push(eq(tasks.refNo, Number(f.ref.replace(/^tsk-/i, ""))))
   if (f.q) {
     const like = `%${f.q.toLowerCase().replace(LIKE_ESCAPE, (m) => `\\${m}`)}%`
@@ -330,7 +343,9 @@ async function moveStatus(tx: TenantTx, env: TaskEnv, ctx: TaskCtx, row: TaskRow
     .where(and(eq(tasks.id, row.id), eq(tasks.tenantId, ctx.tenantId)))
     .returning()
   const from = row.status as TaskStatus
-  const recipients = changeRecipients(ctx, row, assignees)
+  // a submission is the reviewer's cue: the named reviewer (who sees the task through the rule) hears about it too
+  const reviewer = to === "submitted" && row.evidenceRule.review === "named" && row.evidenceRule.reviewer ? [row.evidenceRule.reviewer] : []
+  const recipients = changeRecipients(ctx, row, assignees, reviewer)
   await writeHistory(tx, ctx, row.id, { kind: "status", text: `Status changed ${STATUS[from].label} → ${STATUS[to].label}`, changes: [{ field: "status", from, to }], notified: recipients })
   await notifyTask(tx, env, ctx, next, recipients, "Task status changed")
   const dto = await detail(tx, ctx, next)
@@ -354,9 +369,11 @@ export async function changeStatus(tx: TenantTx, env: TaskEnv, ctx: TaskCtx, id:
 async function completeLocked(tx: TenantTx, env: TaskEnv, ctx: TaskCtx, row: TaskRow, assignees: string[], manage: boolean, mine: boolean): Promise<TaskDto> {
   if (!manage && !mine) throw Forbidden("forbidden")
   if (!nextStatuses(lifecycleOf(row), "assignee").includes("completed")) throw unprocessable("invalid_transition")
-  const target = completeTarget(row.evidenceRule, []) // evidence items arrive with T4.6: until then a Required task cannot be completed
-  if (target === "blocked") throw unprocessable("evidence_required")
-  return moveStatus(tx, env, ctx, row, assignees, target, target === "completed" ? "completed" : "submitted")
+  // the real items (ruling D10): a pending scan is 409 evidence_not_ready; only clean files count toward the minimum
+  const settled = await settleCompletion(tx, ctx, row, { strict: true })
+  if (settled.target === "blocked") throw unprocessable("evidence_required")
+  await applyCompletion(tx, ctx, row, settled)
+  return moveStatus(tx, env, ctx, row, assignees, settled.target, settled.target === "completed" ? "completed" : "submitted")
 }
 
 /** POST /v1/tasks/{id}/complete (FR-M1-43/44): "completed", or "submitted" when a reviewer must check, or 422 evidence_required. */
@@ -400,9 +417,12 @@ export async function applyTaskUpdate(tx: TenantTx, ctx: TaskCtx, u: TaskUpdate)
   let lead = "Reported"
   if (isOpen({ status })) {
     if (u.itemStatus === "done") {
-      const target = completeTarget(row.evidenceRule, [])
-      if (target === "blocked") lead = "Report marked done; evidence still needed"
-      else status = target
+      const settled = await settleCompletion(tx, ctx, row, { strict: false }) // a report never fails on a pending scan: that is just "evidence still needed"
+      if (settled.target === "blocked") lead = "Report marked done; evidence still needed"
+      else {
+        status = settled.target
+        await applyCompletion(tx, ctx, row, settled)
+      }
     } else {
       status = taskStatusFor(u.itemStatus, status, false) as TaskStatus
     }

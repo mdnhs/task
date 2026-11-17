@@ -94,5 +94,12 @@ describe("who verifies", () => {
     expect(canVerify(req(1, { review: "named", reviewer: "p-r" }), { id: "p-r", manager: false }, task)).toBe(true)
     expect(canVerify(NO_EVIDENCE, { id: "x", manager: true }, task)).toBe(false)
   })
+  it("D8: nobody verifies a task they are assigned to, managers included (primary or co-assignee)", () => {
+    expect(canVerify(req(1), { id: "p-a", manager: true }, task)).toBe(false)
+    expect(canVerify(req(1), { id: "p-co", manager: true }, { ...task, assignees: ["p-co"] })).toBe(false)
+    expect(canVerify(req(1, { review: "creator" }), { id: "p-co", manager: false }, { ...task, creator: "p-co", assignees: ["p-co"] })).toBe(false)
+    expect(canVerify(req(1, { review: "named", reviewer: "p-co" }), { id: "p-co", manager: false }, { ...task, assignees: ["p-co"] })).toBe(false)
+    expect(canVerify(req(1), { id: "x", manager: true }, { ...task, assignees: ["p-co"] })).toBe(true)
+  })
   it("describes", () => expect(describeRule(req(2, { types: ["photo", "pdf"] }))).toBe("Required · at least 2 · Photo, PDF"))
 })

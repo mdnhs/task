@@ -2,6 +2,7 @@ import { registerJob } from "../../core/queue/queue"
 import { registerDsrHandler } from "../gdpr/registry"
 import { ARCHIVE_PURGE_JOB, runArchivePurge } from "./archive"
 import { tasksDsrHandler } from "./dsr"
+import { registerEvidenceSubscriber } from "./evidence"
 import { RECURRENCE_JOB, runRecurrence } from "./recurrence"
 
 export { archiveRoutes, taskViewRoutes } from "./archive-routes"
@@ -13,7 +14,11 @@ export { planningRoutes } from "./planning-routes"
 export { indexTask, registerTaskSearchIndexers, taskSearchScope } from "./search"
 export { applyTaskUpdate, buildListQuery, completeTask, createTask, listTasks, normaliseLabels, patchTask, setAssignees, changeStatus } from "./service"
 export { mutate, read1 } from "./run"
-export { checkAssignees, checkRule, checkTeam } from "./service"
+export { checkAssignees, checkRule, checkTeam, lockedTask, staleVersion, taskDetailDto, unprocessable } from "./service"
+export { applyCompletion, AUTO, counts, evidenceDtos, loadEvidence, rejectItems, SCAN_REASON, SCANNER, settleCompletion, stateItems, type EvidenceDto, type EvidenceRow, type EvidenceView } from "./evidence"
+export { namesOf } from "./history"
+export { IdParam, TaskDtoSchema, type TaskDto } from "./dto"
+export { evidenceFilter } from "./evidence"
 export { writeHistory } from "./history"
 export { publishTaskEvent } from "./events"
 export { notifyTask, type TaskEnv } from "./notify"
@@ -24,9 +29,10 @@ export { canManage, getTask, inScope, loadTaskCtx, taskScopeWhere, TaskNotFound,
 export { tasksDsrHandler } from "./dsr"
 export { RECURRENCE_JOB, runRecurrence, setRepeat } from "./recurrence"
 
-/** Registers the tasks DSR handler and the `tasks.recurrence` and `tasks.archive-purge` jobs (worker.ts, tests). Safe to call again. */
+/** Registers the tasks DSR handler, the `tasks.recurrence` and `tasks.archive-purge` jobs and the `file.scanned` evidence subscriber (worker.ts, tests). Safe to call again. */
 export function registerTasks(): void {
   registerDsrHandler("tasks", tasksDsrHandler)
   registerJob(RECURRENCE_JOB, runRecurrence)
   registerJob(ARCHIVE_PURGE_JOB, runArchivePurge)
+  registerEvidenceSubscriber() // file.scanned: an infected file auto-rejects its evidence item (ruling D10)
 }

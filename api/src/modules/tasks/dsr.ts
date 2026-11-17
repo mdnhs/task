@@ -1,10 +1,11 @@
 import { and, asc, eq, or, sql } from "drizzle-orm"
-import { projects, taskAssignees, taskTemplates, taskChecklistItems, taskComments, taskFiles, taskHistory, taskTimeEntries, tasks } from "../../db/schema"
+import { projects, taskAssignees, taskEvidence, taskTemplates, taskChecklistItems, taskComments, taskFiles, taskHistory, taskTimeEntries, tasks } from "../../db/schema"
 import type { DsrHandler } from "../gdpr/registry"
 
 /**
  * Data-subject requests for tasks (FR-M0-18). Export: the tasks the subject created or is assigned to (ids, refs, titles, their
- * role) and the history lines they wrote. Erase: creator, archiver and history actor become null, their time entries lose the person
+ * role) and the history lines they wrote. Evidence: export = the subject's items as metadata; erase nulls created_by / reviewed_by (the items and files stay until the task purge, D13).
+ * Erase: creator, archiver and history actor become null, their time entries lose the person
  * link, they are removed from every assignment and from `notified` lists. The tasks and their history stay (business records).
  * Idempotent: a re-run finds nothing to change.
  */
@@ -25,7 +26,14 @@ export const tasksDsrHandler: DsrHandler = {
       .from(taskComments)
       .where(and(eq(taskComments.tenantId, tenantId), eq(taskComments.authorId, userId), sql`${taskComments.deletedAt} is null`))
       .orderBy(asc(taskComments.createdAt), asc(taskComments.id))
+    // evidence the subject uploaded or decided: ids and metadata only (no file name, note text or link)
+    const evidence = await tx
+      .select({ id: taskEvidence.id, taskId: taskEvidence.taskId, kind: taskEvidence.kind, at: taskEvidence.createdAt, review: taskEvidence.review })
+      .from(taskEvidence)
+      .where(and(eq(taskEvidence.tenantId, tenantId), or(eq(taskEvidence.createdBy, userId), eq(taskEvidence.reviewedBy, userId))))
+      .orderBy(asc(taskEvidence.createdAt), asc(taskEvidence.id))
     return {
+      evidence: evidence.map((e) => ({ id: e.id, taskId: e.taskId, kind: e.kind, at: e.at.toISOString(), review: e.review })),
       comments: comments.map((c) => ({ id: c.id, taskId: c.taskId, at: c.at.toISOString(), body: c.body })),
       tasks: rows.map((r) => ({ id: r.id, ref: `TSK-${r.refNo}`, title: r.title, role: [...(r.creatorId === userId ? ["creator"] : []), ...(r.assigned ? ["assignee"] : [])] })),
       history: history.map((h) => ({ id: h.id, taskId: h.taskId, at: h.at.toISOString(), kind: h.kind, text: h.text })),
@@ -43,6 +51,8 @@ export const tasksDsrHandler: DsrHandler = {
     await tx.update(taskChecklistItems).set({ doneBy: null }).where(and(eq(taskChecklistItems.tenantId, tenantId), eq(taskChecklistItems.doneBy, userId)))
     await tx.update(taskComments).set({ authorId: null }).where(and(eq(taskComments.tenantId, tenantId), eq(taskComments.authorId, userId)))
     await tx.update(taskComments).set({ mentions: sql`array_remove(${taskComments.mentions}, ${userId})` }).where(and(eq(taskComments.tenantId, tenantId), sql`${userId} = any(${taskComments.mentions})`))
+    await tx.update(taskEvidence).set({ createdBy: null }).where(and(eq(taskEvidence.tenantId, tenantId), eq(taskEvidence.createdBy, userId)))
+    await tx.update(taskEvidence).set({ reviewedBy: null }).where(and(eq(taskEvidence.tenantId, tenantId), eq(taskEvidence.reviewedBy, userId)))
     await tx.update(taskFiles).set({ createdBy: null }).where(and(eq(taskFiles.tenantId, tenantId), eq(taskFiles.createdBy, userId)))
     await tx.execute(sql`update search_documents set audience = array_remove(array_remove(audience, ${`a:${userId}`}), ${`o:${userId}`}) where tenant_id = ${tenantId} and entity = 'task' and (${`a:${userId}`} = any(audience) or ${`o:${userId}`} = any(audience))`)
     await tx.delete(taskAssignees).where(and(eq(taskAssignees.tenantId, tenantId), eq(taskAssignees.userId, userId)))

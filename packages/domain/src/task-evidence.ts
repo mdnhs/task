@@ -156,12 +156,18 @@ export function reviewerText(r: EvidenceRule, creatorName: string, names: (id: s
 }
 
 /**
- * May this viewer verify or reject? Managers may always (they own their team's work, FR-M1-10). Otherwise only the
- * creator (creator mode) or the named reviewer, and never the assignee on their own task.
+ * May this viewer verify or reject? Verification is a personal attestation (ruling D8): NOBODY checks work on a task they are assigned
+ * to (primary or co-assignee), managers included. Otherwise managers may (they own their team's work, FR-M1-10), and so may the
+ * creator (creator mode) or the named reviewer. A named reviewer who has left the company changes nothing: managers still can, so a
+ * task is never stuck. The uploader rule (nobody verifies an item they uploaded) needs the items, so the API checks it itself.
  */
-export function canVerify(r: EvidenceRule, viewer: { id: string; manager: boolean }, task: { creator: string; assignee: string }): boolean {
+export function canVerify(
+  r: EvidenceRule,
+  viewer: { id: string; manager: boolean },
+  task: { creator: string; assignee: string; assignees?: readonly string[] },
+): boolean {
   if (r.mode === "none") return false
+  if (viewer.id === task.assignee || task.assignees?.includes(viewer.id)) return false
   if (viewer.manager) return true
-  if (viewer.id === task.assignee) return false
   return (r.review === "creator" && viewer.id === task.creator) || (r.review === "named" && viewer.id === r.reviewer)
 }

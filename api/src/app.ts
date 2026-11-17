@@ -27,6 +27,7 @@ import { rbacRoutes } from "./modules/rbac"
 import { authRoutes } from "./modules/auth/routes"
 import { inviteRoutes } from "./modules/invites"
 import { archiveRoutes, collabRoutes, planningRoutes, taskRoutes, taskViewRoutes } from "./modules/tasks"
+import { evidenceRoutes } from "./modules/task-evidence"
 import { projectRoutes } from "./modules/projects"
 import { templateRoutes } from "./modules/task-templates"
 import { teamRoutes } from "./modules/teams"
@@ -74,6 +75,7 @@ export function createApp(deps: Deps) {
   app.route("/", archiveRoutes)
   app.route("/", collabRoutes)
   app.route("/", planningRoutes)
+  app.route("/", evidenceRoutes)
   app.route("/", projectRoutes)
   app.route("/", templateRoutes)
   app.route("/", mfaRoutes)

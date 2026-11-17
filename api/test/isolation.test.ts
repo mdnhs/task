@@ -124,6 +124,14 @@ const SPECS: Record<string, Spec> = {
   "POST /v1/tasks/{id}/archive": { actor: "owner", expect: "task_not_found" },
   "POST /v1/tasks/{id}/restore": { actor: "owner", expect: "task_not_found", prepare: archiveFixtureTask },
   "DELETE /v1/tasks/{id}": { actor: "owner", expect: "task_not_found", prepare: archiveFixtureTask },
+  // T4.6: evidence rule (control: 200), attach (control: 201 with a note), delete (control: 204), download (control: 409 file_not_ready), verify and reject
+  // (control: 409 invalid_transition, the fixture task is not submitted)
+  "PUT /v1/tasks/{id}/evidence-rule": { actor: "owner", expect: "task_not_found" },
+  "POST /v1/tasks/{id}/evidence": { actor: "owner", expect: "task_not_found", body: () => ({ kind: "note", text: "Walked every floor" }) },
+  "DELETE /v1/tasks/{id}/evidence/{evidenceId}": { actor: "owner", expect: "task_not_found" },
+  "GET /v1/tasks/{id}/evidence/{evidenceId}/download": { actor: "owner", expect: "task_not_found" },
+  "POST /v1/tasks/{id}/verify": { actor: "owner", expect: "task_not_found" },
+  "POST /v1/tasks/{id}/reject": { actor: "owner", expect: "task_not_found" },
   "PATCH /v1/task-templates/{id}": { actor: "owner", expect: "template_not_found" },
   "DELETE /v1/task-templates/{id}": { actor: "owner", expect: "template_not_found" },
 }

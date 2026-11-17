@@ -4,6 +4,7 @@ import { evidenceState } from "@opsdesk/domain/task-evidence"
 import { withholdDriveText } from "@opsdesk/domain/devices"
 import { TASK_STATUSES, taskChecklistItems, taskDependencies, tasks, teams } from "../../db/schema"
 import type { TenantTx } from "../../db/tenant-tx"
+import { evidenceDtos, EVIDENCE_FILTERS, loadEvidence, stateItems } from "./evidence"
 import { assigneesOf } from "./repo"
 import type { HistoryDto } from "./history"
 import { taskScopeWhere, type TaskCtx, type TaskRow } from "./scope"
@@ -100,8 +101,12 @@ export async function taskDtos(tx: TenantTx, ctx: TaskCtx, rows: TaskRow[], time
     : []
   const deps = new Map<string, { id: string; ref: string }[]>()
   for (const d of depRows) deps.set(d.taskId, [...(deps.get(d.taskId) ?? []), { id: d.id, ref: ref(d.refNo) }])
+  // Evidence of the whole page in ONE query (and one names lookup); items that are still scanning, infected or deleted do not count toward the state (ruling D10).
+  const evidenceBy = await loadEvidence(tx, ctx.tenantId, ids)
+  const evidenceDto = new Map((await evidenceDtos(tx, ctx, [...evidenceBy.values()].flat())).map((d) => [d.id, d]))
   return rows.map((r) => {
     const p = people.get(r.id)!
+    const items = evidenceBy.get(r.id) ?? []
     const timeline = timelines.get(r.id) ?? []
     return {
       id: r.id, ref: ref(r.refNo), version: r.version, title: ctx.drive ? r.title : withholdDriveText(r.title),
@@ -117,8 +122,8 @@ export async function taskDtos(tx: TenantTx, ctx: TaskCtx, rows: TaskRow[], time
       ...(r.archivedAt ? { archivedAt: wallOf(r.archivedAt, ctx.tz) } : {}), ...(r.archivedBy ? { archivedBy: r.archivedBy } : {}),
       ...(r.proposal ? { proposal: ctx.drive ? r.proposal : { ...r.proposal, reason: withholdDriveText(String(r.proposal.reason ?? "")) } } : {}), ...(r.repeat ? { repeat: r.repeat as Record<string, unknown> } : {}), ...(r.seriesId ? { seriesId: r.seriesId } : {}),
       ...(r.submittedAt ? { submittedAt: wallOf(r.submittedAt, ctx.tz) } : {}), ...(r.completedAt ? { completedAt: wallOf(r.completedAt, ctx.tz) } : {}),
-      notes: [], evidence: [], timeline, ...(r.overduePlan ? { overdue: r.overduePlan } : {}), timeEntries: [],
-      evidenceState: evidenceState(r.evidenceRule, [], r.status), voiceNote: null,
+      notes: [], evidence: items.map((e) => evidenceDto.get(e.id)!), timeline, ...(r.overduePlan ? { overdue: r.overduePlan } : {}), timeEntries: [],
+      evidenceState: evidenceState(r.evidenceRule, stateItems(items), r.status), voiceNote: null,
     }
   })
 }
@@ -185,6 +190,7 @@ export const ListQuery = z.object({
   q: z.string().trim().min(1).max(100).optional(),
   ref: z.string().regex(/^(tsk-)?\d{1,9}$/i).optional(),
   label: z.string().trim().min(1).max(40).optional(),
+  evidence: z.enum(EVIDENCE_FILTERS).optional(),
 })
 export type ListQueryInput = z.infer<typeof ListQuery>
 export const HistoryQuery = z.object({ limit: z.coerce.number().int().min(1).max(100).default(25), cursor: z.string().max(300).optional() })

@@ -14,6 +14,9 @@ export type TaskEvent =
   | { type: "task.status_changed"; payload: { taskId: string; from: TaskStatus; to: TaskStatus } }
   | { type: "task.completed"; payload: { taskId: string } }
   | { type: "task.submitted"; payload: { taskId: string; round: number } }
+  | { type: "task.evidence_added"; payload: { taskId: string; evidenceId: string } }
+  | { type: "task.evidence_verified"; payload: { taskId: string; evidenceIds: string[] } }
+  | { type: "task.evidence_rejected"; payload: { taskId: string; evidenceIds: string[]; round: number } }
   | { type: "task.comment_added"; payload: { taskId: string; commentId: string } }
   | { type: "task.archived" | "task.restored" | "task.purged"; payload: { taskId: string } }
   | { type: "project.created" | "project.updated" | "project.deleted"; payload: { projectId: string } }
