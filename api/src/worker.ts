@@ -7,7 +7,7 @@ import { registerGdpr, SWEEP_JOB } from "./modules/gdpr"
 import { registerIntegrations } from "./modules/integrations"
 import { NOTIFICATION_SWEEP_JOB, registerNotifications } from "./modules/notifications"
 import { registerSearchIndexers } from "./modules/search"
-import { registerShiftReports } from "./modules/shift-reports"
+import { DEADLINE_JOB, registerShiftReports } from "./modules/shift-reports"
 import { ARCHIVE_PURGE_JOB, RECURRENCE_JOB, registerTasks } from "./modules/tasks"
 import { registerWebhooks, SWEEP_JOB as WEBHOOK_SWEEP_JOB } from "./modules/webhooks-out"
 import { parseEnv, type Env } from "./env"
@@ -35,6 +35,7 @@ export async function startWorkerProcess(env: Env = parseEnv(process.env)) {
   await queue.raw.upsertJobScheduler(WEBHOOK_SWEEP_JOB, { every: 5 * 60_000 }, { name: WEBHOOK_SWEEP_JOB, opts: { removeOnComplete: true, removeOnFail: 100 } }) // re-enqueue lost/stale webhook deliveries
   await queue.raw.upsertJobScheduler(RECURRENCE_JOB, { every: 15 * 60_000 }, { name: RECURRENCE_JOB, opts: { removeOnComplete: true, removeOnFail: 100 } }) // recurring task instances (T4.4); idempotent per (series, local date)
   await queue.raw.upsertJobScheduler(ARCHIVE_PURGE_JOB, { every: 60 * 60_000 }, { name: ARCHIVE_PURGE_JOB, opts: { removeOnComplete: true, removeOnFail: 100 } }) // purge tasks archived 30+ days ago (T4.5); idempotent, safe with two runs
+  await queue.raw.upsertJobScheduler(DEADLINE_JOB, { every: 5 * 60_000 }, { name: DEADLINE_JOB, opts: { removeOnComplete: true, removeOnFail: 100 } }) // shift-end prompt and missing-report alerts (T5.4); exactly once per (member, shift, day, kind) via the ledger, safe with two workers
   deps.logger.info("worker started")
   return {
     async close() {

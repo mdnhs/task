@@ -151,6 +151,16 @@ export async function directReports(tx: TenantTx, managerId: string): Promise<st
   return rows.map((r) => r.u)
 }
 
+/** The ACTIVE primary manager of `userId` (reporting_lines), or null: no manager, or the manager is suspended or gone (the caller falls back, e.g. to the owners). */
+export async function activePrimaryManager(tx: TenantTx, tenantId: string, userId: string): Promise<string | null> {
+  const [r] = await tx
+    .select({ m: reportingLines.managerId })
+    .from(reportingLines)
+    .innerJoin(memberships, and(eq(memberships.tenantId, reportingLines.tenantId), eq(memberships.userId, reportingLines.managerId), eq(memberships.status, "active")))
+    .where(and(eq(reportingLines.tenantId, tenantId), eq(reportingLines.userId, userId)))
+  return r?.m ?? null
+}
+
 // ---- people ----
 export type Scope = "own" | "team" | "all"
 const RANK: Record<Scope, number> = { own: 0, team: 1, all: 2 }

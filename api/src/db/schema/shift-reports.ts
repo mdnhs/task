@@ -160,3 +160,29 @@ export const shiftReportFiles = pgTable(
     tenantPolicy(),
   ],
 ).enableRLS()
+
+/**
+ * The deadline job's ledger (F12, T5.4): one row per (member, shift start date, kind) that was ALERTED, `kind` = `prompt` (the shift has ended, the report is due) or `missing` (the due time passed
+ * with nothing submitted). The unique key is the exactly-once guard: the job inserts `ON CONFLICT DO NOTHING RETURNING` and writes the notifications in the SAME transaction only when a row came back, so two
+ * workers, a retry, a restart or the repeated October hour can neither double-send nor lose an alert. No foreign key to `shift_reports` (a missing alert has no report row, F4). `user_id` has a composite
+ * member FK with ON DELETE CASCADE (hand-written in the migration, run as the table owner), so an erased member's ledger rows leave with the membership (F22) although the app role can only SELECT and INSERT.
+ */
+export const shiftReportAlerts = pgTable(
+  "shift_report_alerts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    tenantId: uuid("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    userId: text("user_id").notNull(),
+    patternId: uuid("pattern_id").notNull(),
+    shiftDate: date("shift_date", { mode: "string" }).notNull(),
+    kind: text("kind").notNull(),
+    alertedAt: ts("alerted_at").notNull(),
+  },
+  (t) => [
+    unique("shift_report_alerts_key").on(t.tenantId, t.userId, t.patternId, t.shiftDate, t.kind),
+    foreignKey({ columns: [t.tenantId, t.patternId], foreignColumns: [shiftPatterns.tenantId, shiftPatterns.id], name: "shift_report_alerts_pattern_fk" }),
+    foreignKey({ columns: [t.tenantId, t.userId], foreignColumns: [memberships.tenantId, memberships.userId], name: "shift_report_alerts_member_fk" }).onDelete("cascade"),
+    check("shift_report_alerts_kind_check", sql`${t.kind} IN ('prompt','missing')`),
+    tenantPolicy(),
+  ],
+).enableRLS()
