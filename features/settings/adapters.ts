@@ -140,10 +140,14 @@ export const idleLabel = (hours: number): string => `${hours} ${hours === 1 ? "h
 
 /** How long an invite lives, read from the invites' own dates (the tenant's `invite_ttl_days` setting is what set them). Null when there is no invite to read it from. */
 export function inviteDaysOf(invites: readonly { createdAt: string; expiresAt: string }[]): number | null {
-  const i = invites[0]
-  if (!i) return null
-  const ms = Date.parse(`${i.expiresAt}Z`) - Date.parse(`${i.createdAt}Z`)
-  return Number.isFinite(ms) && ms > 0 ? Math.max(1, Math.round(ms / 86_400_000)) : null
+  const days = invites
+    .map((i) => (Date.parse(`${i.expiresAt}Z`) - Date.parse(`${i.createdAt}Z`)) / 86_400_000)
+    .filter((d) => Number.isFinite(d) && d > 0)
+    .sort((a, b) => a - b)
+  if (days.length === 0) return null
+  const mid = Math.floor(days.length / 2)
+  const median = days.length % 2 ? days[mid]! : (days[mid - 1]! + days[mid]!) / 2 // a resent or hand-set invite is an outlier: the median is the tenant's setting
+  return Math.max(1, Math.round(median))
 }
 
 /** Changing your own role, or an owner's, is asked about first (it can lock you out or demote the person who runs the workspace). */

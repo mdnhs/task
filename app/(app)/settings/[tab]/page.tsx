@@ -52,7 +52,7 @@ export default async function Page({ params, searchParams }: { params: Promise<{
   async function body(tab: SettingsTabId) {
     switch (tab) {
       case "organisation": {
-        const [o, options, idle] = await Promise.all([readable(() => loadOrganisation(api)), getOrganisationOptions(), loadSessionIdleHours(api)])
+        const [o, options, idle] = await Promise.all([readable(() => loadOrganisation(api)), getOrganisationOptions(), readable(() => loadSessionIdleHours(api))])
         return o && <OrganisationForm options={options} org={o} tzLabel={org.tzLabel} sessionIdleHours={idle} canWrite={write} />
       }
       case "departments": {

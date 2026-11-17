@@ -73,7 +73,10 @@ export const nameOfFrom = (names: Record<string, string>) => (id: string) => nam
 export const serverApi = apiServer
 
 /** The idle sign-out hours the platform set for this company (GET /v1/me/tenant, open to every member). */
-export const loadSessionIdleHours = async (api: Reader): Promise<number> => (await api.get("/v1/me/tenant")).tenant.sessionIdleHours
+export const loadSessionIdleHours = async (api: Reader): Promise<number | null> => {
+  const h: unknown = (await api.get("/v1/me/tenant")).tenant.sessionIdleHours
+  return typeof h === "number" && Number.isFinite(h) ? h : null // a missing field renders as a dash; it never breaks the tab
+}
 
 /**
  * MOCK: no backend (the API has no deactivate route and no last-active). Per-email status and last-active from the demo seed, read only on a demo deployment

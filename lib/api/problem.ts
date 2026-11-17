@@ -123,6 +123,7 @@ const CODE_COPY: Record<string, string> = {
   role_not_invitable: "That role can't be given by invite.",
   resend_too_soon: "Sent a moment ago. Wait a minute.",
   // Roles, teams, devices, integrations, privacy and notification settings (B6 T6.5).
+  owner_not_clonable: "The owner role can't be copied.",
   template_locked: "Built-in roles can't be edited. Copy the role first.",
   role_escalation: "That role has more access than yours.",
   team_name_taken: "That name is taken.",

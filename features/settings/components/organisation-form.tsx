@@ -23,7 +23,7 @@ const schema = z.object({
 })
 
 // Organisation tab (GET/PATCH /v1/settings/organisation): company name, timezone and the daily report deadline. Only what changed is sent. The weekend rule has no backend (the API has holidays instead). The session timeout is shown read-only. Name, slug, timezone and deadline are the tenant's own values.
-export function OrganisationForm({ options, org, tzLabel, sessionIdleHours, canWrite }: { options: OrganisationData; org: Organisation; tzLabel: string; /** Idle sign-out, from /v1/me/tenant. Read-only: the platform sets it. */ sessionIdleHours: number; canWrite: boolean }) {
+export function OrganisationForm({ options, org, tzLabel, sessionIdleHours, canWrite }: { options: OrganisationData; org: Organisation; tzLabel: string; /** Idle sign-out, from /v1/me/tenant. Read-only: the platform sets it. */ sessionIdleHours: number | null; canWrite: boolean }) {
   const run = useApiAction()
   const client = makeSettingsClient(apiBrowser, { go: (u) => window.location.assign(u) })
   const [form, setForm] = useState({ name: org.name, timezone: org.timezone, reportDeadline: org.reportDeadline })
@@ -85,7 +85,7 @@ export function OrganisationForm({ options, org, tzLabel, sessionIdleHours, canW
             </FormSection>
             <FormSection icon={ShieldCheck} title="Security">
               <Field label="Session timeout" htmlFor="set-timeout" hint="Idle time before sign-out. Set by the platform for now.">
-                <Input id="set-timeout" readOnly value={idleLabel(sessionIdleHours)} />
+                <Input id="set-timeout" readOnly value={sessionIdleHours === null ? "—" : idleLabel(sessionIdleHours)} />
               </Field>
             </FormSection>
           </div>

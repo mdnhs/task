@@ -126,7 +126,7 @@ export function UsersPanel({ users, invites, roles, today, tzLabel, seatLimit, s
           <div className="table-wrap">
             <table className="rtable set-table">
               <thead>
-                <tr><th>User</th><th>Role</th><th>Department</th>{mockActivity && <><th>Status</th><th>Last active</th>{canWrite && <th>Actions</th>}</>}</tr>
+                <tr><th>User</th><th>Role</th><th>Department</th>{mockActivity && <><th>Status <span className="tm">Demo</span></th><th>Last active <span className="tm">Demo</span></th>{canWrite && <th>Actions <span className="tm">Demo</span></th>}</>}</tr>
               </thead>
               <tbody>
                 {paged.rows.map((u) => (

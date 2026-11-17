@@ -35,7 +35,7 @@ export function RolesMatrix({ data, canWrite }: { data: MatrixData; canWrite: bo
   async function copy(sourceUuid: string, label: string) {
     const r = await run(`clone:${sourceUuid}`, () => client.cloneRole(sourceUuid, label))
     if (r.ok) {
-      setFresh(label)
+      setFresh(String((r.value as { key?: string }).key ?? ""))
       toast.success("Role copied", { description: `${label} is editable below.` })
     }
     return r.ok
@@ -69,7 +69,7 @@ export function RolesMatrix({ data, canWrite }: { data: MatrixData; canWrite: bo
           <thead>
             <tr>
               <th>Module</th>
-              {data.roles.map((r) => <th key={r.id} data-fresh={fresh === r.label ? "" : undefined}>{r.label}</th>)}
+              {data.roles.map((r) => <th key={r.id} data-fresh={fresh === r.id ? "" : undefined}>{r.label}</th>)}
             </tr>
           </thead>
           <tbody>
@@ -101,7 +101,8 @@ export function RolesMatrix({ data, canWrite }: { data: MatrixData; canWrite: bo
 }
 
 function CopyDialog({ roles, onClose, onCopy }: { roles: MatrixData["roles"]; onClose(): void; onCopy(sourceUuid: string, label: string): Promise<boolean> }) {
-  const [source, setSource] = useState(roles.find((r) => r.id !== "owner")?.uuid ?? roles[0]?.uuid ?? "")
+  const sources = roles.filter((r) => r.id !== "owner") // the owner role cannot be copied (409 owner_not_clonable)
+  const [source, setSource] = useState(sources[0]?.uuid ?? "")
   const [name, setName] = useState("")
   const [error, setError] = useState<string>()
 
@@ -121,7 +122,7 @@ function CopyDialog({ roles, onClose, onCopy }: { roles: MatrixData["roles"]; on
         </DialogHeader>
         <form className="od-form" onSubmit={submit} noValidate>
           <Field label="Copy from" htmlFor="role-src">
-            <FilterSelect label="Copy from" value={source} onChange={setSource} options={roles.map((r) => ({ value: r.uuid, label: r.label }))} />
+            <FilterSelect label="Copy from" value={source} onChange={setSource} options={sources.map((r) => ({ value: r.uuid, label: r.label }))} />
           </Field>
           <Field label="New role name" htmlFor="role-name" error={error} required>
             <Input id="role-name" value={name} maxLength={80} onChange={(e) => { setName(e.target.value); setError(undefined) }} />
