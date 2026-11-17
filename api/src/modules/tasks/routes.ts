@@ -1,17 +1,14 @@
 import { createRoute } from "@hono/zod-openapi"
-import type { Context } from "hono"
-import type { AppEnv } from "../../core/context"
 import { requireModule } from "../../core/middleware/module"
 import { requirePermission } from "../../core/middleware/permission"
 import { requireTenant } from "../../core/middleware/tenant"
 import { newRouter } from "../../core/router"
-import { withTenant, type TenantTx } from "../../db/tenant-tx"
 import { withTenantAfterCommit } from "../notifications"
 import { AssigneesBody, CompleteBody, CreateBody, HistoryList, HistoryQuery, IdParam, ListQuery, PatchBody, StatusBody, TaskDtoSchema, TaskList } from "./dto"
 import { nextRefNo } from "./repo"
-import { getTask, loadTaskCtx, type TaskCtx } from "./scope"
+import { mutate, read1 } from "./run"
+import { getTask, loadTaskCtx } from "./scope"
 import { changeStatus, completeTask, createTask, getTaskDetail, listHistory, listTasks, patchTask, setAssignees } from "./service"
-import type { TaskEnv } from "./notify"
 
 const json = (schema: typeof TaskDtoSchema | typeof TaskList | typeof HistoryList, description: string) => ({ description, content: { "application/json": { schema } } })
 const body = <T extends typeof CreateBody | typeof PatchBody | typeof AssigneesBody | typeof StatusBody | typeof CompleteBody>(schema: T) => ({ content: { "application/json": { schema } }, required: true as const })
@@ -48,17 +45,6 @@ const historyR = createRoute({
   method: "get", path: "/v1/tasks/{id}/history", middleware: [requireTenant, requireModule("M1"), requirePermission("tasks", "read")] as const, request: { params: IdParam, query: HistoryQuery },
   responses: { 200: json(HistoryList, "Field history newest first with old and new values in tenant time; pass nextCursor back as cursor. 400 invalid_cursor") },
 })
-
-/** A read: one tenant tx, the caller's context from the request (role as loaded by the guard). */
-function read1<T>(c: Context<AppEnv>, fn: (tx: TenantTx, ctx: TaskCtx) => Promise<T>): Promise<T> {
-  return withTenant(c.get("deps").db, c.get("tenant")!.id, async (tx) => fn(tx, await loadTaskCtx(c, tx)))
-}
-
-/** A mutation: the actor lock (R25) first, then the work; notification jobs are enqueued only after the tx commits. */
-function mutate<T>(c: Context<AppEnv>, fn: (tx: TenantTx, env: TaskEnv, ctx: TaskCtx) => Promise<T>): Promise<T> {
-  const deps = c.get("deps")
-  return withTenantAfterCommit(deps, c.get("tenant")!.id, async (tx, enqueue) => fn(tx, { deps, enqueue }, await loadTaskCtx(c, tx, "write")))
-}
 
 export const taskRoutes = newRouter()
   .openapi(listR, async (c) => c.json(await read1(c, (tx, ctx) => listTasks(tx, ctx, c.req.valid("query"))), 200))

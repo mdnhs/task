@@ -36,6 +36,9 @@ export const testEnv: Deps["env"] = {
   S3_FORCE_PATH_STYLE: true,
   CLAMD_PORT: 3310,
   FILE_MAX_BYTES: 26214400,
+  TASK_EVIDENCE_MAX_BYTES: 26214400,
+  TASK_VIDEO_MAX_BYTES: 104857600,
+  TASK_VOICE_MAX_BYTES: 3145728,
 }
 
 // Lets helpers (factories.ts) find an app's fake mailer from the app alone.

@@ -25,6 +25,23 @@ export const MAX_SCAN_ATTEMPTS = 5
 export const scanBackoffMs = (attempt: number): number => 30_000 * 2 ** (attempt - 1)
 
 type Actor = { userId: string }
+
+/**
+ * A caller-supplied upload policy (ruling D9): the task upload intent runs the same presign, staging, scan pipeline with its own
+ * purpose, mime list, size cap and permission check (`lock` runs in the tx, in place of the files:write actor lock). `after` runs in
+ * the intent's tx right after the files row exists (the task module records its task_files row there). Without a policy the
+ * behaviour is the ordinary /v1/files one.
+ */
+export type UploadPolicy = {
+  purpose: "task_evidence" | "task_attachment" | "task_voice"
+  mimes: readonly string[]
+  maxBytes: (mime: string) => number
+  lock: (tx: TenantTx) => Promise<void>
+  stripMimeParams?: boolean
+  after?: (tx: TenantTx, fileId: string, mime: string) => Promise<void>
+}
+/** Files created through a task policy carry a `task_` purpose and are invisible to /v1/files (ruling D9). */
+const isTaskFile = (r: { purpose: string | null }): boolean => r.purpose?.startsWith("task_") ?? false
 /** A caller that may read: the role decides files:read, and who may open a DSR export. */
 export type FileReader = { userId: string; role: ResolvedRole }
 type Row = typeof files.$inferSelect
@@ -68,7 +85,7 @@ const dsrAllowed = (row: Row, who: FileReader): boolean => row.purpose !== "dsr_
 async function readableFile(tx: TenantTx, tenantId: string, id: string, who: FileReader): Promise<Row> {
   const canRead = can(who.role, "files", "read")
   const [row] = await tx.select().from(files).where(and(eq(files.id, id), eq(files.tenantId, tenantId)))
-  if (!row) throw canRead ? NotFoundFile() : Forbidden("forbidden")
+  if (!row || isTaskFile(row)) throw canRead ? NotFoundFile() : Forbidden("forbidden") // a task file looks like a missing one: only task routes serve it
   if (row.purpose === "dsr_export") {
     if (!dsrAllowed(row, who)) throw NotFoundFile()
   } else if (!canRead) throw Forbidden("forbidden")
@@ -76,30 +93,46 @@ async function readableFile(tx: TenantTx, tenantId: string, id: string, who: Fil
   return row
 }
 
-/** A live (not soft-deleted) file of this tenant, or 404. RLS plus an explicit tenant filter. */
-async function liveFile(tx: TenantTx, tenantId: string, id: string, lock = false): Promise<Row> {
+/**
+ * A live (not soft-deleted) file of this tenant, or 404. RLS plus an explicit tenant filter. `purpose`: null = an ordinary file
+ * (task files are 404, ruling D9); a string = exactly that purpose (the task upload policy); "*" = any (the scan verdict).
+ */
+async function liveFile(tx: TenantTx, tenantId: string, id: string, lock = false, purpose: string | null = null): Promise<Row> {
   const q = tx.select().from(files).where(and(eq(files.id, id), eq(files.tenantId, tenantId)))
   const [row] = lock ? await q.for("update") : await q
   if (!row || row.status === "deleted") throw NotFoundFile()
+  if (purpose === null ? isTaskFile(row) : purpose !== "*" && row.purpose !== purpose) throw NotFoundFile()
   return row
 }
 
 // ---------------------------------------------------------------- requests
 
-export async function createUpload(deps: Deps, tenantId: string, actor: Actor, input: { name: string; mime: string; sizeBytes: number }): Promise<{ fileId: string; upload: PresignedPut }> {
-  const mime = normalizeMime(input.mime)
+/** The allow-listed mime for a client value: the B2 list, or the policy's list (parameters stripped first when the policy says so). */
+function pickMime(input: string, policy?: UploadPolicy): string | null {
+  if (!policy) return normalizeMime(input)
+  const m = (policy.stripMimeParams ? input.split(";")[0] : input).trim().toLowerCase()
+  return policy.mimes.includes(m) ? m : null
+}
+
+export async function createUpload(
+  deps: Deps, tenantId: string, actor: Actor, input: { name: string; mime: string; sizeBytes: number }, policy?: UploadPolicy,
+): Promise<{ fileId: string; upload: PresignedPut }> {
+  const mime = pickMime(input.mime, policy)
   if (!mime) throw new AppError(422, "mime_not_allowed", "Unprocessable Entity")
   if (!(input.name as unknown as { isWellFormed(): boolean }).isWellFormed()) throw new AppError(422, "invalid_name", "Unprocessable Entity")
   const name = canonicalName(input.name, mime)
-  const max = deps.env.FILE_MAX_BYTES
+  const max = policy ? policy.maxBytes(mime) : deps.env.FILE_MAX_BYTES
   if (input.sizeBytes > max) throw new AppError(422, "file_too_large", "Unprocessable Entity")
+  // A caller who may not upload must not get a presigned URL either (nothing may land in staging): check the policy first, again under lock below.
+  if (policy) await withTenant(deps.db, tenantId, (tx) => policy.lock(tx))
   const id = crypto.randomUUID()
   const key = fileKey(tenantId, id) // final key: server-generated ids only, never in any upload URL
   // presign first: with storage unconfigured (503) nothing is inserted
   const upload = await deps.storage.presignPut(stagingKey(tenantId, id), { mime, sizeBytes: input.sizeBytes, expiresSec: UPLOAD_TTL_SEC })
   await withTenant(deps.db, tenantId, async (tx) => {
-    await lockActor(tx, tenantId, actor.userId, "files", "write")
-    await tx.insert(files).values({ id, tenantId, ownerUserId: actor.userId, key, name, mime, sizeBytes: input.sizeBytes, status: "pending", createdAt: deps.clock.now() })
+    await (policy ? policy.lock(tx) : lockActor(tx, tenantId, actor.userId, "files", "write").then(() => undefined))
+    await tx.insert(files).values({ id, tenantId, ownerUserId: actor.userId, purpose: policy?.purpose ?? null, key, name, mime, sizeBytes: input.sizeBytes, status: "pending", createdAt: deps.clock.now() })
+    await policy?.after?.(tx, id, mime)
   })
   return { fileId: id, upload }
 }
@@ -117,18 +150,18 @@ export async function createUpload(deps: Deps, tenantId: string, actor: Actor, i
  * `uploaded_at` unset, the next call re-copies from staging (nothing was scanned yet) or, when staging is gone, verifies
  * and adopts the existing final object.
  */
-export async function completeUpload(deps: Deps, tenantId: string, actor: Actor, id: string): Promise<FileDto> {
+export async function completeUpload(deps: Deps, tenantId: string, actor: Actor, id: string, policy?: UploadPolicy): Promise<FileDto> {
   const staging = stagingKey(tenantId, id)
   return withTenantAfterCommit(deps, tenantId, async (tx, enqueue) => {
-    await lockActor(tx, tenantId, actor.userId, "files", "write")
-    const row = await liveFile(tx, tenantId, id, true)
+    await (policy ? policy.lock(tx) : lockActor(tx, tenantId, actor.userId, "files", "write").then(() => undefined))
+    const row = await liveFile(tx, tenantId, id, true, policy?.purpose ?? null)
     if (row.status !== "pending") return dto(row) // already scanned: nothing to do
     let cur = row
     if (!row.uploadedAt) {
       const head = await deps.storage.head(staging)
       const src = head ?? (await deps.storage.head(row.key)) // recovery: copied earlier, tx never committed
       if (!src) throw Conflict("upload_missing")
-      if (src.size !== row.sizeBytes || src.size > deps.env.FILE_MAX_BYTES || src.contentType !== row.mime) {
+      if (src.size !== row.sizeBytes || src.size > (policy ? policy.maxBytes(row.mime) : deps.env.FILE_MAX_BYTES) || src.contentType !== row.mime) {
         if (head) await deps.storage.delete(staging) // a wrong object is never kept; the client must start a new upload
         throw new AppError(422, "upload_mismatch", "Unprocessable Entity")
       }
@@ -161,6 +194,21 @@ export async function getFile(tx: TenantTx, tenantId: string, id: string, who: F
  */
 export async function downloadUrl(deps: Deps, tenantId: string, id: string, who: FileReader): Promise<string> {
   const row = await withTenant(deps.db, tenantId, (tx) => readableFile(tx, tenantId, id, who))
+  if (row.status === "infected") throw new AppError(410, "file_infected", "Gone")
+  if (row.status !== "clean") throw Conflict("file_not_ready")
+  return deps.storage.presignGet(row.key, { name: row.name, mime: row.mime, expiresSec: DOWNLOAD_TTL_SEC })
+}
+
+/**
+ * The 60 s download URL of a TASK file (purpose `task_%`). The caller (tasks module) has already proved the caller may see the
+ * task and that the file belongs to it; this only adds the scan gate: 410 file_infected, 409 file_not_ready, else a presigned GET.
+ */
+export async function taskFileDownloadUrl(deps: Deps, tenantId: string, id: string): Promise<string> {
+  const row = await withTenant(deps.db, tenantId, async (tx) => {
+    const r = await liveFile(tx, tenantId, id, false, "*")
+    if (!isTaskFile(r)) throw NotFoundFile()
+    return r
+  })
   if (row.status === "infected") throw new AppError(410, "file_infected", "Gone")
   if (row.status !== "clean") throw Conflict("file_not_ready")
   return deps.storage.presignGet(row.key, { name: row.name, mime: row.mime, expiresSec: DOWNLOAD_TTL_SEC })
@@ -266,7 +314,7 @@ export async function scanFile(data: unknown, deps: Deps): Promise<void> {
 
 async function recordVerdict(deps: Deps, row: Row, result: { clean: true } | { clean: false; signature: string }, sha256: string, etag: string): Promise<void> {
   await withTenantAfterCommit(deps, row.tenantId, async (tx, enqueue) => {
-    const cur = await liveFile(tx, row.tenantId, row.id, true).catch((e: unknown) => {
+    const cur = await liveFile(tx, row.tenantId, row.id, true, "*").catch((e: unknown) => {
       if (e instanceof AppError && e.status === 404) return null // deleted while scanning: the delete wins
       throw e
     })

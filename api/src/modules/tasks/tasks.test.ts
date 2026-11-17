@@ -1,9 +1,14 @@
 import { sql } from "drizzle-orm"
 import pg from "pg"
-import { beforeEach, describe, expect, test } from "vitest"
+import { afterEach, beforeEach, describe, expect, test } from "vitest"
 import { ownerQuery, ownerTenantQuery } from "../../../test/db"
 import { makeApiKey, makeMember, makeTenant, signIn } from "../../../test/factories"
-import { call, resetDb, testApp } from "../../../test/harness"
+import { call, resetDb, testApp, testEnv } from "../../../test/harness"
+import { publish, relayOnce, resetSubscribers } from "../../core/events"
+import { runJob } from "../../core/queue/queue"
+import { registerFiles } from "../files"
+import { registerNotifications } from "../notifications"
+import { registerSearchIndexers } from "../search"
 import { withTenant } from "../../db/tenant-tx"
 import { clearModuleOverride } from "../entitlements"
 import { applyTaskUpdate, buildListQuery, type TaskCtx } from "."
@@ -14,8 +19,8 @@ beforeEach(resetDb)
 
 type Who = { userId: string; email: string; password: string; cookie: string }
 
-async function world(over: { timezone?: string; sessionIdleHours?: number } = {}) {
-  const t = testApp()
+async function world(over: { timezone?: string; sessionIdleHours?: number; env?: Partial<typeof testEnv> } = {}) {
+  const t = testApp(over.env ? { env: { ...testEnv, ...over.env } } : {})
   const tenant = await makeTenant(t.deps, { slug: "acme", sessionIdleHours: over.sessionIdleHours })
   if (over.timezone) await ownerQuery("update tenants set timezone = $1 where id = $2", [over.timezone, tenant.id])
   const who = async (role: string, tenantId = tenant.id): Promise<Who> => {
@@ -737,5 +742,402 @@ describe("review fixes (I1, M2, M3, M5, E2)", () => {
     expect(await code(await w.req("POST", "/v1/tasks", w.ops, w.base({ primary: "usr_ghost" })))).toBe("invalid_assignee")
     // staff: themselves only
     expect(await code(await w.req("POST", "/v1/tasks", w.staff, w.base({ primary: w.staff2.userId })))).toBe("cannot_assign_others")
+  })
+})
+
+// ---------- T4.2: checklists, subtasks, comments, task uploads and search ----------
+
+describe("collaboration (T4.2)", () => {
+  beforeEach(() => {
+    resetSubscribers()
+    registerNotifications()
+    registerFiles()
+    registerSearchIndexers()
+  })
+  afterEach(resetSubscribers)
+
+  const drain = async (w: W) => {
+    for (let i = 0; i < 6 && w.queue.jobs.length > 0; i++) for (const j of w.queue.jobs.splice(0)) await runJob(j.name, j.data, w.deps)
+  }
+  const relay = async (w: W) => {
+    for (let i = 0; i < 5 && (await relayOnce(w.deps)) > 0; i++);
+  }
+  const addItem = async (w: W, as: Who, taskId: string, text: string) => {
+    const r = await w.req("POST", `/v1/tasks/${taskId}/checklist`, as, { text })
+    expect(r.status, await r.clone().text()).toBe(201)
+    return w.json(r)
+  }
+  /** Intent → browser-style PUT → complete → (optionally) scan jobs. Returns the file id. */
+  const attach = async (w: W, as: Who, taskId: string, o: { purpose?: string; content?: string; mime?: string; name?: string; scan?: boolean } = {}) => {
+    const buf = Buffer.from(o.content ?? "hello pdf")
+    const r = await w.req("POST", `/v1/tasks/${taskId}/uploads`, as, { purpose: o.purpose ?? "attachment", name: o.name ?? "a.pdf", mime: o.mime ?? "application/pdf", sizeBytes: buf.length })
+    expect(r.status, await r.clone().text()).toBe(201)
+    const j = await w.json(r)
+    const { "Content-Length": _len, ...headers } = j.upload.headers as Record<string, string>
+    expect((await fetch(j.upload.url, { method: "PUT", headers, body: buf })).status).toBe(200)
+    expect((await w.req("POST", `/v1/tasks/${taskId}/uploads/${j.fileId}/complete`, as)).status).toBe(200)
+    if (o.scan !== false) await drain(w)
+    return j.fileId as string
+  }
+
+  test("concurrent checklist ticks on different items both persist (no lost update)", async () => {
+    const w = await world()
+    const t = await w.mk(w.ops) // staff is the assignee, ops the creator and manager
+    const a = await addItem(w, w.ops, t.id, "Item A")
+    const b = await addItem(w, w.ops, t.id, "Item B")
+    const c = await addItem(w, w.ops, t.id, "Item C")
+    const rs = await Promise.all([
+      w.req("PATCH", `/v1/tasks/${t.id}/checklist/${a.id}`, w.staff, { done: true }),
+      w.req("PATCH", `/v1/tasks/${t.id}/checklist/${b.id}`, w.ops, { done: true }),
+      w.req("PATCH", `/v1/tasks/${t.id}/checklist/${c.id}`, w.owner, { done: true }),
+    ])
+    expect(rs.map((r) => r.status)).toEqual([200, 200, 200])
+    const rows = await w.q("select text, done, done_by from task_checklist_items order by position")
+    expect(rows.map((r) => r.done)).toEqual([true, true, true])
+    expect(rows.map((r) => r.done_by)).toEqual([w.staff.userId, w.ops.userId, w.owner.userId])
+    const detail = await w.json(await w.req("GET", `/v1/tasks/${t.id}`, w.owner))
+    expect(detail.checklist.map((i: Json) => [i.text, i.done])).toEqual([["Item A", true], ["Item B", true], ["Item C", true]])
+  })
+
+  test("checklist ticks do not bump task.version; a PATCH at the old version still succeeds; done is absolute", async () => {
+    const w = await world()
+    const t = await w.mk(w.ops)
+    const item = await addItem(w, w.ops, t.id, "Walk the corridor")
+    for (let i = 0; i < 2; i++) {
+      const r = await w.json(await w.req("PATCH", `/v1/tasks/${t.id}/checklist/${item.id}`, w.staff, { done: true })) // twice: absolute, never a toggle
+      expect(r.done).toBe(true)
+    }
+    expect((await w.json(await w.req("PATCH", `/v1/tasks/${t.id}/checklist/${item.id}`, w.staff, { done: false }))).done).toBe(false)
+    expect((await w.q("select version from tasks where id = $1", [t.id]))[0].version).toBe(1)
+    const p = await w.req("PATCH", `/v1/tasks/${t.id}`, w.ops, { version: 1, priority: 3 })
+    expect(p.status, await p.clone().text()).toBe(200)
+    expect((await w.json(p)).version).toBe(2)
+  })
+
+  test("checklist rules: 50 items at most, text only for the creator or a manager, delete for the creator or a manager, out of scope is 404", async () => {
+    const w = await world()
+    const t = await w.mk(w.ops)
+    const item = await addItem(w, w.ops, t.id, "First")
+    expect((await w.req("PATCH", `/v1/tasks/${t.id}/checklist/${item.id}`, w.staff, { text: "Edited" })).status).toBe(403) // assignee, not creator
+    expect((await w.req("DELETE", `/v1/tasks/${t.id}/checklist/${item.id}`, w.staff)).status).toBe(403)
+    expect((await w.json(await w.req("PATCH", `/v1/tasks/${t.id}/checklist/${item.id}`, w.ops, { text: "Edited" }))).text).toBe("Edited")
+    expect((await w.req("POST", `/v1/tasks/${t.id}/checklist`, w.staff, { text: "mine" })).status).toBe(201) // an assignee may add
+    for (const [m, p, b] of [["POST", `/v1/tasks/${t.id}/checklist`, { text: "x" }], ["PATCH", `/v1/tasks/${t.id}/checklist/${item.id}`, { done: true }], ["DELETE", `/v1/tasks/${t.id}/checklist/${item.id}`, undefined]] as [string, string, unknown][]) {
+      const r = await w.req(m, p, w.staff2, b)
+      expect(r.status, `${m} ${p}`).toBe(404)
+      expect(await code(r)).toBe("task_not_found")
+    }
+    await w.q("insert into task_checklist_items (tenant_id, task_id, text, position) select $1, $2, 'bulk ' || g, 100 + g from generate_series(1, 48) g", [w.tenant.id, t.id]) // now 50
+    const over = await w.req("POST", `/v1/tasks/${t.id}/checklist`, w.ops, { text: "one too many" })
+    expect(over.status).toBe(422)
+    expect(await code(over)).toBe("checklist_limit")
+    expect((await w.req("DELETE", `/v1/tasks/${t.id}/checklist/${item.id}`, w.ops)).status).toBe(204)
+    expect((await w.req("POST", `/v1/tasks/${t.id}/checklist`, w.ops, { text: "fits now" })).status).toBe(201)
+  })
+
+  test("subtask copies team, assignee, project and due; a subtask of a subtask → 422 subtask_depth; the parent's version is untouched", async () => {
+    const w = await world()
+    const dept = await w.json(await w.req("POST", "/v1/teams", w.owner, { name: "Cleaning", kind: "department" }))
+    const parent = await w.mk(w.ops, { teamId: dept.id, due: "2026-12-01T17:00:00" })
+    await w.q("update tasks set project_id = gen_random_uuid() where id = $1", [parent.id]) // projects arrive with T4.3
+    const [{ project_id: projectId }] = await w.q("select project_id from tasks where id = $1", [parent.id])
+    const r = await w.req("POST", `/v1/tasks/${parent.id}/subtasks`, w.ops, { title: "Walk floor 1" })
+    expect(r.status, await r.clone().text()).toBe(201)
+    const child = await w.json(r)
+    expect(child).toMatchObject({ parentId: parent.id, parentRef: parent.ref, teamId: dept.id, dept: "Cleaning", assignee: staffId(w), dueAt: parent.dueAt, projectId, title: "Walk floor 1", status: "not_started", creator: w.ops.userId })
+    expect(child.evidenceRule.mode).toBe("none")
+    expect(child.ref).not.toBe(parent.ref)
+    const deeper = await w.req("POST", `/v1/tasks/${child.id}/subtasks`, w.ops, { title: "grandchild" })
+    expect(deeper.status).toBe(422)
+    expect(await code(deeper)).toBe("subtask_depth")
+    const again = await w.json(await w.req("GET", `/v1/tasks/${parent.id}`, w.ops))
+    expect(again.version).toBe(1)
+    expect(again.subtasks.map((s: Json) => s.ref)).toEqual([child.ref])
+    expect((await w.q("select count(*)::int n from tasks"))[0].n).toBe(2)
+    // staff may add a subtask under their own task and get it assigned to themselves; a stranger gets 404
+    const own = await w.json(await w.req("POST", "/v1/tasks", w.staff, w.base({ primary: undefined })))
+    const mine = await w.json(await w.req("POST", `/v1/tasks/${own.id}/subtasks`, w.staff, { title: "step" }))
+    expect(mine.assignee).toBe(w.staff.userId)
+    expect(await code(await w.req("POST", `/v1/tasks/${own.id}/subtasks`, w.staff2, { title: "x" }))).toBe("task_not_found")
+  })
+  const staffId = (w: W) => w.staff.userId
+
+  test("comment with @mention notifies a mentioned member who can see the task; a member who cannot see it gets nothing and the response is still 201", async () => {
+    const w = await world()
+    const t = await w.mk(w.owner) // staff assigned; staff2 has no access; ops (all scope) can see it
+    const r = await w.req("POST", `/v1/tasks/${t.id}/comments`, w.staff, { body: "Please look @ops and @staff2", mentions: [w.ops.userId, w.staff2.userId, "usr_ghost_000"] })
+    expect(r.status, await r.clone().text()).toBe(201)
+    const c = await w.json(r)
+    expect(c.mentions).toEqual([w.ops.userId, w.staff2.userId, "usr_ghost_000"]) // echoed as sent: the answer cannot tell who could see it
+    expect(c.author).toBeTruthy()
+    const inbox = (u: Who) => w.q("select title from notifications where user_id = $1 and kind = 'task' and title <> 'New task' order by title", [u.userId])
+    expect((await inbox(w.ops)).map((n) => n.title)).toEqual(["You were mentioned"])
+    expect(await inbox(w.staff2)).toEqual([])
+    expect((await inbox(w.owner)).map((n) => n.title)).toEqual(["New comment"]) // the creator hears about it
+    expect(await inbox(w.staff)).toEqual([]) // never the author
+    const detail = await w.json(await w.req("GET", `/v1/tasks/${t.id}`, w.owner))
+    expect(JSON.stringify(detail.timeline)).not.toContain(w.staff2.userId) // the history line carries no recipients
+    const listed = await w.json(await w.req("GET", `/v1/tasks/${t.id}/comments`, w.staff))
+    expect(listed.items.map((i: Json) => i.id)).toEqual([c.id])
+    // staff2 still cannot read or write comments: 404, same as any unknown task
+    expect(await code(await w.req("GET", `/v1/tasks/${t.id}/comments`, w.staff2))).toBe("task_not_found")
+    expect(await code(await w.req("POST", `/v1/tasks/${t.id}/comments`, w.staff2, { body: "hi" }))).toBe("task_not_found")
+  })
+
+  test("comments: list pages oldest first with a cursor; authors and managers delete, others get 403; deleted ones disappear; bad cursor 400", async () => {
+    const w = await world()
+    const t = await w.mk(w.owner)
+    const ids: string[] = []
+    for (const body of ["one", "two", "three"]) {
+      w.clock.advance({ minutes: 1 })
+      ids.push((await w.json(await w.req("POST", `/v1/tasks/${t.id}/comments`, w.staff, { body }))).id)
+    }
+    const p1 = await w.json(await w.req("GET", `/v1/tasks/${t.id}/comments?limit=2`, w.owner))
+    expect(p1.items.map((i: Json) => i.body)).toEqual(["one", "two"])
+    const p2 = await w.json(await w.req("GET", `/v1/tasks/${t.id}/comments?limit=2&cursor=${p1.nextCursor}`, w.owner))
+    expect(p2.items.map((i: Json) => i.body)).toEqual(["three"])
+    expect(p2.nextCursor).toBeNull()
+    expect((await w.req("GET", `/v1/tasks/${t.id}/comments?cursor=zzz`, w.owner)).status).toBe(400)
+    w.clock.advance({ minutes: 1 })
+    const other = await w.json(await w.req("POST", `/v1/tasks/${t.id}/comments`, w.ops, { body: "from ops" }))
+    expect((await w.req("DELETE", `/v1/tasks/${t.id}/comments/${other.id}`, w.staff)).status).toBe(403) // not the author, not a manager
+    expect((await w.req("DELETE", `/v1/tasks/${t.id}/comments/${ids[0]}`, w.staff)).status).toBe(204) // own
+    expect((await w.req("DELETE", `/v1/tasks/${t.id}/comments/${ids[1]}`, w.ops)).status).toBe(204) // a manager
+    expect(await code(await w.req("DELETE", `/v1/tasks/${t.id}/comments/${ids[1]}`, w.ops))).toBe("comment_not_found") // already gone
+    const left = await w.json(await w.req("GET", `/v1/tasks/${t.id}/comments`, w.owner))
+    expect(left.items.map((i: Json) => i.body)).toEqual(["three", "from ops"])
+    expect((await w.q("select count(*)::int n from task_comments"))[0].n).toBe(4) // soft delete
+    expect((await w.json(await w.req("GET", `/v1/tasks/${t.id}`, w.owner))).version).toBe(1) // comments never bump the version
+  })
+
+  test("comment body Drive URLs are withheld off the company PC (and stay intact in storage and with access)", async () => {
+    const w = await world()
+    const t = await w.mk(w.owner)
+    const url = "https://drive.google.com/file/d/abc123/view"
+    const body = `Plan at ${url} thanks`
+    const posted = await w.json(await w.req("POST", `/v1/tasks/${t.id}/comments`, w.owner, { body }))
+    expect(posted.body).toBe(body)
+    expect((await w.req("PUT", "/v1/device-policies/drive", w.owner, { allow: "none" })).status).toBe(200)
+    const listed = await w.json(await w.req("GET", `/v1/tasks/${t.id}/comments`, w.owner))
+    expect(listed.items[0].body).toBe("Plan at Google Drive link thanks")
+    const second = await w.json(await w.req("POST", `/v1/tasks/${t.id}/comments`, w.owner, { body }))
+    expect(second.body).toBe("Plan at Google Drive link thanks")
+    expect((await w.q("select body from task_comments order by created_at, id"))[0].body).toBe(body)
+  })
+
+  test("attachment upload via the task intent works for a tenant without M4 and without files:write; the comment can carry it", async () => {
+    const w = await world()
+    const t = await w.mk(w.owner) // staff: employee role, files none
+    await w.q("insert into module_overrides (tenant_id, module, mode, reason, set_by, set_at) values ($1, 'M4', 'revoke', 'test', 'p', now())", [w.tenant.id])
+    w.clock.advance({ minutes: 1 })
+    expect((await w.req("POST", "/v1/files/uploads", w.staff, { name: "a.pdf", mime: "application/pdf", sizeBytes: 9 })).status).toBe(403) // the ordinary intent is closed to them
+    const fileId = await attach(w, w.staff, t.id)
+    const row = (await w.q("select purpose, status, owner_user_id from files where id = $1", [fileId]))[0]
+    expect(row).toMatchObject({ purpose: "task_attachment", status: "clean", owner_user_id: w.staff.userId })
+    expect(await w.q("select purpose, task_id from task_files where file_id = $1", [fileId])).toEqual([{ purpose: "task_attachment", task_id: t.id }])
+    const c = await w.req("POST", `/v1/tasks/${t.id}/comments`, w.staff, { body: "see file", attachmentFileIds: [fileId] })
+    expect(c.status, await c.clone().text()).toBe(201)
+    expect((await w.json(c)).attachmentFileIds).toEqual([fileId])
+    const bad = await w.req("POST", `/v1/tasks/${t.id}/comments`, w.staff, { body: "x", attachmentFileIds: [crypto.randomUUID()] })
+    expect(await code(bad)).toBe("invalid_attachment")
+    const dl = await call(w.app, "GET", `/v1/tasks/${t.id}/files/${fileId}/download`, { cookie: w.staff.cookie, tenant: "acme" })
+    expect(dl.status).toBe(302)
+    expect(dl.headers.get("location")).toContain(fileId)
+  })
+
+  test("GET /v1/files/{id} and /download for a task_% file → 404 file_not_found even with files:read", async () => {
+    const w = await world()
+    const t = await w.mk(w.owner)
+    const fileId = await attach(w, w.owner, t.id)
+    for (const [m, p] of [["GET", `/v1/files/${fileId}`], ["GET", `/v1/files/${fileId}/download`], ["POST", `/v1/files/${fileId}/complete`], ["DELETE", `/v1/files/${fileId}`]]) {
+      const r = await w.req(m, p, w.owner) // the owner holds files:write
+      expect(r.status, `${m} ${p}`).toBe(404)
+      expect(await code(r)).toBe("file_not_found")
+    }
+    expect((await w.q("select status from files where id = $1", [fileId]))[0].status).toBe("clean") // untouched by the attempts above
+    await relay(w)
+    expect(await w.q("select 1 from search_documents where entity = 'file'")).toEqual([]) // task files are not searchable by name
+  })
+
+  test("task file download needs task access: out of scope → 404 task_not_found; another task's fileId → 404 file_not_found; not scanned → 409; infected → 410", async () => {
+    const w = await world()
+    const t1 = await w.mk(w.owner)
+    const t2 = await w.mk(w.owner, { title: "second" })
+    const f1 = await attach(w, w.staff, t1.id)
+    const dl = (as: Who, task: string, file: string) => w.req("GET", `/v1/tasks/${task}/files/${file}/download`, as)
+    expect((await dl(w.staff, t1.id, f1)).status).toBe(302)
+    const out = await dl(w.staff2, t1.id, f1)
+    expect(out.status).toBe(404)
+    expect(await code(out)).toBe("task_not_found")
+    const cross = await dl(w.owner, t2.id, f1) // the file belongs to t1
+    expect(cross.status).toBe(404)
+    expect(await code(cross)).toBe("file_not_found")
+    const pending = await attach(w, w.staff, t1.id, { scan: false })
+    const np = await dl(w.staff, t1.id, pending)
+    expect(np.status).toBe(409)
+    expect(await code(np)).toBe("file_not_ready")
+    const bad = await attach(w, w.staff, t1.id, { content: "X5O!P%@AP[4\\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*", mime: "text/plain", name: "x.txt" })
+    const inf = await dl(w.staff, t1.id, bad)
+    expect(inf.status).toBe(410)
+    expect(await code(inf)).toBe("file_infected")
+    // a stranger cannot complete or start uploads on it either
+    expect(await code(await w.req("POST", `/v1/tasks/${t1.id}/uploads/${f1}/complete`, w.staff2))).toBe("task_not_found")
+    expect(await code(await w.req("POST", `/v1/tasks/${t2.id}/uploads/${f1}/complete`, w.owner))).toBe("file_not_found")
+    expect(await code(await w.req("POST", `/v1/tasks/${t1.id}/uploads`, w.staff2, { purpose: "attachment", name: "a.pdf", mime: "application/pdf", sizeBytes: 5 }))).toBe("task_not_found")
+  })
+
+  test("evidence purpose accepts video/mp4 up to TASK_VIDEO_MAX_BYTES; attachment purpose refuses video (422 mime_not_allowed); voice strips codec parameters", async () => {
+    const w = await world({ env: { TASK_EVIDENCE_MAX_BYTES: 1000, TASK_VIDEO_MAX_BYTES: 5000, TASK_VOICE_MAX_BYTES: 3000 } })
+    const t = await w.mk(w.ops)
+    const intent = (as: Who, purpose: string, mime: string, sizeBytes: number) => w.req("POST", `/v1/tasks/${t.id}/uploads`, as, { purpose, name: "clip.mp4", mime, sizeBytes })
+    expect((await intent(w.staff, "evidence", "video/mp4", 4000)).status).toBe(201)
+    for (const m of ["video/quicktime", "video/webm"]) expect((await intent(w.staff, "evidence", m, 10)).status, m).toBe(201)
+    const big = await intent(w.staff, "evidence", "video/mp4", 6000)
+    expect(await code(big)).toBe("file_too_large")
+    expect(await code(await intent(w.staff, "evidence", "application/pdf", 2000))).toBe("file_too_large") // non-video uses the evidence cap
+    const refused = await intent(w.staff, "attachment", "video/mp4", 100)
+    expect(refused.status).toBe(422)
+    expect(await code(refused)).toBe("mime_not_allowed")
+    expect(await code(await intent(w.staff, "evidence", "image/svg+xml", 100))).toBe("mime_not_allowed")
+    expect(await code(await w.req("POST", "/v1/files/uploads", w.owner, { name: "c.mp4", mime: "video/mp4", sizeBytes: 100 }))).toBe("mime_not_allowed") // /v1/files never takes video
+    // voice: creator or manager only; codec parameters are stripped and the signed type is the bare one
+    expect((await intent(w.staff, "voice", "audio/webm", 100)).status).toBe(403)
+    const v = await intent(w.ops, "voice", "audio/webm;codecs=opus", 100)
+    expect(v.status, await v.clone().text()).toBe(201)
+    expect((await w.json(v)).upload.headers["Content-Type"]).toBe("audio/webm")
+    expect(await code(await intent(w.ops, "voice", "audio/webm", 4000))).toBe("file_too_large")
+    expect(await code(await intent(w.ops, "voice", "audio/mpeg", 100))).toBe("mime_not_allowed")
+  })
+
+  test("every new task route is 404 task_not_found outside the caller's scope", async () => {
+    const w = await world()
+    const t = await w.mk(w.owner)
+    const item = await addItem(w, w.owner, t.id, "x")
+    const comment = await w.json(await w.req("POST", `/v1/tasks/${t.id}/comments`, w.owner, { body: "c" }))
+    const file = await attach(w, w.owner, t.id)
+    const calls: [string, string, unknown][] = [
+      ["POST", `/v1/tasks/${t.id}/checklist`, { text: "x" }], ["PATCH", `/v1/tasks/${t.id}/checklist/${item.id}`, { done: true }], ["DELETE", `/v1/tasks/${t.id}/checklist/${item.id}`, undefined],
+      ["POST", `/v1/tasks/${t.id}/subtasks`, { title: "x" }], ["GET", `/v1/tasks/${t.id}/comments`, undefined], ["POST", `/v1/tasks/${t.id}/comments`, { body: "x" }],
+      ["DELETE", `/v1/tasks/${t.id}/comments/${comment.id}`, undefined], ["POST", `/v1/tasks/${t.id}/uploads`, { purpose: "attachment", name: "a.pdf", mime: "application/pdf", sizeBytes: 5 }],
+      ["POST", `/v1/tasks/${t.id}/uploads/${file}/complete`, undefined], ["GET", `/v1/tasks/${t.id}/files/${file}/download`, undefined],
+    ]
+    await w.manages(w.manager, w.staff2)
+    for (const who of [w.staff2, w.manager]) {
+      for (const [m, p, b] of calls) {
+        const r = await w.req(m, p, who, b)
+        expect(r.status, `${m} ${p}`).toBe(404)
+        expect(await code(r)).toBe("task_not_found")
+      }
+    }
+    expect((await w.q("select count(*)::int n from task_checklist_items"))[0].n).toBe(1)
+    expect((await w.q("select count(*)::int n from tasks"))[0].n).toBe(1)
+  })
+
+  test("nested ids: A's task with B's commentId or itemId → 404 comment_not_found / checklist_item_not_found", async () => {
+    const w = await world()
+    const a = await w.mk(w.owner, { title: "Task A" })
+    const b = await w.mk(w.owner, { title: "Task B" })
+    const itemA = await addItem(w, w.owner, a.id, "A item")
+    const itemB = await addItem(w, w.owner, b.id, "B item")
+    const comB = await w.json(await w.req("POST", `/v1/tasks/${b.id}/comments`, w.owner, { body: "on B" }))
+    const ghost = crypto.randomUUID()
+    for (const [m, p, b2] of [
+      ["PATCH", `/v1/tasks/${a.id}/checklist/${itemB.id}`, { done: true }], ["DELETE", `/v1/tasks/${a.id}/checklist/${itemB.id}`, undefined], ["PATCH", `/v1/tasks/${a.id}/checklist/${ghost}`, { done: true }],
+    ] as [string, string, unknown][]) {
+      const r = await w.req(m, p, w.owner, b2)
+      expect(r.status, `${m} ${p}`).toBe(404)
+      expect(await code(r)).toBe("checklist_item_not_found")
+    }
+    for (const id of [comB.id, ghost]) {
+      const r = await w.req("DELETE", `/v1/tasks/${a.id}/comments/${id}`, w.owner)
+      expect(r.status).toBe(404)
+      expect(await code(r)).toBe("comment_not_found")
+    }
+    expect((await w.q("select done from task_checklist_items where id = $1", [itemB.id]))[0].done).toBe(false)
+    expect((await w.q("select 1 from task_comments where id = $1 and deleted_at is null", [comB.id])).length).toBe(1)
+    expect(itemA.id).toBeTruthy()
+  })
+
+  test("search: staff finds own task by ref and title, not a colleague's; team manager finds direct reports' tasks; owner finds all", async () => {
+    const w = await world()
+    await w.manages(w.manager, w.staff)
+    const t1 = await w.mk(w.owner, { primary: w.staff.userId, title: "Zebra fire exits" })
+    const t2 = await w.mk(w.owner, { primary: w.staff2.userId, title: "Zebra stock count" })
+    await relay(w)
+    const titles = async (as: Who, q: string, extra = "") => (((await w.json(await w.req("GET", `/v1/search?q=${encodeURIComponent(q)}${extra}`, as))).hits as Json[]) ?? []).filter((h) => h.entity === "task").map((h) => h.title as string).sort()
+    expect(await titles(w.staff, "zebra")).toEqual([`${t1.ref} Zebra fire exits`])
+    expect(await titles(w.staff, "stock")).toEqual([]) // a colleague's task is not found, even by an exact word
+    expect(await titles(w.staff, t1.ref)).toEqual([`${t1.ref} Zebra fire exits`])
+    expect(await titles(w.staff, t2.ref)).not.toContain(`${t2.ref} Zebra stock count`) // the typo fallback may match their own task, never the colleague's
+    expect(await titles(w.staff2, "zebra")).toEqual([`${t2.ref} Zebra stock count`])
+    expect(await titles(w.manager, "zebra")).toEqual([`${t1.ref} Zebra fire exits`]) // a direct report's, not the other team's
+    expect(await titles(w.owner, "zebra")).toEqual([`${t1.ref} Zebra fire exits`, `${t2.ref} Zebra stock count`])
+    expect(await titles(w.ops, "zebra")).toHaveLength(2)
+    const hit = ((await w.json(await w.req("GET", "/v1/search?q=zebra", w.owner))).hits as Json[]).find((h) => h.entity === "task")!
+    expect(hit).toMatchObject({ entity: "task", module: "tasks" })
+    // reassigning moves the task between audiences, archiving-style removal drops it
+    expect((await w.req("PUT", `/v1/tasks/${t2.id}/assignees`, w.owner, { version: 1, primary: w.staff.userId, others: [] })).status).toBe(200)
+    await relay(w)
+    expect(await titles(w.staff, "zebra")).toEqual([`${t1.ref} Zebra fire exits`, `${t2.ref} Zebra stock count`])
+    expect(await titles(w.staff2, "zebra")).toEqual([])
+    await w.q("update tasks set archived_at = now() where id = $1", [t1.id])
+    await withTenant(w.deps.db, w.tenant.id, (tx) => publish(tx, { tenantId: w.tenant.id, type: "task.archived", payload: { taskId: t1.id }, actorId: null }, w.clock.now()))
+    await relay(w)
+    expect(await titles(w.owner, "zebra")).toEqual([`${t2.ref} Zebra stock count`])
+  })
+
+  test("an API key cannot reach /v1/search at all (B3 deny-list), so no key can widen a task search; the scope still reads subjectUserId", async () => {
+    const w = await world()
+    await w.mk(w.owner, { primary: w.staff2.userId, title: "Quokka theirs" })
+    await relay(w)
+    const k = await makeApiKey(w.deps, w.tenant.id, w.owner.userId, ["tasks:read"]) // minted by an all-scope owner
+    const r = await call(w.app, "GET", "/v1/search?q=quokka", { headers: { authorization: `Bearer ${k.key}` } })
+    expect(r.status).toBe(403)
+    expect(await code(r)).toBe("api_key_forbidden_route")
+  })
+
+  test("search body never contains a Drive URL or an email", async () => {
+    const w = await world()
+    const url = "https://drive.google.com/file/d/abc123/view"
+    await w.mk(w.owner, { title: "Mail ann@example.com", description: `See ${url} or write bob@example.org today`, labels: ["Safety", "fire"] })
+    await relay(w)
+    const [doc] = await w.q("select title, body, audience from search_documents where entity = 'task'")
+    expect(doc.body).toContain("safety fire")
+    expect(`${doc.title} ${doc.body}`).not.toMatch(/drive\.google\.com|@|example\.(com|org)/)
+    expect(doc.audience).toEqual([w.owner.userId, w.staff.userId].sort())
+    const long = await w.mk(w.owner, { title: "Longform", description: "word ".repeat(400) })
+    await relay(w)
+    const [d2] = await w.q("select body from search_documents where entity_id = $1", [long.id])
+    expect((d2.body as string).length).toBeLessThanOrEqual(500)
+  })
+
+  test("grants: the new task tables carry minimal app_user privileges", async () => {
+    const tbl = async (t: string) => (await ownerQuery(`select privilege_type from information_schema.role_table_grants where grantee = 'app_user' and table_name = $1 order by 1`, [t])).map((r) => r.privilege_type)
+    const col = async (t: string) => (await ownerQuery(`select column_name from information_schema.column_privileges where grantee = 'app_user' and table_name = $1 and privilege_type = 'UPDATE' order by 1`, [t])).map((r) => r.column_name)
+    expect(await tbl("task_checklist_items")).toEqual(["DELETE", "INSERT", "SELECT"])
+    expect(await col("task_checklist_items")).toEqual(["done", "done_at", "done_by", "position", "text"])
+    expect(await tbl("task_comments")).toEqual(["INSERT", "SELECT"])
+    expect(await col("task_comments")).toEqual(["author_id", "deleted_at", "mentions"])
+    expect(await tbl("task_files")).toEqual(["INSERT", "SELECT"])
+    expect(await col("task_files")).toEqual(["created_by"])
+    const w = await world()
+    const t = await w.mk(w.owner)
+    const c = await w.json(await w.req("POST", `/v1/tasks/${t.id}/comments`, w.owner, { body: "keep" }))
+    for (const stmt of [sql`update task_comments set body = 'edited'`, sql`delete from task_comments`, sql`delete from task_files`, sql`update task_checklist_items set task_id = gen_random_uuid()`]) {
+      const err = await withTenant(w.deps.db, w.tenant.id, (tx) => tx.execute(stmt)).catch((e) => e)
+      expect((err as { cause?: { code?: string } })?.cause?.code, String(stmt)).toBe("42501")
+    }
+    expect((await w.q("select body from task_comments where id = $1", [c.id]))[0].body).toBe("keep")
+  })
+
+  test("RLS: a tenant-A tx cannot read or insert tenant-B checklist, comment and file rows (error on .cause)", async () => {
+    const w = await world()
+    const other = await makeTenant(w.deps, { slug: "bravo" })
+    const t = await w.mk(w.owner)
+    await addItem(w, w.owner, t.id, "mine")
+    const rows = await withTenant(w.deps.db, other.id, async (tx) => [await tx.execute(sql`select 1 from task_checklist_items`), await tx.execute(sql`select 1 from task_comments`), await tx.execute(sql`select 1 from task_files`)])
+    expect(rows.map((r) => r.rows.length)).toEqual([0, 0, 0])
+    const err = await withTenant(w.deps.db, other.id, (tx) => tx.execute(sql`insert into task_checklist_items (tenant_id, task_id, text, position) values (${w.tenant.id}, ${t.id}, 'x', 1)`)).catch((e) => e)
+    expect((err as { cause?: { code?: string } })?.cause?.code).toBe("42501")
   })
 })

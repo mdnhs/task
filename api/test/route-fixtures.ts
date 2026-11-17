@@ -21,7 +21,7 @@ import { notify, withTenantAfterCommit } from "../src/modules/notifications"
 export type Fixture = { kind: "id" | "static"; value: string }
 export type TenantFixtures = Record<string, Record<string, Fixture>>
 
-type Resource = "role" | "member" | "team" | "device" | "feature" | "notification" | "pushToken" | "file" | "integration" | "dataRequest" | "supportGrant" | "apiKey" | "webhook" | "task"
+type Resource = "role" | "member" | "team" | "device" | "feature" | "notification" | "pushToken" | "file" | "integration" | "dataRequest" | "supportGrant" | "apiKey" | "webhook" | "task" | "checklistItem" | "comment" | "taskFile"
 
 /** path template -> param -> which resource that param names on that route. */
 export const ROUTE_PARAMS: Record<string, Record<string, Resource>> = {
@@ -53,6 +53,14 @@ export const ROUTE_PARAMS: Record<string, Record<string, Resource>> = {
   "/v1/tasks/{id}/status": { id: "task" },
   "/v1/tasks/{id}/complete": { id: "task" },
   "/v1/tasks/{id}/history": { id: "task" },
+  "/v1/tasks/{id}/checklist": { id: "task" },
+  "/v1/tasks/{id}/checklist/{itemId}": { id: "task", itemId: "checklistItem" },
+  "/v1/tasks/{id}/subtasks": { id: "task" },
+  "/v1/tasks/{id}/comments": { id: "task" },
+  "/v1/tasks/{id}/comments/{commentId}": { id: "task", commentId: "comment" },
+  "/v1/tasks/{id}/uploads": { id: "task" },
+  "/v1/tasks/{id}/uploads/{fileId}/complete": { id: "task", fileId: "taskFile" },
+  "/v1/tasks/{id}/files/{fileId}/download": { id: "task", fileId: "taskFile" },
 }
 
 export type Actor = { userId: string; cookie: string; slug: string }
@@ -122,7 +130,16 @@ export async function fixtureIds(t: { app: AppType; deps: Deps }, tenant: { id: 
   const taskRes = await call(t.app, "POST", "/v1/tasks", { cookie: owner.cookie, tenant: tenant.slug, body: { title: `Task ${uniq}`, description: `Desc ${uniq}`, start: "2026-11-20T09:00:00", due: "2026-11-20T17:00:00", primary: staff.userId } })
   if (taskRes.status !== 201) throw new Error(`fixture task failed: ${taskRes.status} ${await taskRes.text()}`)
   const task = (await taskRes.json()) as { id: string; ref: string }
-  const resources = { task: task.id, apiKey: apiKey.id, webhook: hook.id, supportGrant: String(sg.id), dataRequest: dsr.id, integration: String(integ.id), file: file.fileId, role: await roleIdOf(t.deps, tenant.id, "employee"), member: staff.userId, team: team.id, device: device.id, notification: String(notif.id), pushToken: ((await tokRes.json()) as { id: string }).id }
+  // T4.2: a checklist item, a comment and an (unfinished) attachment upload of that task, through the real API as its owner
+  const sub = async (path: string, body: unknown) => {
+    const r = await call(t.app, "POST", `/v1/tasks/${task.id}/${path}`, { cookie: owner.cookie, tenant: tenant.slug, body })
+    if (r.status !== 201) throw new Error(`fixture ${path} failed: ${r.status} ${await r.text()}`)
+    return (await r.json()) as { id?: string; fileId?: string }
+  }
+  const item = await sub("checklist", { text: `Item ${uniq}` })
+  const comment = await sub("comments", { body: `Comment ${uniq}` })
+  const taskFile = await sub("uploads", { purpose: "attachment", name: `Attach ${uniq}.pdf`, mime: "application/pdf", sizeBytes: 1024 })
+  const resources = { checklistItem: item.id!, comment: comment.id!, taskFile: taskFile.fileId!, task: task.id, apiKey: apiKey.id, webhook: hook.id, supportGrant: String(sg.id), dataRequest: dsr.id, integration: String(integ.id), file: file.fileId, role: await roleIdOf(t.deps, tenant.id, "employee"), member: staff.userId, team: team.id, device: device.id, notification: String(notif.id), pushToken: ((await tokRes.json()) as { id: string }).id }
   const fixtures: TenantFixtures = {}
   for (const [path, params] of Object.entries(ROUTE_PARAMS)) {
     fixtures[path] = {}
@@ -130,5 +147,5 @@ export async function fixtureIds(t: { app: AppType; deps: Deps }, tenant: { id: 
       fixtures[path][param] = res === "feature" ? { kind: "static", value: "drive" } : { kind: "id", value: resources[res] }
     }
   }
-  return { fixtures, resources, marks: [tenant.id, tenant.slug, String(integ.id), `drive-${uniq}@example.com`, team.id, device.id, file.fileId, dsr.id, `Fix ${uniq}`, `Support ${uniq}`, String(sg.id), `File ${uniq}.pdf`, staff.userId, owner.userId, `Team ${uniq}`, `Device ${uniq}`, apiKey.id, apiKey.prefix, `Key ${uniq}`, hook.id, `hooks-${uniq}.example.com`, task.id, `Task ${uniq}`, `Desc ${uniq}`] }
+  return { fixtures, resources, marks: [tenant.id, tenant.slug, String(integ.id), `drive-${uniq}@example.com`, team.id, device.id, file.fileId, dsr.id, `Fix ${uniq}`, `Support ${uniq}`, String(sg.id), `File ${uniq}.pdf`, staff.userId, owner.userId, `Team ${uniq}`, `Device ${uniq}`, apiKey.id, apiKey.prefix, `Key ${uniq}`, hook.id, `hooks-${uniq}.example.com`, task.id, `Task ${uniq}`, `Desc ${uniq}`, item.id!, comment.id!, taskFile.fileId!, `Item ${uniq}`, `Comment ${uniq}`, `Attach ${uniq}.pdf`] }
 }

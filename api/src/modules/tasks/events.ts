@@ -14,6 +14,8 @@ export type TaskEvent =
   | { type: "task.status_changed"; payload: { taskId: string; from: TaskStatus; to: TaskStatus } }
   | { type: "task.completed"; payload: { taskId: string } }
   | { type: "task.submitted"; payload: { taskId: string; round: number } }
+  | { type: "task.comment_added"; payload: { taskId: string; commentId: string } }
+  | { type: "task.archived" | "task.restored" | "task.purged"; payload: { taskId: string } }
 
 export async function publishTaskEvent(tx: TenantTx, ctx: Pick<TaskCtx, "tenantId" | "actorId" | "now">, e: TaskEvent): Promise<void> {
   await publish(tx, { tenantId: ctx.tenantId, type: e.type, payload: e.payload, actorId: ctx.actorId }, ctx.now)

@@ -117,7 +117,7 @@ export async function getTaskDetail(tx: TenantTx, ctx: TaskCtx, id: string): Pro
   return detail(tx, ctx, await getTask(tx, ctx, id))
 }
 
-export { listHistory }
+export { listHistory, detail as taskDetailDto }
 
 const LIKE_ESCAPE = /[\\%_]/g
 

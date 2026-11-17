@@ -88,6 +88,17 @@ const SPECS: Record<string, Spec> = {
   "POST /v1/tasks/{id}/status": { actor: "owner", expect: "task_not_found" },
   "POST /v1/tasks/{id}/complete": { actor: "owner", expect: "task_not_found" },
   "GET /v1/tasks/{id}/history": { actor: "owner", expect: "task_not_found" },
+  // B4 (T4.2): a checklist item, a comment and an unfinished attachment upload of A's task (the task id is looked up first: 404 task_not_found)
+  "POST /v1/tasks/{id}/checklist": { actor: "owner", expect: "task_not_found" },
+  "PATCH /v1/tasks/{id}/checklist/{itemId}": { actor: "owner", expect: "task_not_found" },
+  "DELETE /v1/tasks/{id}/checklist/{itemId}": { actor: "owner", expect: "task_not_found" },
+  "POST /v1/tasks/{id}/subtasks": { actor: "owner", expect: "task_not_found" },
+  "GET /v1/tasks/{id}/comments": { actor: "owner", expect: "task_not_found" },
+  "POST /v1/tasks/{id}/comments": { actor: "owner", expect: "task_not_found" },
+  "DELETE /v1/tasks/{id}/comments/{commentId}": { actor: "owner", expect: "task_not_found" },
+  "POST /v1/tasks/{id}/uploads": { actor: "owner", expect: "task_not_found" },
+  "POST /v1/tasks/{id}/uploads/{fileId}/complete": { actor: "owner", expect: "task_not_found" }, // control: 409 upload_missing
+  "GET /v1/tasks/{id}/files/{fileId}/download": { actor: "owner", expect: "task_not_found" }, // control: 409 file_not_ready
 }
 
 let t: ReturnType<typeof testApp>
@@ -114,7 +125,7 @@ const substitute = (path: string, params: Record<string, string>) => path.replac
 
 async function hashes(tenantId: string): Promise<Record<string, string>> {
   const out: Record<string, string> = {}
-  for (const tbl of ["roles", "memberships", "teams", "team_members", "reporting_lines", "devices", "device_policies", "invites", "audit_events", "tenant_settings", "notifications", "notification_preferences", "push_tokens", "notification_deliveries", "files", "integration_connections", "oauth_states", "public_holidays", "data_requests", "support_grants", "api_keys", "webhook_endpoints", "webhook_deliveries", "tasks", "task_assignees", "task_history", "task_time_entries", "task_counters"]) {
+  for (const tbl of ["roles", "memberships", "teams", "team_members", "reporting_lines", "devices", "device_policies", "invites", "audit_events", "tenant_settings", "notifications", "notification_preferences", "push_tokens", "notification_deliveries", "files", "integration_connections", "oauth_states", "public_holidays", "data_requests", "support_grants", "api_keys", "webhook_endpoints", "webhook_deliveries", "tasks", "task_assignees", "task_history", "task_time_entries", "task_counters", "task_checklist_items", "task_comments", "task_files"]) {
     const [r] = await ownerTenantQuery(tenantId, `select count(*)::text || ':' || coalesce(md5(string_agg(to_jsonb(x)::text, ',' order by to_jsonb(x)::text)), '') as h from ${tbl} x`)
     out[tbl] = String(r.h)
   }

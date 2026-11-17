@@ -25,7 +25,18 @@ export function normalizeMime(input: string): AllowedMime | null {
   return (ALLOWED_MIMES as readonly string[]).includes(m) ? (m as AllowedMime) : null
 }
 
-const EXT: Record<AllowedMime, string[]> = {
+/** Evidence video (ruling D19 / FR-M1-46): allowed only through the task upload intent, never through /v1/files. */
+export const TASK_VIDEO_MIMES = ["video/mp4", "video/quicktime", "video/webm"] as const
+/** Voice note mimes (ruling D21). */
+export const TASK_VOICE_MIMES = ["audio/webm", "audio/mp4", "audio/ogg"] as const
+
+const EXT: Record<string, string[]> = {
+  "video/mp4": ["mp4"],
+  "video/quicktime": ["mov"],
+  "video/webm": ["webm"],
+  "audio/webm": ["webm"],
+  "audio/mp4": ["m4a", "mp4"],
+  "audio/ogg": ["ogg", "oga"],
   "image/png": ["png"],
   "image/jpeg": ["jpg", "jpeg"],
   "image/webp": ["webp"],
@@ -44,7 +55,7 @@ const EXT: Record<AllowedMime, string[]> = {
  * `x.txt`). A matching extension is kept as typed; a missing or purely numeric one (`v1.2`) gets the canonical one
  * appended; trailing dots/spaces are dropped. The base is shortened so the result stays within 255 characters.
  */
-export function canonicalName(name: string, mime: AllowedMime): string {
+export function canonicalName(name: string, mime: string): string {
   const accepted = EXT[mime]
   const trimmed = name.replace(/[. ]+$/, "")
   const dot = trimmed.lastIndexOf(".")

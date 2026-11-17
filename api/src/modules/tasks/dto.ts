@@ -1,12 +1,12 @@
-import { and, eq, inArray } from "drizzle-orm"
+import { and, asc, eq, inArray, sql } from "drizzle-orm"
 import { z } from "@hono/zod-openapi"
 import { evidenceState } from "@opsdesk/domain/task-evidence"
 import { withholdDriveText } from "@opsdesk/domain/devices"
-import { TASK_STATUSES, tasks, teams } from "../../db/schema"
+import { TASK_STATUSES, taskChecklistItems, tasks, teams } from "../../db/schema"
 import type { TenantTx } from "../../db/tenant-tx"
 import { assigneesOf } from "./repo"
 import type { HistoryDto } from "./history"
-import type { TaskCtx, TaskRow } from "./scope"
+import { taskScopeWhere, type TaskCtx, type TaskRow } from "./scope"
 import { wallOf } from "./time"
 
 const TID = "6f1c0d52-8d3a-4b7e-9c41-2a5b7e90d3f8"
@@ -76,6 +76,19 @@ export async function taskDtos(tx: TenantTx, ctx: TaskCtx, rows: TaskRow[], time
   const parentIds = [...new Set(rows.flatMap((r) => (r.parentId ? [r.parentId] : [])))]
   const parentRows = parentIds.length ? await tx.select({ id: tasks.id, refNo: tasks.refNo }).from(tasks).where(and(eq(tasks.tenantId, ctx.tenantId), inArray(tasks.id, parentIds))) : []
   const parentRef = new Map(parentRows.map((p) => [p.id, ref(p.refNo)]))
+  const ids = rows.map((r) => r.id)
+  const free = (v: string) => (ctx.drive ? v : withholdDriveText(v))
+  const itemRows = ids.length
+    ? await tx.select({ id: taskChecklistItems.id, taskId: taskChecklistItems.taskId, text: taskChecklistItems.text, done: taskChecklistItems.done }).from(taskChecklistItems).where(and(eq(taskChecklistItems.tenantId, ctx.tenantId), inArray(taskChecklistItems.taskId, ids))).orderBy(asc(taskChecklistItems.position), asc(taskChecklistItems.id))
+    : []
+  const checklists = new Map<string, { id: string; text: string; done: boolean }[]>()
+  for (const i of itemRows) checklists.set(i.taskId, [...(checklists.get(i.taskId) ?? []), { id: i.id, text: free(i.text), done: i.done }])
+  // Subtasks the caller may see (their own scope applies to children too), live ones only; tasks_parent_idx.
+  const childRows = ids.length
+    ? await tx.select({ id: tasks.id, parentId: tasks.parentId, refNo: tasks.refNo, title: tasks.title, status: tasks.status }).from(tasks).where(and(eq(tasks.tenantId, ctx.tenantId), inArray(tasks.parentId, ids), sql`${tasks.archivedAt} is null`, taskScopeWhere(ctx.scope, ctx.reports))).orderBy(asc(tasks.refNo))
+    : []
+  const children = new Map<string, { id: string; ref: string; title: string; status: string }[]>()
+  for (const c of childRows) children.set(c.parentId!, [...(children.get(c.parentId!) ?? []), { id: c.id, ref: ref(c.refNo), title: free(c.title), status: c.status }])
   return rows.map((r) => {
     const p = people.get(r.id)!
     const timeline = timelines.get(r.id) ?? []
@@ -89,7 +102,7 @@ export async function taskDtos(tx: TenantTx, ctx: TaskCtx, rows: TaskRow[], time
       ...(r.client ? { client: r.client } : {}), ...(r.estimateMin ? { estimate: r.estimateMin } : {}),
       ...(r.projectId ? { projectId: r.projectId } : {}), ...(r.milestoneId ? { milestoneId: r.milestoneId } : {}),
       ...(r.parentId ? { parentRef: parentRef.get(r.parentId) ?? "" } : {}), parentId: r.parentId,
-      checklist: [], subtasks: [], dependsOn: [], dependsOnIds: [], round: r.round,
+      checklist: checklists.get(r.id) ?? [], subtasks: children.get(r.id) ?? [], dependsOn: [], dependsOnIds: [], round: r.round,
       ...(r.archivedAt ? { archivedAt: wallOf(r.archivedAt, ctx.tz) } : {}), ...(r.archivedBy ? { archivedBy: r.archivedBy } : {}),
       ...(r.proposal ? { proposal: r.proposal } : {}), ...(r.repeat ? { repeat: r.repeat as Record<string, unknown> } : {}), ...(r.seriesId ? { seriesId: r.seriesId } : {}),
       ...(r.submittedAt ? { submittedAt: wallOf(r.submittedAt, ctx.tz) } : {}), ...(r.completedAt ? { completedAt: wallOf(r.completedAt, ctx.tz) } : {}),

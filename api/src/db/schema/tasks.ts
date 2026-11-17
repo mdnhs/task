@@ -4,6 +4,7 @@ import type { EvidenceRule } from "@opsdesk/domain/task-evidence"
 import type { RepeatRule } from "@opsdesk/domain/task-model"
 import { memberships, tenants } from "./tenants"
 import { teams } from "./teams"
+import { files } from "./files"
 
 // Standard RLS template (R8); FORCE is appended by hand in the migration.
 const tenantMatch = sql`tenant_id = nullif(current_setting('app.tenant_id', true), '')::uuid`
@@ -81,6 +82,7 @@ export const tasks = pgTable(
     foreignKey({ columns: [t.tenantId, t.parentId], foreignColumns: [t.tenantId, t.id], name: "tasks_parent_fk" }),
     index("tasks_live_due_idx").on(t.tenantId, t.dueAt, t.id).where(sql`${t.archivedAt} is null`),
     index("tasks_live_status_due_idx").on(t.tenantId, t.status, t.dueAt, t.id).where(sql`${t.archivedAt} is null`),
+    index("tasks_parent_idx").on(t.tenantId, t.parentId).where(sql`${t.parentId} is not null`),
     index("tasks_labels_gin").using("gin", t.labels),
     index("tasks_title_trgm_idx").using("gin", sql`lower(${t.title}) gin_trgm_ops`),
     tenantPolicy(),
@@ -153,6 +155,76 @@ export const taskTimeEntries = pgTable(
     unique("task_time_entries_update_uq").on(t.tenantId, t.updateId),
     check("task_time_entries_minutes_check", sql`${t.minutes} > 0`),
     index("task_time_entries_task_idx").on(t.tenantId, t.taskId),
+    tenantPolicy(),
+  ],
+).enableRLS()
+
+/**
+ * Checklist items of a task (FR-M1-02), at most 50 per task (the service counts under the task row lock). `done` is set absolutely;
+ * done_by is a user id or `apikey:<id>` (no foreign key), nulled on erasure. Child rows never bump the task version (ruling D4).
+ */
+export const taskChecklistItems = pgTable(
+  "task_checklist_items",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    tenantId: uuid("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    taskId: uuid("task_id").notNull(),
+    text: text("text").notNull(),
+    done: boolean("done").notNull().default(false),
+    position: integer("position").notNull(),
+    doneBy: text("done_by"),
+    doneAt: ts("done_at"),
+  },
+  (t) => [
+    foreignKey({ columns: [t.tenantId, t.taskId], foreignColumns: [tasks.tenantId, tasks.id], name: "task_checklist_items_task_fk" }).onDelete("cascade"),
+    check("task_checklist_items_text_check", sql`char_length(${t.text}) BETWEEN 1 AND 200`),
+    index("task_checklist_task_idx").on(t.tenantId, t.taskId, t.position, t.id),
+    tenantPolicy(),
+  ],
+).enableRLS()
+
+/**
+ * Comments (FR-M1-03, ruling D16): no edit, soft delete. `mentions` are the user ids the author named, stored as sent (the response
+ * must not reveal who could see the task). author_id is a user id or `apikey:<id>`, nulled on erasure.
+ */
+export const taskComments = pgTable(
+  "task_comments",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    tenantId: uuid("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    taskId: uuid("task_id").notNull(),
+    authorId: text("author_id"),
+    body: text("body").notNull(),
+    mentions: text("mentions").array().notNull().default(sql`'{}'::text[]`),
+    attachmentFileIds: uuid("attachment_file_ids").array().notNull().default(sql`'{}'::uuid[]`),
+    createdAt: ts("created_at").notNull(),
+    deletedAt: ts("deleted_at"),
+  },
+  (t) => [
+    foreignKey({ columns: [t.tenantId, t.taskId], foreignColumns: [tasks.tenantId, tasks.id], name: "task_comments_task_fk" }).onDelete("cascade"),
+    check("task_comments_body_check", sql`char_length(${t.body}) BETWEEN 1 AND 4000`),
+    index("task_comments_task_idx").on(t.tenantId, t.taskId, t.createdAt, t.id),
+    tenantPolicy(),
+  ],
+).enableRLS()
+
+/** Files that belong to a task (ruling D9): reachable only through task routes. The `files` row carries the same purpose. */
+export const TASK_FILE_PURPOSES = ["task_evidence", "task_attachment", "task_voice"] as const
+export const taskFiles = pgTable(
+  "task_files",
+  {
+    fileId: uuid("file_id").primaryKey(),
+    tenantId: uuid("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    taskId: uuid("task_id").notNull(),
+    purpose: text("purpose").notNull(),
+    createdBy: text("created_by"),
+    createdAt: ts("created_at").notNull(),
+  },
+  (t) => [
+    foreignKey({ columns: [t.tenantId, t.taskId], foreignColumns: [tasks.tenantId, tasks.id], name: "task_files_task_fk" }).onDelete("cascade"),
+    foreignKey({ columns: [t.tenantId, t.fileId], foreignColumns: [files.tenantId, files.id], name: "task_files_file_fk" }),
+    check("task_files_purpose_check", sql`${t.purpose} IN ('task_evidence','task_attachment','task_voice')`),
+    index("task_files_task_idx").on(t.tenantId, t.taskId),
     tenantPolicy(),
   ],
 ).enableRLS()

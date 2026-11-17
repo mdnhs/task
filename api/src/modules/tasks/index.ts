@@ -2,6 +2,8 @@ import { registerDsrHandler } from "../gdpr/registry"
 import { tasksDsrHandler } from "./dsr"
 
 export { taskRoutes } from "./routes"
+export { collabRoutes } from "./collab-routes"
+export { indexTask, registerTaskSearchIndexers, taskSearchScope } from "./search"
 export { applyTaskUpdate, buildListQuery, completeTask, createTask, listTasks, normaliseLabels, patchTask, setAssignees, changeStatus } from "./service"
 export { canManage, getTask, inScope, loadTaskCtx, taskScopeWhere, TaskNotFound, type TaskCtx, type TaskRow } from "./scope"
 export { tasksDsrHandler } from "./dsr"

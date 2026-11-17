@@ -3,6 +3,7 @@ import { requireTenant } from "../../core/middleware/tenant"
 import { visibleModules } from "../../core/middleware/permission"
 import { newRouter } from "../../core/router"
 import { withTenant } from "../../db/tenant-tx"
+import { taskSearchScope } from "../tasks/search"
 import { parseLimit, searchDocuments } from "./service"
 
 const Hit = z.object({ entity: z.string(), entityId: z.string(), title: z.string(), module: z.string() })
@@ -20,6 +21,6 @@ export const searchRoutes = newRouter().openapi(searchRoute, async (c) => {
   const t = c.get("tenant")!
   const { q, limit } = c.req.valid("query")
   const modules = await visibleModules(c)
-  const hits = await withTenant(c.get("deps").db, t.id, (tx) => searchDocuments(tx, t.id, modules, q, parseLimit(limit)))
+  const hits = await withTenant(c.get("deps").db, t.id, async (tx) => searchDocuments(tx, t.id, modules, q, parseLimit(limit), modules.includes("tasks") ? await taskSearchScope(c, tx) : {}))
   return c.json({ hits }, 200)
 })

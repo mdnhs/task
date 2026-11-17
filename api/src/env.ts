@@ -56,6 +56,10 @@ const schema = z.object({
   CLAMD_PORT: z.preprocess(unsetIfEmpty, z.coerce.number().int().min(1).max(65535).default(3310)),
   // Upper bound for one uploaded file (default 25 MiB); a per-plan limit can only lower it.
   FILE_MAX_BYTES: z.preprocess(unsetIfEmpty, z.coerce.number().int().min(1).default(26214400)),
+  // Task upload limits per deployment (ruling D19): evidence files (25 MiB), evidence video (100 MiB), voice notes (3 MiB).
+  TASK_EVIDENCE_MAX_BYTES: z.preprocess(unsetIfEmpty, z.coerce.number().int().min(1).default(26214400)),
+  TASK_VIDEO_MAX_BYTES: z.preprocess(unsetIfEmpty, z.coerce.number().int().min(1).default(104857600)),
+  TASK_VOICE_MAX_BYTES: z.preprocess(unsetIfEmpty, z.coerce.number().int().min(1).default(3145728)),
 }).superRefine((e, ctx) => {
   if (e.SECRETS_KEYS) {
     try {

@@ -22,11 +22,14 @@ export const searchDocuments = pgTable(
     title: text("title").notNull(),
     body: text("body").notNull().default(""),
     tsv: tsvector("tsv").generatedAlwaysAs(sql`setweight(to_tsvector('simple', title), 'A') || to_tsvector('simple', body)`),
+    /** Who may see the hit when its module is scoped (ruling D12: tasks = assignees, creator, named reviewer); null = everyone with module read. */
+    audience: text("audience").array(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull(),
   },
   (t) => [
     primaryKey({ columns: [t.tenantId, t.entity, t.entityId] }),
     index("search_documents_tsv_idx").using("gin", t.tsv),
+    index("search_documents_audience_gin").using("gin", t.audience),
     index("search_documents_title_trgm_idx").using("gin", sql`lower(${t.title}) gin_trgm_ops`),
     pgPolicy("tenant_isolation", { as: "permissive", for: "all", using: tenantMatch, withCheck: tenantMatch }),
   ],

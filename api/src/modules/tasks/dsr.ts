@@ -1,5 +1,5 @@
 import { and, asc, eq, or, sql } from "drizzle-orm"
-import { taskAssignees, taskHistory, taskTimeEntries, tasks } from "../../db/schema"
+import { taskAssignees, taskChecklistItems, taskComments, taskFiles, taskHistory, taskTimeEntries, tasks } from "../../db/schema"
 import type { DsrHandler } from "../gdpr/registry"
 
 /**
@@ -20,7 +20,13 @@ export const tasksDsrHandler: DsrHandler = {
       .from(taskHistory)
       .where(and(eq(taskHistory.tenantId, tenantId), eq(taskHistory.actorId, userId)))
       .orderBy(asc(taskHistory.at), asc(taskHistory.id))
+    const comments = await tx
+      .select({ id: taskComments.id, taskId: taskComments.taskId, at: taskComments.createdAt, body: taskComments.body })
+      .from(taskComments)
+      .where(and(eq(taskComments.tenantId, tenantId), eq(taskComments.authorId, userId), sql`${taskComments.deletedAt} is null`))
+      .orderBy(asc(taskComments.createdAt), asc(taskComments.id))
     return {
+      comments: comments.map((c) => ({ id: c.id, taskId: c.taskId, at: c.at.toISOString(), body: c.body })),
       tasks: rows.map((r) => ({ id: r.id, ref: `TSK-${r.refNo}`, title: r.title, role: [...(r.creatorId === userId ? ["creator"] : []), ...(r.assigned ? ["assignee"] : [])] })),
       history: history.map((h) => ({ id: h.id, taskId: h.taskId, at: h.at.toISOString(), kind: h.kind, text: h.text })),
     }
@@ -31,6 +37,11 @@ export const tasksDsrHandler: DsrHandler = {
     await tx.update(taskHistory).set({ actorId: null }).where(and(eq(taskHistory.tenantId, tenantId), eq(taskHistory.actorId, userId)))
     await tx.update(taskHistory).set({ notified: sql`array_remove(${taskHistory.notified}, ${userId})` }).where(and(eq(taskHistory.tenantId, tenantId), sql`${userId} = any(${taskHistory.notified})`))
     await tx.update(taskTimeEntries).set({ userId: null }).where(and(eq(taskTimeEntries.tenantId, tenantId), eq(taskTimeEntries.userId, userId)))
+    await tx.update(taskChecklistItems).set({ doneBy: null }).where(and(eq(taskChecklistItems.tenantId, tenantId), eq(taskChecklistItems.doneBy, userId)))
+    await tx.update(taskComments).set({ authorId: null }).where(and(eq(taskComments.tenantId, tenantId), eq(taskComments.authorId, userId)))
+    await tx.update(taskComments).set({ mentions: sql`array_remove(${taskComments.mentions}, ${userId})` }).where(and(eq(taskComments.tenantId, tenantId), sql`${userId} = any(${taskComments.mentions})`))
+    await tx.update(taskFiles).set({ createdBy: null }).where(and(eq(taskFiles.tenantId, tenantId), eq(taskFiles.createdBy, userId)))
+    await tx.execute(sql`update search_documents set audience = array_remove(audience, ${userId}) where tenant_id = ${tenantId} and entity = 'task' and ${userId} = any(audience)`)
     await tx.delete(taskAssignees).where(and(eq(taskAssignees.tenantId, tenantId), eq(taskAssignees.userId, userId)))
   },
 }
