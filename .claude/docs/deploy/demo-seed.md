@@ -30,13 +30,21 @@ npm -w api run seed:demo -- [--reset] [--anchor 2026-12-01]
 | `--anchor YYYY-MM-DD` | The day the mock's frozen "today" (2026-10-20) becomes. Default: today in the tenant timezone. |
 | `--reset` | Deletes the three demo tenants and the demo users first (new ids), then seeds. Never touches any other tenant (see the guards: a database with another tenant is refused before anything is deleted). |
 
-## Guards (all checked once, before any write; there is no flag that skips them)
+## Guards (checked before any write and again under a lock; there is no flag that skips them)
+
+**T6.9 (e2e) and any compose or deploy setup that runs the seed must set `ALLOW_DEMO_SEED=1`** (it is required in every environment, not only production).
 
 1. `ALLOW_DEMO_SEED=1` must be set. `NODE_ENV=production` without it is the same refusal; with it the checks below still apply.
 2. The database must hold **no tenant other than** `northgate`, `harbourline`, `millbrook` (exact slugs). A host name cannot tell a demo database from a
    production one, so this is the real guard: a database with a real customer in it is `refused: other_tenants`, whatever the environment says.
 3. The database must hold **no account outside the demo email domain** (`refused: foreign_users`), e.g. real sign-ups made before the first tenant.
 4. `SEED_DEMO_PASSWORD` is 12+ characters (`refused: password_required`).
+5. **Two connections, one database.** The guard runs on the owner connection (when `DATABASE_OWNER_URL` is given: the owner sees every row whatever RLS says) AND on `DATABASE_URL`, and the two must be
+   the same database (name, server port and address, plus the cluster `system_identifier` when both roles can read it): otherwise `refused: connections_differ`. Without this a wrong env could make the guard
+   vouch for one database while `--reset` deletes in another.
+6. **Seed lock and re-check.** Immediately before the first write the seed takes a session advisory lock (two seeds never interleave) and runs the guard again. Covered: the check-to-write window of
+   concurrent seeds and a foreign tenant created before the lock. Not covered: a non-seed process creating a tenant after the re-check (tenant creation takes no such lock, and a table lock would block the seed's own writes).
+   That window cannot hurt foreign data: every delete names the three demo slugs and every write goes to a demo tenant or a demo-domain user.
 
 Refusals print one safe code (`refused: <code>`) and write nothing. A failure prints only the error class and SQLSTATE, never a message (messages can carry SQL parameters).
 
@@ -53,7 +61,9 @@ Refusals print one safe code (`refused: <code>`) and write nothing. A failure pr
   dependencies, the weekly repeat series, evidence items; 17 shift reports with items, frozen versions and reviewer comments; the report template, public holidays, and the demo person's in-app notifications.
 - Every date is **re-anchored**: the mock's `2026-10-20T09:00` becomes the anchor day, every other date keeps its distance from it, and local wall times are kept across DST
   (17:00 stays 17:00 on both sides of the October clock change). So the overdue / due-today / submitted counts are the mock's, on any day.
-  Dates are moved by whole days, so a shift report's weekday can differ from its pattern's weekdays unless the offset is a multiple of 7 (`--anchor 2026-12-01` is).
+  Dates with no weekday meaning (tasks, subscription dates) move by the exact offset. **Weekday-bound dates (shift assignments and report shift dates) move by a whole number of weeks**: the
+  largest multiple of 7 that keeps the latest report on or before the anchor day, so every report stays on a day its pattern runs and no submitted report is in the future. When that differs from the
+  exact offset the run prints `warning: shift dates moved by N days (not M) to keep weekdays` (also `shiftOffsetDays` in the report).
 
 ## Idempotent and re-runnable
 

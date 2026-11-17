@@ -1,4 +1,8 @@
+import { readFileSync } from "node:fs"
 import { dirname, resolve } from "node:path"
+import pg from "pg"
+import { runMigrations } from "../src/db/migrate"
+import { makeDb, type Db } from "../src/db/client"
 import { fileURLToPath } from "node:url"
 import { fakeClock } from "./fakes"
 import { ownerDb, ownerQuery, ownerTenantQuery } from "./db"
@@ -33,4 +37,31 @@ export async function countAll(table: string, where = "true"): Promise<number> {
     total += Number((await ownerTenantQuery(String(t.id), `select count(*)::int as n from ${table} where ${where}`))[0].n)
   }
   return total
+}
+
+const withDatabase = (url: string, name: string): string => {
+  const u = new URL(url)
+  u.pathname = `/${name}`
+  return u.toString()
+}
+
+/** A SECOND, migrated database on the same Postgres server (same roles), for the "two connections, two databases" tests. Created once per run. */
+export async function secondDatabase(): Promise<{ app: Db; owner: Db }> {
+  const name = "seed_other"
+  const admin = new pg.Client({ connectionString: process.env.TEST_DATABASE_ADMIN_URL })
+  await admin.connect()
+  try {
+    const exists = (await admin.query("select 1 from pg_database where datname = $1", [name])).rowCount
+    if (!exists) {
+      await admin.query(`create database ${name}`)
+      const inner = new pg.Client({ connectionString: withDatabase(process.env.TEST_DATABASE_ADMIN_URL!, name) })
+      await inner.connect()
+      await inner.query(readFileSync(resolve(here, "../src/db/bootstrap/roles.sql"), "utf8"))
+      await inner.end()
+      await runMigrations(withDatabase(process.env.TEST_DATABASE_OWNER_URL!, name))
+    }
+  } finally {
+    await admin.end()
+  }
+  return { app: makeDb(withDatabase(process.env.TEST_DATABASE_URL!, name), { max: 2 }), owner: makeDb(withDatabase(process.env.TEST_DATABASE_OWNER_URL!, name), { max: 2 }) }
 }

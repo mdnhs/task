@@ -67,6 +67,7 @@ export async function setup(): Promise<void> {
   process.env.TEST_S3_ACCESS_KEY_ID = MINIO_USER
   process.env.TEST_S3_SECRET_ACCESS_KEY = MINIO_PW
 
+  process.env.TEST_DATABASE_ADMIN_URL = container.getConnectionUri() // superuser: only the seed tests use it (to create a second database)
   process.env.TEST_DATABASE_URL = url("app_user", USER_PW)
   process.env.TEST_DATABASE_OWNER_URL = ownerUrl
 }

@@ -28,6 +28,8 @@ import { wipeTenantData } from "./wipe"
 export type TenantRun = {
   src: Source
   anchor: Anchor
+  /** Offset in whole weeks, for everything with weekday semantics (assignments, report shift dates). */
+  weekAnchor: Anchor
   now: Date
   tz: string
   people: Person[]
@@ -106,7 +108,7 @@ async function seedInTx(tx: TenantTx, run: TenantRun, tenantId: string): Promise
 }
 
 async function seedDataset(tx: TenantTx, run: TenantRun, tenantId: string, actor: { userId: string }, counts: TenantCounts, warnings: string[]): Promise<void> {
-  const { src, anchor, now, tz, ownerId, people, byMock, byName, userIds } = run
+  const { src, anchor, weekAnchor, now, tz, ownerId, people, byMock, byName, userIds } = run
   const uid = (p: Person): string => userIds.get(p.email)!
   const userOfMock = (pid: string): string => {
     const p = byMock.get(pid)
@@ -163,7 +165,7 @@ async function seedDataset(tx: TenantTx, run: TenantRun, tenantId: string, actor
     patternIds.set(p.id, (await createPattern(tx, sctx, { name: p.name, teamId, start: p.start, end: p.end, days: p.days, timeZone: p.timeZone ?? null })).id)
   }
   for (const a of src.assignments) {
-    await createAssignment(tx, sctx, { userId: userOfMock(a.personId), patternId: patternIds.get(a.patternId)!, from: anchor.day(a.from), until: a.until ? anchor.day(a.until) : null })
+    await createAssignment(tx, sctx, { userId: userOfMock(a.personId), patternId: patternIds.get(a.patternId)!, from: weekAnchor.day(a.from), until: a.until ? weekAnchor.day(a.until) : null })
   }
   for (const [team, on] of Object.entries(src.reporting.teamDefaults)) if (teamOf(team)) await setTeamReporting(tx, sctx, teamOf(team)!, on)
   for (const [pid, on] of Object.entries(src.reporting.overrides)) await setPersonReporting(tx, sctx, userOfMock(pid), on)
@@ -211,7 +213,7 @@ async function seedDataset(tx: TenantTx, run: TenantRun, tenantId: string, actor
   counts.taskEvidence = src.tasks.reduce((n, t) => n + t.evidence.length, 0)
   const patternById = new Map(src.patterns.map((p) => [p.id, p]))
   const rep = await seedReports(tx, {
-    tenantId, tz, now, anchor, actorId: ownerId, dueAfterMinutes: src.reporting.reportDueAfterMinutes, userOfMock, userOfName,
+    tenantId, tz, now, anchor: weekAnchor, actorId: ownerId, dueAfterMinutes: src.reporting.reportDueAfterMinutes, userOfMock, userOfName,
     patternId: (m) => patternIds.get(m)!, teamId: (d) => teamOf(d)!, pattern: (m) => patternById.get(m)!, taskIds: seeded.ids,
   }, src.reports)
   counts.reports = src.reports.length

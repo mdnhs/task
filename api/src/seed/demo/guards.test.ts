@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test } from "vitest"
 import { resetDb, testApp } from "../../../test/harness"
-import { ownerQuery, testDb } from "../../../test/db"
+import { ownerDb, ownerQuery, testDb } from "../../../test/db"
 import { makeTenant, makeUser } from "../../../test/factories"
 import { assertSeedAllowed, DEMO_SLUGS, SeedRefused } from "./guards"
 import { seedDemo } from "./seed"
@@ -121,5 +121,31 @@ describe("seed guards", () => {
     expect(await refusal(seedDemo(testDb(), { ...base, emailDomain: "company.com" }))).toBe("email_domain")
     expect(await refusal(seedDemo(testDb(), { ...base, emailDomain: "mail.real-company.ie" }))).toBe("email_domain")
     expect(await written()).toEqual(before)
+  })
+
+  test("email rules: only exactly @<domain> (any case) is a demo address; look-alikes, sub-domains and a user with no tenant are foreign", async () => {
+    const t = testApp()
+    const before = await written()
+    for (const email of ["x@evil.demo.example", "x@demo.example.attacker.com", "x@demo.example.com", "someone@real.ie"]) {
+      await ownerQuery('delete from "user"')
+      await makeUser(t.deps, { email }) // a user with no tenant at all
+      expect(await refusal(guard()), email).toBe("foreign_users")
+      expect(await refusal(seedDemo(testDb(), await demoOptions())), email).toBe("foreign_users")
+    }
+    // a demo-domain address in any case, with no tenant, is allowed (the seed re-uses it)
+    await ownerQuery('delete from "user"')
+    const u = await makeUser(t.deps, { email: "someone@demo.example" })
+    await ownerQuery('update "user" set email = $1 where id = $2', ["Someone@DEMO.EXAMPLE", u.userId])
+    expect(await refusal(guard())).toBe("allowed")
+    await ownerQuery('delete from "user"')
+    expect((await written()).tenants).toBe(before.tenants)
+  })
+
+  test("the guard's queries must see every row, so it runs on the OWNER connection too: owner and app_user both see a foreign tenant (if RLS ever covered tenants or user, the owner side keeps the guard from going blind)", async () => {
+    const t = testApp()
+    await makeTenant(t.deps, { slug: "real-customer" })
+    const env = { ALLOW_DEMO_SEED: "1" }
+    expect(await refusal(assertSeedAllowed(ownerDb(), { env, emailDomain: "demo.example" }))).toBe("other_tenants")
+    expect(await refusal(assertSeedAllowed(testDb(), { env, emailDomain: "demo.example" }))).toBe("other_tenants")
   })
 })
