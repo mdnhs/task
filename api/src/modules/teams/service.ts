@@ -3,7 +3,7 @@ import { reportScope, type ReportAccess } from "@opsdesk/domain/permissions"
 import type { ResolvedRole } from "../../core/context"
 import { AppError, Conflict, NotFound } from "../../core/errors"
 import { publish } from "../../core/events"
-import { memberships, projects, reportingLines, roles, taskTemplates, tasks, teamMembers, teams, user } from "../../db/schema"
+import { memberships, projects, reportingLines, roles, shiftPatterns, taskTemplates, tasks, teamMembers, teams, user } from "../../db/schema"
 import type { TenantTx } from "../../db/tenant-tx"
 import { recordAudit } from "../audit"
 import { lockActor } from "../rbac"
@@ -80,11 +80,20 @@ export async function updateTeam(tx: TenantTx, tenantId: string, actor: Actor, i
 export async function deleteTeam(tx: TenantTx, tenantId: string, actor: Actor, id: string, now: Date): Promise<void> {
   await begin(tx, tenantId, actor)
   const cur = await teamIn(tx, tenantId, id)
+  // A team that still has a shift pattern (archived ones too: reports keep pointing at them) cannot be deleted (T5.1): the composite FK has no cascade.
+  const [pattern] = await tx.select({ id: shiftPatterns.id }).from(shiftPatterns).where(and(eq(shiftPatterns.tenantId, tenantId), eq(shiftPatterns.teamId, id))).limit(1)
+  if (pattern) throw Conflict("team_has_shifts")
   const memberIds = await memberIdsOf(tx, tenantId, id)
   await tx.update(tasks).set({ teamId: null }).where(and(eq(tasks.tenantId, tenantId), eq(tasks.teamId, id))) // tasks keep existing without a department (composite FK has no SET NULL on one column)
   await tx.update(projects).set({ teamId: null }).where(and(eq(projects.tenantId, tenantId), eq(projects.teamId, id))) // projects_team_fk has no SET NULL either
   await tx.update(taskTemplates).set({ teamId: null }).where(and(eq(taskTemplates.tenantId, tenantId), eq(taskTemplates.teamId, id))) // task_templates_team_fk likewise
-  await tx.delete(teams).where(and(eq(teams.id, id), eq(teams.tenantId, tenantId))) // team_members rows cascade
+  try {
+    await tx.delete(teams).where(and(eq(teams.id, id), eq(teams.tenantId, tenantId))) // team_members rows cascade
+  } catch (err) {
+    // a pattern created between the check above and here (FK 23503 on shift_patterns_team_fk, read from .cause, R9); the tx is aborted either way, so this only picks the status
+    if ((err as { cause?: { code?: string; constraint?: string } })?.cause?.code === "23503" && (err as { cause?: { constraint?: string } }).cause?.constraint === "shift_patterns_team_fk") throw Conflict("team_has_shifts")
+    throw err
+  }
   await recordAudit(tx, tenantId, { action: "team.deleted", entity: "team", entityId: id, actorId: actor.userId, before: { name: cur.name, kind: cur.kind, userIds: memberIds }, after: null }, now)
   await publish(tx, { tenantId, type: "team.deleted", payload: { teamId: id }, actorId: actor.userId }, now)
 }

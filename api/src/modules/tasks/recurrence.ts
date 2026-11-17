@@ -1,15 +1,16 @@
-import { and, asc, eq, inArray, sql } from "drizzle-orm"
-import { addDays, wallToEpoch } from "@opsdesk/domain/shifts"
+import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm"
+import { addDays, occurrenceInstants, wallToEpoch } from "@opsdesk/domain/shifts"
 import { diffFields } from "@opsdesk/domain/task-history"
 import type { RepeatRule } from "@opsdesk/domain/task-model"
 import { nextOccurrences, repeatError } from "@opsdesk/domain/task-recurrence"
 import type { ResolvedRole } from "../../core/context"
 import { Forbidden } from "../../core/errors"
-import { memberships, projects, roles, taskChecklistItems, taskCounters, tasks, tenants } from "../../db/schema"
+import { memberships, projects, roles, shiftAssignments, shiftPatterns, taskChecklistItems, taskCounters, tasks, tenants } from "../../db/schema"
 import { withTenant, type TenantTx } from "../../db/tenant-tx"
 import type { Deps } from "../../deps"
 import { tenantEntitlements } from "../entitlements/service"
 import { withTenantAfterCommit } from "../notifications"
+import { domainPattern, patternZone, shiftDatesBetween, type PatternRow } from "../shifts"
 import { directReports, effectiveReportScope } from "../teams"
 import type { TaskDto } from "./dto"
 import { publishTaskEvent } from "./events"
@@ -31,6 +32,13 @@ import { wallOf } from "./time"
 //   3. the per-series cursor `repeat_cursor` (the last local date handled) moves to today in the same transaction.
 // The key is the DATE, never the due instant, so the repeated 01:30 of the October clock change cannot create a second instance, and the due
 // time is wallToEpoch(date + the series' local time of day), which takes the EARLIER instant of an ambiguous time and moves a gap time forward.
+//
+// `per_shift` (F15, D11): the same machinery, the same unique key and cursor, but the dates are the SHIFT START dates of the series' pattern that its
+// PRIMARY assignee is assigned to (a pattern-local date, F2), "today" is today in the pattern's own zone (the instance exists from the shift's
+// own midnight), and the instance runs from the shift's start instant to its end instant (occurrenceInstants, F3: a night is 9 h on 24 Oct 2026,
+// 7 h on 27 Mar 2027; the key is the shift date, so the repeated hour cannot create a second instance). The series' own due day is its first
+// occurrence, as for every other frequency. An archived pattern produces nothing; an assignment added for a date the cursor already passed is not
+// back-filled (the cursor only moves forward, like an edited rule).
 
 export const RECURRENCE_JOB = "tasks.recurrence"
 export const SYSTEM_ACTOR = "system:recurrence"
@@ -52,14 +60,18 @@ const safeCode = (e: unknown): string => {
 
 // ---------- PUT /v1/tasks/{id}/repeat ----------
 
-export type RepeatInput = { freq: string; days?: number[]; dayOfMonth?: number; until?: string }
+export type RepeatInput = { freq: string; days?: number[]; dayOfMonth?: number; until?: string; patternId?: string }
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
-/** The rule as stored: only the fields its frequency uses, days unique and sorted. "per shift" is B5 (422 unsupported_repeat); anything else odd is 422 invalid_repeat. */
+/** The rule as stored: only the fields its frequency uses, days unique and sorted. `per_shift` needs a `patternId` (the pattern is checked to be live by setRepeat); anything odd is 422 invalid_repeat. */
 export function normaliseRepeat(input: RepeatInput, firstDueDay: string): RepeatRule {
-  if (input.freq === "per_shift") throw unprocessable("unsupported_repeat")
-  if (!(FREQS as readonly string[]).includes(input.freq)) throw unprocessable("invalid_repeat")
+  if (!(FREQS as readonly string[]).includes(input.freq) && input.freq !== "per_shift") throw unprocessable("invalid_repeat")
   const freq = input.freq as RepeatRule["freq"]
   const rule: RepeatRule = { freq }
+  if (freq === "per_shift") {
+    if (typeof input.patternId !== "string" || !UUID.test(input.patternId)) throw unprocessable("invalid_repeat")
+    rule.patternId = input.patternId.toLowerCase()
+  }
   if (freq === "weekly") {
     const days = [...new Set(input.days ?? [])].sort((a, b) => a - b)
     if (days.length === 0 || days.some((d) => !Number.isInteger(d) || d < 0 || d > 6)) throw unprocessable("invalid_repeat")
@@ -87,9 +99,15 @@ export async function setRepeat(tx: TenantTx, env: TaskEnv, ctx: TaskCtx, id: st
   staleVersion(row, input.version)
   if (row.seriesId || row.parentId) throw unprocessable("invalid_repeat")
   const rule = input.rule ? normaliseRepeat(input.rule, wallOf(row.dueAt, ctx.tz).slice(0, 10)) : null
+  let ruleTz = ctx.tz // the zone "today" is read in: the tenant's, or the pattern's own for per_shift
+  if (rule?.freq === "per_shift") {
+    const [p] = await tx.select().from(shiftPatterns).where(and(eq(shiftPatterns.id, rule.patternId!), eq(shiftPatterns.tenantId, ctx.tenantId), isNull(shiftPatterns.archivedAt)))
+    if (!p) throw unprocessable("invalid_repeat") // unknown, another tenant's or archived pattern
+    ruleTz = patternZone(p, ctx.tz)
+  }
   const changes = diffFields({ repeat: row.repeat }, { repeat: rule })
   if (changes.length === 0) return taskDetailDto(tx, ctx, row)
-  const yesterday = addDays(wallOf(ctx.now, ctx.tz).slice(0, 10), -1)
+  const yesterday = addDays(wallOf(ctx.now, ruleTz).slice(0, 10), -1)
   // a newly set rule (cursor null, also after a removal) starts at yesterday: only today and later are produced, never stale back-instances of an overdue task
   const repeatCursor = rule === null ? null : row.repeatCursor && row.repeatCursor < yesterday ? row.repeatCursor : yesterday
   const [next] = await tx.update(tasks).set({ repeat: rule, repeatCursor, version: row.version + 1, updatedAt: ctx.now }).where(and(eq(tasks.id, row.id), eq(tasks.tenantId, ctx.tenantId))).returning()
@@ -124,6 +142,13 @@ export function planOccurrences(rule: RepeatRule, cursor: string | null, dueDay:
   return { dates: nextOccurrences(rule, from > floor ? from : floor, today), skipped: from < floor ? nextOccurrences(rule, from, floor).length : 0 }
 }
 
+/** The same plan for `per_shift`: the shift start dates of `pattern` the primary assignee works (`mine` = their assignments of it), same catch-up window, until and cursor rules. */
+export function planShiftOccurrences(rule: RepeatRule, pattern: Pick<PatternRow, "days">, mine: { fromDate: string; untilDate: string | null }[], cursor: string | null, dueDay: string, today: string): Plan {
+  const from = cursor && cursor > dueDay ? cursor : dueDay
+  const floor = addDays(today, -CATCH_UP_DAYS)
+  return { dates: shiftDatesBetween(pattern, mine, from > floor ? from : floor, today, rule.until), skipped: from < floor ? shiftDatesBetween(pattern, mine, from, floor, rule.until).length : 0 }
+}
+
 /**
  * Job `tasks.recurrence` (every 15 min in the worker, `{}`). Active tenants only (C14) that still have M1 and are not blocked for payment
  * (ruling C13: no new tasks while writes are refused); the others keep their data and resume from the cursor, within the 7-day window.
@@ -138,11 +163,23 @@ export async function runRecurrence(_data: unknown, deps: Deps): Promise<void> {
       if (!ent.allowed.includes("M1") || ent.billingState === "blocked") continue
       const today = wallOf(now, tz).slice(0, 10)
       const live = await withTenant(deps.db, tenantId, (tx) => liveSeriesQuery(tx, tenantId))
+      const shiftIds = [...new Set(live.flatMap((s) => (s.repeat?.freq === "per_shift" && s.repeat.patternId && UUID.test(s.repeat.patternId) ? [s.repeat.patternId] : [])))]
+      const patterns = new Map<string, PatternRow>(
+        shiftIds.length ? (await withTenant(deps.db, tenantId, (tx) => tx.select().from(shiftPatterns).where(and(eq(shiftPatterns.tenantId, tenantId), inArray(shiftPatterns.id, shiftIds))))).map((p) => [p.id, p]) : [],
+      )
       for (const s of live) {
-        if (s.cursor && s.cursor >= today) continue // already handled today: no lock, no write
         try {
-          const plan = planOccurrences(s.repeat!, s.cursor, wallOf(s.dueAt, tz).slice(0, 10), today)
-          await materialiseSeries(deps, { tenantId, tz, now, today, seriesId: s.id, projectId: s.projectId, needsRefs: plan.dates.length > 0 })
+          const rule = s.repeat!
+          let seriesToday = today
+          if (rule.freq === "per_shift") {
+            const p = patterns.get(rule.patternId ?? "")
+            if (!p || p.archivedAt) continue // an archived (or missing) pattern has no occurrences (F14)
+            seriesToday = wallOf(now, patternZone(p, tz)).slice(0, 10) // "today" is the pattern's own date
+          }
+          if (s.cursor && s.cursor >= seriesToday) continue // already handled today: no lock, no write
+          // per_shift: the dates need the assignments, so the unlocked pre-read cannot know; the counter is taken (once a day per series) and the locked re-read plans
+          const needsRefs = rule.freq === "per_shift" || planOccurrences(rule, s.cursor, wallOf(s.dueAt, tz).slice(0, 10), seriesToday).dates.length > 0
+          await materialiseSeries(deps, { tenantId, tz, now, today: seriesToday, seriesId: s.id, projectId: s.projectId, needsRefs })
         } catch (err) {
           deps.logger.error({ tenantId, seriesId: s.id, errCode: safeCode(err) }, "recurrence failed for a series")
         }
@@ -195,7 +232,16 @@ async function materialiseSeries(deps: Deps, r: Run): Promise<void> {
     if (s.repeatCursor && s.repeatCursor >= today) return // a concurrent run already handled today (re-read under the lock)
     const rule = s.repeat!
     const dueDay = wallOf(s.dueAt, tz).slice(0, 10)
-    const plan = planOccurrences(rule, s.repeatCursor, dueDay, today)
+    let plan: Plan
+    let shift: { pattern: PatternRow; primary: string | null } | null = null
+    if (rule.freq === "per_shift") {
+      const [pattern] = await tx.select().from(shiftPatterns).where(and(eq(shiftPatterns.id, rule.patternId ?? ""), eq(shiftPatterns.tenantId, tenantId), isNull(shiftPatterns.archivedAt)))
+      if (!pattern) return // archived since the pre-read: nothing to produce
+      const primary = (await assigneesOf(tx, tenantId, [s.id])).get(s.id)?.primary ?? null
+      const mine = primary ? await tx.select({ fromDate: shiftAssignments.fromDate, untilDate: shiftAssignments.untilDate }).from(shiftAssignments).where(and(eq(shiftAssignments.tenantId, tenantId), eq(shiftAssignments.userId, primary), eq(shiftAssignments.patternId, pattern.id))) : []
+      plan = planShiftOccurrences(rule, pattern, mine, s.repeatCursor, dueDay, today)
+      shift = { pattern, primary }
+    } else plan = planOccurrences(rule, s.repeatCursor, dueDay, today)
     if (plan.dates.length > 0 && !r.needsRefs) return
 
     const created: TaskRow[] = []
@@ -210,12 +256,14 @@ async function materialiseSeries(deps: Deps, r: Run): Promise<void> {
       const lead = Math.max(0, dayNum(dueDay) - dayNum(startWall.slice(0, 10)))
       for (const date of plan.dates) {
         if (have.has(date)) continue
-        if (!assign) {
-          noAssignee++
+        if (!assign || (shift && assign.primary !== shift.primary)) {
+          noAssignee++ // per_shift: the shifts are the primary assignee's, so instances are produced only while that person is still an active assignee
           continue
         }
-        const dueAt = new Date(wallToEpoch(`${date}T${dueTime}`, tz))
-        const startAt = new Date(Math.min(wallToEpoch(`${addDays(date, -lead)}T${startWall.slice(11, 19)}`, tz), dueAt.getTime()))
+        // per_shift: the shift's own start and end instants (F3); otherwise the series' local time of day on the date
+        const win = shift ? occurrenceInstants(domainPattern(shift.pattern), date, tz) : null
+        const dueAt = new Date(win ? win.endAt : wallToEpoch(`${date}T${dueTime}`, tz))
+        const startAt = new Date(win ? win.startAt : Math.min(wallToEpoch(`${addDays(date, -lead)}T${startWall.slice(11, 19)}`, tz), dueAt.getTime()))
         const refNo = await nextRefNo(tx, tenantId)
         const [row] = await tx
           .insert(tasks)

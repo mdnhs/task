@@ -44,7 +44,7 @@ const completeR = createRoute({
 })
 const repeatR = createRoute({
   method: "put", path: "/v1/tasks/{id}/repeat", middleware: [requireTenant, requireModule("M1"), requirePermission("tasks", "write")] as const, request: { params: IdParam, body: body(RepeatBody) },
-  responses: { 200: json(TaskDtoSchema, "The task with its new repetition (managers only); rule null stops it. A job creates the instances. 403 forbidden; 404 task_not_found; 409 version_conflict; 422 invalid_repeat (also for an instance or a subtask) | unsupported_repeat") },
+  responses: { 200: json(TaskDtoSchema, "The task with its new repetition (managers only); rule null stops it. A job creates the instances. 403 forbidden; 404 task_not_found; 409 version_conflict; 422 invalid_repeat (also for an instance or a subtask, and for per_shift without a live patternId)") },
 })
 const historyR = createRoute({
   method: "get", path: "/v1/tasks/{id}/history", middleware: [requireTenant, requireModule("M1"), requirePermission("tasks", "read")] as const, request: { params: IdParam, query: HistoryQuery },

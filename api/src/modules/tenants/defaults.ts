@@ -8,13 +8,13 @@ function readJson<T>(path: string): T {
   return JSON.parse(readFileSync(new URL(path, DATA), "utf8")) as T
 }
 
-type OnboardingDefaults = { locale: string; timezones: { value: string }[]; inviteRoles: string[]; deadline: string }
+type OnboardingDefaults = { locale: string; timezones: { value: string }[]; inviteRoles: string[]; deadline: string; reportDueAfterMinutes: number }
 type RoleTemplate = { id: string; label: string; description?: string; home: string; access: Record<string, string>; platform?: boolean; reportScope?: "team" }
 
 let defaults: OnboardingDefaults | undefined
-export function onboardingDefaults(): { timezone: string; locale: string; inviteRoles: string[]; deadline: string } {
+export function onboardingDefaults(): { timezone: string; locale: string; inviteRoles: string[]; deadline: string; reportDueAfterMinutes: number } {
   defaults ??= readJson<OnboardingDefaults>("auth/onboarding-defaults.json")
-  return { timezone: defaults.timezones[0].value, locale: defaults.locale, inviteRoles: defaults.inviteRoles, deadline: defaults.deadline }
+  return { timezone: defaults.timezones[0].value, locale: defaults.locale, inviteRoles: defaults.inviteRoles, deadline: defaults.deadline, reportDueAfterMinutes: defaults.reportDueAfterMinutes }
 }
 
 let templates: RoleTemplate[] | undefined

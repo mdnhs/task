@@ -19,6 +19,7 @@ export function daysInMonth(year: number, month: number) {
 }
 
 const matches = (rule: RepeatRule, date: string): boolean => {
+  if (rule.freq === "per_shift") return false // the occurrences of a shift pattern are computed by the server from the assignments (shifts.ts)
   if (rule.freq === "daily") return true
   const dow = weekdayOf(date)
   if (rule.freq === "weekdays") return dow >= 1 && dow <= 5
@@ -46,6 +47,7 @@ export function describeRepeat(rule: RepeatRule): string {
   const base =
     rule.freq === "daily" ? "Daily"
     : rule.freq === "weekdays" ? "Every weekday"
+    : rule.freq === "per_shift" ? "Every shift"
     : rule.freq === "weekly" ? `Weekly on ${[...(rule.days ?? [])].sort((a, b) => a - b).map((d) => WEEKDAYS[d]).join(", ")}`
     : `Monthly on day ${rule.dayOfMonth ?? 1}`
   return rule.until ? `${base} until ${rule.until}` : base
@@ -53,6 +55,7 @@ export function describeRepeat(rule: RepeatRule): string {
 
 /** Anything wrong with a rule, for form validation. Empty string when fine. */
 export function repeatError(rule: RepeatRule, firstDue: string): string {
+  if (rule.freq === "per_shift" && !rule.patternId) return "Choose a shift pattern"
   if (rule.freq === "weekly" && !(rule.days ?? []).length) return "Choose at least one day"
   if (rule.freq === "monthly" && !(Number.isInteger(rule.dayOfMonth) && rule.dayOfMonth! >= 1 && rule.dayOfMonth! <= 31)) return "Enter a day from 1 to 31"
   if (rule.until && firstDue && ymd(rule.until) < ymd(firstDue)) return "End date can't be before the first due date"

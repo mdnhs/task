@@ -16,6 +16,8 @@ import {
   daysLabel,
   directReports,
   durationLabel,
+  dueInstant,
+  occurrenceInstants,
   epochToWall,
   isAssignedOn,
   isHm,
@@ -348,5 +350,76 @@ describe("edits", () => {
     expect(toggleReporting(state, "b", true).reporting.overrides).toEqual({ c: true }) // Security default on
     expect(toggleReporting(state, "a", false).reporting.overrides).toEqual({ b: false, c: true, a: false })
     expect(toggleReporting(state, "c", false).reporting.overrides).toEqual({ b: false }) // Cleaning default off
+  })
+})
+
+// ---------- T5.1: occurrence instants, due instants, the shift date (F2, F3) ----------
+
+describe("occurrenceInstants and dueInstant across both DST changes (Europe/Dublin, pattern 22:00-06:00)", () => {
+  const nightly: ShiftPattern = { id: "n", name: "Night", team: "Security", start: "22:00", end: "06:00", days: [0, 1, 2, 3, 4, 5, 6] }
+  const iso = (ms: number) => new Date(ms).toISOString()
+  it("Sat 24 Oct 2026 lasts 9 h and is due 07:00Z; shiftDate is the START date", () => {
+    const o = occurrenceInstants(nightly, "2026-10-24", TZ)
+    expect(iso(o.startAt)).toBe("2026-10-24T21:00:00.000Z")
+    expect(iso(o.endAt)).toBe("2026-10-25T06:00:00.000Z")
+    expect(o.minutes).toBe(540)
+    expect(dueInstant(o.endAt, 60)).toBe(Date.parse("2026-10-25T07:00:00Z")) // not 05:00Z, not 06:00Z
+    expect(shiftWindow(nightly, "2026-10-24", TZ).date).toBe("2026-10-24")
+  })
+  it("Sun 25 Oct 2026 is a plain 8 h night", () => {
+    const o = occurrenceInstants(nightly, "2026-10-25", TZ)
+    expect(iso(o.startAt)).toBe("2026-10-25T22:00:00.000Z")
+    expect(iso(o.endAt)).toBe("2026-10-26T06:00:00.000Z")
+    expect(o.minutes).toBe(480)
+    expect(shiftWindow(nightly, "2026-10-25", TZ).date).toBe("2026-10-25")
+  })
+  it("Sat 27 Mar 2027 lasts 7 h", () => {
+    const o = occurrenceInstants(nightly, "2027-03-27", TZ)
+    expect(iso(o.startAt)).toBe("2027-03-27T22:00:00.000Z")
+    expect(iso(o.endAt)).toBe("2027-03-28T05:00:00.000Z")
+    expect(o.minutes).toBe(420)
+    expect(shiftWindow(nightly, "2027-03-27", TZ).date).toBe("2027-03-27")
+    expect(dueInstant(o.endAt, 60)).toBe(Date.parse("2027-03-28T06:00:00Z"))
+  })
+  it("an end time inside the repeated hour takes the earlier instant (18:00-01:30 on Sat 24 Oct ends 00:30Z, due 01:30Z)", () => {
+    const p: ShiftPattern = { ...nightly, start: "18:00", end: "01:30" }
+    const o = occurrenceInstants(p, "2026-10-24", TZ)
+    expect(iso(o.startAt)).toBe("2026-10-24T17:00:00.000Z")
+    expect(iso(o.endAt)).toBe("2026-10-25T00:30:00.000Z")
+    expect(iso(dueInstant(o.endAt, 60))).toBe("2026-10-25T01:30:00.000Z")
+    expect(o.minutes).toBe(450)
+  })
+  it("a start inside the spring-forward gap moves forward (01:30-09:30 on Sun 28 Mar 2027: starts 01:30Z = wall 02:30, 420 min)", () => {
+    const p: ShiftPattern = { ...nightly, start: "01:30", end: "09:30" }
+    const o = occurrenceInstants(p, "2027-03-28", TZ)
+    expect(iso(o.startAt)).toBe("2027-03-28T01:30:00.000Z")
+    expect(iso(o.endAt)).toBe("2027-03-28T08:30:00.000Z")
+    expect(o.minutes).toBe(420)
+  })
+  it("a pattern in Pacific/Auckland keeps its own start date; shiftsOn, shiftKey and occurrence agree (F2)", () => {
+    const akl: ShiftPattern = { id: "akl", name: "Early", team: "Security", start: "06:00", end: "14:00", days: [1], timeZone: "Pacific/Auckland" }
+    const w = shiftWindow(akl, "2026-10-19", TZ) // Mon 19 Oct 06:00 NZDT = Sun 18 Oct 17:00Z = 18:00 Dublin Sunday
+    expect(w.start).toBe("2026-10-18T18:00") // the tenant-zone wall clock moves to the day before
+    expect(w.date).toBe("2026-10-19") // ...but the shift belongs to the date it starts on in ITS zone
+    const out = shiftsOn("2026-10-19", [akl], [{ personId: "p", patternId: "akl", from: "2026-10-01" }], TZ)
+    expect(out).toHaveLength(1)
+    expect(out[0].window.date).toBe("2026-10-19")
+    expect(shiftKey("p", out[0].window)).toBe("p:akl:2026-10-19")
+    expect(shiftsOn("2026-10-18", [akl], [{ personId: "p", patternId: "akl", from: "2026-10-01" }], TZ)).toHaveLength(0)
+  })
+  it("the same patterns give the same real durations under a tenant in Pacific/Auckland and one in Dublin", () => {
+    const akl = "Pacific/Auckland"
+    // Auckland clocks go FORWARD 2:00 -> 3:00 on Sun 27 Sep 2026 and BACK 3:00 -> 2:00 on Sun 4 Apr 2027
+    const cases: [string, number][] = [["2026-09-26", 420], ["2026-09-27", 480], ["2027-04-03", 540], ["2027-04-05", 480]]
+    const local: ShiftPattern = { ...nightly, timeZone: akl }
+    for (const [d, minutes] of cases) {
+      expect(occurrenceInstants(local, d, TZ).minutes, d).toBe(minutes)
+      expect(occurrenceInstants(local, d, akl).minutes, d).toBe(minutes)
+      expect(occurrenceInstants({ ...nightly }, d, akl).minutes, d).toBe(occurrenceInstants({ ...nightly, timeZone: akl }, d, TZ).minutes)
+    }
+  })
+  it("dueInstant adds real minutes, never wall arithmetic", () => {
+    expect(dueInstant(Date.parse("2026-10-25T06:00:00Z"), 0)).toBe(Date.parse("2026-10-25T06:00:00Z"))
+    expect(dueInstant(Date.parse("2026-10-25T00:30:00Z"), 90)).toBe(Date.parse("2026-10-25T02:00:00Z"))
   })
 })

@@ -171,9 +171,10 @@ export const RepeatBody = z
     version: Version,
     rule: z
       .object({
-        freq: z.string().min(1).max(20).openapi({ description: "daily | weekdays | weekly | monthly (per_shift is not available yet: 422 unsupported_repeat)", example: "weekly" }),
+        freq: z.string().min(1).max(20).openapi({ description: "daily | weekdays | weekly | monthly | per_shift (one instance per shift of `patternId` for the primary assignee, start = shift start, due = shift end)", example: "weekly" }),
         days: z.array(z.number().int()).max(14).optional().openapi({ description: "Weekly: weekdays 0 = Sunday … 6 = Saturday" }),
         dayOfMonth: z.number().int().optional().openapi({ description: "Monthly: 1–31; a short month uses its last day" }),
+        patternId: z.string().max(64).optional().openapi({ description: "per_shift: the shift pattern (a live pattern of this tenant, else 422 invalid_repeat)" }),
         until: z.string().max(10).optional().openapi({ description: "Last local day (YYYY-MM-DD), inclusive" }),
       })
       .nullable()

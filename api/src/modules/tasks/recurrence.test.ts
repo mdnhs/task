@@ -245,11 +245,11 @@ describe("recurrence job", () => {
 })
 
 describe("PUT /v1/tasks/{id}/repeat", () => {
-  test("per_shift → 422 unsupported_repeat; bad rules → 422 invalid_repeat; staff 403; out of scope 404; instances and subtasks cannot repeat; null clears; stale 409", async () => {
+  test("per_shift without a live patternId → 422 invalid_repeat (T5.1 replaced unsupported_repeat); bad rules → 422 invalid_repeat; staff 403; out of scope 404; instances and subtasks cannot repeat; null clears; stale 409", async () => {
     const w = await world()
     const t = await w.mk(w.ops, { start: "2026-11-16T08:00:00", due: "2026-11-16T09:00:00" })
     const put = (id: string, as: Who, body: Json) => w.req("PUT", `/v1/tasks/${id}/repeat`, as, body)
-    expect(await code(await put(t.id, w.ops, { version: 1, rule: { freq: "per_shift" } }))).toBe("unsupported_repeat")
+    expect(await code(await put(t.id, w.ops, { version: 1, rule: { freq: "per_shift" } }))).toBe("invalid_repeat")
     for (const rule of [{ freq: "weekly" }, { freq: "weekly", days: [] }, { freq: "weekly", days: [7] }, { freq: "monthly" }, { freq: "monthly", dayOfMonth: 32 }, { freq: "daily", until: "2026-11-01" }, { freq: "daily", until: "2026-13-45" }, { freq: "yearly" }]) {
       const r = await put(t.id, w.ops, { version: 1, rule })
       expect(r.status, JSON.stringify(rule)).toBe(422)
@@ -475,5 +475,140 @@ describe("templates", () => {
     }
     expect((await w.q("select count(*)::int n from task_templates"))[0].n).toBe(1)
     await clearModuleOverride(w.deps, w.tenant.id, w.owner.userId, "M1")
+  })
+})
+
+describe("per_shift recurrence (F15, D11)", () => {
+  /** A team, a night pattern 22:00-06:00 (every day unless overridden) and staff assigned to it from `from`. */
+  async function shifts(w: W, o: { days?: number[]; from?: string; until?: string; zone?: string; start?: string; end?: string; name?: string } = {}) {
+    const team = await w.json(await w.req("POST", "/v1/teams", w.owner, { name: `T${Math.random().toString(36).slice(2, 7)}`, kind: "team" }))
+    const pr = await w.req("POST", "/v1/shifts/patterns", w.ops, { name: o.name ?? "Night", teamId: team.id, start: o.start ?? "22:00", end: o.end ?? "06:00", days: o.days ?? [0, 1, 2, 3, 4, 5, 6], ...(o.zone ? { timeZone: o.zone } : {}) })
+    expect(pr.status, await pr.clone().text()).toBe(201)
+    const pattern = await w.json(pr)
+    const ar = await w.req("POST", "/v1/shifts/assignments", w.ops, { userId: w.staff.userId, patternId: pattern.id, from: o.from ?? "2026-10-01", ...(o.until ? { until: o.until } : {}) })
+    expect(ar.status, await ar.clone().text()).toBe(201)
+    return { team, pattern, assignment: await w.json(ar) }
+  }
+  const perShift = (w: W, patternId: string, over: Json = {}, rule: Json = {}) => series(w, { freq: "per_shift", patternId, ...rule }, { title: "Night walk-round", ...over })
+  const dates = async (w: W, id: string) => (await instances(w, id)).map((r) => r.d)
+
+  test("one instance per shift of the pattern for the primary assignee: start = shift start, due = shift end (Sat 24 Oct night is 9 h, due 25 Oct 06:00Z; Sat 27 Mar night is 7 h)", async () => {
+    const w = await world()
+    const { pattern } = await shifts(w)
+    const s = await perShift(w, pattern.id, { start: "2026-10-22T09:00:00", due: "2026-10-23T09:00:00" })
+    expect(s.repeat).toEqual({ freq: "per_shift", patternId: pattern.id })
+    await aged(w, s.id)
+    await rec(w, "2026-10-24T08:00:00Z") // Sat 24 Oct, Dublin
+    await rec(w, "2026-10-25T08:00:00Z")
+    await rec(w, "2026-10-26T08:00:00Z")
+    const rows = await instances(w, s.id)
+    expect(rows.map((r) => [r.d, iso(r.start), iso(r.due)])).toEqual([
+      ["2026-10-24", "2026-10-24T21:00:00.000Z", "2026-10-25T06:00:00.000Z"], // 22:00 BST to 06:00 GMT: 9 h
+      ["2026-10-25", "2026-10-25T22:00:00.000Z", "2026-10-26T06:00:00.000Z"],
+      ["2026-10-26", "2026-10-26T22:00:00.000Z", "2026-10-27T06:00:00.000Z"],
+    ])
+    const [inst] = await w.q("select assignee.user_id, t.title, t.series_id from tasks t join task_assignees assignee on assignee.task_id = t.id where t.series_id = $1 and t.occurrence_date = '2026-10-24'", [s.id])
+    expect(inst).toMatchObject({ user_id: w.staff.userId, title: "Night walk-round", series_id: s.id })
+    // the spring-forward night: 22:00 GMT Sat 27 Mar to 06:00 BST Sun 28 Mar = 05:00Z, 7 h
+    const m = await perShift(w, pattern.id, { start: "2027-03-25T09:00:00", due: "2027-03-26T09:00:00" })
+    await aged(w, m.id)
+    await rec(w, "2027-03-27T12:00:00Z")
+    const mar = await instances(w, m.id)
+    expect(mar.map((r) => [r.d, iso(r.start), iso(r.due)])).toEqual([["2027-03-27", "2027-03-27T22:00:00.000Z", "2027-03-28T05:00:00.000Z"]])
+  }, 60_000)
+
+  test("exactly once under two (and eight) concurrent workers across the October change; the key is the shift date", async () => {
+    const w = await world()
+    const { pattern } = await shifts(w, { start: "18:00", end: "01:30" }) // ends inside the repeated hour on Sat 24 Oct
+    const s = await perShift(w, pattern.id, { start: "2026-10-22T09:00:00", due: "2026-10-23T09:00:00" })
+    await aged(w, s.id)
+    await tick(w, "2026-10-23T22:00:00Z", "2026-10-26T03:00:00Z", 2)
+    const rows = await instances(w, s.id)
+    expect(rows.map((r) => r.d)).toEqual(["2026-10-24", "2026-10-25", "2026-10-26"])
+    expect(iso(rows[0].due)).toBe("2026-10-25T00:30:00.000Z") // the EARLIER 01:30 (BST), not the second one
+    expect(iso(rows[1].start)).toBe("2026-10-25T18:00:00.000Z")
+    expect(new Set(rows.map((r) => r.ref_no)).size).toBe(3)
+    // eight at once for a new day: one instance, one history line, no gap in the ref numbers
+    await Promise.all(Array.from({ length: 8 }, () => rec(w, "2026-10-27T10:00:00Z")))
+    expect((await dates(w, s.id)).at(-1)).toBe("2026-10-27")
+    expect((await dates(w, s.id)).length).toBe(4)
+    const refs = (await w.q("select ref_no from tasks order by ref_no")).map((r) => r.ref_no as number)
+    expect(refs).toEqual(Array.from({ length: refs.length }, (_, i) => 1000 + i)) // no gaps: the losers took no number
+    expect((await w.q("select count(*)::int n from task_history h join tasks t on t.id = h.task_id where t.series_id = $1 and h.text like 'Created from recurring%'", [s.id]))[0].n).toBe(4)
+    const err = await w
+      .q(`insert into tasks (tenant_id, ref_no, title, start_at, due_at, evidence_rule, series_id, occurrence_date, created_at, updated_at) values ($1, 9999, 'dup', now(), now(), '{}'::jsonb, $2, '2026-10-25', now(), now())`, [w.tenant.id, s.id])
+      .catch((e) => e)
+    expect(String((err as Error).message)).toContain("tasks_series_occ_uq")
+  }, 120_000)
+
+  test("only the pattern's days and the primary assignee's assignment window (from/until inclusive) produce instances; another member's assignment does not", async () => {
+    const w = await world()
+    const { pattern } = await shifts(w, { days: [1, 2, 3, 4, 5], start: "07:00", end: "15:00", from: "2026-11-02", until: "2026-11-12" }) // Mon 2 Nov .. Thu 12 Nov
+    await w.req("POST", "/v1/shifts/assignments", w.ops, { userId: w.staff2.userId, patternId: pattern.id, from: "2026-10-01" })
+    const s = await perShift(w, pattern.id, { start: "2026-11-01T09:00:00", due: "2026-11-01T10:00:00" })
+    await aged(w, s.id)
+    await rec(w, "2026-11-15T12:00:00Z") // catch-up window 8..15 Nov
+    expect(await dates(w, s.id)).toEqual(["2026-11-09", "2026-11-10", "2026-11-11", "2026-11-12"]) // Mon..Thu: Fri 13 is past until; the weekend is off
+    const [one] = await instances(w, s.id)
+    expect([iso(one.start), iso(one.due)]).toEqual(["2026-11-09T07:00:00.000Z", "2026-11-09T15:00:00.000Z"])
+    expect((await w.q("select count(*)::int n from tasks t join task_assignees a on a.task_id = t.id where t.series_id = $1 and a.user_id = $2", [s.id, w.staff2.userId]))[0].n).toBe(0)
+  }, 60_000)
+
+  test("7-day catch-up: older shifts are skipped and logged once, the rest are created", async () => {
+    const w = await world()
+    const { pattern } = await shifts(w, { start: "07:00", end: "15:00" })
+    const s = await perShift(w, pattern.id, { start: "2026-10-05T09:00:00", due: "2026-10-05T10:00:00" })
+    await aged(w, s.id)
+    await rec(w, "2026-10-24T12:00:00Z")
+    expect(await dates(w, s.id)).toEqual(["2026-10-18", "2026-10-19", "2026-10-20", "2026-10-21", "2026-10-22", "2026-10-23", "2026-10-24"])
+    const skipped = async () => (await w.q("select text from task_history where task_id = $1 and text like '%skipped%'", [s.id])).map((r) => r.text)
+    expect(await skipped()).toEqual(["12 occurrences skipped (outside catch-up window)"]) // 6..17 Oct (the series' own due day, the 5th, is the first occurrence)
+    await rec(w, "2026-10-24T13:00:00Z")
+    expect(await skipped()).toHaveLength(1)
+  }, 60_000)
+
+  test("per_shift without a patternId, with an unknown, another tenant's or an archived pattern is 422 invalid_repeat; an archived pattern stops the series without error", async () => {
+    const w = await world()
+    const { pattern } = await shifts(w)
+    const other = await makeTenant(w.deps, { slug: "bravo" })
+    const t = await w.mk(w.ops)
+    const put = (patternId?: string) => w.req("PUT", `/v1/tasks/${t.id}/repeat`, w.ops, { version: 1, rule: { freq: "per_shift", ...(patternId === undefined ? {} : { patternId }) } })
+    const foreign = (await w.q("select 1")) && (await ownerTenantQuery(other.id, "insert into teams (tenant_id, name) values ($1, 'X') returning id", [other.id]))
+    const fp = await ownerTenantQuery(other.id, "insert into shift_patterns (tenant_id, team_id, name, start_time, end_time, days, created_at, updated_at) values ($1, $2, 'F', '07:00', '15:00', '{1}', now(), now()) returning id", [other.id, foreign[0].id])
+    for (const id of [undefined, "", "not-a-uuid", "00000000-0000-4000-8000-000000000000", String(fp[0].id)]) {
+      const r = await put(id)
+      expect([id, r.status, await code(r)]).toEqual([id, 422, "invalid_repeat"])
+    }
+    const ok = await put(pattern.id)
+    expect(ok.status, await ok.clone().text()).toBe(200)
+    // archiving the pattern: the series is skipped, nothing fails, no instance appears
+    expect((await w.req("DELETE", `/v1/shifts/patterns/${pattern.id}`, w.ops)).status).toBe(204)
+    await rec(w, "2026-11-20T12:00:00Z")
+    expect(await dates(w, t.id)).toEqual([])
+    // and an archived pattern cannot be chosen
+    const t2 = await w.mk(w.ops)
+    const again = await w.req("PUT", `/v1/tasks/${t2.id}/repeat`, w.ops, { version: 1, rule: { freq: "per_shift", patternId: pattern.id } })
+    expect([again.status, await code(again)]).toEqual([422, "invalid_repeat"])
+  })
+
+  test("a pattern in Pacific/Auckland: 'today' is the pattern's own date, so the instance exists from the shift's own midnight (before it starts)", async () => {
+    const w = await world() // tenant Europe/Dublin
+    const { pattern } = await shifts(w, { start: "06:00", end: "14:00", zone: "Pacific/Auckland", days: [1] }) // Mondays in Auckland
+    const s = await perShift(w, pattern.id, { start: "2026-10-12T09:00:00", due: "2026-10-12T10:00:00" })
+    await aged(w, s.id)
+    await rec(w, "2026-10-18T10:00:00Z") // Sun 18 Oct 23:00 NZDT: still Sunday there
+    expect(await dates(w, s.id)).toEqual([])
+    await rec(w, "2026-10-18T11:30:00Z") // Mon 19 Oct 00:30 NZDT, 12:30 Dublin on the 18th
+    const [i] = await instances(w, s.id)
+    expect([i.d, iso(i.start), iso(i.due)]).toEqual(["2026-10-19", "2026-10-18T17:00:00.000Z", "2026-10-19T01:00:00.000Z"]) // 06:00-14:00 NZDT (+13)
+  })
+
+  test("a series rule set today starts today (no stale back-instances) and a per_shift series is listed as repeating", async () => {
+    const w = await world()
+    const { pattern } = await shifts(w, { start: "07:00", end: "15:00" })
+    const t = await w.mk(w.ops, { start: "2026-10-01T09:00:00", due: "2026-10-01T10:00:00" })
+    expect((await w.req("PUT", `/v1/tasks/${t.id}/repeat`, w.ops, { version: 1, rule: { freq: "per_shift", patternId: pattern.id } })).status).toBe(200)
+    await rec(w, "2026-11-16T10:00:00Z") // fake-clock day: the rule was set "now" (16 Nov), so yesterday is the cursor
+    expect(await dates(w, t.id)).toEqual(["2026-11-16"])
   })
 })

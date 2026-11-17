@@ -144,6 +144,14 @@ const SPECS: Record<string, Spec> = {
   "POST /v1/tasks/{id}/reject": { actor: "owner", expect: "task_not_found" },
   "PATCH /v1/task-templates/{id}": { actor: "owner", expect: "template_not_found" },
   "DELETE /v1/task-templates/{id}": { actor: "owner", expect: "template_not_found" },
+  // T5.1: shift patterns (control: PATCH 200, DELETE 204), assignments (control: PATCH 200 with an end date after the fixture's start, DELETE 204 for the future one),
+  // team defaults (control: 200) and per-person overrides (control: 200; the ghost user id is 404 not_a_member)
+  "PATCH /v1/shifts/patterns/{id}": { actor: "owner", expect: "shift_pattern_not_found" },
+  "DELETE /v1/shifts/patterns/{id}": { actor: "owner", expect: "shift_pattern_not_found" },
+  "PATCH /v1/shifts/assignments/{id}": { actor: "owner", expect: "shift_assignment_not_found", body: () => ({ until: "2027-12-31" }) },
+  "DELETE /v1/shifts/assignments/{id}": { actor: "owner", expect: "shift_assignment_not_found" },
+  "PUT /v1/shifts/reporting/teams/{teamId}": { actor: "owner", expect: "team_not_found" },
+  "PUT /v1/shifts/reporting/people/{userId}": { actor: "owner", expect: "not_a_member" },
 }
 
 let t: ReturnType<typeof testApp>
@@ -169,7 +177,7 @@ const bodyExample = (op: Json): { present: boolean; example?: unknown } => {
 const substitute = (path: string, params: Record<string, string>) => path.replace(/\{(\w+)\}/g, (_, p) => encodeURIComponent(params[p]))
 
 /** Tenant tables whose rows are hashed before and after the walk: any change in the OTHER tenant is a cross-tenant mutation. */
-const HASHED_TABLES = ["roles", "memberships", "teams", "team_members", "reporting_lines", "devices", "device_policies", "invites", "audit_events", "tenant_settings", "notifications", "notification_preferences", "push_tokens", "notification_deliveries", "files", "integration_connections", "oauth_states", "public_holidays", "data_requests", "support_grants", "api_keys", "webhook_endpoints", "webhook_deliveries", "tasks", "task_assignees", "task_history", "task_time_entries", "task_counters", "task_checklist_items", "task_comments", "task_files", "task_templates", "task_voice_access", "projects", "project_milestones", "task_dependencies", "task_evidence"]
+const HASHED_TABLES = ["roles", "memberships", "teams", "team_members", "reporting_lines", "devices", "device_policies", "invites", "audit_events", "tenant_settings", "notifications", "notification_preferences", "push_tokens", "notification_deliveries", "files", "integration_connections", "oauth_states", "public_holidays", "data_requests", "support_grants", "api_keys", "webhook_endpoints", "webhook_deliveries", "tasks", "task_assignees", "task_history", "task_time_entries", "task_counters", "task_checklist_items", "task_comments", "task_files", "task_templates", "task_voice_access", "projects", "project_milestones", "task_dependencies", "task_evidence", "shift_patterns", "shift_assignments", "shift_reporting_teams", "shift_reporting_people"]
 
 async function hashes(tenantId: string): Promise<Record<string, string>> {
   const out: Record<string, string> = {}
@@ -212,10 +220,10 @@ const operations = (): Op[] =>
   })
 
 describe("AC-M0-01 cross-tenant isolation walker", () => {
-  test("every M1 task/project tenant table (migrations 0027-0034 and later) is in the mutation-hash list", async () => {
-    const rows = await ownerQuery("select table_name from information_schema.columns where table_schema = 'public' and column_name = 'tenant_id' and table_name ~ '^(tasks?|task_.*|projects?|project_.*)$' order by 1")
+  test("every M1 task/project/shift/report tenant table (migrations 0027-0035 and later) is in the mutation-hash list", async () => {
+    const rows = await ownerQuery("select table_name from information_schema.columns where table_schema = 'public' and column_name = 'tenant_id' and table_name ~ '^(tasks?|task_.*|projects?|project_.*|shift_.*|report_.*)$' order by 1")
     const tenantTables = rows.map((r) => String((r as { table_name: string }).table_name))
-    expect(tenantTables.length).toBeGreaterThanOrEqual(13)
+    expect(tenantTables.length).toBeGreaterThanOrEqual(17)
     expect(tenantTables.filter((x) => !HASHED_TABLES.includes(x))).toEqual([])
   })
 

@@ -9,6 +9,7 @@ export type EventType =
   | "task.evidence_added" | "task.evidence_verified" | "task.evidence_rejected"
   | "task.comment_added" | "task.archived" | "task.restored" | "task.purged"
   | "project.created" | "project.updated" | "project.deleted"
+  | "shift.pattern_created" | "shift.pattern_updated" | "shift.pattern_archived" | "shift.assigned" | "shift.unassigned" | "shift.reporting_changed"
 
 export type DomainEvent = {
   id: string

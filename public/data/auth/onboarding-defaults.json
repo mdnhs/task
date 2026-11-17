@@ -17,6 +17,7 @@
     { "value": "Asia/Dubai", "label": "Gulf time (Asia/Dubai)" }
   ],
   "deadline": "17:30",
+  "reportDueAfterMinutes": 60,
   "departments": ["Security", "Cleaning"],
   "reportSections": [
     "Staff / Attendance",

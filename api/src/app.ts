@@ -30,6 +30,7 @@ import { archiveRoutes, collabRoutes, planningRoutes, taskRoutes, taskViewRoutes
 import { evidenceRoutes } from "./modules/task-evidence"
 import { projectRoutes } from "./modules/projects"
 import { templateRoutes } from "./modules/task-templates"
+import { shiftRoutes } from "./modules/shifts"
 import { teamRoutes } from "./modules/teams"
 import { tenantRoutes } from "./modules/tenants"
 
@@ -85,6 +86,7 @@ export function createApp(deps: Deps) {
   app.route("/", evidenceRoutes)
   app.route("/", projectRoutes)
   app.route("/", templateRoutes)
+  app.route("/", shiftRoutes)
   app.route("/", mfaRoutes)
   app.route("/", auditRoutes)
   app.route("/", deviceRoutes)

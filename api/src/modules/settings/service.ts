@@ -43,10 +43,10 @@ const NAME = /^[^\r\n\u0000-\u001f\u007f]+$/
 
 // ------------------------------------------------------------------ organisation
 
-export type OrganisationDto = { name: string; slug: string; timezone: string; currency: string; locale: string; reportDeadline: string }
-export type OrganisationPatch = Partial<Pick<OrganisationDto, "name" | "timezone" | "currency" | "locale" | "reportDeadline">>
-type Org = Omit<OrganisationDto, "slug">
-const ORG_KEYS = ["name", "timezone", "currency", "locale", "reportDeadline"] as const
+export type OrganisationDto = { name: string; slug: string; timezone: string; currency: string; locale: string; reportDeadline: string; reportDueAfterMinutes: number }
+export type OrganisationPatch = Partial<Pick<OrganisationDto, "name" | "timezone" | "currency" | "locale" | "reportDeadline" | "reportDueAfterMinutes">>
+const ORG_KEYS = ["name", "timezone", "currency", "locale", "reportDeadline", "reportDueAfterMinutes"] as const
+export const isDueAfterMinutes = (v: unknown): v is number => typeof v === "number" && Number.isInteger(v) && v >= 0 && v <= 1440
 
 async function readSetting(tx: TenantTx, tenantId: string, key: string): Promise<unknown> {
   const [r] = await tx.select({ value: tenantSettings.value }).from(tenantSettings).where(and(eq(tenantSettings.tenantId, tenantId), eq(tenantSettings.key, key)))
@@ -56,13 +56,22 @@ async function writeSetting(tx: TenantTx, tenantId: string, key: string, value: 
   await tx.insert(tenantSettings).values({ tenantId, key, value }).onConflictDoUpdate({ target: [tenantSettings.tenantId, tenantSettings.key], set: { value } })
 }
 
+/**
+ * How long after a shift ends its end-of-shift report is due (FR-M1-21, Q7, F13): the tenant setting `report_due_after_minutes` (0-1440, edited with
+ * PATCH /v1/settings/organisation), else the default from DATA (onboarding-defaults.json `reportDueAfterMinutes`), never a literal in code.
+ */
+export async function reportDueAfterMinutes(tx: TenantTx, tenantId: string): Promise<number> {
+  const v = await readSetting(tx, tenantId, "report_due_after_minutes")
+  return isDueAfterMinutes(v) ? v : onboardingDefaults().reportDueAfterMinutes
+}
+
 async function readOrg(tx: TenantTx, tenantId: string, lock = false): Promise<OrganisationDto> {
   const q = tx.select().from(tenants).where(eq(tenants.id, tenantId))
   const [t] = lock ? await q.for("update") : await q
   const dl = await readSetting(tx, tenantId, "report_deadline")
   // The default is DATA (public/data/auth/onboarding-defaults.json `deadline`), never a literal in code.
   const reportDeadline = typeof dl === "string" && isDeadline(dl) ? dl : onboardingDefaults().deadline
-  return { name: t.name, slug: t.slug, timezone: t.timezone, currency: t.currency, locale: t.locale, reportDeadline }
+  return { name: t.name, slug: t.slug, timezone: t.timezone, currency: t.currency, locale: t.locale, reportDeadline, reportDueAfterMinutes: await reportDueAfterMinutes(tx, tenantId) }
 }
 export const getOrganisation = (tx: TenantTx, tenantId: string) => readOrg(tx, tenantId)
 
@@ -91,22 +100,27 @@ export async function patchOrganisation(deps: Deps, tenantId: string, actorId: s
     if (!isDeadline(patch.reportDeadline)) throw unprocessable("invalid_report_deadline")
     next.reportDeadline = patch.reportDeadline
   }
+  if (patch.reportDueAfterMinutes !== undefined) {
+    if (!isDueAfterMinutes(patch.reportDueAfterMinutes)) throw unprocessable("invalid_report_due")
+    next.reportDueAfterMinutes = patch.reportDueAfterMinutes
+  }
   return withTenant(deps.db, tenantId, async (tx) => {
     await lockSettings(tx, tenantId)
     await lockActor(tx, tenantId, actorId, "settings", "write")
     const cur = await readOrg(tx, tenantId, true)
     const keys = ORG_KEYS.filter((k) => next[k] !== undefined && next[k] !== cur[k])
     if (keys.length === 0) return cur // nothing changes: no write, no audit entry
-    const before: Partial<Org> = {}
-    const after: Partial<Org> = {}
+    const before: Record<string, unknown> = {}
+    const after: Record<string, unknown> = {}
     for (const k of keys) {
       before[k] = cur[k]
       after[k] = next[k]
     }
     const cols: Partial<Record<"name" | "timezone" | "currency" | "locale", string>> = {}
-    for (const k of keys) if (k !== "reportDeadline") cols[k] = next[k]
+    for (const k of keys) if (k !== "reportDeadline" && k !== "reportDueAfterMinutes") cols[k] = next[k]
     if (Object.keys(cols).length > 0) await tx.update(tenants).set(cols).where(eq(tenants.id, tenantId))
     if (after.reportDeadline !== undefined) await writeSetting(tx, tenantId, "report_deadline", after.reportDeadline)
+    if (after.reportDueAfterMinutes !== undefined) await writeSetting(tx, tenantId, "report_due_after_minutes", after.reportDueAfterMinutes)
     await recordAudit(tx, tenantId, { action: "tenant.settings_updated", entity: "tenant", entityId: tenantId, actorId, before, after }, deps.clock.now())
     return { ...cur, ...after }
   })

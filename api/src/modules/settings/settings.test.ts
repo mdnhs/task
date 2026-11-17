@@ -8,7 +8,7 @@ beforeEach(resetDb)
 
 type Json = Record<string, any> // eslint-disable-line @typescript-eslint/no-explicit-any
 const q = (tenant: string, sql: string, params: unknown[] = []) => ownerTenantQuery(tenant, sql, params)
-const DEFAULTS = JSON.parse(readFileSync(new URL("../../../../public/data/auth/onboarding-defaults.json", import.meta.url), "utf8")) as { deadline: string }
+const DEFAULTS = JSON.parse(readFileSync(new URL("../../../../public/data/auth/onboarding-defaults.json", import.meta.url), "utf8")) as { deadline: string; reportDueAfterMinutes: number }
 
 async function world(over: Parameters<typeof testApp>[0] = {}) {
   const t = testApp(over)
@@ -31,7 +31,7 @@ test("organisation GET returns the tenant's values; reads need settings:read", a
   const w = await world()
   const r = await w.req("GET", "/v1/settings/organisation")
   expect(r.status).toBe(200)
-  expect(await r.json()).toEqual({ name: "Acme Ltd", slug: "acme", timezone: "Europe/Dublin", currency: "EUR", locale: "en-IE", reportDeadline: DEFAULTS.deadline })
+  expect(await r.json()).toEqual({ name: "Acme Ltd", slug: "acme", timezone: "Europe/Dublin", currency: "EUR", locale: "en-IE", reportDeadline: DEFAULTS.deadline, reportDueAfterMinutes: DEFAULTS.reportDueAfterMinutes })
   expect((await w.req("GET", "/v1/settings/organisation", w.ca)).status).toBe(200)
   expect((await w.req("GET", "/v1/settings/organisation", w.cs)).status).toBe(403)
 })

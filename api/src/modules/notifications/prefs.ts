@@ -3,11 +3,11 @@ import type { ChannelPrefs } from "../../db/schema"
 import { notificationPreferences } from "../../db/schema"
 import type { TenantTx } from "../../db/tenant-tx"
 
-export const KINDS = ["invite", "member", "file", "security", "dsr", "billing", "system", "task"] as const
+export const KINDS = ["invite", "member", "file", "security", "dsr", "billing", "system", "task", "report"] as const
 export type NotificationKind = (typeof KINDS)[number]
 export type Resolved = Record<NotificationKind, Required<ChannelPrefs>>
 
-/** Defaults: in-app on for every kind; email on for invite|security|dsr|billing (not task); push on for every kind (when a token exists). */
+/** Defaults: in-app on for every kind; email on for invite|security|dsr|billing (not task or report); push on for every kind (when a token exists). */
 const EMAIL_BY_DEFAULT: readonly NotificationKind[] = ["invite", "security", "dsr", "billing"]
 
 /** Defaults overlaid with the user's per-kind overrides. `security` can never lose in-app or email. */

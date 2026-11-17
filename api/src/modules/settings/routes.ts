@@ -5,13 +5,13 @@ import { newRouter } from "../../core/router"
 import { withTenant } from "../../db/tenant-tx"
 import { getBranding, getHolidays, getOrganisation, currentYear, patchOrganisation, putBranding, replaceHolidays } from "./service"
 
-const Org = z.object({ name: z.string(), slug: z.string(), timezone: z.string(), currency: z.string(), locale: z.string(), reportDeadline: z.string() })
-const OrgExample = { name: "Acme Ltd", slug: "acme", timezone: "Europe/Dublin", currency: "EUR", locale: "en-IE", reportDeadline: "17:30" }
+const Org = z.object({ name: z.string(), slug: z.string(), timezone: z.string(), currency: z.string(), locale: z.string(), reportDeadline: z.string(), reportDueAfterMinutes: z.number().int() })
+const OrgExample = { name: "Acme Ltd", slug: "acme", timezone: "Europe/Dublin", currency: "EUR", locale: "en-IE", reportDeadline: "17:30", reportDueAfterMinutes: 60 }
 const OrgPatch = z
-  .object({ name: z.string().max(200), timezone: z.string().max(100), currency: z.string().max(10), locale: z.string().max(50), reportDeadline: z.string().max(10) })
+  .object({ name: z.string().max(200), timezone: z.string().max(100), currency: z.string().max(10), locale: z.string().max(50), reportDeadline: z.string().max(10), reportDueAfterMinutes: z.number() })
   .partial()
   .refine((v) => Object.values(v).some((x) => x !== undefined))
-  .openapi({ example: { timezone: "Europe/London", currency: "GBP", locale: "en-GB", reportDeadline: "18:00" } })
+  .openapi({ example: { timezone: "Europe/London", currency: "GBP", locale: "en-GB", reportDeadline: "18:00", reportDueAfterMinutes: 90 } })
 const Branding = z.object({ logoFileId: z.string().max(64).nullable(), primaryColor: z.string().max(16).nullable() })
 const BrandingBody = Branding.openapi({ example: { logoFileId: "0b6f4c1e-8f0e-4c53-9a3e-6a4c1b2d7e90", primaryColor: "#0A1B2C" } })
 const Holiday = z.object({ date: z.string().max(10), name: z.string().max(200) })
@@ -26,7 +26,7 @@ const orgGet = createRoute({
 const orgPatch = createRoute({
   method: "patch", path: "/v1/settings/organisation", middleware: [requireTenant, requirePermission("settings", "write")] as const,
   request: { body: { content: { "application/json": { schema: OrgPatch } }, required: true } },
-  responses: { 200: { description: "Updated settings. 422 invalid_name | invalid_timezone | invalid_locale | invalid_currency | invalid_report_deadline. Audited with before/after", content: { "application/json": { schema: Org.openapi({ example: OrgExample }) } } } },
+  responses: { 200: { description: "Updated settings. 422 invalid_name | invalid_timezone | invalid_locale | invalid_currency | invalid_report_deadline | invalid_report_due (minutes after a shift ends, 0-1440). Audited with before/after", content: { "application/json": { schema: Org.openapi({ example: OrgExample }) } } } },
 })
 const brandingGet = createRoute({
   method: "get", path: "/v1/settings/branding", middleware: [requireTenant, requirePermission("settings", "read")] as const,

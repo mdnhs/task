@@ -48,7 +48,7 @@ export type TeamMember = { personId: string; teams: string[]; managerId: string 
 /** One concrete occurrence of a pattern, in tenant wall-clock time. */
 export type ShiftWindow = {
   patternId: string
-  /** Shift start date (tenant time); the shift "belongs" to this date. */
+  /** Shift start date in the PATTERN's own zone (the tenant zone unless the pattern names one); the shift "belongs" to this date (F2). */
   date: string
   /** "YYYY-MM-DDTHH:MM", tenant time. */
   start: string
@@ -183,18 +183,16 @@ export function runsOn(p: Pick<ShiftPattern, "days">, date: string): boolean {
 
 /**
  * The occurrence of `pattern` that starts on `date` (a date in the pattern's own zone, which is the tenant zone unless the
- * pattern overrides it), with start/end in tenant wall-clock time. Does not check `days`; use `runsOn` / `shiftsOn` for that.
+ * pattern overrides it), with start/end in tenant wall-clock time. `date` of the result is that same pattern-zone start date (F2). Does not check `days`; use `runsOn` / `shiftsOn` for that.
  */
 export function shiftWindow(pattern: ShiftPattern, date: string, tenantTz: string): ShiftWindow {
-  const tz = pattern.timeZone || tenantTz
   const d = date.slice(0, 10)
-  const startMs = wallToEpoch(`${d}T${pattern.start}`, tz)
-  const endMs = wallToEpoch(`${crossesMidnight(pattern) ? addDays(d, 1) : d}T${pattern.end}`, tz)
+  const { startAt: startMs, endAt: endMs } = occurrenceInstants(pattern, d, tenantTz)
   const start = epochToWall(startMs, tenantTz)
   const end = epochToWall(endMs, tenantTz)
   return {
     patternId: pattern.id,
-    date: start.slice(0, 10),
+    date: d, // the date it STARTS on in the pattern's own zone: the key of the shift, whatever zone `start` is shown in
     start,
     end,
     timeZone: tenantTz,
@@ -202,6 +200,23 @@ export function shiftWindow(pattern: ShiftPattern, date: string, tenantTz: strin
     minutes: Math.round((endMs - startMs) / MIN_MS),
   }
 }
+
+/**
+ * UTC instants (epoch ms) of the occurrence of `pattern` that starts on `date` in the pattern's zone (F3). The one place that reads the
+ * pattern's wall times: start/end go through `wallToEpoch` (a gap time moves forward, an ambiguous time takes the EARLIER instant), and
+ * `minutes` is the real elapsed time (a 22:00-06:00 night is 540 min on 24 Oct 2026 and 420 min on 27 Mar 2027 in Europe/Dublin).
+ * Store the instants; never re-derive them from a wall string (a time in the repeated hour does not identify one instant).
+ */
+export function occurrenceInstants(pattern: ShiftPattern, date: string, tenantTz: string): { startAt: number; endAt: number; minutes: number } {
+  const tz = pattern.timeZone || tenantTz
+  const d = date.slice(0, 10)
+  const startAt = wallToEpoch(`${d}T${pattern.start}`, tz)
+  const endAt = wallToEpoch(`${crossesMidnight(pattern) ? addDays(d, 1) : d}T${pattern.end}`, tz)
+  return { startAt, endAt, minutes: Math.round((endAt - startAt) / MIN_MS) }
+}
+
+/** When the end-of-shift report is due: `dueAfterMinutes` REAL minutes after the end instant (epoch ms), never wall-clock arithmetic. */
+export const dueInstant = (endAt: number, dueAfterMinutes: number): number => endAt + dueAfterMinutes * MIN_MS
 
 /** Assignment covers the shift starting on `date` (from/until inclusive). */
 export function isAssignedOn(a: ShiftAssignment, date: string): boolean {
@@ -215,7 +230,7 @@ export function shiftKey(personId: string, w: Pick<ShiftWindow, "patternId" | "d
 }
 
 /**
- * Every assigned shift that STARTS on `date` (tenant date), sorted by start then person. A night shift from the evening
+ * Every assigned shift that STARTS on `date` (the pattern's own zone date; the tenant date unless a pattern names a zone), sorted by start then person. A night shift from the evening
  * before is not included; use `currentShift` / `shiftsOverlapping` for "who is working now".
  */
 export function shiftsOn(date: string, patterns: ShiftPattern[], assignments: ShiftAssignment[], tenantTz: string): ShiftOccurrence[] {

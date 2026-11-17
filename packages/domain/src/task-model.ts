@@ -51,9 +51,14 @@ export type Evidence = {
   url?: string
   size?: number
 }
-/** FR-TASK-10 repeat rule. `days` are weekdays 0 (Sun) to 6 (Sat); `until` is an optional YYYY-MM-DD end date. */
+/**
+ * FR-TASK-10 repeat rule. `days` are weekdays 0 (Sun) to 6 (Sat); `until` is an optional YYYY-MM-DD end date.
+ * `per_shift` (D11, F15): one instance per occurrence of the shift pattern `patternId` for the series' primary assignee; the dates come
+ * from the pattern's own days and the assignee's assignments (the server job), not from this rule, so nextOccurrences() yields none.
+ */
 export type RepeatRule = {
-  freq: "daily" | "weekdays" | "weekly" | "monthly"
+  freq: "daily" | "weekdays" | "weekly" | "monthly" | "per_shift"
+  patternId?: string
   days?: number[]
   dayOfMonth?: number
   until?: string
