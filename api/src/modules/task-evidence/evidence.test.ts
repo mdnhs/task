@@ -2,7 +2,7 @@ import { sql } from "drizzle-orm"
 import pg from "pg"
 import { afterEach, beforeEach, describe, expect, test } from "vitest"
 import { ownerQuery, ownerTenantQuery } from "../../../test/db"
-import { makeApiKey, makeMember, makeTenant, signIn } from "../../../test/factories"
+import { makeApiKey, makeMember, makeStaff, makeTenant, signIn } from "../../../test/factories"
 import { call, resetDb, testApp, testEnv } from "../../../test/harness"
 import { relayOnce, resetSubscribers } from "../../core/events"
 import { runJob } from "../../core/queue/queue"
@@ -224,7 +224,7 @@ describe("rule and attach", () => {
     expect(await code(await addEv(w, w.staff, done.id, { kind: "note", text: "late" }))).toBe("evidence_locked")
   }, 90_000)
 
-  test("PUT /evidence-rule: creator or manager, version checked, invalid rule 422, named reviewer must be an active member with tasks:read; also strict on create (D23)", async () => {
+  test("PUT /evidence-rule: creator or manager, version checked, invalid rule 422, named reviewer must be an active member with tasks:write; also strict on create (D23)", async () => {
     const w = await world()
     const t = await w.mk(w.ops)
     const put = (as: Who, rl: Json, version?: number) => w.req("PUT", `/v1/tasks/${t.id}/evidence-rule`, as, { version: version ?? 1, rule: rl })
@@ -241,6 +241,9 @@ describe("rule and attach", () => {
     await w.q(`update roles set access = access || '{"tasks":"none"}'::jsonb where key = 'payroll'`)
     const noTasks = await w.who("payroll") // a role without tasks:read
     expect(await code(await put(w.ops, rule({ review: "named", reviewer: noTasks.userId }), 2))).toBe("invalid_reviewer")
+    const readOnly = await w.who("hr") // tasks:read only: could see the task but never verify (ruling E9)
+    expect(await code(await put(w.ops, rule({ review: "named", reviewer: readOnly.userId }), 2))).toBe("invalid_reviewer")
+    expect(await code(await w.req("POST", "/v1/tasks", w.ops, w.base({ evidenceRule: rule({ review: "named", reviewer: readOnly.userId }) })))).toBe("invalid_reviewer")
     expect((await put(w.ops, rule({ review: "named", reviewer: w.staff2.userId }), 2)).status).toBe(200)
     // the named reviewer now sees the task
     expect((await w.req("GET", `/v1/tasks/${t.id}`, w.staff2)).status).toBe(200)
@@ -251,6 +254,50 @@ describe("rule and attach", () => {
     const s = await submitted(w)
     expect(await code(await w.req("PUT", `/v1/tasks/${s.id}/evidence-rule`, w.ops, { version: await versionOf(w, s.id), rule: rule({ min: 3 }) }))).toBe("evidence_locked")
   }, 90_000)
+})
+
+describe("inherited rules (D23)", () => {
+  test("a template or project rule whose named reviewer can no longer write falls back to manager review; a template without a rule still beats the project default; an invalid inherited rule is 422", async () => {
+    const w = await world()
+    const named = rule({ review: "named", reviewer: w.staff2.userId })
+    const tpl = await w.json(await w.req("POST", "/v1/task-templates", w.ops, { name: "Named", title: "Named", evidenceRule: named }))
+    const proj = await w.json(await w.req("POST", "/v1/projects", w.ops, { name: "P", defaultEvidenceRule: named }))
+    const plain = await w.json(await w.req("POST", "/v1/task-templates", w.ops, { name: "Plain", title: "Plain" }))
+    await w.q(`update roles set access = access || '{"tasks":"read"}'::jsonb where key = 'employee'`) // staff2 is now read-only
+    const viaTpl = await w.mk(w.ops, { templateId: tpl.id })
+    expect(viaTpl.evidenceRule).toMatchObject({ mode: "required", review: "manager" })
+    expect(viaTpl.evidenceRule.reviewer).toBeUndefined()
+    const viaProj = await w.mk(w.ops, { projectId: proj.id })
+    expect(viaProj.evidenceRule).toMatchObject({ mode: "required", review: "manager" })
+    // the explicit template (no rule) wins over the project default
+    expect((await w.mk(w.ops, { templateId: plain.id, projectId: proj.id })).evidenceRule.mode).toBe("none")
+    // an inherited rule that is itself invalid now fails the POST
+    await w.q(`update task_templates set evidence_rule = '{"mode":"required","types":[],"min":1,"instruction":"","review":"manager"}'::jsonb where id = $1`, [tpl.id])
+    expect(await code(await w.req("POST", "/v1/tasks", w.ops, w.base({ templateId: tpl.id })))).toBe("invalid_evidence_rule")
+  }, 60_000)
+})
+
+describe("support grants", () => {
+  test("a support-grant session gets 403 support_read_only on verify, reject and batch (nothing changes) and can read the gallery", async () => {
+    const w = await world()
+    const t = await submitted(w)
+    const staff = await makeStaff(w.deps, "support")
+    const g = await call(w.app, "POST", `/v1/platform/tenants/${w.tenant.id}/support-grants`, { cookie: staff.cookie, body: { reason: "Ticket 4411: report totals look wrong", hours: 2 } })
+    expect(g.status, await g.clone().text()).toBe(201)
+    const v = await versionOf(w, t.id)
+    const as = (m: string, path: string, body?: unknown) => call(w.app, m, path, { cookie: staff.cookie, tenant: "acme", body })
+    for (const [path, body] of [[`/v1/tasks/${t.id}/verify`, { version: v }], [`/v1/tasks/${t.id}/reject`, { version: v, reason: "no" }], ["/v1/evidence/verify-batch", { items: [{ taskId: t.id, version: v }] }]] as const) {
+      const r = await as("POST", path, body)
+      expect(r.status, path).toBe(403)
+      expect(await code(r), path).toBe("support_read_only")
+    }
+    expect(await versionOf(w, t.id)).toBe(v)
+    expect(await statusOf(w, t.id)).toBe("submitted")
+    expect(await auditCount(w)).toBe(0)
+    const gal = await as("GET", "/v1/evidence")
+    expect(gal.status).toBe(200)
+    expect(((await w.json(gal)).items as Json[]).map((i) => i.taskId)).toEqual([t.id])
+  }, 60_000)
 })
 
 describe("verification independence (D8)", () => {
@@ -551,6 +598,37 @@ describe("races", () => {
     expect((await w.q("select count(*)::int n from domain_events where type = 'task.evidence_verified' and payload->>'taskId' = $1", [t2.id]))[0].n).toBe(1)
     expect((await evRows(w, t2.id)).filter((e) => e.review === "accepted")).toHaveLength(1)
   }, 90_000)
+
+  test("verify-batch never deadlocks with a single verify / reject or another batch (ruling E10): no 500, no 40P01, one audit row and one event per decided item", async () => {
+    const w = await world()
+    const N = 6
+    for (let round = 0; round < 4; round++) {
+      const ts: Json[] = []
+      for (let i = 0; i < N; i++) ts.push(await submitted(w))
+      const vs = await Promise.all(ts.map((t) => versionOf(w, t.id)))
+      const items = (order: number[]) => ({ items: order.map((i) => ({ taskId: ts[i].id, version: vs[i] })) })
+      const fwd = ts.map((_, i) => i)
+      const calls = [
+        w.req("POST", "/v1/evidence/verify-batch", w.ops, items(fwd)),
+        w.req("POST", "/v1/evidence/verify-batch", w.owner, items([...fwd].reverse())), // overlapping, opposite order
+        // a single verify or reject of EVERY batched task, racing the batches
+        ...ts.map((t, i) => (i % 2 ? w.req("POST", `/v1/tasks/${t.id}/verify`, w.owner, { version: vs[i] }) : w.req("POST", `/v1/tasks/${t.id}/reject`, w.ops, { version: vs[i], reason: "No" }))),
+      ]
+      const res = await Promise.all(calls)
+      for (const r of res) expect(r.status, await r.clone().text()).toBeLessThan(500)
+      for (const r of res.slice(0, 2)) expect(r.status).toBe(200)
+      // each task was decided exactly once: its audit row, its event and its status agree
+      for (const t of ts) {
+        const st = await statusOf(w, t.id)
+        expect(["completed", "changes_requested"]).toContain(st)
+        const au = await w.q<{ action: string }>("select action from audit_events where entity_id = $1 and action in ('task.evidence_verified','task.evidence_rejected')", [t.id])
+        expect(au).toHaveLength(1)
+        expect(au[0].action).toBe(st === "completed" ? "task.evidence_verified" : "task.evidence_rejected")
+        const ev = await w.q("select 1 from domain_events where payload->>'taskId' = $1 and type in ('task.evidence_verified','task.evidence_rejected')", [t.id])
+        expect(ev).toHaveLength(1)
+      }
+    }
+  }, 300_000)
 
   test("the assignee adding evidence while a reviewer decides: the item never slips in unreviewed (409 evidence_locked once submitted)", async () => {
     const w = await world()

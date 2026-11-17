@@ -57,7 +57,7 @@ export async function checkAssignees(tx: TenantTx, ctx: TaskCtx, primary: string
 /**
  * A rule the caller ENTERED (body, template, project, PUT /evidence-rule): judged strictly BEFORE it is normalised, so a Required rule with a
  * minimum of 0 or no types is refused (422 invalid_evidence_rule) instead of being quietly repaired. A named reviewer must be an ACTIVE member of
- * THIS tenant whose role has tasks:read, else 422 invalid_reviewer (a person from another tenant looks exactly like an unknown one).
+ * THIS tenant whose role has tasks:write (ruling E9: verify and reject need it, so a read-only reviewer could never act), else 422 invalid_reviewer (a person from another tenant looks exactly like an unknown one).
  */
 export async function checkRule(tx: TenantTx, ctx: TaskCtx, rule: EvidenceRule | undefined): Promise<EvidenceRule> {
   if (!rule) return { ...NO_EVIDENCE }
@@ -70,7 +70,7 @@ export async function checkRule(tx: TenantTx, ctx: TaskCtx, rule: EvidenceRule |
       .from(memberships)
       .innerJoin(roles, eq(roles.id, memberships.roleId))
       .where(and(eq(memberships.tenantId, ctx.tenantId), eq(memberships.status, "active"), eq(memberships.userId, r.reviewer)))
-    if (!m || !can({ access: m.access } as never, "tasks", "read")) throw unprocessable("invalid_reviewer")
+    if (!m || !can({ access: m.access } as never, "tasks", "write")) throw unprocessable("invalid_reviewer")
   }
   return r
 }
@@ -103,6 +103,8 @@ export const staleVersion = (row: TaskRow, version: number) => {
  * else NO_EVIDENCE. Only the RULE is inherited server-side; the other template fields are filled in by the client (applyTemplate). An
  * inherited rule whose named reviewer has left is kept but falls back to manager review, so a stale template never blocks creating a task.
  * A template of another tenant is the same 422 invalid_template as an unknown id.
+ * Two documented consequences of D23: a template WITHOUT an evidence rule (its stored rule is NO_EVIDENCE) still beats the project's default, because the
+ * explicit template wins; and since checkRule is strict, an inherited rule that is itself invalid (not just a departed reviewer) fails POST /v1/tasks with 422 invalid_evidence_rule.
  */
 async function inheritedRule(tx: TenantTx, ctx: TaskCtx, body: EvidenceRule | undefined, templateId: string | undefined, projectRule: EvidenceRule | null): Promise<EvidenceRule> {
   if (body) return checkRule(tx, ctx, body)

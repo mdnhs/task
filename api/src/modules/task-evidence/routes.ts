@@ -30,7 +30,7 @@ const deviceIdOf = (c: Context<AppEnv>): string | null => {
 
 const ruleR = createRoute({
   method: "put", path: "/v1/tasks/{id}/evidence-rule", middleware: write, request: { params: IdParam, body: reqBody(RuleBody) },
-  responses: { 200: { description: "The task with its new evidence rule (the creator or a manager; locked once submitted, completed or cancelled). 403 forbidden; 404 task_not_found; 409 version_conflict | evidence_locked | task_archived; 422 invalid_evidence_rule | invalid_reviewer (a named reviewer must be an active member with tasks:read)", content: content(TaskDtoSchema) } },
+  responses: { 200: { description: "The task with its new evidence rule (the creator or a manager; locked once submitted, completed or cancelled). 403 forbidden; 404 task_not_found; 409 version_conflict | evidence_locked | task_archived; 422 invalid_evidence_rule | invalid_reviewer (a named reviewer must be an active member with tasks:write)", content: content(TaskDtoSchema) } },
 })
 const addR = createRoute({
   method: "post", path: "/v1/tasks/{id}/evidence", middleware: write, request: { params: IdParam, body: reqBody(EvidenceBody) },

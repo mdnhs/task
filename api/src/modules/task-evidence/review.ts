@@ -1,4 +1,4 @@
-import { and, eq, inArray } from "drizzle-orm"
+import { and, asc, eq, inArray } from "drizzle-orm"
 import { canVerify, missingEvidence } from "@opsdesk/domain/task-evidence"
 import { STATUS, type TaskStatus } from "@opsdesk/domain/task-model"
 import { AppError, Conflict, Forbidden, NotFound } from "../../core/errors"
@@ -6,7 +6,7 @@ import { taskComments, taskEvidence, tasks } from "../../db/schema"
 import type { TenantTx } from "../../db/tenant-tx"
 import { recordAudit } from "../audit"
 import {
-  counts, loadEvidence, lockedTask, notifyTask, publishTaskEvent, rejectItems, SCAN_REASON, SCANNER, staleVersion, stateItems, taskDetailDto, writeHistory,
+  counts, loadEvidence, taskScopeWhere, lockedTask, notifyTask, publishTaskEvent, rejectItems, SCAN_REASON, SCANNER, staleVersion, stateItems, taskDetailDto, writeHistory,
   type EvidenceView, type TaskCtx, type TaskDto, type TaskEnv,
 } from "../tasks"
 
@@ -109,6 +109,11 @@ export type BatchOutcome = { taskId: string; status: "verified" | "failed"; code
  * keeps the request order. Only an AppError is reported per item: anything else is a bug and fails the whole call.
  */
 export async function verifyBatch(tx: TenantTx, env: TaskEnv, ctx: TaskCtx, items: BatchItem[]): Promise<BatchOutcome[]> {
+  // LOCK ORDER (ruling E10): every task row of the batch is locked up front, in ONE statement in id order, in scope, BEFORE the first decide(). recordAudit takes
+  // the tenant audit advisory lock and holds it to commit, so a row lock taken after item A's audit would meet a single verify of that row (row lock held,
+  // waiting for the audit lock): a deadlock. These locks are taken outside every savepoint, so a failing item's rollback never releases or reorders them.
+  const wanted = [...new Set(items.map((i) => i.taskId))]
+  await tx.select({ id: tasks.id }).from(tasks).where(and(eq(tasks.tenantId, ctx.tenantId), inArray(tasks.id, wanted), taskScopeWhere(ctx.scope, ctx.reports))).orderBy(asc(tasks.id)).for("update", { of: [tasks] })
   const out: BatchOutcome[] = new Array(items.length)
   const order = items.map((_, i) => i).sort((a, b) => (items[a].taskId < items[b].taskId ? -1 : items[a].taskId > items[b].taskId ? 1 : a - b))
   for (const i of order) {
