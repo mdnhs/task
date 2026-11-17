@@ -383,6 +383,46 @@ describe("the 48 h lookback and the tenant gate", () => {
   }, 120_000)
 })
 
+describe("T5.4 review carry-ins (M1, M2)", () => {
+  test("M1: the REAL erase path (a data request run by the worker as the app role, FORCE RLS with the tenant set) removes the member's shift_report_alerts rows through the member FK cascade, and nobody else's", async () => {
+    const w = await world({ now: "2026-10-25T07:00:00.000Z" })
+    await onlyFrom(w, "2026-10-24")
+    await tick(w, "2026-10-25T07:00:00Z")
+    const victim = w.staff
+    const before = await ledger(w)
+    expect(before.filter((r) => r.user_id === victim.userId).length).toBeGreaterThan(0)
+    expect(before.filter((r) => r.user_id !== victim.userId).length).toBeGreaterThan(0)
+    const dr = await w.req("POST", "/v1/data-requests", w.owner, { subjectUserId: victim.userId, kind: "erase", reason: "asked" })
+    expect(dr.status, await dr.clone().text()).toBe(201)
+    await w.drain()
+    const request = (await w.json(await w.req("GET", `/v1/data-requests/${(await w.json(dr)).id}`, w.owner)))
+    expect(request.status, JSON.stringify(request)).toBe("completed")
+    expect(await w.q("select count(*)::int n from memberships where user_id = $1", [victim.userId])).toEqual([{ n: 0 }])
+    expect(await ledger(w, `user_id = '${victim.userId}'`)).toEqual([])
+    const after = await ledger(w)
+    expect(after.map((r) => r.user_id).sort()).toEqual(before.filter((r) => r.user_id !== victim.userId).map((r) => r.user_id).sort())
+  }, 60_000)
+
+  test("M2: a pattern in Pacific/Auckland inside a Dublin tenant: the alert text shows the PATTERN zone's HH:mm (the shift 22:00-06:00 Auckland on 24 Oct is due 07:00 there = 18:00Z), not the tenant's 19:00", async () => {
+    const w = await world({ now: "2026-10-24T16:00:00.000Z" })
+    await w.q("delete from shift_assignments")
+    const pr = await w.req("POST", "/v1/shifts/patterns", w.ops, { name: "Kiwi night", teamId: w.team, start: "22:00", end: "06:00", days: [0, 1, 2, 3, 4, 5, 6], timeZone: "Pacific/Auckland" })
+    expect(pr.status, await pr.clone().text()).toBe(201)
+    const kiwi = (await w.json(pr)).id as string
+    expect((await w.req("POST", "/v1/shifts/assignments", w.ops, { userId: w.staff.userId, patternId: kiwi, from: "2026-10-24" })).status).toBe(201)
+    await tick(w, "2026-10-24T17:00:00Z") // 06:00 Auckland: the shift ended -> prompt
+    await tick(w, "2026-10-24T18:00:00Z") // 07:00 Auckland: due -> missing
+    const rows = await ledger(w)
+    expect(uniq(rows.map((r) => `${r.d}|${r.kind}@${iso(r.alerted_at)}`))).toEqual(["2026-10-24|prompt@2026-10-24T17:00:00.000Z", "2026-10-24|missing@2026-10-24T18:00:00.000Z"])
+    const n = await notes(w)
+    const prompt = n.find((r) => r.title === PROMPT && r.user_id === w.staff.userId)
+    const missing = n.find((r) => r.title === MISSING && r.user_id === w.staff.userId)
+    expect(prompt?.body).toBe("Kiwi night, 2026-10-24. Due 07:00")
+    expect(missing?.body).toBe("Kiwi night, 2026-10-24. Was due 07:00")
+    expect(JSON.stringify(n)).not.toContain("19:00") // the tenant's Dublin wall time of the same instant
+  })
+})
+
 describe("the clock, the queue and the database", () => {
   test("the job uses deps.clock only: ledger and notification times are the fake clock's, the source has no new Date() / Date.now() / SQL now(), the worker registers the job, and enqueued job ids have no ':'", async () => {
     const w = await world({ now: "2026-10-25T07:00:00.000Z" })

@@ -788,6 +788,55 @@ describe("T5.3 review carry-ins (T5.4 first commit)", () => {
     expect((await w.q("select count(*)::int n from tenant_settings where key = 'report_template'"))[0].n).toBe(0)
   })
 
+  test("M5: the template size cap sits at 64 KB serialised: a body of about 63 KB saves, one of about 65 KB is 422 template_too_large", async () => {
+    const w = await world()
+    const admin = await w.who("admin")
+    const field = (f: number, label: string) => ({ id: `f${f}`, label, required: false })
+    const fullDept = (i: number) => ({ dept: `Dept ${i}`, sections: Array.from({ length: 12 }, (_, s) => ({ id: `s${s}`, title: "T".repeat(80), enabled: true, fields: Array.from({ length: 12 }, (_, f) => field(f, "L".repeat(80))) })) })
+    /** A valid template whose JSON is exactly `target` bytes: whole departments, then one more built field by field, the last label padded. */
+    const sized = (target: number) => {
+      const departments: ReturnType<typeof fullDept>[] = []
+      const size = () => Buffer.byteLength(JSON.stringify({ departments }), "utf8")
+      while (true) {
+        departments.push(fullDept(departments.length))
+        if (size() > target) {
+          const last = departments.pop()!
+          const part = { dept: last.dept, sections: [] as typeof last.sections }
+          departments.push(part)
+          for (const sec of last.sections) {
+            const s = { ...sec, fields: [] as typeof sec.fields }
+            part.sections.push(s)
+            for (const f of sec.fields) {
+              s.fields.push(f)
+              if (size() > target) { s.fields.pop(); break }
+            }
+            if (s.fields.length < sec.fields.length) break
+          }
+          break
+        }
+      }
+      const gap = target - size()
+      const lastSection = departments[departments.length - 1].sections.at(-1)!
+      if (lastSection.fields.length === 0) lastSection.fields.push(field(0, "x"))
+      const lf = lastSection.fields.at(-1)!
+      lf.label = lf.label + "y".repeat(Math.min(gap, 80 - lf.label.length))
+      return { departments, bytes: size() }
+    }
+    const ok = sized(63 * 1024)
+    expect(ok.bytes).toBeGreaterThan(62 * 1024)
+    expect(ok.bytes).toBeLessThanOrEqual(64 * 1024)
+    const r1 = await w.req("PUT", "/v1/shift-reports/template", admin, { departments: ok.departments })
+    expect([r1.status, await r1.clone().text()].join(" ")).toMatch(/^200 /)
+    expect((await w.q("select count(*)::int n from tenant_settings where key = 'report_template'"))[0].n).toBe(1)
+    const bad = sized(65 * 1024)
+    expect(bad.bytes).toBeGreaterThan(64 * 1024)
+    expect(bad.bytes).toBeLessThan(66 * 1024)
+    const r2 = await w.req("PUT", "/v1/shift-reports/template", admin, { departments: bad.departments })
+    expect([r2.status, await code(r2)]).toEqual([422, "template_too_large"])
+    const stored = (await w.q("select value from tenant_settings where key = 'report_template'"))[0].value
+    expect(Buffer.byteLength(JSON.stringify(stored), "utf8")).toBeLessThanOrEqual(64 * 1024) // the second PUT wrote nothing
+  })
+
   test("accept or return a submitted report whose owner was erased (user_id null) → 409 report_owner_erased: nobody can be told or resubmit; nothing changes", async () => {
     const w = await world()
     const rep = await submitted(w, w.staff)
