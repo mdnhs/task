@@ -14,7 +14,7 @@ import { apiBrowser } from "@/lib/api/browser"
 import { userMessage } from "@/lib/api/problem"
 import { paginate } from "@/lib/paginate"
 import { actionInfo } from "../actions-catalogue"
-import { AUDIT_LIMIT, exportUrl, loadAudit } from "../adapters"
+import { AUDIT_LIMIT, exportUrl, loadAudit, nameFrom } from "../adapters"
 import { AUDIT_PAGE_SIZE, EMPTY_FILTERS, filterEvents } from "../filters"
 import type { AuditEvent, AuditFilters } from "../types"
 
@@ -51,7 +51,7 @@ export function AuditView({
     if (k === "recordType" || k === "from" || k === "to") {
       setBusy(true)
       setError(null)
-      loadAudit(apiBrowser, next, timezone, (id) => names[id] ?? id)
+      loadAudit(apiBrowser, next, timezone, nameFrom(names))
         .then(setEvents)
         .catch((e: unknown) => setError(userMessage(e).text))
         .finally(() => setBusy(false))
@@ -78,7 +78,7 @@ export function AuditView({
         title="Audit Log"
         subtitle="Who did what, when and from where"
         actions={
-          <a className="btn btn-outline" href={exportUrl(filters, timezone)} download>
+          <a className="btn btn-outline" href={exportUrl(filters, timezone)} download title="The export uses the record type and dates only, not the actor, action or search filters">
             Export CSV
           </a>
         }
@@ -87,7 +87,7 @@ export function AuditView({
         <p className="au-note">
           <Icon name="lock" />
           <span>
-            Audit records can&apos;t be edited or deleted. {flagged} sensitive actions are flagged.{events.length >= AUDIT_LIMIT ? ` Showing the latest ${AUDIT_LIMIT.toLocaleString("en")}: narrow the dates or export the CSV for the rest.` : ""}
+            Audit records can&apos;t be edited or deleted. {flagged} sensitive actions are flagged. Export CSV uses the record type and dates (type and dates only).{events.length >= AUDIT_LIMIT ? ` Showing the latest ${AUDIT_LIMIT.toLocaleString("en")}: narrow the dates or export the CSV for the rest. The actor, action and search filters apply to the loaded rows only.` : ""}
           </span>
         </p>
         <FilterBar>

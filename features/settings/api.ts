@@ -72,6 +72,18 @@ export const nameOfFrom = (names: Record<string, string>) => (id: string) => nam
 
 export const serverApi = apiServer
 
+/** The idle sign-out hours the platform set for this company (GET /v1/me/tenant, open to every member). */
+export const loadSessionIdleHours = async (api: Reader): Promise<number> => (await api.get("/v1/me/tenant")).tenant.sessionIdleHours
+
+/**
+ * MOCK: no backend (the API has no deactivate route and no last-active). Per-email status and last-active from the demo seed, read only on a demo deployment
+ * (ENABLE_MOCK_MODULES=1, ruling J2). It never calls the API. Isolated: the page loads it only behind mockEnabled().
+ */
+export async function getMockUserActivity(): Promise<Record<string, { status: "active" | "deactivated"; lastActive: string }>> {
+  const { users } = await getData<{ users: { email: string; status: "active" | "deactivated"; lastActive: string }[] }>("settings/users.json")
+  return Object.fromEntries(users.map((u) => [u.email.toLowerCase(), { status: u.status, lastActive: u.lastActive }]))
+}
+
 // ---- MOCK: no backend until T6.7 (template editor) and B9 (tenant-default notification settings, delivery log). Shown only on a demo deployment (I16). ----
 export const getTemplate = () => getData<TemplateData>("settings/template.json")
 export const getNotificationSettings = () => getData<NotificationsData>("settings/notifications.json")

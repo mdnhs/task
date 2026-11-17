@@ -170,17 +170,26 @@ export function GlobalSearch({
   // Data hits from the API as the user types (150 ms debounce, 2+ characters, the previous request aborted). They are ranked by the API, so they skip the local
   // scorer; a facet filter drops them (the API has no facets yet). The platform console keeps its own local index.
   const [apiItems, setApiItems] = React.useState<SearchItem[]>(NO_ITEMS)
+  const [apiError, setApiError] = React.useState(false)
+  const [retryN, setRetryN] = React.useState(0)
   const searcher = React.useMemo(() => (scope === "app" ? makeSearcher({ api: apiBrowser }) : null), [scope])
   React.useEffect(() => {
     if (!searcher) return
     let live = true
-    void searcher.search(q).then((hits) => {
-      if (live && hits) setApiItems(hits)
+    void searcher.search(q).then((res) => {
+      if (!live || !res) return
+      if (Array.isArray(res)) {
+        setApiItems(res)
+        setApiError(false)
+      } else {
+        setApiItems(NO_ITEMS)
+        setApiError(true)
+      }
     })
     return () => {
       live = false
     }
-  }, [searcher, q])
+  }, [searcher, q, retryN])
   React.useEffect(() => () => searcher?.cancel(), [searcher])
   const results = React.useMemo(() => [...searchItems(items, q, filters), ...applyFilters(searcher && q.trim().length >= 2 ? apiItems : NO_ITEMS, filters)], [items, q, filters, apiItems, searcher])
   const groups = React.useMemo(() => groupResults(results), [results])
@@ -575,7 +584,13 @@ export function GlobalSearch({
                   </SkGroup>
                 )
               ) : searching ? (
-                groups.length === 0 ? (
+                groups.length === 0 && apiError ? (
+                  <div className="od-search-empty" role="presentation">
+                    <p className="od-search-empty-t">Couldn&apos;t search</p>
+                    <p className="od-search-empty-s">Check your connection and try again.</p>
+                    <button type="button" className="btn btn-outline set-sm" onClick={() => setRetryN((n) => n + 1)}>Retry</button>
+                  </div>
+                ) : groups.length === 0 ? (
                   <div className="od-search-empty" role="presentation">
                     <Icon name="search" />
                     <p className="od-search-empty-t">No results{q.trim() ? <> for “{q.trim()}”</> : null}</p>

@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs"
+import path from "node:path"
 import { describe, expect, test, vi } from "vitest"
 import { fakeApi } from "@/test/support/fake-api"
 import { applyFilters, EMPTY_FILTERS, groupResults } from "./match"
@@ -94,7 +96,7 @@ describe("T6.5 search: debounce 150 ms, 2+ characters, the previous request is a
     expect(signals).toHaveLength(2)
     expect(signals[0]!.aborted).toBe(true)
     expect(a).toBeNull() // superseded: the caller ignores it
-    expect(b!.map((i) => i.title)).toEqual(["TSK-1 fire"])
+    expect((b as { title: string }[]).map((i) => i.title)).toEqual(["TSK-1 fire"])
     // typing again inside the pause cancels the timer: only the last query is sent
     const calls0 = (api as { get: ReturnType<typeof vi.fn> }).get.mock.calls.length
     const x = s.search("ab")
@@ -106,13 +108,18 @@ describe("T6.5 search: debounce 150 ms, 2+ characters, the previous request is a
     expect((api as { get: ReturnType<typeof vi.fn> }).get.mock.calls.length - calls0).toBe(1)
   })
 
-  test("a failed request is an empty result, not a crash", async () => {
+  test("a failed request is an error result (shown with a retry), not an empty list", async () => {
     const { client } = fakeApi({})
     const t = timers()
     const s = makeSearcher({ api: client, setTimer: t.set, clearTimer: t.clear })
     const p = s.search("fire")
     t.advance(150)
-    expect(await p).toEqual([])
+    expect(await p).toEqual({ error: true })
+  })
+  test("the dialog shows the error state with a Retry button", () => {
+    const src = readFileSync(path.resolve(__dirname, "components/global-search.tsx"), "utf8")
+    expect(src).toMatch(/Retry/)
+    expect(src).toMatch(/apiError/)
   })
 })
 

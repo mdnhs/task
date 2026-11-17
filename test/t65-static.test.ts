@@ -73,10 +73,11 @@ describe("T6.5 secrets and the enrolment code", () => {
   })
 })
 
-describe("T6.5 branding: colour only unless the plan has the files module", () => {
-  test("the panel shows one hint line and no upload when the plan has no files module", () => {
+describe("T6.5 branding: colour only for now", () => {
+  test("the logo upload is hidden behind LOGO_UPLOAD_ENABLED (false) and the colour control stays", () => {
     const src = strip(read("features/settings/components/branding-panel.tsx"))
+    expect(src).toMatch(/LOGO_UPLOAD_ENABLED/)
     expect(src).toMatch(/canUpload/)
-    expect(src).toMatch(/Logo upload isn&apos;t in your plan|Logo upload is not in your plan/)
+    expect(src).toMatch(/ColorPicker/)
   })
 })

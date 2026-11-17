@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Building2, CalendarClock } from "lucide-react"
+import { Building2, CalendarClock, ShieldCheck } from "lucide-react"
 import { toast } from "sonner"
 import { z } from "zod"
 
@@ -13,7 +13,7 @@ import { TimePicker, formatTime } from "@/components/time-picker"
 import { Input } from "@/components/ui/input"
 import { useApiAction } from "@/hooks/use-api-action"
 import { apiBrowser } from "@/lib/api/browser"
-import { fieldErrorOf, organisationPatch } from "../adapters"
+import { fieldErrorOf, idleLabel, organisationPatch } from "../adapters"
 import { makeSettingsClient } from "../client"
 import type { Organisation, OrganisationData } from "../types"
 
@@ -22,9 +22,8 @@ const schema = z.object({
   reportDeadline: z.string().regex(/^\d{2}:\d{2}$/, "Choose the report deadline"),
 })
 
-// Organisation tab (GET/PATCH /v1/settings/organisation): company name, timezone and the daily report deadline. Only what changed is sent. Weekend rules and the session
-// timeout have no backend (the API does not store them), so they are not offered. Name, slug, timezone and deadline are the tenant's own values.
-export function OrganisationForm({ options, org, tzLabel, canWrite }: { options: OrganisationData; org: Organisation; tzLabel: string; canWrite: boolean }) {
+// Organisation tab (GET/PATCH /v1/settings/organisation): company name, timezone and the daily report deadline. Only what changed is sent. The weekend rule has no backend (the API has holidays instead). The session timeout is shown read-only. Name, slug, timezone and deadline are the tenant's own values.
+export function OrganisationForm({ options, org, tzLabel, sessionIdleHours, canWrite }: { options: OrganisationData; org: Organisation; tzLabel: string; /** Idle sign-out, from /v1/me/tenant. Read-only: the platform sets it. */ sessionIdleHours: number; canWrite: boolean }) {
   const run = useApiAction()
   const client = makeSettingsClient(apiBrowser, { go: (u) => window.location.assign(u) })
   const [form, setForm] = useState({ name: org.name, timezone: org.timezone, reportDeadline: org.reportDeadline })
@@ -82,6 +81,11 @@ export function OrganisationForm({ options, org, tzLabel, canWrite }: { options:
               </Field>
               <Field label="Workspace ID" htmlFor="set-slug">
                 <Input id="set-slug" value={org.slug} readOnly />
+              </Field>
+            </FormSection>
+            <FormSection icon={ShieldCheck} title="Security">
+              <Field label="Session timeout" htmlFor="set-timeout" hint="Idle time before sign-out. Set by the platform for now.">
+                <Input id="set-timeout" readOnly value={idleLabel(sessionIdleHours)} />
               </Field>
             </FormSection>
           </div>

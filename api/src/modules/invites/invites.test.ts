@@ -434,3 +434,47 @@ test("the new invite routes are covered by the API-key deny-list prefix (/v1/inv
   const { API_KEY_DENIED_ROUTES } = await import("../../core/middleware/api-key")
   expect(API_KEY_DENIED_ROUTES.some((r) => "prefix" in r && r.prefix === "/v1/invites")).toBe(true) // prefix: covers the list, revoke and resend
 })
+
+// ---------------------------------------------------------------- T6.5 fix round 1: support sessions and races
+
+test("a support session (read-only, under a grant) is refused on GET /v1/invites and on every invite write", async () => {
+  const { makeStaff } = await import("../../../test/factories")
+  const w = await world()
+  const created = (await (await invite(w)).json()) as Json
+  const staff = await makeStaff(w.deps, "support")
+  const g = await call(w.app, "POST", `/v1/platform/tenants/${w.tenant.id}/support-grants`, { cookie: staff.cookie!, body: { reason: "Ticket 4411: invites look wrong", hours: 2 } })
+  expect(g.status).toBe(201)
+  const asSupport = (method: string, path: string, body?: unknown) => call(w.app, method, path, { cookie: staff.cookie!, tenant: "acme", body })
+  for (const [m, p] of [["GET", "/v1/invites"], ["DELETE", `/v1/invites/${created.id}`], ["POST", `/v1/invites/${created.id}/resend`]] as const) {
+    const r = await asSupport(m, p)
+    expect(r.status, `${m} ${p}`).toBe(403)
+    expect(await r.text()).not.toMatch(/new@x\.ie|token/i)
+  }
+  expect(await ownerTenantQuery(w.tenant.id, "select 1 from invites")).toHaveLength(1)
+})
+
+test("an accept racing a revoke or a resend: exactly one outcome, never a 500, and the final state agrees with the winner", async () => {
+  for (const other of ["revoke", "resend"] as const) {
+    await resetDb()
+    const w = await world()
+    const created = (await (await invite(w)).json()) as Json
+    const token = tokenFrom(w.mailer.last())
+    const cookie = await newcomer(w)
+    w.clock.advance({ minutes: 5 }) // past the resend cooldown (the admin session stays valid)
+    const [acc, act] = await Promise.all([
+      call(w.app, "POST", "/v1/invites/accept", { cookie, body: { token } }),
+      other === "revoke" ? as(w, "DELETE", `/v1/invites/${created.id}`) : as(w, "POST", `/v1/invites/${created.id}/resend`),
+    ])
+    expect(acc.status, other).toBeLessThan(500)
+    expect(act.status, other).toBeLessThan(500)
+    const joined = (await ownerTenantQuery(w.tenant.id, "select 1 from memberships m join \"user\" u on u.id = m.user_id where u.email = 'new@x.ie'")).length
+    if (acc.status === 200) {
+      expect(joined, other).toBe(1)
+      expect(act.status, `${other} after the accept`).toBe(409) // invite_used
+    } else {
+      expect(joined, other).toBe(0)
+      expect([404, 409], `accept lost to ${other}`).toContain(acc.status)
+      expect(act.status).toBeLessThan(300)
+    }
+  }
+})

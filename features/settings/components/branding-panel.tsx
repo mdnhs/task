@@ -15,11 +15,12 @@ import { BRAND_STYLE_ID, brandCss } from "@/lib/brand"
 import { LOGO_ACCEPT, initialsOf, logoError } from "@/lib/branding"
 import { fieldErrorOf } from "../adapters"
 import { makeSettingsClient } from "../client"
+import { LOGO_UPLOAD_ENABLED } from "../constants"
 
 const schema = z.object({ color: z.string().regex(/^#[0-9a-fA-F]{6}$/, "Use a 6 digit hex colour, like #2f6f5e") })
 
 // Branding (FR-SAAS-11, GET/PUT /v1/settings/branding): the brand colour, with a live preview of the sidebar chip, and the logo when the plan has the files module
-// (the upload goes straight to storage and must pass the malware scan). Starter companies cannot upload, so they get colour only and one line saying why.
+// (the upload goes straight to storage and must pass the malware scan). The upload is hidden for now (LOGO_UPLOAD_ENABLED): the shell cannot show a logo yet.
 // The appearance presets and a separate display name have no backend (the company name is edited on the Organisation tab).
 export function BrandingPanel({ name, color, logoFileId, presets, canWrite, canUpload }: { name: string; color: string; logoFileId: string | null; presets: string[]; canWrite: boolean; canUpload: boolean }) {
   const run = useApiAction()
@@ -86,6 +87,7 @@ export function BrandingPanel({ name, color, logoFileId, presets, canWrite, canU
       </div>
       <div className="set-brand">
         <form className="od-form set-form" noValidate onSubmit={(e) => { e.preventDefault(); document.getElementById("brand-save")?.click() }}>
+          {LOGO_UPLOAD_ENABLED && (
           <FormSection icon={ImageIcon} title="Logo">
             {canUpload ? (
               <Field label="Logo" htmlFor="brand-logo" error={errors.logo} hint="PNG, JPG, SVG or WebP, up to 512 KB">
@@ -112,6 +114,7 @@ export function BrandingPanel({ name, color, logoFileId, presets, canWrite, canU
               <p className="od-field-hint">Logo upload isn&apos;t in your plan. Colour only.</p>
             )}
           </FormSection>
+          )}
           <FormSection icon={Palette} title="Colour">
             <Field label="Brand colour" htmlFor="brand-color" error={errors.color} required>
               <ColorPicker id="brand-color" aria-label="Brand colour" value={value} presets={presets} disabled={!canWrite} readOnly={!canWrite} invalid={!!errors.color} onValueChange={(hex) => { setValue(hex); setErrors((x) => ({ ...x, color: undefined })) }} />

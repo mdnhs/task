@@ -132,3 +132,19 @@ export function toDataRequest(dto: unknown, tz: string, nameOf: (userId: string)
 }
 
 export { initialsOf }
+
+// ---- small display rules ----
+
+/** "12 hours" / "1 hour": the platform's idle sign-out setting (read-only here). */
+export const idleLabel = (hours: number): string => `${hours} ${hours === 1 ? "hour" : "hours"}`
+
+/** How long an invite lives, read from the invites' own dates (the tenant's `invite_ttl_days` setting is what set them). Null when there is no invite to read it from. */
+export function inviteDaysOf(invites: readonly { createdAt: string; expiresAt: string }[]): number | null {
+  const i = invites[0]
+  if (!i) return null
+  const ms = Date.parse(`${i.expiresAt}Z`) - Date.parse(`${i.createdAt}Z`)
+  return Number.isFinite(ms) && ms > 0 ? Math.max(1, Math.round(ms / 86_400_000)) : null
+}
+
+/** Changing your own role, or an owner's, is asked about first (it can lock you out or demote the person who runs the workspace). */
+export const needsRoleConfirm = (u: { id: string; role: string }, meId: string): boolean => u.id === meId || u.role === "owner"

@@ -37,9 +37,12 @@ export const SEARCH_LIMIT = 20
 
 type Timer = unknown
 
+/** A finished search: the items, or `{ error: true }` when the request failed (the dialog shows an error with Retry, never "no results"). */
+export type SearchResult = SearchItem[] | { error: true }
+
 /**
  * One searcher per dialog. `search(q)` waits 150 ms; a newer call before that cancels the wait, and a newer call while a request is in flight aborts it. It resolves the items,
- * `[]` for a query under 2 characters or a failed request, or `null` when it was superseded (the caller ignores that answer).
+ * `[]` for a query under 2 characters, `{ error: true }` for a failed request, or `null` when it was superseded (the caller ignores that answer).
  */
 export function makeSearcher(o: {
   api: Pick<ApiClient, "get">
@@ -62,7 +65,7 @@ export function makeSearcher(o: {
   }
 
   return {
-    search(raw: string): Promise<SearchItem[] | null> {
+    search(raw: string): Promise<SearchResult | null> {
       supersede()
       const q = raw.trim()
       if (q.length < SEARCH_MIN_CHARS) return Promise.resolve([])
@@ -75,7 +78,7 @@ export function makeSearcher(o: {
           ctl = mine
           o.api.get("/v1/search", { query: { q, limit: String(SEARCH_LIMIT) }, signal: mine.signal }).then(
             (r) => resolve(mine.signal.aborted ? null : hitsToItems((r as { hits: Hit[] }).hits)),
-            () => resolve(mine.signal.aborted ? null : []),
+            () => resolve(mine.signal.aborted ? null : { error: true }),
           )
         }, SEARCH_DEBOUNCE_MS)
       })

@@ -5,9 +5,10 @@ import { notFound } from "next/navigation"
 import { BillingView, getBilling, getEntitlements, getPlans, getSeatLimit, moduleRows, planCards } from "@/features/billing"
 import {
   BrandingPanel, DepartmentsPanel, DevicePolicyCard, DevicesPanel, IntegrationsPanel, MfaPolicyCard, NotificationsPanel, OrganisationForm, PrivacyPanel, RolesMatrix, SETTINGS_TABS,
-  SettingsLayout, TemplatePanel, UsersPanel, getBrandingPresets, getDeliveryLog, getNames, getNotificationSettings, getOrganisationOptions, getTemplate, isTab, loadBranding,
+  SettingsLayout, TemplatePanel, UsersPanel, getBrandingPresets, getDeliveryLog, getNames, getNotificationSettings, getOrganisationOptions, getMockUserActivity, getTemplate, isTab, loadBranding, loadSessionIdleHours,
   loadDepartments, loadDevices, loadIntegrations, loadInvites, loadMatrix, loadMfaPolicy, loadMyExports, loadOrganisation, loadPolicies, loadRequests, loadUsers, nameOfFrom, readable, serverApi,
 } from "@/features/settings"
+import { LOGO_UPLOAD_ENABLED } from "@/features/settings/constants"
 import type { SettingsTabId } from "@/features/settings"
 import { AccessRestricted } from "@/features/shell"
 import { hasModule } from "@/lib/entitlements"
@@ -51,8 +52,8 @@ export default async function Page({ params, searchParams }: { params: Promise<{
   async function body(tab: SettingsTabId) {
     switch (tab) {
       case "organisation": {
-        const [o, options] = await Promise.all([readable(() => loadOrganisation(api)), getOrganisationOptions()])
-        return o && <OrganisationForm options={options} org={o} tzLabel={org.tzLabel} canWrite={write} />
+        const [o, options, idle] = await Promise.all([readable(() => loadOrganisation(api)), getOrganisationOptions(), loadSessionIdleHours(api)])
+        return o && <OrganisationForm options={options} org={o} tzLabel={org.tzLabel} sessionIdleHours={idle} canWrite={write} />
       }
       case "departments": {
         const d = await readable(() => loadDepartments(api))
@@ -63,7 +64,8 @@ export default async function Page({ params, searchParams }: { params: Promise<{
           readable(() => loadUsers(api)), readable(() => loadMatrix(api)), readable(() => loadInvites(api, org.timezone)), getSeatLimit(),
         ])
         if (!users || !roles) return null
-        return <UsersPanel users={users} invites={invites ?? []} roles={roles.roles} today={org.today} tzLabel={org.tzLabel} seatLimit={seats.limit} seatsUsed={seats.used} planName={seats.planName} canWrite={write} />
+        const mockActivity = mockEnabled() ? await getMockUserActivity() : undefined // MOCK (J2): deactivate and last active, demo deployments only
+        return <UsersPanel meId={session.user.id} mockActivity={mockActivity} users={users} invites={invites ?? []} roles={roles.roles} today={org.today} tzLabel={org.tzLabel} seatLimit={seats.limit} seatsUsed={seats.used} planName={seats.planName} canWrite={write} />
       }
       case "roles": {
         const [matrix, policy] = await Promise.all([readable(() => loadMatrix(api)), readable(() => loadMfaPolicy(api))])
@@ -98,7 +100,7 @@ export default async function Page({ params, searchParams }: { params: Promise<{
       case "branding": {
         const [o, b, presets] = await Promise.all([readable(() => loadOrganisation(api)), readable(() => loadBranding(api)), getBrandingPresets()])
         if (!o || !b) return null
-        const canUpload = hasModule(session.entitlements, "files") && canWrite(session, "files")
+        const canUpload = LOGO_UPLOAD_ENABLED && hasModule(session.entitlements, "files") && canWrite(session, "files")
         return <BrandingPanel name={o.name} color={b.primaryColor ?? tenant.brand} logoFileId={b.logoFileId} presets={presets.presets} canWrite={write} canUpload={canUpload} />
       }
       case "billing": {

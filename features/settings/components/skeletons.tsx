@@ -165,6 +165,9 @@ function Organisation() {
               <FieldSk label="Company name" hint={0} required />
               <FieldSk label="Workspace ID" hint={0} />
             </SecSk>
+            <SecSk title="Security">
+              <FieldSk label="Session timeout" hint="Idle time before sign-out. Set by the platform for now." />
+            </SecSk>
           </div>
           <div className="od-form-col">
             <SecSk title="Daily report">
@@ -259,10 +262,10 @@ const LEVEL = { none: "None", read: "Read", write: "Write" } as const
 function Roles({ canWrite, roles, modules }: { canWrite: boolean; roles: number; modules: number }) {
   return (
     <section className="card set-card">
-      <CardHead title="Roles and permissions" sub="What each role can open and change, per module" />
+      <CardHead title="Roles and permissions" sub="What each role can open and change, per module" button={canWrite ? 128 : undefined} />
       <p className="set-notice">
         <Sk w={18} h={18} r="circle" />
-        <span>{g("Changes are audited")}</span>
+        <span>{g("Changes are audited. Built-in roles are fixed: copy one to edit it.")}</span>
       </p>
       <div className="table-wrap">
         <table className="rtable set-matrix">
@@ -532,10 +535,6 @@ function Branding({
       <CardHead title={90} sub={230} />
       <div className="set-brand">
         <div className="od-form set-form">
-          <SecSk title="Logo">
-            {/* starter plans get one hint line; plans with the files module get the upload drop zone (intended, T6.9 measures both) */}
-            <Sk w={230} h={10} lh={17.4} />
-          </SecSk>
           <SecSk title="Colour">
             <div className="od-field">
               <Sk w={90} h={11} lh={18.1} />

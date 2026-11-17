@@ -65,3 +65,6 @@ export function exportUrl(f: AuditFilters, tz: string): string {
   if (q.to) p.set("to", q.to)
   return `/v1/audit/export?${p.toString()}`
 }
+
+/** Id -> name for the people the caller can see. Anyone else is "Unknown member" (never a raw id on screen). */
+export const nameFrom = (names: Record<string, string>) => (id: string): string => names[id] ?? "Unknown member"

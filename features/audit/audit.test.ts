@@ -92,3 +92,18 @@ describe("T6.5 audit: the actions catalogue holds every action the API records",
     expect(stale).toEqual([])
   })
 })
+
+describe("T6.5 fix: audit labels", () => {
+  test("an unknown actor reads as Unknown member, never a raw id", async () => {
+    const { nameFrom } = await import("./adapters")
+    expect(nameFrom({ u1: "Ada Byrne" })("u1")).toBe("Ada Byrne")
+    expect(nameFrom({})("usr_8Kq2mZ4tW1xyz")).toBe("Unknown member")
+  })
+  test("the export says it uses type and dates only, and the truncation notice says the other filters apply to loaded rows", () => {
+    const src = readFileSync(path.resolve(__dirname, "components/audit-view.tsx"), "utf8")
+    expect(src).toMatch(/Export CSV/)
+    expect(src).toMatch(/type and dates/i)
+    expect(src).toMatch(/apply to the loaded rows/i)
+    expect(src).not.toMatch(/\bids\[|\?\? id\b/)
+  })
+})

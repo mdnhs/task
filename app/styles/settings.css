@@ -199,3 +199,4 @@
 .dev-policy .seg.od-seg{background:var(--card)}
 /* the hidden logo input must keep .sr-only size (.od-field input sets width:100%, which made the page scroll sideways) */
 .set-upload>input.sr-only{width:1px;min-height:0;height:1px;padding:0}
+.set-matrix th[data-fresh]{color:var(--brand)}
