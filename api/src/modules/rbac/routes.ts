@@ -7,9 +7,9 @@ import { AccessPatch, FieldRules } from "./access"
 import { changeMemberRole, cloneRole, listRoles, toRoleDto, updateRole } from "./service"
 
 const Id = z.uuid()
-const Role = z.object({
+export const RoleDto = z.object({
   id: z.string(), key: z.string(), label: z.string(), description: z.string(), home: z.string(),
-  access: z.record(z.string(), z.string()), fieldRules: z.record(z.string(), z.array(z.string())),
+  access: z.record(z.string(), z.enum(["none", "read", "write"])), fieldRules: z.record(z.string(), z.array(z.string())),
   isTemplate: z.boolean(), clonedFrom: z.string().nullable(),
 })
 const Clone = z.object({ label: z.string().trim().min(1).max(80).regex(/^[^\r\n]+$/) }).openapi({ example: { label: "Night lead" } })
@@ -21,17 +21,17 @@ const MemberPatch = z.object({ roleId: Id }).openapi({ example: { roleId: "00000
 
 const listRoute = createRoute({
   method: "get", path: "/v1/roles", middleware: [requireTenant, requirePermission("settings", "read")] as const,
-  responses: { 200: { description: "Roles of the tenant", content: { "application/json": { schema: z.array(Role) } } } },
+  responses: { 200: { description: "Roles of the tenant", content: { "application/json": { schema: z.array(RoleDto) } } } },
 })
 const cloneRoute = createRoute({
   method: "post", path: "/v1/roles/{id}/clone", middleware: [requireTenant, requirePermission("settings", "write")] as const,
   request: { params: z.object({ id: Id }), body: { content: { "application/json": { schema: Clone } }, required: true } },
-  responses: { 201: { description: "Editable copy of the role", content: { "application/json": { schema: Role } } } },
+  responses: { 201: { description: "Editable copy of the role", content: { "application/json": { schema: RoleDto } } } },
 })
 const patchRoute = createRoute({
   method: "patch", path: "/v1/roles/{id}", middleware: [requireTenant, requirePermission("settings", "write")] as const,
   request: { params: z.object({ id: Id }), body: { content: { "application/json": { schema: Patch } }, required: true } },
-  responses: { 200: { description: "Updated role", content: { "application/json": { schema: Role } } } },
+  responses: { 200: { description: "Updated role", content: { "application/json": { schema: RoleDto } } } },
 })
 const memberRoute = createRoute({
   method: "patch", path: "/v1/members/{userId}", middleware: [requireTenant, requirePermission("settings", "write")] as const,

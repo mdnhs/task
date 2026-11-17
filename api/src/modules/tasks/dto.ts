@@ -44,6 +44,31 @@ export const HistoryItem = z
   })
   .openapi({ example: { id: TID, at: WALL_EX, atUtc: UTC_EX, actorId: UID, by: "Ann Byrne", kind: "updated", text: "Updated Due", changes: [{ field: "Due", from: "20 Nov 17:00", to: "21 Nov 17:00" }], notified: [] } })
 
+const ChecklistItemDto = z.object({ id: z.string(), text: z.string(), done: z.boolean() }).openapi({ example: { id: TID, text: "Ground floor", done: true } })
+const SubtaskDto = z.object({ id: z.string(), ref: z.string(), title: z.string(), status: Status }).openapi({ example: { id: TID, ref: "TSK-1002", title: "Stairwell", status: "not_started" } })
+const NoteDto = z
+  .object({ at: z.string(), by: z.string(), text: z.string(), changes: z.array(FieldChangeSchema).optional(), notified: z.array(z.string()).optional(), updateId: z.string().optional() })
+  .openapi({ example: { at: WALL_EX, by: "Ann Byrne", text: "Called the landlord" } })
+const EvidenceItemDto = z
+  .object({
+    id: z.string(), kind: z.string(), name: z.string(), by: z.string(), at: z.string(), review: z.enum(["pending", "accepted", "rejected"]), reason: z.string().optional(), round: z.number().int(), locked: z.boolean(),
+    source: z.string().optional(), capturedAt: z.string().optional(), url: z.string().optional(), size: z.number().optional(), fileId: z.string().optional(),
+    fileStatus: z.enum(["pending", "clean", "infected", "deleted"]).optional(), reviewedBy: z.string().optional(), reviewedAt: z.string().optional(),
+  })
+  .openapi({ example: { id: TID, kind: "photo", name: "exit.jpg", by: "Ann Byrne", at: WALL_EX, review: "pending", round: 1, locked: false, fileId: TID, fileStatus: "clean", size: 1200 } })
+const TimeEntryDto = z
+  .object({ id: z.string(), at: z.string(), by: z.string(), minutes: z.number(), note: z.string(), source: z.string() })
+  .openapi({ example: { id: TID, at: WALL_EX, by: "Ann Byrne", minutes: 30, note: "Walked it", source: "shift_report" } })
+const ProposalDto = z
+  .object({ start: z.string(), due: z.string(), reason: z.string(), by: z.string(), at: z.string() })
+  .openapi({ example: { start: "2026-11-21T09:00:00", due: "2026-11-21T17:00:00", reason: "Waiting on keys", by: "Ann Byrne", at: WALL_EX } })
+const RepeatRuleDto = z
+  .object({ freq: z.enum(["daily", "weekdays", "weekly", "monthly", "per_shift"]), patternId: z.string().optional(), days: z.array(z.number().int()).optional(), dayOfMonth: z.number().int().optional(), until: z.string().optional() })
+  .openapi({ example: { freq: "weekly", days: [1, 3], until: "2026-12-31" } })
+const VoiceNoteDto = z
+  .object({ durationSec: z.number(), mime: z.string(), recordedBy: z.string(), recordedAt: z.string() })
+  .openapi({ example: { durationSec: 12, mime: "audio/webm", recordedBy: UID, recordedAt: UTC_EX } })
+
 /** A task as the API returns it (ruling D2/D3/D4): the FE Task contract (features/tasks/types.ts) plus ids, version and UTC instants. Absent optional values are omitted. */
 export const TaskDtoSchema = z
   .object({
@@ -53,12 +78,12 @@ export const TaskDtoSchema = z
     start: z.string(), due: z.string(), startAt: z.string(), dueAt: z.string(),
     status: Status, evidenceRule: EvidenceRuleSchema, client: z.string().optional(), tags: z.array(z.string()), estimate: z.number().int().optional(),
     projectId: z.string().optional(), milestoneId: z.string().optional(), parentRef: z.string().optional(), parentId: z.string().nullable(),
-    checklist: z.array(z.unknown()), subtasks: z.array(z.unknown()), dependsOn: z.array(z.string()), dependsOnIds: z.array(z.string()),
-    archivedAt: z.string().optional(), archivedBy: z.string().optional(), proposal: z.record(z.string(), z.unknown()).optional(), round: z.number().int(),
-    repeat: z.record(z.string(), z.unknown()).optional(), seriesId: z.string().optional(), submittedAt: z.string().optional(), completedAt: z.string().optional(),
-    notes: z.array(z.unknown()), evidence: z.array(z.unknown()), timeline: z.array(HistoryItem),
+    checklist: z.array(ChecklistItemDto), subtasks: z.array(SubtaskDto), dependsOn: z.array(z.string()), dependsOnIds: z.array(z.string()),
+    archivedAt: z.string().optional(), archivedBy: z.string().optional(), proposal: ProposalDto.optional(), round: z.number().int(),
+    repeat: RepeatRuleDto.optional(), seriesId: z.string().optional(), submittedAt: z.string().optional(), completedAt: z.string().optional(),
+    notes: z.array(NoteDto), evidence: z.array(EvidenceItemDto), timeline: z.array(HistoryItem),
     overdue: z.object({ reason: z.string(), nextAction: z.string(), owner: z.string(), revisedDue: z.string() }).optional(),
-    timeEntries: z.array(z.unknown()), evidenceState: z.string().nullable(), voiceNote: z.record(z.string(), z.unknown()).nullable(),
+    timeEntries: z.array(TimeEntryDto), evidenceState: z.string().nullable(), voiceNote: VoiceNoteDto.nullable(),
   })
   .openapi({
     example: {
@@ -69,6 +94,7 @@ export const TaskDtoSchema = z
     },
   })
 export type TaskDto = z.infer<typeof TaskDtoSchema>
+type DateProposalDto = z.infer<typeof ProposalDto>
 
 export const TaskList = z.object({ items: z.array(TaskDtoSchema), nextCursor: z.string().nullable() }).openapi({ example: { items: [], nextCursor: null } })
 
@@ -97,8 +123,8 @@ export async function taskDtos(tx: TenantTx, ctx: TaskCtx, rows: TaskRow[], time
   const childRows = ids.length
     ? await tx.select({ id: tasks.id, parentId: tasks.parentId, refNo: tasks.refNo, title: tasks.title, status: tasks.status }).from(tasks).where(and(eq(tasks.tenantId, ctx.tenantId), inArray(tasks.parentId, ids), sql`${tasks.archivedAt} is null`, taskScopeWhere(ctx.scope, ctx.reports))).orderBy(asc(tasks.refNo))
     : []
-  const children = new Map<string, { id: string; ref: string; title: string; status: string }[]>()
-  for (const c of childRows) children.set(c.parentId!, [...(children.get(c.parentId!) ?? []), { id: c.id, ref: ref(c.refNo), title: free(c.title), status: c.status }])
+  const children = new Map<string, { id: string; ref: string; title: string; status: z.infer<typeof Status> }[]>()
+  for (const c of childRows) children.set(c.parentId!, [...(children.get(c.parentId!) ?? []), { id: c.id, ref: ref(c.refNo), title: free(c.title), status: c.status as z.infer<typeof Status> }])
   // Dependencies the caller may see (their scope applies to the tasks they point at, so no ref of an unseen task leaks), live ones only.
   const depRows = ids.length
     ? await tx
@@ -129,7 +155,7 @@ export async function taskDtos(tx: TenantTx, ctx: TaskCtx, rows: TaskRow[], time
       ...(r.parentId && parentRef.has(r.parentId) ? { parentRef: parentRef.get(r.parentId)! } : {}), parentId: r.parentId && parentRef.has(r.parentId) ? r.parentId : null, // a parent outside the caller's scope is dropped (no ref or id leaks)
       checklist: checklists.get(r.id) ?? [], subtasks: children.get(r.id) ?? [], dependsOn: (deps.get(r.id) ?? []).map((d) => d.ref), dependsOnIds: (deps.get(r.id) ?? []).map((d) => d.id), round: r.round,
       ...(r.archivedAt ? { archivedAt: wallOf(r.archivedAt, ctx.tz) } : {}), ...(r.archivedBy ? { archivedBy: r.archivedBy } : {}),
-      ...(r.proposal ? { proposal: ctx.drive ? r.proposal : { ...r.proposal, reason: withholdDriveText(String(r.proposal.reason ?? "")) } } : {}), ...(r.repeat ? { repeat: r.repeat as Record<string, unknown> } : {}), ...(r.seriesId ? { seriesId: r.seriesId } : {}),
+      ...(r.proposal ? { proposal: (ctx.drive ? r.proposal : { ...r.proposal, reason: withholdDriveText(String(r.proposal.reason ?? "")) }) as DateProposalDto } : {}), ...(r.repeat ? { repeat: r.repeat } : {}), ...(r.seriesId ? { seriesId: r.seriesId } : {}),
       ...(r.submittedAt ? { submittedAt: wallOf(r.submittedAt, ctx.tz) } : {}), ...(r.completedAt ? { completedAt: wallOf(r.completedAt, ctx.tz) } : {}),
       notes: [], evidence: items.map((e) => evidenceDto.get(e.id)!), timeline, ...(r.overduePlan ? { overdue: r.overduePlan } : {}), timeEntries: [],
       evidenceState: evidenceState(r.evidenceRule, stateItems(items), r.status), voiceNote: voiceNoteOf(r),

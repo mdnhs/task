@@ -4,7 +4,7 @@ import { newRouter } from "../../core/router"
 import { withTenant } from "../../db/tenant-tx"
 import { entitlementsFor, seatsUsed } from "./service"
 
-const EntitlementsDto = z
+export const EntitlementsDto = z
   .object({
     planId: z.string(),
     status: z.enum(["trialing", "active", "past_due", "canceled", "incomplete", "unpaid", "paused"]),

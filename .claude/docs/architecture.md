@@ -110,3 +110,30 @@ The product is a modular multi-tenant SaaS (SRS §2, FR-M0-01/02), billed throug
 - Each module is switched on by plan entitlement; a module not in the plan is hidden in the UI (FR-M0-15). Hide later-phase pages, don't delete them.
 - Never hard-code tenant-specific values in components: company name, departments, the 5:30 PM deadline, timezone, branding, approver names. They come from data (today JSON, later the tenant settings API).
 - Future platform features are planned as their own folders: `features/tenant` (settings, branding, members), `features/billing` (plans, Stripe checkout/portal; UI talks only to the billing module, never Stripe directly) and `features/platform-admin`.
+
+## Data layer (B6, switch from mock JSON to the API)
+Mock features keep `features/<f>/api.ts` + `lib/data.ts` until their task switches them (B6 ruling I16). Everything below is the transport those switches use (`lib/api/*`).
+
+**Types come from the OpenAPI document, not from `hc<AppType>`** (`AppType` carries no routes, ruling I2). `npm run api:types` dumps the API's OpenAPI 3.1 document (`api/scripts/dump-openapi.ts`, stub dependencies, test-only routes excluded) and turns it into the committed `lib/api/schema.d.ts` with `openapi-typescript` (a devDependency). `npm run api:types:check` regenerates in memory and fails when the file differs; it runs in CI (`ci.yml` job `contract-types`) and in the deploy gate (`deploy.yml`). A DTO change in `api/` means `npm run api:types` and committing the result. Never edit `schema.d.ts` by hand. The web imports types only (`import type { paths }`), so no server code reaches the bundle. There is no `packages/contracts`: DTO schemas live next to their routes in the API, shared pure rules in `packages/domain`.
+
+**Who calls what**
+| Caller | Client | Goes to | Tenant and cookies |
+|---|---|---|---|
+| Browser (client components) | `apiBrowser` (`lib/api/browser.ts`) | same-origin `/v1/*` and `/api/auth/*` route handlers (BFF) | the browser sends its own httpOnly cookies; the BFF builds `X-Tenant` |
+| BFF (`app/v1/[...path]/route.ts`, `app/api/auth/[...path]/route.ts`) | `forwardToApi` (`lib/api/bff.ts`) | `API_URL` | see rules below |
+| Server components, server actions | `apiServer()` (`lib/api/server.ts`, `server-only`) | `API_URL` directly, no hop | allow-listed cookies, `X-Tenant` from `od-tenant`, `Origin` on writes, `cache: "no-store"` |
+| Stripe webhooks | none | the API host directly (`/webhooks/billing/*`), never the BFF | the provider signature |
+
+`lib/api/client.ts` (`makeApiClient`, generic over `paths`) is the one typed client; a `fetch` can be injected (the contract tests pass the real app's `app.request`). Errors are `ApiError` (`lib/api/problem.ts`): `classifyApiError()` gives one `ErrorKind` per row of the plan's error table (the three MFA shapes collapse to `mfa_challenge` / `mfa_enrolment`), `userMessage()` gives short copy plus `Ref <requestId>`; the raw `title` and server text are never shown. `lib/auth-client.ts` wraps the 12 Better Auth endpoints with zod-typed answers; the contract tests pin its paths and bodies.
+
+**BFF rules (security, ruling I4-I6, I21)**
+- Path must be `/v1/...` or `/api/auth/...` exactly: no dot segments (raw or encoded), no `//`, no encoded slash or backslash. `/api/auth/list-sessions` (raw tokens) is a 404. Methods GET POST PUT PATCH DELETE.
+- Request headers dropped: `x-tenant`, `authorization`, `cookie` (rebuilt from the allow-list), `host`, `x-forwarded-*` except `x-forwarded-for`, every `x-od-*`. `Origin: <APP_ORIGIN>` is set on every non-GET.
+- Cookie allow-list (`lib/api/cookies.ts`): `better-auth.*`, `__Secure-better-auth.*`, `__Host-od-device-*` (plain `od-device-*` outside production). `od-tenant` and everything else stay home.
+- Tenant: `X-Tenant` comes only from the httpOnly cookie `od-tenant` (the slug, `lib/tenant-cookie.ts`, server-only). The page sends `x-od-tenant` (the tenant it was rendered for); a mismatch with the cookie is `409 tenant_changed` with no upstream call. The API's membership check stays the authority.
+- CSRF, three layers: the BFF refuses a non-GET whose `Origin` is not exactly the web origin (or whose `Sec-Fetch-Site` is not `same-origin`, or with no `Origin`): `403 bad_origin`; the API has `requireSameOrigin` on `/v1/*` (a present foreign `Origin` on a non-GET is `403 bad_origin`; no `Origin` and Bearer `odk_` keys pass); `proxy.ts` gives every Next server action POST its own Origin check (Next lets a missing Origin through).
+- `redirect: "manual"` (a presigned 302 and the Google callback reach the browser), body read with a 2 MiB cap (413), 30 s timeout, `Set-Cookie` copied one by one unchanged (a stray `od-tenant` is dropped). An unreachable upstream, a 502 or a non-problem 5xx becomes `502 upstream_unavailable` problem+json with a fresh request id and no upstream text; a real problem body passes through untouched.
+
+**Env (server only, never `NEXT_PUBLIC_*`)**: `API_URL` (internal API address), `APP_ORIGIN` (public web origin = the API's `APP_URL`). `npm run check:bundle` (after `next build`, also in the deploy gate) greps `.next/static` for the `API_URL` value, `odk_`, `BETTER_AUTH_SECRET`, `sk_live`, `sk_test`, `whsec_`.
+
+**Tests**: pure units (default `npx vitest run`, fake `fetch`): `lib/api/*.test.ts`, `app/v1/route.test.ts`, `app/api/auth/route.test.ts`, `proxy.test.ts`. Contract tests (`npm run test:contract`, Docker): `test/contract/` boots the real API in process through `api/test/harness`. The API's own `test/openapi-typed.test.ts` fails on any untyped 2xx JSON response (the only free-form values are the audit `before`/`after`).

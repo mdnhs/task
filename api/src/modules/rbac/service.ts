@@ -19,7 +19,7 @@ export const toRoleDto = (r: RoleRow) => ({
   label: r.label,
   description: r.description,
   home: r.home,
-  access: r.access,
+  access: r.access as Record<string, Access>, // validated on every write (AccessPatch); the column is jsonb
   fieldRules: r.fieldRules,
   isTemplate: r.isTemplate,
   clonedFrom: r.clonedFrom,

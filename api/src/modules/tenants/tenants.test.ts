@@ -1,7 +1,7 @@
 import { beforeEach, expect, test } from "vitest"
 import { call, resetDb, testApp } from "../../../test/harness"
 import { ownerQuery, ownerTenantQuery, testDb } from "../../../test/db"
-import { makeMember, makeTenant, signIn, signUp } from "../../../test/factories"
+import { makeMember, makeStaff, makeTenant, signIn, signUp } from "../../../test/factories"
 import { withTenant } from "../../db/tenant-tx"
 import { memberships } from "../../db/schema"
 import { readFileSync } from "node:fs"
@@ -211,4 +211,92 @@ test("R23: probing a foreign 1h tenant slug as a user whose tenants are all 12h 
   t.clock.advance({ hours: 2 })
   expect((await call(t.app, "GET", "/v1/me/tenant", { cookie, tenant: "foreign" })).status).toBe(404)
   expect((await call(t.app, "GET", "/v1/me/tenant", { cookie, tenant: "nope" })).status).toBe(404)
+})
+
+// ---------- B6 T6.1: typed /v1/me and /v1/me/tenant (ruling I23 d, e) ----------
+
+test("GET /v1/me returns user name, emailVerified, twoFactorEnabled and platformRole (null for members, the staff role for staff)", async () => {
+  const t = testApp()
+  const a = await makeTenant(t.deps, { slug: "alpha", name: "Alpha Ltd" })
+  const u = await makeMember(t.deps, a.id, "owner")
+  const { cookie } = await signIn(t.app, u.email, u.password)
+  const me = (await (await call(t.app, "GET", "/v1/me", { cookie })).json()) as Json
+  expect(me).toEqual({
+    user: { id: u.userId, email: u.email, name: "Test Member", emailVerified: true, twoFactorEnabled: false },
+    platformRole: null,
+    tenants: [{ slug: "alpha", name: "Alpha Ltd", roleKey: "owner" }],
+  })
+  const staff = await makeStaff(t.deps, "support")
+  const sme = (await (await call(t.app, "GET", "/v1/me", { cookie: staff.cookie })).json()) as Json
+  expect(sme.platformRole).toBe("support")
+  expect(sme.user).toMatchObject({ name: "Platform Person", emailVerified: true, twoFactorEnabled: true })
+  const viewer = await makeStaff(t.deps, "viewer", { totp: false })
+  const { cookie: vc } = await signIn(t.app, viewer.email, viewer.password)
+  expect(((await (await call(t.app, "GET", "/v1/me", { cookie: vc })).json()) as Json).platformRole).toBe("viewer")
+})
+
+test("a suspended staff row is not a platform role on /v1/me", async () => {
+  const t = testApp()
+  const s = await makeStaff(t.deps, "owner", { status: "suspended" })
+  expect(((await (await call(t.app, "GET", "/v1/me", { cookie: s.cookie })).json()) as Json).platformRole).toBeNull()
+})
+
+test("GET /v1/me/tenant is typed: name, brand.primaryColor, reportDeadline, reportDueAfterMinutes, device and features.drive", async () => {
+  const t = testApp()
+  const a = await makeTenant(t.deps, { slug: "ctx2", name: "Ctx Two" })
+  const u = await makeMember(t.deps, a.id, "owner")
+  const { cookie } = await signIn(t.app, u.email, u.password)
+  const first = (await (await call(t.app, "GET", "/v1/me/tenant", { cookie, tenant: "ctx2" })).json()) as Json
+  expect(first.tenant).toMatchObject({ id: a.id, slug: "ctx2", name: "Ctx Two", timezone: "Europe/Dublin", currency: "EUR", locale: "en-IE", sessionIdleHours: 12 })
+  expect(first.member).toMatchObject({ userId: u.userId, roleKey: "owner" })
+  expect(first.brand).toEqual({ primaryColor: null })
+  expect(first.reportDeadline).toMatch(/^\d\d:\d\d$/)
+  expect(Number.isInteger(first.reportDueAfterMinutes)).toBe(true)
+  expect(first.device).toEqual({ id: null, type: "browser", label: "Unregistered browser", trusted: false })
+  expect(first.features).toEqual({ drive: true })
+  // settings written by the owner show up (staff cannot read settings, so this route is where they get them)
+  expect((await call(t.app, "PUT", "/v1/settings/branding", { cookie, tenant: "ctx2", body: { logoFileId: null, primaryColor: "#0A1B2C" } })).status).toBe(200)
+  expect((await call(t.app, "PATCH", "/v1/settings/organisation", { cookie, tenant: "ctx2", body: { reportDeadline: "18:15", reportDueAfterMinutes: 90 } })).status).toBe(200)
+  const next = (await (await call(t.app, "GET", "/v1/me/tenant", { cookie, tenant: "ctx2" })).json()) as Json
+  expect(next).toMatchObject({ brand: { primaryColor: "#0A1B2C" }, reportDeadline: "18:15", reportDueAfterMinutes: 90 })
+})
+
+test("a plain member (no settings permission) still gets brand, deadline and device from /v1/me/tenant", async () => {
+  const t = testApp()
+  const a = await makeTenant(t.deps, { slug: "ctx3" })
+  const owner = await makeMember(t.deps, a.id, "owner")
+  const { cookie: oc } = await signIn(t.app, owner.email, owner.password)
+  await call(t.app, "PUT", "/v1/settings/branding", { cookie: oc, tenant: "ctx3", body: { logoFileId: null, primaryColor: "#112233" } })
+  const staff = await makeMember(t.deps, a.id, "employee")
+  const { cookie } = await signIn(t.app, staff.email, staff.password)
+  expect((await call(t.app, "GET", "/v1/settings/branding", { cookie, tenant: "ctx3" })).status).toBe(403)
+  const r = (await (await call(t.app, "GET", "/v1/me/tenant", { cookie, tenant: "ctx3" })).json()) as Json
+  expect(r.brand).toEqual({ primaryColor: "#112233" })
+})
+
+test("features.drive follows the device policy per request: false on an unregistered browser, true on the bound company PC, false again once trust is revoked", async () => {
+  const t = testApp()
+  const a = await makeTenant(t.deps, { slug: "drv" })
+  const admin = await makeMember(t.deps, a.id, "owner")
+  const staff = await makeMember(t.deps, a.id, "employee")
+  const ac = (await signIn(t.app, admin.email, admin.password)).cookie
+  const sc = (await signIn(t.app, staff.email, staff.password)).cookie
+  const req = (m: string, path: string, cookie: string, body?: unknown, extra?: string) => call(t.app, m, path, { cookie: extra ? `${cookie}; ${extra}` : cookie, tenant: "drv", body })
+  expect((await req("PUT", "/v1/device-policies/drive", ac, { allow: "trusted-company-pc" })).status).toBe(200)
+  const reg = await req("POST", "/v1/devices", ac, { userId: staff.userId, type: "pc", owner: "company", label: "Front desk PC", trusted: true })
+  const pc = (await reg.json()) as Json
+  const code = ((await (await req("POST", `/v1/devices/${pc.id}/enrolment-code`, ac)).json()) as Json).code as string
+  const bind = await req("POST", `/v1/devices/${pc.id}/bind`, sc, { code })
+  expect(bind.status).toBe(200)
+  const dev = bind.headers.getSetCookie().map((c) => c.split(";")[0]).find((c) => c.startsWith("od-device-"))!
+  const before = (await (await req("GET", "/v1/me/tenant", sc)).json()) as Json
+  expect(before.features).toEqual({ drive: false })
+  expect(before.device.id).toBeNull()
+  const on = (await (await req("GET", "/v1/me/tenant", sc, undefined, dev)).json()) as Json
+  expect(on.features).toEqual({ drive: true })
+  expect(on.device).toEqual({ id: pc.id, type: "pc", label: "Front desk PC", trusted: true })
+  expect((await req("PATCH", `/v1/devices/${pc.id}`, ac, { trusted: false })).status).toBe(200)
+  const off = (await (await req("GET", "/v1/me/tenant", sc, undefined, dev)).json()) as Json
+  expect(off.features).toEqual({ drive: false })
+  expect(off.device.trusted).toBe(false)
 })

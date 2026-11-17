@@ -53,3 +53,6 @@ Phase 1 steps 3 (evidence rules) and 6 (task model and views), built 28 Oct 2026
 
 ## Not done yet
 Timeline (Gantt) and workload views (Should), custom statuses (FR-M1-06), milestone date editing, evidence in the shift report / progress view and gallery bulk verify (FR-M1-48/49), capture device + malware scan (FR-M1-46), "per shift" recurrence.
+
+## Backend notes (B6 T6.1: typed DTO)
+`TaskDto` (api `modules/tasks/dto.ts`) now types every nested value the web reads, so `lib/api/schema.d.ts` has no `unknown` left: `checklist` `{ id, text, done }`, `subtasks` `{ id, ref, title, status }`, `notes` (timeline-event shape), `evidence` (`EvidenceItemDto`), `timeEntries` `{ id, at, by, minutes, note, source }`, `proposal` `{ start, due, reason, by, at }`, `repeat` (the `RepeatRule` shape), `voiceNote` `{ durationSec, mime, recordedBy, recordedAt }` (metadata only). The API still returns `notes` and `timeEntries` empty. `api/src/modules/tasks/dto.test.ts` parses a fully filled task and rejects each malformed nested value.

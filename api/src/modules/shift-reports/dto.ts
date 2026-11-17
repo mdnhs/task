@@ -92,12 +92,27 @@ export type ReportDto = {
   items: ReportItemDto[]; summary: string; blockers: string; unplanned: { id: string; text: string; minutes: number }[]; extra: Record<string, string>
   attachments: ReportAttachmentDto[]; submittedAt: string | null; reviewedAt: string | null; reviewedBy: string | null; comments: { at: string; by: string; text: string }[]
 }
-export type VersionDto = { v: number; at: string; by: string; note: string; snapshot: unknown }
+export type VersionDto = { v: number; at: string; by: string; note: string; snapshot: VersionSnapshotDto }
 
-const Any = z.any()
+const OUTCOMES = ["applied", "needs_evidence", "submitted_for_review", "skipped_archived", "skipped_unavailable"] as const
+const ReportItemSchema = z.strictObject({
+  position: z.number().int(), taskId: z.string().nullable(), ref: z.string(), title: z.string(), due: z.string(), dueAt: z.string(), status: z.enum(ITEM_STATUSES), minutes: z.number().int(), note: z.string(),
+  taskStatus: z.string().nullable(), evidenceState: z.string().nullable(), outcome: z.enum(OUTCOMES).optional(),
+})
+const ReportAttachmentSchema = z.strictObject({ id: z.string(), name: z.string(), kind: z.enum(["image", "file"]), size: z.number(), status: z.enum(["pending", "clean", "infected"]) })
+const REPORT_STATUS = ["draft", "submitted", "accepted", "returned"] as const
+const REPORT_STATE = ["draft", "submitted", "late", "missing", "accepted", "returned"] as const
+/** Strict (no catchall, no z.any): a renamed or missing key must fail the contract tests, never show up as `undefined` in the UI (Review Focus 4). Mirrors ReportDto above. */
 export const ReportSchema = z
-  .object({ id: z.uuid() })
-  .catchall(Any)
+  .strictObject({
+    id: z.uuid(), key: z.string(), userId: z.string().nullable(), patternId: z.string(), shiftName: z.string(), team: z.string(), date: z.string(),
+    start: z.string(), end: z.string(), due: z.string(), startAt: z.string(), endAt: z.string(), dueAt: z.string(),
+    status: z.enum(REPORT_STATUS), state: z.enum(REPORT_STATE), version: z.number().int(), submissions: z.number().int(),
+    items: z.array(ReportItemSchema), summary: z.string(), blockers: z.string(),
+    unplanned: z.array(z.strictObject({ id: z.string(), text: z.string(), minutes: z.number().int() })), extra: z.record(z.string(), z.string()),
+    attachments: z.array(ReportAttachmentSchema), submittedAt: z.string().nullable(), reviewedAt: z.string().nullable(), reviewedBy: z.string().nullable(),
+    comments: z.array(z.strictObject({ at: z.string(), by: z.string(), text: z.string() })),
+  })
   .openapi({
     example: {
       id: RID, key: `usr_8Kq2mZ4tW1:${PID}:2026-10-24`, userId: "usr_8Kq2mZ4tW1", patternId: PID, shiftName: "Night", team: "Security", date: "2026-10-24",
@@ -110,8 +125,14 @@ export const ReportSchema = z
 export const CurrentOut = z
   .object({ item: z.object({ key: z.string(), shiftName: z.string(), shiftDate: z.string(), startAt: z.string(), endAt: z.string(), dueAt: z.string(), state: z.string(), reportId: z.string().nullable() }).nullable() })
   .openapi({ example: { item: { key: `usr_8Kq2mZ4tW1:${PID}:2026-10-24`, shiftName: "Night", shiftDate: "2026-10-24", startAt: "2026-10-24T21:00:00.000Z", endAt: "2026-10-25T06:00:00.000Z", dueAt: "2026-10-25T07:00:00.000Z", state: "draft", reportId: null } } })
+/** What a submission froze (submit.ts); after an erasure the strings read "[erased]" but the shape stays. */
+const VersionSnapshot = z.object({
+  summary: z.string(), blockers: z.string(), unplanned: z.array(z.object({ id: z.string(), text: z.string(), minutes: z.number() })), extra: z.record(z.string(), z.string()), attachmentFileIds: z.array(z.string()),
+  items: z.array(z.object({ ref: z.string(), taskId: z.string().nullable(), title: z.string(), status: z.string(), minutes: z.number(), note: z.string(), outcome: z.enum(OUTCOMES) })),
+})
+export type VersionSnapshotDto = z.infer<typeof VersionSnapshot>
 export const VersionsOut = z
-  .object({ items: z.array(z.object({ v: z.number(), at: z.string(), by: z.string(), note: z.string(), snapshot: z.any() })) })
+  .object({ items: z.array(z.object({ v: z.number(), at: z.string(), by: z.string(), note: z.string(), snapshot: VersionSnapshot })) })
   .openapi({ example: { items: [{ v: 1, at: "2026-10-25T06:20:00.000Z", by: "Alex Byrne", note: "Submitted", snapshot: { summary: "Quiet night.", items: [] } }] } })
 
 // ---------- T5.3: review, inbox, template ----------

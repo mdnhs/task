@@ -12,7 +12,11 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "smoke": "node scripts/smoke.mjs",
-    "test:api": "npm -w api test"
+    "test:api": "npm -w api test",
+    "api:types": "node scripts/api-types.mjs",
+    "api:types:check": "node scripts/api-types.mjs --check",
+    "test:contract": "vitest run --config vitest.contract.config.ts",
+    "check:bundle": "node scripts/check-bundle.mjs"
   },
   "dependencies": {
     "@ark-ui/react": "^5.39.3",
@@ -50,6 +54,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.4.2",
+    "openapi-typescript": "7.13.0",
     "prettier": "^3.9.10",
     "prettier-plugin-tailwindcss": "^0.8.1",
     "tailwindcss": "^4",

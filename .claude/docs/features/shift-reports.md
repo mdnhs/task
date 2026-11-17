@@ -74,3 +74,6 @@ Rulings and follow-ups: `../superpowers/plans/2026-11-17-backend-b5-followups.md
 - The dashboard "awaiting review" count leaves out the caller's own submitted reports (they cannot review them: `self_review`).
 - DSR erase against a reviewer's `notify` can deadlock in theory; the loser gets 409 `retry`.
 - `completed_at` can be off by up to an hour inside the repeated DST hour.
+
+## Backend notes (B6 T6.1: strict ReportSchema)
+`ReportSchema` (api `modules/shift-reports/dto.ts`) is a strict object with exactly the `ReportDto` fields: no `catchall`, no `z.any()`. `items` (with the optional `outcome`), `attachments`, `comments`, `unplanned` and `extra` are typed, and the version `snapshot` is typed too. An unknown or missing key fails `api/src/modules/shift-reports/dto.test.ts`, so a renamed field can no longer show up as `undefined` in the UI. The OpenAPI walker `api/test/openapi-typed.test.ts` fails on any new untyped 2xx JSON response.

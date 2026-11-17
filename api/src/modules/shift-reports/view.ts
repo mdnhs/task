@@ -100,5 +100,5 @@ export async function reportDtos(tx: TenantTx, ctx: ViewCtx, rows: ReportRow[]):
 export async function versionDtos(tx: TenantTx, ctx: ViewCtx, reportId: string): Promise<VersionDto[]> {
   const rows = await tx.select().from(shiftReportVersions).where(and(eq(shiftReportVersions.tenantId, ctx.tenantId), eq(shiftReportVersions.reportId, reportId))).orderBy(asc(shiftReportVersions.v))
   const nameOf = await namesOf(tx, rows.flatMap((v) => (v.byUser ? [v.byUser] : [])))
-  return rows.map((v) => ({ v: v.v, at: v.at.toISOString(), by: v.byUser ? nameOf(v.byUser) : FORMER, note: v.note, snapshot: withholdDeep(v.snapshot, ctx.drive) }))
+  return rows.map((v) => ({ v: v.v, at: v.at.toISOString(), by: v.byUser ? nameOf(v.byUser) : FORMER, note: v.note, snapshot: withholdDeep(v.snapshot, ctx.drive) as VersionDto["snapshot"] }))
 }

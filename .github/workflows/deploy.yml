@@ -23,7 +23,13 @@ jobs:
       - run: npx tsc --noEmit
       - run: npx eslint .
       - run: npx vitest run
+      # The web's API types are generated from the API's OpenAPI document (B6 ruling I2); a stale file cannot ship.
+      - run: npm run api:types:check
       - run: npm run build
+      # No secret or server-only value in what the browser downloads (B6 global constraint). API_URL is a dummy here: only its absence from the bundle matters.
+      - run: npm run check:bundle
+        env:
+          API_URL: http://api.internal.invalid:3001
 
   # Dokploy builds the image from this repo's Dockerfile; this job only tells it to deploy.
   # Repo secrets: DOKPLOY_URL (e.g. https://dokploy.example.com), DOKPLOY_API_KEY, DOKPLOY_APPLICATION_ID.

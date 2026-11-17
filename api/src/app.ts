@@ -5,6 +5,7 @@ import { newRouter } from "./core/router"
 import { AppError, problem, statusCode, statusTitle } from "./core/errors"
 import { errorInfo } from "./core/safe-error"
 import { requestId } from "./core/middleware/request-id"
+import { requireSameOrigin } from "./core/middleware/origin"
 import { auditRoutes } from "./modules/audit" // keep before any module that imports core/middleware/permission first (latent import cycle via entitlements -> audit)
 import { apiKeyRoutes } from "./modules/api-keys"
 import { webhookRoutes } from "./modules/webhooks-out"
@@ -45,6 +46,7 @@ export function createApp(deps: Deps) {
     await next()
   })
   app.use("*", requestId)
+  app.use("/v1/*", requireSameOrigin) // CSRF layer 2 (B6 I6): a foreign Origin on a non-GET call is 403 bad_origin, before any auth
   // F18: a write that succeeded through THIS instance drops that tenant's read-model cache (a read model is derived from tasks, shifts, reports and settings; other instances catch up within the 30 s TTL).
   // Conservative on purpose: any successful non-GET request of a tenant busts it, the tenant is the one the request resolved.
   app.use("/v1/*", async (c, next) => {

@@ -28,6 +28,30 @@ jobs:
       # Testcontainers starts Postgres through the Docker daemon on the runner.
       - run: npm -w api test
 
+  # B6 ruling I2: the web's types (lib/api/schema.d.ts) are generated from the API's OpenAPI document. A DTO change without `npm run api:types` fails here.
+  contract-types:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run api:types:check
+
+  # B6 ruling I29: the web clients against the REAL API in process (Testcontainers Postgres, Redis, MinIO through the Docker daemon on the runner).
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run test:contract
+
   domain:
     runs-on: ubuntu-latest
     steps:
