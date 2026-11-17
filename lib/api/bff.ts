@@ -66,6 +66,36 @@ function canonicalPath(pathname: string): string {
   return `/${segs.join("/")}`
 }
 
+/** Session-token fields Better Auth puts in its JSON answers (sign-in and sign-up return the raw `token`). Page JS must never see one (I21, K3). */
+const TOKEN_KEY = /^(?:session[_-]?)?token$/i
+
+function dropTokens(v: unknown): { value: unknown; changed: boolean } {
+  if (Array.isArray(v)) {
+    let changed = false
+    const out = v.map((x) => {
+      const r = dropTokens(x)
+      changed ||= r.changed
+      return r.value
+    })
+    return { value: changed ? out : v, changed }
+  }
+  if (v && typeof v === "object") {
+    let changed = false
+    const out: Record<string, unknown> = {}
+    for (const [k, x] of Object.entries(v as Record<string, unknown>)) {
+      if (TOKEN_KEY.test(k)) {
+        changed = true
+        continue
+      }
+      const r = dropTokens(x)
+      changed ||= r.changed
+      out[k] = r.value
+    }
+    return { value: changed ? out : v, changed }
+  }
+  return { value: v, changed: false }
+}
+
 class TooLarge extends Error {}
 
 /** Reads the body incrementally and stops at the cap, so an endless stream cannot fill memory. Undefined when there is no body. */
@@ -182,5 +212,17 @@ export async function forwardToApi(req: Request, o: BffOptions): Promise<Respons
     out.append("set-cookie", c)
   }
   if (!out.has("cache-control")) out.set("cache-control", "no-store")
+  // Better Auth's JSON answers carry the raw session token; the cookie (signed, httpOnly) is the only copy the browser may hold. Rewrite only /api/auth
+  // JSON bodies that really contain one (anything else, problem+json included, passes untouched); content-length is dropped above, so the new body is framed fresh.
+  if (o.prefix === "/api/auth" && ![204, 205, 304].includes(res.status) && /^application\/json\b/i.test(res.headers.get("content-type") ?? "")) {
+    const text = await res.text()
+    try {
+      const r = dropTokens(JSON.parse(text))
+      if (r.changed) return new Response(JSON.stringify(r.value), { status: res.status, headers: out })
+    } catch {
+      /* not JSON after all: pass it on as it came */
+    }
+    return new Response(text, { status: res.status, headers: out })
+  }
   return new Response(res.body, { status: res.status, headers: out })
 }

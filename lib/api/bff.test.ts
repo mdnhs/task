@@ -246,6 +246,60 @@ describe("path rules", () => {
     expect(lastCall().url).toBe(`${API}/api/auth/verify-email?token=a%2Bb%73`)
   })
 
+  describe("K3 (I21): no raw session token in an /api/auth JSON body", () => {
+    const json = (body: unknown, init: ResponseInit = {}) => new Response(typeof body === "string" ? body : JSON.stringify(body), { status: 200, headers: { "content-type": "application/json" }, ...init })
+    const viaAuth = async (res: Response, path = "/api/auth/sign-in/email") => {
+      fetchMock.mockResolvedValueOnce(res)
+      return forwardToApi(post(path), AUTH)
+    }
+
+    test("a sign-in answer loses `token` and keeps everything else, status and Set-Cookie untouched", async () => {
+      const h = new Headers({ "content-type": "application/json" })
+      h.append("set-cookie", "better-auth.session_token=abc.sig; Path=/; HttpOnly; SameSite=Lax")
+      const out = await viaAuth(new Response(JSON.stringify({ redirect: false, token: "RAWTOKEN", user: { id: "u1", email: "a@x.ie", name: "Ana" } }), { status: 200, headers: h }))
+      const text = await out.text()
+      expect(text).not.toContain("RAWTOKEN")
+      expect(JSON.parse(text)).toEqual({ redirect: false, user: { id: "u1", email: "a@x.ie", name: "Ana" } })
+      expect(out.status).toBe(200)
+      expect(out.headers.getSetCookie()).toEqual(["better-auth.session_token=abc.sig; Path=/; HttpOnly; SameSite=Lax"])
+      expect(out.headers.get("content-type")).toMatch(/application\/json/)
+    })
+
+    test("sign-up too, and nested or array shapes (any depth, any casing of the key)", async () => {
+      expect(JSON.parse(await (await viaAuth(json({ token: "T1", user: { id: "u" } }), "/api/auth/sign-up/email")).text())).toEqual({ user: { id: "u" } })
+      const nested = { a: { session: { token: "T2", id: "s1", sessionToken: "T3", Token: "T4" } }, list: [{ token: "T5", ok: 1 }, { deep: [{ token: "T6" }] }], keep: "token" }
+      const text = await (await viaAuth(json(nested))).text()
+      expect(text).not.toMatch(/T[1-6]/)
+      expect(JSON.parse(text)).toEqual({ a: { session: { id: "s1" } }, list: [{ ok: 1 }, { deep: [{}] }], keep: "token" })
+    })
+
+    test("a body with no token is passed on byte for byte; a string that merely says 'token' is not touched", async () => {
+      const raw = '{"status":true,  "message":"your token is fine"}'
+      expect(await (await viaAuth(json(raw))).text()).toBe(raw)
+    })
+
+    test("non-JSON and problem+json bodies are untouched; an unparseable JSON body passes as is", async () => {
+      expect(await (await viaAuth(new Response("<html>token=abc</html>", { status: 200, headers: { "content-type": "text/html" } }))).text()).toBe("<html>token=abc</html>")
+      const prob = new Response(JSON.stringify({ status: 401, code: "x", token: "keep-me", requestId: "r" }), { status: 401, headers: { "content-type": "application/problem+json" } })
+      expect((await (await viaAuth(prob)).json() as Record<string, unknown>).token).toBe("keep-me")
+      expect(await (await viaAuth(json("{not json token"))).text()).toBe("{not json token")
+    })
+
+    test("content-length and content-encoding of the upstream are not carried over a rewritten body (the runtime sets them from the new body)", async () => {
+      const upstream = new Response(JSON.stringify({ token: "RAW", ok: true }), { status: 200, headers: { "content-type": "application/json", "content-length": "9999", "content-encoding": "gzip" } })
+      const out = await viaAuth(upstream)
+      expect(out.headers.get("content-length")).toBeNull()
+      expect(out.headers.get("content-encoding")).toBeNull()
+      expect(await out.json()).toEqual({ ok: true })
+    })
+
+    test("only /api/auth is rewritten: a /v1 body keeps its own fields (an invite-accept token is theirs)", async () => {
+      fetchMock.mockResolvedValueOnce(json({ token: "keep", id: 1 }))
+      const out = await forwardToApi(req("/v1/me"), V1)
+      expect(await out.json()).toEqual({ token: "keep", id: 1 })
+    })
+  })
+
   test("the real path is forwarded as is, query included, onto API_URL only", async () => {
     await forwardToApi(req("/api/auth/verify-email?token=abc%2Bdef&x=1"), AUTH)
     expect(lastCall().url).toBe(`${API}/api/auth/verify-email?token=abc%2Bdef&x=1`)

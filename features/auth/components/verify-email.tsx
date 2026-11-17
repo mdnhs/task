@@ -7,6 +7,7 @@ import { Field } from "@/components/field"
 import { Input } from "@/components/ui/input"
 import { resendVerification, verifyEmail } from "@/lib/auth-client"
 import { verifyEmailStep } from "@/lib/auth-flow"
+import { stripQueryFromAddressBar } from "@/lib/strip-token"
 import { emailSchema } from "../schemas"
 
 type State = { kind: "ready" } | { kind: "verified" } | { kind: "expired" } | { kind: "error"; message: string }
@@ -21,6 +22,8 @@ export function VerifyEmail({ token }: { token: string }) {
   const [pending, start] = useTransition()
 
   function verify() {
+    // The token is held in memory from here on; the address bar no longer shows it (also when the call fails and the visitor asks for a new link).
+    stripQueryFromAddressBar()
     start(async () => {
       const r = await verifyEmailStep({ verifyEmail }, token)
       setState(r.kind === "error" ? { kind: "error", message: r.message } : { kind: r.kind })

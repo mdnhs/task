@@ -29,7 +29,7 @@ vi.mock("@/lib/data", () => ({
   getData: async (file: string) => (file === "billing/entitlements.json" ? ENT_DATA : file === "shell/roles.json" ? { roles: STATIC_ROLES } : Promise.reject(new Error(`unexpected getData ${file}`))),
 }))
 
-import { canWrite, getIdentity, getPlatformSession, getSession, peekPlatformSession, peekSession } from "@/lib/session"
+import { canWrite, getIdentity, getPlatformSession, getSession, peekPlatformSession, peekSession, requireMfaOk } from "@/lib/session"
 
 const redirectOf = async (p: Promise<unknown>) => {
   try {
@@ -183,5 +183,28 @@ describe("T6.3 getIdentity and peekPlatformSession (onboarding and skeletons)", 
     state.memos.forEach((m) => m.clear())
     state.current = world({ me: { status: 401, code: "unauthenticated" } })
     expect(await peekPlatformSession()).toBeNull()
+  })
+})
+
+describe("K2 requireMfaOk: every page and action that calls the API gates itself (a layout does not protect the pages below it)", () => {
+  test("returns the session when the second factor is in order", async () => {
+    expect((await requireMfaOk()).mfa).toBe("ok")
+  })
+
+  test("redirects to /mfa while enrolment or the code step is outstanding (a page that is not itself guarded, so no loop), never returning a session", async () => {
+    state.current = world({ tenants: { alpha: { status: 401, code: "mfa_enrolment_required" } } })
+    expect(await redirectOf(requireMfaOk())).toBe("/mfa")
+    state.memos.forEach((m) => m.clear())
+    state.current = world({ tenants: { alpha: { status: 401, code: "mfa_challenge" } } })
+    expect(await redirectOf(requireMfaOk())).toBe("/mfa")
+  })
+
+  test("it keeps getSession's own redirects: signed out, expired, no company", async () => {
+    state.jar.delete("better-auth.session_token")
+    expect(await redirectOf(requireMfaOk())).toBe("/sign-in")
+    state.memos.forEach((m) => m.clear())
+    state.jar.set("better-auth.session_token", "tok")
+    state.current = world({ me: { status: 401, code: "session_expired" } })
+    expect(await redirectOf(requireMfaOk())).toBe("/api/session/expired")
   })
 })

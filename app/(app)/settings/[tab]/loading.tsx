@@ -5,12 +5,13 @@ import { planModules } from "@/lib/entitlements"
 import { getDeviceRegister } from "@/lib/device-session"
 import { getOrg } from "@/lib/org"
 import { can } from "@/lib/permissions"
-import { canWrite, getSession } from "@/lib/session"
+import { canWrite } from "@/lib/permissions"
 import { getSupportAccess } from "@/lib/support-data"
+import { getSkeletonSession } from "@/lib/skeleton-session"
 
 // Async so the skeleton uses the real row counts and the role's controls; the client wrapper picks the tab from the pathname.
 export default async function Loading() {
-  const session = await getSession()
+  const session = await getSkeletonSession()
   if (!can(session.role, "settings")) return <PageSkeleton />
   const [{ users, invites }, departments, matrix, template, notifications, integrations, support, billing, organisation, org, deliveryLog, reg] = await Promise.all([
     getUsersAndInvites(), getDepartments(), getRolesMatrix(), getTemplate(), getNotificationSettings(), getIntegrations(), getSupportAccess().then((rows) => rows.filter((r) => r.tenantId === session.tenant.id)), getBilling(session.tenant.id), getOrganisation(), getOrg(), getDeliveryLog(), getDeviceRegister(session),

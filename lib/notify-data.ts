@@ -7,13 +7,14 @@ import { reportScope } from "./permissions"
 import { managerOf } from "./shifts"
 import { reportState } from "./shift-report"
 import { getShiftReportData } from "./shift-reports-data"
+import type { TenantEntitlements } from "./entitlements"
 import type { Role } from "./types"
 
-export async function getNotifyContext(org: OrgTiming & { departments: string[] }, role: Role, canSubmit: boolean, me?: NotifyContext["me"]): Promise<NotifyContext> {
+export async function getNotifyContext(org: OrgTiming & { departments: string[] }, role: Role, canSubmit: boolean, session: { entitlements: TenantEntitlements }, me?: NotifyContext["me"]): Promise<NotifyContext> {
   const [tenant, user, data, people] = await Promise.all([
     getData<TenantNotify>("settings/notifications.json"),
     getData<UserNotifyPrefs>("account/notifications.json"),
-    getShiftReportData(org),
+    getShiftReportData(org, session),
     getPeople(),
   ])
   const date = org.today.slice(0, 10)

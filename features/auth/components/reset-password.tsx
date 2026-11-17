@@ -7,6 +7,7 @@ import { Field } from "@/components/field"
 import { Input } from "@/components/ui/input"
 import { resetPassword } from "@/lib/auth-client"
 import { resetStep } from "@/lib/auth-flow"
+import { stripQueryFromAddressBar } from "@/lib/strip-token"
 import { PASSWORD_RULES, passwordScore } from "../schemas"
 
 type State = { kind: "form" } | { kind: "done" } | { kind: "expired"; message: string }
@@ -22,7 +23,7 @@ export function ResetPassword({ token }: { token: string }) {
   const [pending, start] = useTransition()
 
   useEffect(() => {
-    if (token && window.location.search) window.history.replaceState(null, "", window.location.pathname)
+    if (token) stripQueryFromAddressBar()
   }, [token])
 
   function submit(e: React.FormEvent) {

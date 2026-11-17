@@ -1,18 +1,19 @@
 import { headers } from "next/headers"
 
 import { StaffRostersSkeleton, gapGroups, getDerivedGaps, getRosters } from "@/features/staff-rosters"
-import { PageSkeleton, getUser } from "@/features/shell"
+import { PageSkeleton } from "@/features/shell"
 import { getOrg } from "@/lib/org"
 import { can } from "@/lib/permissions"
-import { canWrite, getSession } from "@/lib/session"
+import { canWrite } from "@/lib/permissions"
+import { getSkeletonSession, getSkeletonUser } from "@/lib/skeleton-session"
 
 // Async so the skeleton uses the real row count and the role's controls (loading.tsx gets no params).
 // loading.tsx gets no search params either: coming back from a gap page (Save, Cancel, back link → ?tab=gaps) is told
 // by the referrer, so that return shows the Roster gaps skeleton. Anything else shows the default Attendance tab.
 export default async function Loading() {
-  const session = await getSession()
+  const session = await getSkeletonSession()
   if (!can(session.role, "staff")) return <PageSkeleton />
-  const [org, user] = await Promise.all([getOrg(), getUser()])
+  const [org, user] = await Promise.all([getOrg(), getSkeletonUser()])
   const [{ incidents, gaps }, h] = await Promise.all([getRosters(false, await getDerivedGaps(session, user.name, org.today)), headers()])
   let fromGap = false
   try {

@@ -1,4 +1,5 @@
 import { getData } from "./data"
+import type { TenantEntitlements } from "./entitlements"
 import type { Org } from "./org"
 import { addDays } from "./shifts"
 import { getShiftState } from "./shifts-data"
@@ -15,9 +16,9 @@ export const REPORT_HISTORY_DAYS = 7
 
 export type ShiftReportData = { rows: ShiftReport[]; template: TemplateData; shifts: ShiftState; range: { from: string; to: string } }
 
-export async function getShiftReportData(org: Pick<Org, "today" | "timezone">): Promise<ShiftReportData> {
+export async function getShiftReportData(org: Pick<Org, "today" | "timezone">, session: { entitlements: TenantEntitlements }): Promise<ShiftReportData> {
   const [shifts, { reports }, { tasks }, template] = await Promise.all([
-    getShiftState(),
+    getShiftState(session),
     getData<{ reports: StoredReport[] }>("reports/reports.json"),
     getData<{ tasks: ShiftTask[] }>("tasks/tasks.json"),
     getData<TemplateData>("settings/template.json"),

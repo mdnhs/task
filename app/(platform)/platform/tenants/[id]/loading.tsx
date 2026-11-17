@@ -1,14 +1,13 @@
-import { DeniedSkeleton, TENANT_TABS, Tenant360Skeleton, tabAction } from "@/features/platform"
+import { DeniedSkeleton, Tenant360Skeleton, tabAction } from "@/features/platform"
 import { requireStaff } from "@/features/platform"
-import { AccessRestricted } from "@/features/shell"
 
-import { gate } from "../../../gate"
+import { skeletonGate } from "../../../skeleton-gate"
 import { FORM_ACTION, FormBody, Header, TabBody, TenantNotFound, isFormPage, isTenantTab, load360, pathParts } from "./t360"
 
 // Entering a tenant from elsewhere (the list, search, a link): the real header and tab, or the long-form page, masked
 // (SkMask), from the same gate and view model as the routes. Switching tabs inside the 360 uses [tab]/loading.tsx.
 export default async function Loading() {
-  const g = await gate("tenants.read", "platform tenants")
+  const g = await skeletonGate("tenants.read", "platform tenants")
   if ("denied" in g) return <DeniedSkeleton />
   const { id, rest } = await pathParts()
   const v = id ? await load360(id, g.op) : null
@@ -24,8 +23,8 @@ export default async function Loading() {
       {requireStaff(g.op, tabAction(tab)) ? (
         <TabBody tab={tab} v={v} />
       ) : (
-        // The same body the tab page's gate returns (app/(platform)/gate.tsx), so the skeleton matches.
-        <AccessRestricted moduleLabel={`tenant ${TENANT_TABS.find((x) => x.id === tab)!.label.toLowerCase()}`} home={{ href: "/platform", label: "Back to Overview" }} />
+        // A role the page will refuse gets the denied skeleton (the real body, AccessRestricted, asks the session, which a fallback must not).
+        <DeniedSkeleton />
       )}
     </Tenant360Skeleton>
   )

@@ -1,11 +1,11 @@
 import { DeniedSkeleton, Tenant360Skeleton } from "@/features/platform"
 
-import { gate } from "../../../../gate"
+import { skeletonGate } from "../../../../skeleton-gate"
 import { FORM_ACTION, FORM_LABEL, FormBody, TenantNotFound, load360, pathParts } from "../t360"
 
 // The real form, masked, from the same gate and view model as the page.
 export default async function Loading() {
-  const g = await gate(FORM_ACTION["schedule-deletion"], FORM_LABEL["schedule-deletion"])
+  const g = await skeletonGate(FORM_ACTION["schedule-deletion"], FORM_LABEL["schedule-deletion"])
   if ("denied" in g) return <DeniedSkeleton />
   const { id } = await pathParts()
   const v = id ? await load360(id, g.op) : null

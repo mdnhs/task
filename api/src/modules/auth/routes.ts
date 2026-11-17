@@ -59,6 +59,8 @@ authRoutes.on(["GET", "POST"], "/api/auth/*", async (c) => {
     return problem(403, "mfa_required", "Forbidden", c.get("requestId"))
   }
   const res = await deps.auth.handler(c.req.raw)
+  // "Sign out other devices": logged like DELETE /v1/me/sessions/{id} (no tenant context, so no audit row; ids and outcome only, never a token or an IP).
+  if (sub === "/revoke-other-sessions" && found) deps.logger.info({ userId: found.user.id, sessionId: found.session.id, requestId: c.get("requestId"), outcome: res.status < 400 ? "ok" : "failed" }, "other sessions revoked")
   // One place maps every Better Auth error to our problem+json shape. Its own error code (lower-cased,
   // e.g. invalid_email_or_password, email_not_verified) becomes `code`; its free-text message is dropped.
   if (res.status >= 400) return mapAuthError(res, c.get("requestId"))

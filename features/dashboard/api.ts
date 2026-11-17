@@ -71,7 +71,7 @@ export async function getReportDeadline(session: Session, org: Org, userName?: s
   const meId = todayUserId(session, people, userName)
   const scope = reportScope(session.role, meId)
   if (!scope) return undefined
-  const data = await getShiftReportData(org)
+  const data = await getShiftReportData(org, session)
   const rows = scopeReports(data.rows, scope, data.shifts.members)
   const tz = org.timezone
   const note = `${org.tzLabel} · shift end + ${data.shifts.reporting.dueAfterMinutes} min`

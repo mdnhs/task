@@ -1,21 +1,22 @@
 import { ReportPage, ReportPageSkeleton, getReportSeed } from "@/features/reports"
-import { PageSkeleton, getUser } from "@/features/shell"
+import { PageSkeleton } from "@/features/shell"
 import { SkMask } from "@/components/sk"
 import { formatDate } from "@/lib/dates"
 import { getOrg } from "@/lib/org"
 import { can, canReview } from "@/lib/permissions"
 import { lastSegment } from "@/lib/request-path"
-import { canWrite, getSession } from "@/lib/session"
+import { canWrite } from "@/lib/permissions"
+import { getSkeletonSession, getSkeletonUser } from "@/lib/skeleton-session"
 
 // Like /tasks/[ref]: the id comes from the pathname header proxy.ts sets, and the real report is rendered masked (SkMask).
 // Unknown id: the typical-counts skeleton.
 export default async function Loading() {
-  const session = await getSession()
+  const session = await getSkeletonSession()
   if (!can(session.role, "reports")) return <PageSkeleton />
   const staff = session.role.home === "staff"
   const typical = <ReportPageSkeleton edit={staff && canWrite(session, "reports")} review={!staff && canReview(session.role, session.tenant.status)} />
   const id = await lastSegment("/daily-reports/")
-  const [seed, org, user] = await Promise.all([getReportSeed(session), getOrg(), getUser()])
+  const [seed, org, user] = await Promise.all([getReportSeed(session), getOrg(), getSkeletonUser()])
   if (!seed || !id || !seed.reports.some((r) => r.id === id)) return typical
   const me = seed.people.find((p) => p.id === seed.meId)?.name || user.name
   return (

@@ -10,7 +10,7 @@ import { getUser } from "@/features/shell"
 import { getMfaState } from "@/lib/device-session"
 import { getOrg } from "@/lib/org"
 import { getPeople } from "@/lib/people"
-import { getSession } from "@/lib/session"
+import { requireMfaOk } from "@/lib/session"
 import { todayUserId } from "@/lib/today-data"
 
 export const dynamicParams = false
@@ -29,9 +29,9 @@ export async function generateMetadata({ params }: { params: Promise<{ tab: stri
 export default async function Page({ params }: { params: Promise<{ tab: string }> }) {
   const { tab } = await params
   if (!isTab(tab)) notFound()
-  const [session, org, user, profile, prefs] = await Promise.all([getSession(), getOrg(), getUser(), getProfile(), getNotificationPrefs()])
-  // While two-step verification is outstanding the layout shows the gate instead of this page, and the API refuses its data.
-  if (session.mfa !== "ok") return null
+  // This page calls the API (sessions): it gates itself on the second factor (a layout does not protect the page below it).
+  const session = await requireMfaOk()
+  const [org, user, profile, prefs] = await Promise.all([getOrg(), getUser(), getProfile(), getNotificationPrefs()])
   const [mfa, security, people] = await Promise.all([getMfaState(session), getSecurity({ timezone: org.timezone, twoFactorEnabled: session.twoFactorEnabled }), getPeople()])
   const role = session.role.label
   const scopeKey = `${session.tenant.id}:${session.role.id}:${mfa.enrolled ? "mfa" : "nomfa"}`

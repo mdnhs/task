@@ -11,10 +11,9 @@ import { parseAppearance } from "./appearance"
 import { DEFAULT_BRAND } from "./brand"
 import { getData } from "./data"
 import type { EntitlementsData } from "./entitlements"
-import { canWriteFor } from "./permissions"
 import { resolveSession, type Me, type Resolved, type Session } from "./session-core"
 import { TENANT_COOKIE, isTenantSlug } from "./api/tenant"
-import type { Module, Role, Tenant } from "./types"
+import type { Role, Tenant } from "./types"
 
 export type { Session } from "./session-core"
 
@@ -51,6 +50,20 @@ export async function getSession(): Promise<Session> {
       if (r.cookieStale) redirect(`${TENANT_REPAIR_PATH}?next=${encodeURIComponent(await landing())}`)
       return withBranding(r.session, (await cookies()).get(`od-brand-${r.session.tenant.id}`)?.value)
   }
+}
+
+/** Where a page or action sends a caller whose second factor is outstanding: the (app) layout shows the gate there, and that page does not guard itself, so there is no loop. */
+export const MFA_PATH = "/mfa"
+
+/**
+ * getSession() for every page and server action that CALLS the API. The (app) layout shows the MFA gate instead of its children, but a layout does not
+ * protect the pages below it (Next renders them in parallel and a direct request or action reaches them), and the API refuses their data with 401 mfa_*.
+ * So each such page gates itself: it gets a session whose second factor is in order, or a redirect (test/auth-static.test.ts fails for a page that does not).
+ */
+export async function requireMfaOk(): Promise<Session> {
+  const s = await getSession()
+  if (s.mfa !== "ok") return redirect(MFA_PATH)
+  return s
 }
 
 /** Who the caller is, with or without a company (onboarding, the console): redirects only a signed-out or expired caller. */
@@ -126,7 +139,4 @@ function withBranding(s: Session, raw: string | undefined): Session {
   }
 }
 
-// Suspended tenants are read-only (FR-SAAS-08).
-export function canWrite(s: Session, m: Module): boolean {
-  return canWriteFor(s.role, s.tenant.status, m)
-}
+export { canWrite } from "./permissions"

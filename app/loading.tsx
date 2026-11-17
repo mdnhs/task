@@ -1,21 +1,16 @@
 import { filterForStaff, getOperator, getPlatformEnv, getPlatformNav } from "@/features/platform"
 import { AppShellSkeleton, PageSkeleton, getNavigation } from "@/features/shell"
-import { filterByEntitlement, hasProductModule } from "@/lib/entitlements"
-import { filterNav } from "@/lib/permissions"
 import { requestPath } from "@/lib/request-path"
-import { peekPlatformSession, peekSession } from "@/lib/session"
 
 // First load: the (app) layout is still fetching nav/user, so show the whole shell as a skeleton.
-// Departments come from the local nav JSON so the topbar filter skeleton matches the tenant's real pills.
-// The topbar icons follow the same rules as the layout: the assistant needs its plan module.
-// Under /platform (platform role) it is the console shell instead (D1, D2).
+// STATIC (B6 ruling I9, K1): no API call and no session lookup, so the fallback is instant. It never knows who the caller is: it shows the typical shell
+// (every nav entry the seed lists, the assistant icon, the seed departments) and the page replaces it. Auth pages have their own loading.tsx; anything
+// else without one (a not-found, the callback routes) gets the neutral PageSkeleton.
+// Under /platform it is the console shell instead (D1, D2), filtered by the SEED operator's staff role (the real operator is only known to the page).
+// Intended dimensions: AppShellSkeleton at its measured sizes (nav rows 9 + 2, user block 50px pill, topbar controls) around PageSkeleton; nothing new here.
 export default async function Loading() {
   const path = await requestPath()
-  const underConsole = path === "/platform" || path.startsWith("/platform/")
-  // A fallback never redirects (peek*): signed out, expired or no company shows the neutral skeleton, and the page itself redirects.
-  const [navigation, session] = await Promise.all([getNavigation(), underConsole ? peekPlatformSession() : peekSession()])
-  if (!session) return <PageSkeleton />
-  if (underConsole && session.role.platform) {
+  if (path === "/platform" || path.startsWith("/platform/")) {
     const [nav, op, env] = await Promise.all([getPlatformNav(), getOperator(), getPlatformEnv()])
     return (
       <AppShellSkeleton departments={false} assistant={false} platform={{ menu: filterForStaff(nav.menu, op), env }}>
@@ -23,12 +18,10 @@ export default async function Loading() {
       </AppShellSkeleton>
     )
   }
-  const menu = filterByEntitlement(filterNav(navigation.menu, session.role), session.entitlements)
+  if (!path || /^\/(?:sign-in|sign-up|forgot-password|verify-email|reset-password|onboarding)(?:\/|$)/.test(path)) return <PageSkeleton />
+  const navigation = await getNavigation()
   return (
-    <AppShellSkeleton
-      departments={navigation.departments}
-      assistant={hasProductModule(session.entitlements, session.entitlements.assistant)}
-    >
+    <AppShellSkeleton departments={navigation.departments} assistant>
       <PageSkeleton />
     </AppShellSkeleton>
   )

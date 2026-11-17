@@ -32,6 +32,7 @@ test("policy all: a member without TOTP gets 401 mfa_enrolment_required on every
   const { cookie } = await signIn(w.app, m.email, m.password)
   const paths = tenantGetRoutes(w.app)
   expect(paths).toContain("/v1/roles")
+  expect(paths).not.toContain("/v1/auth/providers") // the one public route is excluded by name, nothing else under /v1/auth is
   for (const path of paths) {
     const r = await w.req("GET", path, cookie)
     expect([path, r.status, await codeOf(r)]).toEqual([path, 401, "mfa_enrolment_required"])

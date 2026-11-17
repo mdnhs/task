@@ -1,16 +1,16 @@
 import { RostersSkeleton, getRosterData, rosterScopeKey, getHolidayDates, getRosterExchange, getRosterHistory, getRosterRequests, getRosterRules, getWeekTemplates, rosterEdit, rosterViewData } from "@/features/rosters"
-import { PageSkeleton, getUser } from "@/features/shell"
+import { PageSkeleton } from "@/features/shell"
 import { getData } from "@/lib/data"
 import { getOrg } from "@/lib/org"
 import { can } from "@/lib/permissions"
 import { getPeople } from "@/lib/people"
 import { rosterAccess, type LocationGrant, type OfficeLimit } from "@/lib/roster-access"
-import { getSession } from "@/lib/session"
 import { todayUserId } from "@/lib/today-data"
+import { getSkeletonSession, getSkeletonUser } from "@/lib/skeleton-session"
 
 // Async so the skeleton is the real view for the role's default location and the current week (loading.tsx gets no params).
 export default async function Loading() {
-  const [session, org, user] = await Promise.all([getSession(), getOrg(), getUser()])
+  const [session, org, user] = await Promise.all([getSkeletonSession(), getOrg(), getSkeletonUser()])
   if (!can(session.role, "roster")) return <PageSkeleton />
   const [{ locations }, { grants, limits }, people] = await Promise.all([
     getData<{ locations: { id: string; name: string }[] }>("rosters/locations.json"),

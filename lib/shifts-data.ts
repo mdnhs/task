@@ -1,8 +1,7 @@
 import { getData } from "./data"
-import { hasProductModule } from "./entitlements"
+import { hasProductModule, type TenantEntitlements } from "./entitlements"
 import { overlayRoster } from "./roster-overlay"
 import type { Location, RosterShift, RosterWeek, ShiftTemplate } from "./rosters"
-import { getSession } from "./session"
 import type { ReportingSettings, ShiftAssignment, ShiftPattern, ShiftState, TeamMember } from "./shifts"
 
 // Server only (reads the mock JSON in public/data/shifts/). The pure model is lib/shifts.ts, the client store hooks/use-shifts.ts.
@@ -23,8 +22,8 @@ export async function getBaseShiftState(): Promise<ShiftState> {
  * What shift reports, Today and the other consumers read (D3): the stored state plus the published roster shifts as one-day patterns, when the
  * tenant has Location Rosters (product module M1A). Without it the result equals getBaseShiftState().
  */
-export async function getShiftState(): Promise<ShiftState> {
-  const [base, session] = await Promise.all([getBaseShiftState(), getSession()])
+export async function getShiftState(session: { entitlements: TenantEntitlements }): Promise<ShiftState> {
+  const base = await getBaseShiftState()
   if (!hasProductModule(session.entitlements, "M1A")) return base
   const [{ weeks }, { shifts }, { templates }, { locations }] = await Promise.all([
     getData<{ weeks: RosterWeek[] }>("rosters/weeks.json"),

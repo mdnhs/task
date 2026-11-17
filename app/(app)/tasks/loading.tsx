@@ -4,12 +4,13 @@ import { getOrg } from "@/lib/org"
 import { EVIDENCE_STATE, evidenceState } from "@/lib/task-evidence"
 import { assigneesOf } from "@/lib/task-scope"
 import { can } from "@/lib/permissions"
-import { canWrite, getSession } from "@/lib/session"
+import { canWrite } from "@/lib/permissions"
+import { getSkeletonSession } from "@/lib/skeleton-session"
 
 // Async so the skeleton matches the role: staff see no assignee filter and only their own rows, read-only roles no New task button.
 // Rows on the first page with an evidence tag under the status get the extra line (archived tasks are not listed).
 export default async function Loading() {
-  const session = await getSession()
+  const session = await getSkeletonSession()
   if (!can(session.role, "tasks")) return <PageSkeleton />
   const [{ seed, staff, refFloor, people }, projects, org] = await Promise.all([getTaskSeed(session), getProjects(), getOrg()])
   // The list adds the due instances of recurring series on mount, so the skeleton counts them too.

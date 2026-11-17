@@ -5,12 +5,12 @@ import { PageSkeleton } from "@/features/shell"
 import { formatDate, formatDue, formatTime } from "@/lib/dates"
 import { getOrg } from "@/lib/org"
 import { REPORT_STATE, currentReport, draftPhase, isLate, itemProgress, minutesText, needsAction, reportState, totalMinutes, windowLabel } from "@/lib/shift-report"
-import { getSession } from "@/lib/session"
+import { getSkeletonSession } from "@/lib/skeleton-session"
 
 // Async so the skeleton matches the scope and uses the real counts from the same seed (loading.tsx gets no search params,
 // so the row count is the unfiltered one). The member view gets its real text as ghost text so wrapped lines match on phones.
 export default async function Loading() {
-  const [session, org] = await Promise.all([getSession(), getOrg()])
+  const [session, org] = await Promise.all([getSkeletonSession(), getOrg()])
   const seed = await getReportSeed(session)
   if (!seed) return <PageSkeleton />
   const own = seed.scope === "own"

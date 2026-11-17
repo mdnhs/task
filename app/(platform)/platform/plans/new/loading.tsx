@@ -1,9 +1,9 @@
 import { DeniedSkeleton, PlanNewSkeleton, getPlatformSeed } from "@/features/platform"
 
-import { gate } from "../../../gate"
+import { skeletonGate } from "../../../skeleton-gate"
 
 export default async function Loading() {
-  const g = await gate("plans.write", "platform plan editing")
+  const g = await skeletonGate("plans.write", "platform plan editing")
   if ("denied" in g) return <DeniedSkeleton />
   const { plans, entitlements } = await getPlatformSeed()
   // The new plan takes the first plan's currency (see NewPlanForm).

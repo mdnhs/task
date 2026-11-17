@@ -4,14 +4,15 @@ import { PageSkeleton } from "@/features/shell"
 import { getOrg } from "@/lib/org"
 import { can } from "@/lib/permissions"
 import { EVIDENCE_STATE, evidenceState } from "@/lib/task-evidence"
-import { canWrite, getSession } from "@/lib/session"
+import { canWrite } from "@/lib/permissions"
 import { assigneesOf } from "@/lib/task-scope"
+import { getSkeletonSession } from "@/lib/skeleton-session"
 
 const COLUMNS: TaskStatus[] = ["not_started", "in_progress", "blocked", "submitted", "changes_requested", "completed"]
 
 // Real cards per column (title, checklist chip, evidence tag, Move-to select), recurring instances included, so the board doesn't jump when it loads.
 export default async function Loading() {
-  const session = await getSession()
+  const session = await getSkeletonSession()
   if (!can(session.role, "tasks")) return <PageSkeleton />
   const [{ seed, staff, refFloor }, projects, org] = await Promise.all([getTaskSeed(session), getProjects(), getOrg()])
   const live = liveTasks(materialiseRecurring(seed, org.today, refFloor))

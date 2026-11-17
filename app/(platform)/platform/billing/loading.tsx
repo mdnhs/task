@@ -2,11 +2,11 @@ import { BillingSkeleton, DeniedSkeleton, billingData, getPlatformSeed, getPlatf
 import { getOrg } from "@/lib/org"
 import { requestParam } from "@/lib/request-path"
 
-import { gate } from "../../gate"
+import { skeletonGate } from "../../skeleton-gate"
 
 // Same gate, view model and saved view (`?view=`, forwarded by proxy.ts) as the page, rendered masked: identical layout.
 export default async function Loading() {
-  const g = await gate("billing.read", "platform billing")
+  const g = await skeletonGate("billing.read", "platform billing")
   if ("denied" in g) return <DeniedSkeleton />
   const [seed, settings, org, view] = await Promise.all([getPlatformSeed(), getPlatformSettings(), getOrg(), requestParam("view")])
   return (

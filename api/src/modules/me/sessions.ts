@@ -69,12 +69,23 @@ export const meSessionRoutes = newRouter()
     return c.json({ items: rows.map((r) => ({ id: r.id, label: sessionLabel(r.userAgent), createdAt: r.createdAt.toISOString(), lastSeenAt: r.lastSeenAt.toISOString(), current: r.id === me.id })) }, 200)
   })
   .openapi(deleteRoute, async (c) => {
-    const { db } = c.get("deps")
+    const deps = c.get("deps")
+    const { db } = deps
     const me = c.get("session")!
     const { id } = c.req.valid("param")
-    if (id === me.id) throw Conflict("current_session")
+    // Logged, not audited: the audit log is per tenant and this call has no tenant context (a session belongs to the user, not to a company).
+    // Only ids and the outcome: never the session token, the IP address or the user agent.
+    const log = (outcome: "removed" | "not_found" | "current") => deps.logger.info({ userId: me.userId, sessionId: id, requestId: c.get("requestId"), outcome }, "session revoked")
+    if (id === me.id) {
+      log("current")
+      throw Conflict("current_session")
+    }
     // Own sessions only: the user id is part of the delete, so another user's id deletes nothing and answers like a never-existing one.
     const gone = await db.delete(sessionTable).where(and(eq(sessionTable.id, id), eq(sessionTable.userId, me.userId))).returning({ id: sessionTable.id })
-    if (gone.length === 0) throw NotFound("session_not_found")
+    if (gone.length === 0) {
+      log("not_found")
+      throw NotFound("session_not_found")
+    }
+    log("removed")
     return c.body(null, 204)
   })

@@ -10,7 +10,7 @@ export default async function Page() {
   const [session, org] = await Promise.all([getSession(), getOrg()])
   const scope = shiftScope(session.role)
   if (scope === "none") return <AccessRestricted moduleLabel="Shifts" />
-  const data = await getShifts(scope, ME_ID)
+  const data = await getShifts(scope, ME_ID, session)
   return (
     <ShiftsView
       data={data}

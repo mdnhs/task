@@ -34,7 +34,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const notice = await getPlatformNotice(org.today)
   // The bell's person (task change notices, FR-M1-12): the same directory person the Today card uses.
   const me = { tenantId: session.tenant.id, personId: todayUserId(session, await getPeople(), user.name) }
-  const notify = await getNotifyContext(org, session.role, can(session.role, "reports", "write"), me)
+  const notify = await getNotifyContext(org, session.role, can(session.role, "reports", "write"), session, me)
 
   // Filtered on the server so hidden modules never reach the client payload.
   // session.role is already narrowed to the plan; filterByEntitlement states the plan check (FR-M0-15) on its own.

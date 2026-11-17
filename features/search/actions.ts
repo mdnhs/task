@@ -12,5 +12,5 @@ import type { SearchConfig, SearchItem } from "./types"
 export async function searchIndex(): Promise<{ items: SearchItem[]; config: SearchConfig }> {
   const session = await getSession()
   if (!session.signedIn) return { items: [], config: { popular: [], actions: [] } }
-  return getSearchData(session.role)
+  return getSearchData(session.role, session)
 }

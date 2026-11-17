@@ -40,7 +40,7 @@ export function todayUserId(session: Session, people: { id: string; name: string
 }
 
 export async function getTodayData(session: Session, org: Org, userName?: string): Promise<TodayData> {
-  const [people, { tasks: seeded }, shifts, jar] = await Promise.all([getPeople(), getData<{ tasks: RawTask[] }>("tasks/tasks.json"), getShiftState(), cookies()])
+  const [people, { tasks: seeded }, shifts, jar] = await Promise.all([getPeople(), getData<{ tasks: RawTask[] }>("tasks/tasks.json"), getShiftState(session), cookies()])
   // Archived tasks are out of every count (FR-M1-13); "mine" means any assignee, not only the primary one.
   const tasks = activeTasks(seeded)
   const meId = todayUserId(session, people, userName)
@@ -62,7 +62,7 @@ export async function getTodayData(session: Session, org: Org, userName?: string
   let reports = 0
   let missing: { who: string; shift: string }[] = []
   if (scope) {
-    const data = await getShiftReportData(org)
+    const data = await getShiftReportData(org, session)
     const rows = scopeReports(data.rows, scope, shifts.members)
     reports = rows.filter((r) => reportState(r, now, org.timezone) === "submitted" || reportState(r, now, org.timezone) === "late").length
     const since = addDays(now.slice(0, 10), -1)

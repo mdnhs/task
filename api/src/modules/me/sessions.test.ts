@@ -1,3 +1,4 @@
+import pino from "pino"
 import { beforeEach, describe, expect, test } from "vitest"
 import { call, resetDb, testApp, testEnv } from "../../../test/harness"
 import { ownerQuery } from "../../../test/db"
@@ -131,5 +132,32 @@ describe("T6.3 GET/DELETE /v1/me/sessions (I21)", () => {
     await signInAs(t.app, u.email, u.password, SAFARI_IOS)
     await ownerQuery("update session set expires_at = now() - interval '1 day' where user_agent like 'Mozilla/5.0 (iPhone%'")
     expect(((await (await call(t.app, "GET", "/v1/me/sessions", { cookie: c })).json()) as { items: Item[] }).items).toHaveLength(1)
+  })
+
+  test("K4: removing a session and 'sign out other devices' each write one structured log line (userId, sessionId, requestId, outcome) with no token and no IP", async () => {
+    const lines: string[] = []
+    const logger = pino({ level: "info" }, { write: (l: string) => void lines.push(l) })
+    const t = testApp({ logger })
+    const u = await makeUser(t.deps)
+    const mac = await signInAs(t.app, u.email, u.password, CHROME_MAC)
+    await signInAs(t.app, u.email, u.password, SAFARI_IOS)
+    await signInAs(t.app, u.email, u.password, SAFARI_IOS)
+    const { items } = (await (await call(t.app, "GET", "/v1/me/sessions", { cookie: mac })).json()) as { items: Item[] }
+    const others = items.filter((i) => !i.current)
+    lines.length = 0
+    expect((await call(t.app, "DELETE", `/v1/me/sessions/${others[0].id}`, { cookie: mac, headers: { origin: testEnv.APP_URL } })).status).toBe(204)
+    expect((await call(t.app, "DELETE", "/v1/me/sessions/nope", { cookie: mac, headers: { origin: testEnv.APP_URL } })).status).toBe(404)
+    expect((await call(t.app, "POST", "/api/auth/revoke-other-sessions", { cookie: mac, body: {}, headers: { origin: testEnv.APP_URL } })).status).toBe(200)
+    const logs = lines.map((l) => JSON.parse(l) as Record<string, unknown>).filter((l) => /session/i.test(String(l.msg)))
+    expect(logs.map((l) => [l.msg, l.outcome])).toEqual([["session revoked", "removed"], ["session revoked", "not_found"], ["other sessions revoked", "ok"]])
+    for (const l of logs) {
+      expect(l).toMatchObject({ userId: u.userId, requestId: expect.any(String) })
+      expect(typeof l.sessionId).toBe("string")
+    }
+    expect(logs[0].sessionId).toBe(others[0].id)
+    const all = lines.join("\n")
+    expect(all).not.toContain(IP)
+    for (const row of await ownerQuery("select token from session")) expect(all).not.toContain(String(row.token))
+    expect(all).not.toMatch(/ip_?address|"token"/i)
   })
 })

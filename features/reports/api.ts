@@ -15,7 +15,7 @@ export async function getReportSeed(session: Session): Promise<ReportsSeed | nul
   const scope = reportScope(session.role, ME_ID)
   if (!scope) return null
   const org = await getOrg()
-  const [{ rows, template, shifts, range }, people] = await Promise.all([getShiftReportData(org), getPeople()])
+  const [{ rows, template, shifts, range }, people] = await Promise.all([getShiftReportData(org, session), getPeople()])
   const reports = scopeReports(rows, scope, shifts.members)
   const meId = scope.kind === "own" ? scope.personId : session.role.person ?? ""
   const ids = new Set([...reports.map((r) => r.personId), meId])
