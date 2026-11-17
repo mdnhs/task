@@ -4,6 +4,7 @@ import { files, publicHolidays, tenants, tenantSettings } from "../../db/schema"
 import { withTenant, type TenantTx } from "../../db/tenant-tx"
 import type { Deps } from "../../deps"
 import { recordAudit } from "../audit"
+import { isScopedPurpose } from "../files"
 import { lockActor } from "../rbac"
 import { onboardingDefaults } from "../tenants"
 
@@ -146,8 +147,9 @@ export async function putBranding(deps: Deps, tenantId: string, actorId: string,
     await lockActor(tx, tenantId, actorId, "settings", "write")
     if (input.logoFileId !== null) {
       // a CLEAN (scanned) file of this tenant; share-locked so it cannot be deleted under us
-      const [f] = await tx.select({ id: files.id }).from(files).where(and(eq(files.id, input.logoFileId), eq(files.tenantId, tenantId), eq(files.status, "clean"))).for("share")
-      if (!f) throw unprocessable("invalid_logo")
+      // not a task or report file (isScopedPurpose, C6): those are private to their task or report and 404 on /v1/files, so a settings:write holder must not publish one as the logo
+      const [f] = await tx.select({ id: files.id, purpose: files.purpose }).from(files).where(and(eq(files.id, input.logoFileId), eq(files.tenantId, tenantId), eq(files.status, "clean"))).for("share")
+      if (!f || isScopedPurpose(f.purpose)) throw unprocessable("invalid_logo")
     }
     const before = await readBranding(tx, tenantId)
     const after: BrandingDto = { logoFileId: input.logoFileId, primaryColor: input.primaryColor }

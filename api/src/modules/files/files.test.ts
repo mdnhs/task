@@ -9,7 +9,8 @@ import { runJob } from "../../core/queue/queue"
 import type { MalwareScanner } from "../../core/scan/scanner"
 import { fakeScanner } from "../../core/scan/fake-scanner"
 import { registerNotifications } from "../notifications"
-import { ALLOWED_MIMES, isScopedPurpose, registerFiles } from "."
+import { ALLOWED_MIMES, DELETE_OBJECT_JOB, expireFile, isScopedPurpose, registerFiles } from "."
+import { withTenant } from "../../db/tenant-tx"
 import { fileKey, stagingKey } from "../../core/storage/storage"
 
 const EICAR = "X5O!P%@AP[4\\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*"
@@ -545,4 +546,27 @@ const fileIdHolder = { id: "" }
 test("isScopedPurpose (rulings D9, F16): task_ and report_ purposes are scoped, an ordinary file and a DSR export are not", () => {
   for (const p of ["task_evidence", "task_attachment", "task_voice", "report_attachment", "report_export"]) expect(isScopedPurpose(p), p).toBe(true)
   for (const p of [null, undefined, "", "dsr_export", "tasks", "reports", "my_report_x"]) expect(isScopedPurpose(p), String(p)).toBe(false)
+})
+
+test("expireFile on an INFECTED file leaves it infected (files_signature_check forbids `deleted`), returns false and queues only the object removal; a deleted file is a no-op; a clean one is soft-deleted (C4)", async () => {
+  const w = await world()
+  const infected = await scanned(w, EICAR)
+  expect((await rowOf(w, infected.id)).status).toBe("infected")
+  const clean = await scanned(w, "ordinary pdf body")
+  const calls: { name: string; data: unknown }[] = []
+  const enqueue = (name: string, data: unknown) => void calls.push({ name, data })
+  const run = (id: string) => withTenant(w.deps.db, w.tenant.id, (tx) => expireFile(tx, w.tenant.id, id, enqueue))
+
+  expect(await run(infected.id)).toBe(false) // not soft-deleted
+  expect(calls).toEqual([{ name: DELETE_OBJECT_JOB, data: { fileId: infected.id, tenantId: w.tenant.id } }])
+  expect(await rowOf(w, infected.id)).toMatchObject({ status: "infected", signature: "Eicar-Signature" }) // the scan already removed the object: the queued job is an idempotent repeat
+
+  calls.length = 0
+  expect(await run(clean.id)).toBe(true)
+  expect(calls).toHaveLength(1)
+  expect((await rowOf(w, clean.id)).status).toBe("deleted")
+  calls.length = 0
+  expect(await run(clean.id)).toBe(false) // already deleted: nothing queued
+  expect(calls).toHaveLength(0)
+  expect(await run(crypto.randomUUID())).toBe(false) // unknown id
 })

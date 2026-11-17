@@ -666,6 +666,30 @@ describe("retention job tasks.archive-purge", () => {
   }, 60_000)
 })
 
+describe("lost object removal of an infected file (C4, T5.2 review)", () => {
+  test("an INFECTED task file (it stays `infected`, never `deleted`: files_signature_check) whose delete-object job was lost is re-queued by the retention sweep, and the job marks it removed", async () => {
+    const w = await world()
+    const t = await w.mk(w.ops)
+    const f = await attach(w, w.ops, t.id, { content: "will be infected" })
+    await w.q("update files set status = 'infected', signature = 'Eicar-Test-Signature', scanned_at = now() where id = $1", [f])
+    await arch(w, t.id)
+    w.clock.advance({ days: 31 })
+    await sweep(w)
+    expect(await exists(w, t.id)).toBe(false)
+    expect((await w.q("select status from files where id = $1", [f]))[0].status).toBe("infected") // expireFile keeps an infected file infected
+    w.queue.jobs.length = 0 // the enqueue was lost
+    expect(await objectOf(w, f)).not.toBeNull()
+    w.clock.advance({ hours: 3 }) // past the back-off of the attempt the first sweep already recorded (an infected file whose object is still there is picked up even before its task is purged)
+    await sweep(w) // the reconcile pass must find an infected file whose object is still there
+    expect(w.queue.jobs.filter((j) => j.name === "file.delete-object" && (j.data as Json).fileId === f)).toHaveLength(1)
+    await drain(w)
+    expect(await objectOf(w, f)).toBeNull()
+    expect((await w.q("select object_removed_at from files where id = $1", [f]))[0].object_removed_at).not.toBeNull()
+    await sweep(w)
+    expect(w.queue.jobs).toHaveLength(0) // nothing left to retry
+  }, 60_000)
+})
+
 describe("retention extras", () => {
   test("object removal retries are capped and rotate: failing rows back off (1h, 2h, ...) and stop at 8 attempts, so they never starve later rows", async () => {
     const w = await world()

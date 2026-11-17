@@ -1,12 +1,10 @@
 import { randomUUID } from "node:crypto"
 import { sql } from "drizzle-orm"
 import { afterEach, beforeEach, describe, expect, test } from "vitest"
-import { ownerQuery, ownerTenantQuery } from "../../../test/db"
-import { fakeClock } from "../../../test/fakes"
+import { ownerQuery } from "../../../test/db"
 import { makeApiKey, makeMember, makeStaff, makeTenant, signIn } from "../../../test/factories"
-import { call, resetDb, testApp } from "../../../test/harness"
-import { relayOnce, resetSubscribers } from "../../core/events"
-import { runJob } from "../../core/queue/queue"
+import { call, resetDb } from "../../../test/harness"
+import { resetSubscribers } from "../../core/events"
 import { withTenant } from "../../db/tenant-tx"
 import { registerFiles } from "../files"
 import { registerGdpr } from "../gdpr"
@@ -16,17 +14,9 @@ import { registerWebhooks } from "../webhooks-out"
 import { registerSearchIndexers } from "../search"
 import { registerTasks } from "../tasks"
 import { registerShiftReports, shiftReportsDsrHandler } from "."
+import { code, DAY, DRIVE, EICAR, REQUIRED, upload, world, type Json, type Who } from "./world"
 
 // T5.2: shift reports, the member side (rows, draft, submit, versions, uploads, listTasksForPerson). Rulings F2-F11, F16, F21, F22; D4, D5, D8, D9/D10, D22/E13, E3.
-
-type Json = Record<string, any> // eslint-disable-line @typescript-eslint/no-explicit-any
-type Who = { userId: string; email: string; password: string; cookie: string }
-const EICAR = "X5O!P%@AP[4\\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*"
-const DRIVE = "https://drive.google.com/file/d/abc123/view"
-const DAY = "2026-10-24" // the Dublin night that lasts 9 h: 21:00Z -> 06:00Z, due 07:00Z
-const IN_START = "2026-10-24T20:00:00.000Z"
-const IN_DUE = "2026-10-25T02:00:00.000Z"
-const REQUIRED = { mode: "required", types: ["pdf", "note", "image"], min: 1, instruction: "", review: "manager" }
 
 beforeEach(async () => {
   await resetDb()
@@ -40,90 +30,6 @@ beforeEach(async () => {
   registerWebhooks()
 })
 afterEach(resetSubscribers)
-
-async function world(over: { now?: string; reporting?: boolean; slug?: string } = {}) {
-  const slug = over.slug ?? "acme"
-  const t = testApp(over.now ? { clock: fakeClock(new Date(over.now)) } : {})
-  const tenant = await makeTenant(t.deps, { slug, sessionIdleHours: 2160 })
-  await ownerQuery("update tenants set timezone = 'Europe/Dublin' where id = $1", [tenant.id])
-  const who = async (role: string): Promise<Who> => {
-    const m = await makeMember(t.deps, tenant.id, role)
-    return { userId: m.userId, email: m.email, password: m.password, cookie: (await signIn(t.app, m.email, m.password)).cookie }
-  }
-  const owner = await who("owner")
-  const manager = await who("manager") // manager-home, report scope "team"
-  const ops = await who("ops") // manager-home, all
-  const staff = await who("employee")
-  const staff2 = await who("employee")
-  const staff3 = await who("employee")
-  const req = (method: string, path: string, as: { cookie: string } | null, body?: unknown) => call(t.app, method, path, { cookie: as?.cookie, tenant: slug, body })
-  const json = async (r: Response) => (await r.json()) as Json
-  const q = <R = Json>(sqlText: string, params: unknown[] = []) => ownerTenantQuery(tenant.id, sqlText, params) as Promise<R[]>
-  const team = (await json(await req("POST", "/v1/teams", owner, { name: "Night team", kind: "team" }))).id as string
-  const pr = await req("POST", "/v1/shifts/patterns", ops, { name: "Night", teamId: team, start: "22:00", end: "06:00", days: [0, 1, 2, 3, 4, 5, 6] })
-  expect(pr.status, await pr.clone().text()).toBe(201)
-  const pattern = (await json(pr)).id as string
-  for (const u of [staff, staff2, staff3, owner]) expect((await req("POST", "/v1/shifts/assignments", ops, { userId: u.userId, patternId: pattern, from: "2026-10-01" })).status).toBe(201)
-  if (over.reporting !== false) expect((await req("PUT", `/v1/shifts/reporting/teams/${team}`, ops, { on: true })).status).toBe(200)
-  const manages = async (mgr: Who, person: Who) => expect((await req("PUT", `/v1/members/${person.userId}/manager`, owner, { managerId: mgr.userId })).status).toBe(200)
-  /** A task assigned to `primary`, placed inside the 24 Oct night by default (start 20:00Z, due 02:00Z). */
-  const task = async (primary: Who, o: Json = {}) => {
-    const { start = IN_START, due = IN_DUE, status, completedAt, ...rest } = o
-    const r = await req("POST", "/v1/tasks", ops, { title: "Check fire exits", description: "Walk every floor.", priority: 2, start: "2026-11-20T09:00:00", due: "2026-11-20T17:00:00", primary: primary.userId, ...rest })
-    expect(r.status, await r.clone().text()).toBe(201)
-    const tk = await json(r)
-    await q("update tasks set start_at = $2, due_at = $3 where id = $1", [tk.id, start, due])
-    if (status) await q("update tasks set status = $2, completed_at = $3 where id = $1", [tk.id, status, completedAt ?? null])
-    return tk
-  }
-  const open = (as: Who, date = DAY, patternId = pattern) => req("POST", "/v1/shift-reports/open", as, { patternId, date })
-  const opened = async (as: Who, date = DAY) => {
-    const r = await open(as, date)
-    expect([200, 201], await r.clone().text()).toContain(r.status)
-    return json(r)
-  }
-  const get = async (as: Who, id: string) => json(await req("GET", `/v1/shift-reports/${id}`, as))
-  const draftBody = (rep: Json, o: Json = {}) => ({
-    version: rep.version, summary: "Quiet night.", blockers: "", unplanned: [], extra: {}, attachmentFileIds: [],
-    items: rep.items.filter((i: Json) => i.taskId).map((i: Json) => ({ taskId: i.taskId, status: i.status, minutes: i.minutes, note: i.note })), ...o,
-  })
-  const put = (as: Who, rep: Json, o: Json = {}) => req("PUT", `/v1/shift-reports/${rep.id}/draft`, as, draftBody(rep, o))
-  const saved = async (as: Who, rep: Json, o: Json = {}) => {
-    const r = await put(as, rep, o)
-    expect(r.status, await r.clone().text()).toBe(200)
-    return json(r)
-  }
-  const submit = (as: Who, rep: Json, requestId = randomUUID()) => req("POST", `/v1/shift-reports/${rep.id}/submit`, as, { version: rep.version, requestId })
-  /** Marks every row done with 30 min and a summary, then submits. */
-  const filled = async (as: Who, rep: Json, o: Json = {}) => {
-    const items = rep.items.filter((i: Json) => i.taskId).map((i: Json) => ({ taskId: i.taskId, status: "done", minutes: 30, note: "" }))
-    return saved(as, rep, { items, ...o })
-  }
-  const taskRow = async (id: string) => (await q("select status, version from tasks where id = $1", [id]))[0]
-  const hist = (id: string) => q("select kind, text, update_id from task_history where task_id = $1 and kind = 'report' order by at, id", [id])
-  const relay = async () => {
-    for (let i = 0; i < 5 && (await relayOnce(t.deps)) > 0; i++);
-  }
-  const drain = async () => {
-    for (let i = 0; i < 6 && t.queue.jobs.length > 0; i++) for (const j of t.queue.jobs.splice(0)) await runJob(j.name, j.data, t.deps)
-  }
-  return { ...t, tenant, who, owner, manager, ops, staff, staff2, staff3, req, json, q, team, pattern, manages, task, open, opened, get, draftBody, put, saved, submit, filled, taskRow, hist, relay, drain }
-}
-type W = Awaited<ReturnType<typeof world>>
-const code = async (r: Response) => ((await r.clone().json()) as Json).code as string
-
-/** Intent -> browser-style PUT -> complete (-> scan job). Returns the file id. */
-async function upload(w: W, as: Who, reportId: string, o: { name?: string; mime?: string; content?: string; scan?: boolean } = {}) {
-  const buf = Buffer.from(o.content ?? "hello pdf")
-  const r = await w.req("POST", `/v1/shift-reports/${reportId}/uploads`, as, { name: o.name ?? "site-photo.pdf", mime: o.mime ?? "application/pdf", sizeBytes: buf.length })
-  expect(r.status, await r.clone().text()).toBe(201)
-  const j = await w.json(r)
-  const { "Content-Length": _len, ...headers } = j.upload.headers as Record<string, string>
-  expect((await fetch(j.upload.url, { method: "PUT", headers, body: buf })).status).toBe(200)
-  expect((await w.req("POST", `/v1/shift-reports/${reportId}/uploads/${j.fileId}/complete`, as)).status).toBe(200)
-  if (o.scan !== false) await w.drain()
-  return j.fileId as string
-}
 
 describe("rows and deadline (F2, F3, F9)", () => {
   test("report rows and deadline for the 24 Oct night: window 21:00Z-06:00Z; a task completed 2026-10-25T00:30Z (01:30 BST) and one at 01:30Z (01:30 GMT) are both in; one completed 20:59Z is out; due_at 07:00Z", async () => {
@@ -210,6 +116,32 @@ describe("open (F4)", () => {
     const rep = await w.opened(w.staff)
     expect(rep.userId).toBe(w.staff.userId)
     expect((await w.q("select user_id from shift_reports"))[0].user_id).toBe(w.staff.userId)
+  })
+})
+
+describe("lock order of the item inserts (C2, T5.2 review)", () => {
+  test("open and the draft save insert the rows in TASK-ID order (the tasks FK KEY SHARE locks then follow the same global order as submit), while `position` keeps the due order", async () => {
+    const w = await world()
+    // 8 tasks with different due times: random uuids make "due order == id order" a 1 in 40320 chance
+    const mk = [] as Json[]
+    for (let k = 0; k < 8; k++) mk.push(await w.task(w.staff, { title: `T${k}`, due: `2026-10-25T0${k % 6}:${10 + k}:00.000Z` }))
+    const rep = await w.opened(w.staff)
+    const physical = async () => (await w.q("select task_id, position from shift_report_items where report_id = $1 order by ctid", [rep.id])) as { task_id: string; position: number }[]
+    const first = await physical()
+    expect(first.map((r) => r.task_id)).toEqual([...first.map((r) => r.task_id)].sort())
+    expect(first.map((r) => r.position).sort((a, b) => a - b)).toEqual([0, 1, 2, 3, 4, 5, 6, 7])
+    const byPosition = [...first].sort((a, b) => a.position - b.position).map((r) => r.task_id)
+    const dueOrder = [...rep.items].sort((a: Json, b: Json) => a.position - b.position).map((i: Json) => i.taskId)
+    expect(byPosition).toEqual(dueOrder) // position still follows due order
+    // a draft save adds the tasks that joined the shift since: also in id order
+    const more = [] as Json[]
+    for (let k = 0; k < 6; k++) more.push(await w.task(w.staff, { title: `L${k}`, due: `2026-10-25T0${(k * 2) % 6}:${30 + k}:00.000Z` }))
+    await w.saved(w.staff, rep)
+    const ids = more.map((t) => t.id)
+    const added = ((await physical()) as { task_id: string }[]).map((r) => r.task_id).filter((id) => ids.includes(id)) // the saved rows were rewritten (new tuples), the added ones were only inserted
+    expect(added).toHaveLength(6)
+    expect(added).toEqual([...added].sort())
+    expect(mk).toHaveLength(8)
   })
 })
 
@@ -496,6 +428,23 @@ describe("submit (F7, F8, F11)", () => {
     expect((await w.q("select count(*)::int n from task_evidence"))[0].n).toBe(1)
   })
 
+  test("H1 (controller ruling): a row marked done moves a BLOCKED task straight to completed (the domain taskStatusFor rule; no prior unblock needed), while a Required task without evidence stays open", async () => {
+    const w = await world()
+    const blocked = await w.task(w.staff, { title: "Waiting for parts", status: "blocked" })
+    const gated = await w.task(w.staff, { title: "Needs proof", status: "blocked", evidenceRule: REQUIRED })
+    expect((await w.taskRow(blocked.id)).status).toBe("blocked")
+    const rep = await w.opened(w.staff)
+    const rows = rep.items.map((i: Json) => ({ taskId: i.taskId, status: "done", minutes: 20, note: "" }))
+    const s = await w.saved(w.staff, rep, { items: rows })
+    const r = await w.submit(w.staff, s)
+    expect(r.status, await r.clone().text()).toBe(200)
+    const out = await w.json(r)
+    expect(out.items.find((i: Json) => i.ref === blocked.ref)).toMatchObject({ outcome: "applied", taskStatus: "completed" })
+    expect((await w.taskRow(blocked.id)).status).toBe("completed") // blocked -> completed in one step: intended (ruling H1)
+    expect((await w.taskRow(gated.id)).status).not.toBe("completed") // evidence still applies: a Required task never completes from a bare "done"
+    expect(out.items.find((i: Json) => i.ref === gated.ref).outcome).toBe("needs_evidence")
+  })
+
   test("submitted or accepted report rejects PUT draft and submit: 409 report_locked; returned allows both", async () => {
     const w = await world()
     await w.task(w.staff)
@@ -762,8 +711,8 @@ describe("races (E8-E10 lock order)", () => {
       const fa = await w.saved(w.staff, a, { items: [...a.items].reverse().map((r: Json) => ({ taskId: r.taskId, status: "done", minutes: 10, note: "" })) })
       const fb = await w.saved(w.staff2, b, { items: b.items.map((r: Json) => ({ taskId: r.taskId, status: "done", minutes: 20, note: "" })) })
       const rs = await Promise.all([w.submit(w.staff, fa), w.submit(w.staff2, fb)])
-      for (const r of rs) expect([200, 409], await r.clone().text()).toContain(r.status)
-      expect(rs.filter((r) => r.status === 200).length).toBeGreaterThanOrEqual(1)
+      // C3 (T5.2 review): the name promises "both succeed, no deadlock", so BOTH must be 200 (rows lock in id order, so there is no real retry condition)
+      for (const r of rs) expect(r.status, await r.clone().text()).toBe(200)
       for (const t of shared) expect((await w.taskRow(t.id)).status).toBe("completed")
       const entries = await w.q("select user_id, count(*)::int n from task_time_entries group by user_id")
       for (const e of entries) expect(e.n).toBeLessThanOrEqual(4)

@@ -258,7 +258,8 @@ async function purgeIfExpired(deps: Deps, tenantId: string, id: string, cutoff: 
 export const REMOVAL_MAX_ATTEMPTS = 8
 
 /**
- * Re-queues `file.delete-object` for task files that were deleted but whose object removal never completed (a lost enqueue, a failed job). Never-tried
+ * Re-queues `file.delete-object` for task and report files that were deleted but whose object removal never completed. An INFECTED file counts too: `files_signature_check` ties
+ * status `infected` to its signature, so `expireFile` leaves it `infected` (unreadable) and only removes its object, and a lost job for it must be recovered like any other (C4) (a lost enqueue, a failed job). Never-tried
  * rows come first, then the longest-waiting; each pick records an attempt, and a row waits 2^attempts hours before the next one, so rows that fail for
  * good rotate out of the first 200 instead of starving the rest. Rows past the cap are only counted and logged.
  */
@@ -268,7 +269,7 @@ async function requeueObjects(deps: Deps, tenantId: string): Promise<void> {
     const picked = await tx.execute(sql`
       with due as (
         select id from files
-        where tenant_id = ${tenantId} and status = 'deleted' and object_removed_at is null and (purpose like 'task!_%' escape '!' or purpose like 'report!_%' escape '!')
+        where tenant_id = ${tenantId} and status in ('deleted', 'infected') and object_removed_at is null and (purpose like 'task!_%' escape '!' or purpose like 'report!_%' escape '!')
           and object_removal_attempts < ${REMOVAL_MAX_ATTEMPTS}
           and (object_removal_attempted_at is null or object_removal_attempted_at + (interval '1 hour' * power(2, object_removal_attempts)) <= ${now}::timestamptz)
         order by object_removal_attempted_at nulls first, created_at, id
@@ -278,7 +279,7 @@ async function requeueObjects(deps: Deps, tenantId: string): Promise<void> {
       from due where f.id = due.id and f.tenant_id = ${tenantId}
       returning f.id`)
     for (const r of picked.rows as { id: string }[]) enqueue(DELETE_OBJECT_JOB, { fileId: r.id, tenantId }, { key: `${r.id}-${crypto.randomUUID()}` })
-    const stuck = await tx.execute(sql`select count(*)::int n from files where tenant_id = ${tenantId} and status = 'deleted' and object_removed_at is null and (purpose like 'task!_%' escape '!' or purpose like 'report!_%' escape '!') and object_removal_attempts >= ${REMOVAL_MAX_ATTEMPTS}`)
+    const stuck = await tx.execute(sql`select count(*)::int n from files where tenant_id = ${tenantId} and status in ('deleted', 'infected') and object_removed_at is null and (purpose like 'task!_%' escape '!' or purpose like 'report!_%' escape '!') and object_removal_attempts >= ${REMOVAL_MAX_ATTEMPTS}`)
     const n = (stuck.rows[0] as { n: number }).n
     if (n > 0) deps.logger.error({ tenantId, files: n }, "task file objects could not be removed after the maximum attempts")
   })

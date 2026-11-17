@@ -90,15 +90,28 @@ test("report_deadline defaults from onboarding-defaults.json, not code; PATCH va
   expect(((await (await w.req("GET", "/v1/settings/organisation", w.cx, undefined, "other")).json()) as Json).reportDeadline).toBe(DEFAULTS.deadline)
 })
 
-async function insertFile(w: Awaited<ReturnType<typeof world>>, tenantId: string, owner: string, status: string) {
+async function insertFile(w: Awaited<ReturnType<typeof world>>, tenantId: string, owner: string, status: string, purpose: string | null = null) {
   const id = crypto.randomUUID()
   await q(
     tenantId,
-    `insert into files (id, tenant_id, owner_user_id, key, name, mime, size_bytes, status, created_at) values ($1::uuid, $2::uuid, $3, 't/' || $2::text || '/' || $1::text, 'logo.png', 'image/png', 10, $4, now())`,
-    [id, tenantId, owner, status],
+    `insert into files (id, tenant_id, owner_user_id, key, name, mime, size_bytes, status, purpose, created_at) values ($1::uuid, $2::uuid, $3, 't/' || $2::text || '/' || $1::text, 'logo.png', 'image/png', 10, $4, $5, now())`,
+    [id, tenantId, owner, status, purpose],
   )
   return id
 }
+
+test("branding: a task or report file (scoped purposes) can never be the logo, whoever holds settings:write (C6, T5.2 review)", async () => {
+  const w = await world()
+  for (const purpose of ["task_attachment", "task_evidence", "task_voice", "report_attachment", "report_export"]) {
+    const id = await insertFile(w, w.tenant.id, w.owner.userId, "clean", purpose)
+    const r = await w.req("PUT", "/v1/settings/branding", w.co, { logoFileId: id, primaryColor: null })
+    expect([purpose, r.status, ((await r.json()) as Json).code]).toEqual([purpose, 422, "invalid_logo"])
+  }
+  expect(await (await w.req("GET", "/v1/settings/branding", w.ca)).json()).toEqual({ logoFileId: null, primaryColor: null })
+  // an ordinary clean upload (purpose null) is unchanged
+  const plain = await insertFile(w, w.tenant.id, w.owner.userId, "clean", null)
+  expect((await w.req("PUT", "/v1/settings/branding", w.co, { logoFileId: plain, primaryColor: null })).status).toBe(200)
+})
 
 test("branding: logo must be a clean file of THIS tenant (422 invalid_logo), colour #RRGGBB; audited", async () => {
   const w = await world()

@@ -14,6 +14,7 @@ import { assertOwner, editable, getReport, type ReportCtx, type ReportRow } from
 import { stateOf } from "./view"
 
 const refNoOf = (ref: string): number => Number(ref.slice("TSK-".length))
+const byTaskId = (a: { taskId: string | null }, b: { taskId: string | null }): number => (a.taskId ?? "") < (b.taskId ?? "") ? -1 : (a.taskId ?? "") > (b.taskId ?? "") ? 1 : 0
 
 /**
  * POST /open (ruling F4): get-or-create the CALLER'S OWN report row for one of their shifts. The shift must be one the caller is assigned to on that date (a live pattern,
@@ -40,8 +41,10 @@ export async function openReport(tx: TenantTx, ctx: ReportCtx, input: { patternI
   }
   const rows = ctx.task ? await listTasksForPerson(tx, ctx.task, ctx.me, { fromUtc: occ.startAt, toUtc: occ.endAt }) : []
   if (rows.length) {
+    // `position` keeps the due order the member sees; the INSERT order is the task id order, because each row takes the tasks FK's KEY SHARE lock and submit locks the
+    // same tasks FOR UPDATE in id order (C2, T5.2 review): one global lock order, so an open or a draft save can never deadlock with a submit
     await tx.insert(shiftReportItems).values(
-      rows.map((t, position) => ({ tenantId: ctx.tenantId, reportId: row.id, position, taskId: t.taskId, taskRef: refNoOf(t.ref), title: t.title, dueAt: t.dueAt, status: itemStatusOf(t.status), minutes: 0, note: "" })),
+      rows.map((t, position) => ({ tenantId: ctx.tenantId, reportId: row.id, position, taskId: t.taskId, taskRef: refNoOf(t.ref), title: t.title, dueAt: t.dueAt, status: itemStatusOf(t.status), minutes: 0, note: "" })).sort(byTaskId),
     )
   }
   return { row, created: true }
@@ -66,8 +69,8 @@ export async function saveDraft(tx: TenantTx, enqueue: Enqueue, ctx: ReportCtx, 
   const fresh = shift.filter((t) => !hasTask.has(t.taskId))
   let position = have.reduce((m, i) => Math.max(m, i.position), -1) + 1
   if (fresh.length) {
-    await tx.insert(shiftReportItems).values(
-      fresh.map((t) => ({ tenantId: ctx.tenantId, reportId: id, position: position++, taskId: t.taskId, taskRef: refNoOf(t.ref), title: t.title, dueAt: t.dueAt, status: itemStatusOf(t.status), minutes: 0, note: "" })),
+    await tx.insert(shiftReportItems).values( // positions in due order, inserted in task id order (C2, see openReport)
+      fresh.map((t) => ({ tenantId: ctx.tenantId, reportId: id, position: position++, taskId: t.taskId, taskRef: refNoOf(t.ref), title: t.title, dueAt: t.dueAt, status: itemStatusOf(t.status), minutes: 0, note: "" })).sort(byTaskId),
     )
   }
   for (const i of body.items) {
