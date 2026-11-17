@@ -41,11 +41,16 @@ const NOT_APPLICABLE: Record<string, string> = {
  *  - "owner": owner of A.  - "dual": a member of BOTH A and B, the allocated user of a device in A and one in B.
  * `body(w)` gets the world whose ids are in the path (so bind can use a code issued for that very device).
  */
-type Spec = { actor: "owner" | "dual"; expect: string; body?: (w: World) => Promise<unknown> | unknown }
+type Spec = { actor: "owner" | "dual"; expect: string; body?: (w: World) => Promise<unknown> | unknown; prepare?: (w: World) => Promise<void> }
 const issueCode = async (w: World) => {
   const r = await call(t.app, "POST", `/v1/devices/${w.resources.device}/enrolment-code`, { cookie: w.owner.cookie, tenant: w.tenant.slug })
   if (r.status !== 201) throw new Error(`enrolment code failed: ${r.status}`)
   return { code: ((await r.json()) as Json).code }
+}
+/** The control run for restore / purge needs an ARCHIVED task of A: archive the fresh fixture task through the real API as A's owner. */
+const archiveFixtureTask = async (w: World) => {
+  const r = await call(t.app, "POST", `/v1/tasks/${w.resources.task}/archive`, { cookie: w.owner.cookie, tenant: w.tenant.slug, body: { version: 1 } })
+  if (r.status !== 200) throw new Error(`fixture archive failed: ${r.status} ${await r.text()}`)
 }
 const SPECS: Record<string, Spec> = {
   "POST /v1/roles/{id}/clone": { actor: "owner", expect: "role_not_found" },
@@ -115,6 +120,10 @@ const SPECS: Record<string, Spec> = {
   "DELETE /v1/projects/{id}/milestones/{milestoneId}": { actor: "owner", expect: "project_not_found" },
   // T4.4: a repeat rule on A's task (control: 200) and a task template of A (control: PATCH 200, DELETE 204)
   "PUT /v1/tasks/{id}/repeat": { actor: "owner", expect: "task_not_found" },
+  // T4.5: archive (control: 200), restore and purge (control: the fixture task is archived first, then restore 200 / purge 204)
+  "POST /v1/tasks/{id}/archive": { actor: "owner", expect: "task_not_found" },
+  "POST /v1/tasks/{id}/restore": { actor: "owner", expect: "task_not_found", prepare: archiveFixtureTask },
+  "DELETE /v1/tasks/{id}": { actor: "owner", expect: "task_not_found", prepare: archiveFixtureTask },
   "PATCH /v1/task-templates/{id}": { actor: "owner", expect: "template_not_found" },
   "DELETE /v1/task-templates/{id}": { actor: "owner", expect: "template_not_found" },
 }
@@ -260,6 +269,7 @@ describe("AC-M0-01 cross-tenant isolation walker", () => {
       const f = await fixtureIds(t, a.tenant, a.owner, a.staff, dual)
       const w: World = { ...a, ...f }
       const params = Object.fromEntries(o.params.map((p) => [p, f.fixtures[o.path][p].value]))
+      await spec.prepare?.(w)
       const ex = bodyExample(o.op)
       const body = ex.present ? await (spec.body ? spec.body(w) : ex.example) : undefined
       const r = await call(t.app, o.method, substitute(o.path, params), { cookie: spec.actor === "dual" ? dual.cookie : ownerA.cookie, tenant: a.tenant.slug, body })

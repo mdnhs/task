@@ -26,7 +26,7 @@ import { platformConsoleRoutes, supportGrantRoutes } from "./modules/platform-co
 import { rbacRoutes } from "./modules/rbac"
 import { authRoutes } from "./modules/auth/routes"
 import { inviteRoutes } from "./modules/invites"
-import { collabRoutes, planningRoutes, taskRoutes } from "./modules/tasks"
+import { archiveRoutes, collabRoutes, planningRoutes, taskRoutes, taskViewRoutes } from "./modules/tasks"
 import { projectRoutes } from "./modules/projects"
 import { templateRoutes } from "./modules/task-templates"
 import { teamRoutes } from "./modules/teams"
@@ -69,7 +69,9 @@ export function createApp(deps: Deps) {
   app.route("/", inviteRoutes)
   app.route("/", rbacRoutes)
   app.route("/", teamRoutes)
+  app.route("/", taskViewRoutes) // static /v1/tasks/{archive,board,calendar} before /v1/tasks/{id}
   app.route("/", taskRoutes)
+  app.route("/", archiveRoutes)
   app.route("/", collabRoutes)
   app.route("/", planningRoutes)
   app.route("/", projectRoutes)

@@ -68,8 +68,13 @@ const detail = async (tx: TenantTx, ctx: TaskCtx, row: TaskRow): Promise<TaskDto
   return (await taskDtos(tx, ctx, [row], new Map([[row.id, timeline]])))[0]
 }
 
-export async function lockedTask(tx: TenantTx, ctx: TaskCtx, id: string) {
-  const row = await getTask(tx, ctx, id, { forUpdate: true })
+/**
+ * The task, locked, with its assignees and the caller's relation to it. An archived task is 404 task_not_found like any hidden one, except for
+ * `onArchived: "conflict"` (PATCH, assignees, status, complete): the caller can see the task, so the honest answer is 409 task_archived.
+ */
+export async function lockedTask(tx: TenantTx, ctx: TaskCtx, id: string, o: { onArchived?: "notFound" | "conflict" } = {}) {
+  const row = await getTask(tx, ctx, id, { forUpdate: true, includeArchived: o.onArchived === "conflict" })
+  if (row.archivedAt) throw Conflict("task_archived")
   const people = (await assigneesOf(tx, ctx.tenantId, [row.id])).get(row.id)!
   const assignees = allAssignees(people)
   return { row, people, assignees, manage: canManage(ctx, row, assignees), mine: assignees.includes(ctx.me) }
@@ -153,8 +158,8 @@ export { listHistory, detail as taskDetailDto }
 
 const LIKE_ESCAPE = /[\\%_]/g
 
-/** The list query (ruling D5 scope, archived excluded, cursor on (due_at, id)); exported so the EXPLAIN test can plan the exact statement. */
-export function buildListQuery(tx: TenantTx, ctx: TaskCtx, f: Partial<ListQueryInput> & { after?: { at: Date; id: string } }, take: number) {
+/** The list filters as SQL conditions (ruling D5 scope, archived excluded); shared by the list and the board. */
+export function listConditions(ctx: TaskCtx, f: Partial<ListQueryInput> & { after?: { at: Date; id: string } }): (SQL | undefined)[] {
   const conds: (SQL | undefined)[] = [eq(tasks.tenantId, ctx.tenantId), sql`${tasks.archivedAt} is null`, taskScopeWhere(ctx.scope, ctx.reports)]
   const mine = sql`exists (select 1 from task_assignees ta where ta.task_id = ${tasks.id} and ta.user_id = ${ctx.me})`
   if (f.status === "open") conds.push(inArray(tasks.status, OPEN_STATUSES))
@@ -181,7 +186,11 @@ export function buildListQuery(tx: TenantTx, ctx: TaskCtx, f: Partial<ListQueryI
     conds.push(asRef ? sql`(${tasks.refNo} = ${Number(asRef[2])} or lower(${tasks.title}) like ${like})` : sql`lower(${tasks.title}) like ${like}`)
   }
   if (f.after) conds.push(sql`(${tasks.dueAt}, ${tasks.id}) > (${f.after.at.toISOString()}::timestamptz, ${f.after.id}::uuid)`)
-  return tx.select().from(tasks).where(and(...conds)).orderBy(asc(tasks.dueAt), asc(tasks.id)).limit(take)
+  return conds
+}
+
+export function buildListQuery(tx: TenantTx, ctx: TaskCtx, f: Partial<ListQueryInput> & { after?: { at: Date; id: string } }, take: number) {
+  return tx.select().from(tasks).where(and(...listConditions(ctx, f))).orderBy(asc(tasks.dueAt), asc(tasks.id)).limit(take)
 }
 
 export async function listTasks(tx: TenantTx, ctx: TaskCtx, q: ListQueryInput): Promise<{ items: TaskDto[]; nextCursor: string | null }> {
@@ -239,7 +248,7 @@ async function checkPlacement(tx: TenantTx, ctx: TaskCtx, row: Pick<TaskRow, "pr
 /** PATCH /v1/tasks/{id}. Row lock → permission → version → validation → write → history → notify → publish. */
 export async function patchTask(tx: TenantTx, env: TaskEnv, ctx: TaskCtx, id: string, input: PatchInput): Promise<TaskDto> {
   await lockPlacementTargets(tx, ctx, input) // project row first, then the task row (the order project deletes use)
-  const { row, assignees, manage, mine } = await lockedTask(tx, ctx, id)
+  const { row, assignees, manage, mine } = await lockedTask(tx, ctx, id, { onArchived: "conflict" })
   const touched = (Object.keys(input) as (keyof PatchInput)[]).filter((k) => k !== "version" && input[k] !== undefined)
   if (!manage) {
     if (touched.includes("start") || touched.includes("due")) throw Forbidden("dates_manager_only")
@@ -286,7 +295,7 @@ export async function patchTask(tx: TenantTx, env: TaskEnv, ctx: TaskCtx, id: st
 
 /** PUT /v1/tasks/{id}/assignees: managers only (ruling D6). Replaces the primary and the others. */
 export async function setAssignees(tx: TenantTx, env: TaskEnv, ctx: TaskCtx, id: string, input: { version: number; primary: string; others: string[] }): Promise<TaskDto> {
-  const { row, people, assignees, manage } = await lockedTask(tx, ctx, id)
+  const { row, people, assignees, manage } = await lockedTask(tx, ctx, id, { onArchived: "conflict" })
   if (!manage) throw Forbidden("forbidden")
   staleVersion(row, input.version)
   const others = [...new Set(input.others)].sort()
@@ -333,7 +342,7 @@ async function moveStatus(tx: TenantTx, env: TaskEnv, ctx: TaskCtx, row: TaskRow
 
 /** POST /v1/tasks/{id}/status: the assignee's moves (nextStatuses) and a manager's own moves plus cancel. "completed" is the complete route. */
 export async function changeStatus(tx: TenantTx, env: TaskEnv, ctx: TaskCtx, id: string, input: { version: number; to: TaskStatus }): Promise<TaskDto> {
-  const { row, assignees, manage, mine } = await lockedTask(tx, ctx, id)
+  const { row, assignees, manage, mine } = await lockedTask(tx, ctx, id, { onArchived: "conflict" })
   if (!manage && !mine) throw Forbidden("forbidden")
   staleVersion(row, input.version)
   if (input.to === "completed") return completeLocked(tx, env, ctx, row, assignees, manage, mine)
@@ -352,7 +361,7 @@ async function completeLocked(tx: TenantTx, env: TaskEnv, ctx: TaskCtx, row: Tas
 
 /** POST /v1/tasks/{id}/complete (FR-M1-43/44): "completed", or "submitted" when a reviewer must check, or 422 evidence_required. */
 export async function completeTask(tx: TenantTx, env: TaskEnv, ctx: TaskCtx, id: string, input: { version: number }): Promise<TaskDto> {
-  const { row, assignees, manage, mine } = await lockedTask(tx, ctx, id)
+  const { row, assignees, manage, mine } = await lockedTask(tx, ctx, id, { onArchived: "conflict" })
   if (!manage && !mine) throw Forbidden("forbidden")
   staleVersion(row, input.version)
   return completeLocked(tx, env, ctx, row, assignees, manage, mine)

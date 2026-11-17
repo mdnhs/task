@@ -35,6 +35,8 @@ export const files = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
     uploadedAt: timestamp("uploaded_at", { withTimezone: true }),
     scannedAt: timestamp("scanned_at", { withTimezone: true }),
+    // Set by the file.delete-object job once the object is really gone from storage; a `deleted` row without it is retried by the task retention job (T4.5).
+    objectRemovedAt: timestamp("object_removed_at", { withTimezone: true }),
   },
   (t) => [
     // No cascade: removing a membership must not silently drop metadata of objects that still exist in storage.
@@ -42,6 +44,7 @@ export const files = pgTable(
     unique("files_tenant_id_id").on(t.tenantId, t.id),
     unique("files_key").on(t.key),
     index("files_tenant_created_idx").on(t.tenantId, t.createdAt),
+    index("files_removal_pending_idx").on(t.tenantId, t.createdAt).where(sql`${t.status} = 'deleted' and ${t.objectRemovedAt} is null`),
     tenantPolicy(),
   ],
 ).enableRLS()

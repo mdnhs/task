@@ -54,12 +54,14 @@ export function taskScopeWhere(scope: TaskScope, reports: string[]): SQL {
  * The task, or 404 task_not_found: unknown id, another tenant's, archived (unless asked) and OUT OF THE CALLER'S SCOPE all look the
  * same (no existence oracle). `forUpdate` takes the row lock a mutation needs before it checks the version.
  */
-export async function getTask(tx: TenantTx, ctx: TaskCtx, id: string, o: { forUpdate?: boolean; includeArchived?: boolean } = {}): Promise<TaskRow> {
+export async function getTask(tx: TenantTx, ctx: TaskCtx, id: string, o: { forUpdate?: boolean; forShare?: boolean; includeArchived?: boolean } = {}): Promise<TaskRow> {
   const q = tx
     .select()
     .from(tasks)
     .where(and(eq(tasks.id, id), eq(tasks.tenantId, ctx.tenantId), o.includeArchived ? undefined : sql`${tasks.archivedAt} is null`, taskScopeWhere(ctx.scope, ctx.reports)))
-  const [row] = o.forUpdate ? await q.for("update", { of: [tasks] }) : await q
+  // forShare: a writer that only ATTACHES to the task (an upload intent) takes the row FOR SHARE, so an archive or purge (FOR UPDATE / DELETE) cannot
+  // slip in between its check and its insert (the T4.2 purge race); a task that is gone or archived by then is the same 404.
+  const [row] = o.forUpdate ? await q.for("update", { of: [tasks] }) : o.forShare ? await q.for("share", { of: [tasks] }) : await q
   if (!row) throw TaskNotFound()
   return row
 }

@@ -1167,7 +1167,7 @@ describe("collaboration (T4.2)", () => {
     expect(await tbl("task_comments")).toEqual(["INSERT", "SELECT"])
     expect(await col("task_comments")).toEqual(["author_id", "deleted_at", "mentions"])
     expect(await tbl("task_files")).toEqual(["INSERT", "SELECT"])
-    expect(await col("task_files")).toEqual(["created_by"])
+    expect(await col("task_files")).toEqual(["created_by", "task_id"]) // task_id: T4.5 re-homes a shared voice file
     const w = await world()
     const t = await w.mk(w.owner)
     const c = await w.json(await w.req("POST", `/v1/tasks/${t.id}/comments`, w.owner, { body: "keep" }))

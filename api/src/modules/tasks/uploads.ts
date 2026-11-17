@@ -56,7 +56,7 @@ function policyFor(c: Context<AppEnv>, purpose: TaskFilePurpose, lock: UploadPol
  * evidence = an assignee or a manager; attachment = assignee, manager or creator; voice = the creator or a manager (ruling D21).
  */
 async function authorise(tx: TenantTx, ctx: TaskCtx, taskId: string, purpose: TaskFilePurpose): Promise<void> {
-  const row = await getTask(tx, ctx, taskId)
+  const row = await getTask(tx, ctx, taskId, { forShare: true }) // held to commit: the task_files insert of the intent cannot meet a purge
   const assignees = allAssignees((await assigneesOf(tx, ctx.tenantId, [row.id])).get(row.id)!)
   const manage = canManage(ctx, row, assignees)
   const mine = assignees.includes(ctx.me)

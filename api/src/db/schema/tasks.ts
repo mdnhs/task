@@ -93,6 +93,9 @@ export const tasks = pgTable(
     index("tasks_milestone_idx").on(t.tenantId, t.milestoneId).where(sql`${t.milestoneId} is not null`),
     index("tasks_live_due_idx").on(t.tenantId, t.dueAt, t.id).where(sql`${t.archivedAt} is null`),
     index("tasks_live_status_due_idx").on(t.tenantId, t.status, t.dueAt, t.id).where(sql`${t.archivedAt} is null`),
+    // T4.5: the archive list and the retention job (archived rows only, newest first by scanning backwards), and the batch a restore brings back.
+    index("tasks_archived_idx").on(t.tenantId, t.archivedAt, t.id).where(sql`${t.archivedAt} is not null`),
+    index("tasks_archive_batch_idx").on(t.tenantId, t.archiveBatchId).where(sql`${t.archiveBatchId} is not null`),
     index("tasks_parent_idx").on(t.tenantId, t.parentId).where(sql`${t.parentId} is not null`),
     index("tasks_labels_gin").using("gin", t.labels),
     index("tasks_title_trgm_idx").using("gin", sql`lower(${t.title}) gin_trgm_ops`),

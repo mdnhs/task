@@ -350,4 +350,6 @@ export async function deleteObject(data: unknown, deps: Deps): Promise<void> {
   if (row.status !== "infected" && row.status !== "deleted") return
   await deps.storage.delete(row.key)
   await deps.storage.delete(stagingKey(job.tenantId, job.fileId))
+  // The object is really gone (storage deletes are idempotent): record it, so the task retention job only retries what never finished (T4.5).
+  await withTenant(deps.db, job.tenantId, (tx) => tx.update(files).set({ objectRemovedAt: deps.clock.now() }).where(and(eq(files.id, job.fileId), eq(files.tenantId, job.tenantId))))
 }
