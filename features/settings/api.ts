@@ -8,7 +8,7 @@ import { getPeople } from "@/lib/people"
 import { toDataRequest, toDepartments, toDevice, toGrant, toIntegration, toInvites, toOrganisation, toRoles, toUsers } from "./adapters"
 import { MATRIX_MODULE_LABELS } from "./constants"
 import { fetchTemplate } from "@/lib/report-template"
-import type { BrandingData, DataRequestRow, DeliveryRow, Department, Integration, Invite, MatrixData, NotificationsData, Organisation, OrganisationData, SettingsUser, SupportGrant, TemplateData } from "./types"
+import type { BrandingData, DataRequestRow, DeliveryRow, Department, Integration, Invite, MatrixData, NotificationsData, Organisation, OrganisationData, SettingsUser, SupportGrant } from "./types"
 import type { Device, DevicePolicy } from "@/lib/devices"
 import type { MfaPolicy } from "@/lib/mfa"
 
