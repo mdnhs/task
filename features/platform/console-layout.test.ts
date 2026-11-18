@@ -111,8 +111,12 @@ describe("platform lists: filter tabs and search share one toolbar row", () => {
     expect(s.indexOf("<FilterSeg")).toBeGreaterThan(s.indexOf("<FilterBar>"))
     expect(s.indexOf("<FilterSearch")).toBeLessThan(s.indexOf("</FilterBar>"))
   })
-  test("search sits at the right end and the tabs shrink before the row wraps", () => {
-    expect(rule(".pf-card .od-filters .od-filter-search")).toContain("margin-left:auto")
+  test("search follows the tabs with the normal filter-bar gap (no auto margin) and the tabs shrink before the row wraps", () => {
+    expect(css).not.toMatch(/\.od-filter-search\{[^}]*margin-left/)
+    expect(rule(".pf-card .od-filters .od-filter-search")).toBe("")
+    const kit = readFileSync(join(process.cwd(), "app/styles/kit.css"), "utf8")
+    expect(kit).toMatch(/\.od-filters\{[^}]*gap:10px/)
+    expect(kit).not.toMatch(/\.od-filters[^{]*\.od-filter-search\{[^}]*margin-left/)
     expect(rule(".pf-card .od-filters .seg.od-seg")).toContain("min-width:0")
   })
 })
