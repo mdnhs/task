@@ -108,7 +108,10 @@ export async function inboxCounts(tx: TenantTx, ctx: ReportCtx, f: InboxFilter):
   let virtualOpen = 0
   let virtualMissing = 0
   const nowMs = ctx.now.getTime()
-  for (const v of await virtualRows(tx, ctx, { ...f, status: "all", after: undefined }, Number.MAX_SAFE_INTEGER)) (nowMs > v.dueAt.getTime() ? virtualMissing++ : virtualOpen++)
+  for (const v of await virtualRows(tx, ctx, { ...f, status: "all", after: undefined }, Number.MAX_SAFE_INTEGER)) {
+    if (nowMs > v.dueAt.getTime()) virtualMissing++
+    else virtualOpen++
+  }
   const open = row.draft + row.submitted + virtualOpen
   const missing = row.missing + virtualMissing
   return { all: open + missing + row.late + row.returned + row.accepted, open, missing, late: row.late, returned: row.returned, accepted: row.accepted }

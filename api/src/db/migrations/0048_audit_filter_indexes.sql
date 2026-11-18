@@ -1,0 +1,6 @@
+-- Selective filters of the audit list (B8 Task 16): `(tenant_id, actor_id, seq)` and `(tenant_id, action, seq)`, so `where tenant_id = ? and actor_id = ? order by seq desc limit n` (and the same for an exact action) reads the index backwards instead of walking the whole chain.
+-- Plain CREATE INDEX (IF NOT EXISTS, so a replay is harmless): the concurrent form cannot run inside the migrator's single transaction. LOCK COST: each statement holds a SHARE lock on audit_events while it builds, which blocks audit INSERTs (every
+-- write path of the API) but not reads; at the size we run (5 000 rows per tenant, tens of tenants) a build takes well under a second. For a database with millions of rows build both indexes first by hand with the concurrent form of CREATE INDEX under the same names; this file then finds them and does nothing.
+-- No data is read or changed; the table is FORCE ROW LEVEL SECURITY and an index build needs no tenant context.
+CREATE INDEX IF NOT EXISTS "audit_events_actor_idx" ON "audit_events" USING btree ("tenant_id","actor_id","seq");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "audit_events_action_idx" ON "audit_events" USING btree ("tenant_id","action","seq");

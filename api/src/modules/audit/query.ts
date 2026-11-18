@@ -3,7 +3,7 @@ import { AppError } from "../../core/errors"
 import { decodeCursor, encodeCursor } from "../../core/cursor"
 import type { Db } from "../../db/client"
 import { auditEvents } from "../../db/schema"
-import { withTenant } from "../../db/tenant-tx"
+import { withTenant, type TenantTx } from "../../db/tenant-tx"
 import { csvCell } from "@opsdesk/domain/csv"
 
 export type AuditRow = typeof auditEvents.$inferSelect
@@ -43,6 +43,10 @@ export function listAudit(db: Db, tenantId: string, f: AuditFilter & Paging): Pr
   )
 }
 
+/** The statement of one audit page (exported so the EXPLAIN test plans exactly what runs): chain order, newest first; the actor and exact-action filters are served by `audit_events_actor_idx` / `audit_events_action_idx`. */
+export const auditPageQuery = (tx: TenantTx, tenantId: string, f: AuditFilter, beforeSeq: number | undefined, take: number) =>
+  tx.select().from(auditEvents).where(where(tenantId, { ...f, beforeSeq })).orderBy(desc(auditEvents.seq)).limit(take)
+
 export type AuditPage = { rows: AuditRow[]; nextCursor: string | null }
 
 /**
@@ -60,7 +64,7 @@ export function listAuditPage(db: Db, tenantId: string, f: AuditFilter, o: { cur
       if (!at || at.at.getTime() !== after.at.getTime()) throw new AppError(400, "invalid_cursor", "Bad Request")
       beforeSeq = at.seq
     }
-    const rows = await tx.select().from(auditEvents).where(where(tenantId, { ...f, beforeSeq })).orderBy(desc(auditEvents.seq)).limit(o.limit + 1)
+    const rows = await auditPageQuery(tx, tenantId, f, beforeSeq, o.limit + 1)
     const more = rows.length > o.limit
     const items = more ? rows.slice(0, o.limit) : rows
     const last = items[items.length - 1]

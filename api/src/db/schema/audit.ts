@@ -24,6 +24,9 @@ export const auditEvents = pgTable(
   (t) => [
     unique("audit_events_tenant_seq").on(t.tenantId, t.seq),
     index("audit_events_entity_idx").on(t.tenantId, t.entity, t.at),
+    // the selective filters of the audit list (actor, exact action), each in chain order so `order by seq desc limit n` reads the index backwards (migration 0048)
+    index("audit_events_actor_idx").on(t.tenantId, t.actorId, t.seq),
+    index("audit_events_action_idx").on(t.tenantId, t.action, t.seq),
     pgPolicy("tenant_isolation", { as: "permissive", for: "all", using: tenantMatch, withCheck: tenantMatch }),
   ],
 ).enableRLS()

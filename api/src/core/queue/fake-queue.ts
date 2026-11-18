@@ -1,6 +1,7 @@
 import type { Queue } from "./queue"
+import { stampRequestId } from "./request-context"
 
-export type FakeJob = { name: string; data: unknown; opts?: { delayMs?: number; jobId?: string } }
+export type FakeJob = { name: string; data: unknown; opts?: { delayMs?: number; jobId?: string; requestId?: string } }
 
 /** In-memory Queue for tests: records jobs; `drain` runs and clears them. A repeated jobId is dropped (BullMQ semantics). */
 export type FakeQueue = Queue & {
@@ -21,7 +22,8 @@ export function fakeQueue(): FakeQueue {
     add: async (name, data, opts) => {
       if (opts?.jobId?.includes(":")) throw new Error("Custom Id cannot contain :") // same rule as BullMQ
       if (opts?.jobId && jobs.some((j) => j.opts?.jobId === opts.jobId)) return
-      jobs.push({ name, data, opts })
+      const requestId = stampRequestId(opts?.requestId) // the same stamping as the BullMQ producer
+      jobs.push({ name, data, opts: requestId ? { ...opts, requestId } : opts })
     },
     drain: async (run) => {
       let n = 0

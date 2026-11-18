@@ -3,9 +3,9 @@ import { Redis } from "ioredis"
 import type { Logger } from "pino"
 import type { Deps } from "../../deps"
 import { errorInfo } from "../safe-error"
-import { REQUEST_ID } from "../middleware/request-id"
 import { safeCapture } from "../observability/error-reporter"
 import { runJob, type Queue } from "./queue"
+import { stampRequestId, validRequestId } from "./request-context"
 
 export const QUEUE_NAME = "opsdesk"
 
@@ -26,12 +26,13 @@ const connectProducer = (url: string) =>
 /** `queue.add` gives up after this long even if BullMQ is still waiting for the connection. */
 export const ADD_TIMEOUT_MS = 3000
 
-type JobLike = { name?: string; id?: string; data?: unknown }
-/** The request id a job was enqueued under, when its data carries one that is id-shaped. Nothing else of the payload is ever read. */
-const jobRequestId = (job: JobLike | undefined): string | undefined => {
-  const id = (job?.data as { requestId?: unknown } | null | undefined)?.requestId
-  return typeof id === "string" && REQUEST_ID.test(id) ? id : undefined
-}
+type JobLike = { name?: string; id?: string; data?: unknown; opts?: unknown }
+/**
+ * The request id a job was enqueued under: the one in its ENVELOPE (job options), when id-shaped. An older job whose payload happens to hold an id-shaped `requestId` field is still logged under it
+ * (log correlation only: nothing else of the payload is ever read and it is never an identifier for authorization).
+ */
+export const jobRequestId = (job: JobLike | undefined): string | undefined =>
+  validRequestId((job?.opts as { requestId?: unknown } | null | undefined)?.requestId) ?? validRequestId((job?.data as { requestId?: unknown } | null | undefined)?.requestId)
 
 /** Tenant-scoped jobs that change what a read model shows (the tenant id is in the job data). The sweeps that do (recurrence, archive purge) bust per tenant themselves. Others (notification, webhook, export) are left out on purpose: busting for them would only thrash the cache. */
 export const READ_MODEL_JOBS = new Set(["file.scan", "dsr.erase"])
@@ -74,10 +75,11 @@ export function makeBullQueue(redisUrl: string, name: string = QUEUE_NAME): Queu
   return {
     raw,
     add: async (jobName, data, opts) => {
+      const requestId = stampRequestId(opts?.requestId) // envelope, not data: job schemas, ledgers and jobIds are untouched
       let timer: ReturnType<typeof setTimeout> | undefined
       try {
         await Promise.race([
-          raw.add(jobName, data ?? {}, { delay: opts?.delayMs, jobId: opts?.jobId, removeOnComplete: { age: 86400 }, removeOnFail: { age: 7 * 86400 } }),
+          raw.add(jobName, data ?? {}, { delay: opts?.delayMs, jobId: opts?.jobId, removeOnComplete: { age: 86400 }, removeOnFail: { age: 7 * 86400 }, ...(requestId ? ({ requestId } as object) : {}) }),
           new Promise<never>((_, reject) => (timer = setTimeout(() => reject(Object.assign(new Error("queue add timed out"), { name: "QueueTimeout", code: "queue_timeout" })), ADD_TIMEOUT_MS))),
         ])
       } finally {
@@ -96,8 +98,10 @@ export function makeBullQueue(redisUrl: string, name: string = QUEUE_NAME): Queu
 export function startWorker(deps: Deps, redisUrl: string, name: string = QUEUE_NAME): { close(): Promise<void> } {
   const connection = connect(redisUrl)
   const worker = new Worker(name, (job) => instrumentJob(deps, job, async () => {
+      const requestId = jobRequestId(job)
+      const jobDeps = requestId ? { ...deps, logger: deps.logger.child({ requestId }) } : deps // the handler logs with the id of the request (or event) that caused the job
       try {
-        await runJob(job.name, job.data, deps)
+        await runJob(job.name, job.data, jobDeps)
       } finally {
         await bustAfterJob(deps, job) // a failed job may have committed part of its work
       }

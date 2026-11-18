@@ -2,7 +2,8 @@ import type { Deps } from "../../deps"
 
 /** Background-job producer. Jobs run after the enqueuing tx commits, in the worker process (src/worker.ts). */
 export type Queue = {
-  add(name: string, data: unknown, opts?: { delayMs?: number; jobId?: string }): Promise<void>
+  /** `requestId` goes into the job's envelope (its options), never into `data`; without one the ambient request's id is used (see request-context.ts). */
+  add(name: string, data: unknown, opts?: { delayMs?: number; jobId?: string; requestId?: string }): Promise<void>
   close?(): Promise<void>
   /** Reachability of the queue's Redis, for /readyz (B7 Task 15). Rejects when it is down. */
   ping?(): Promise<void>

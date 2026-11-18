@@ -13,7 +13,7 @@ import { decodeCursor, encodeCursor } from "../../core/cursor"
 import { ListQuery, Status, type ListQueryInput } from "./dto"
 import { assigneesOf } from "./repo"
 import { taskScopeWhere, type TaskCtx, type TaskRow } from "./scope"
-import { buildListQuery, listConditions } from "./service"
+import { buildListQuery, listConditions, teamTaskWhere } from "./service"
 import { wallOf } from "./time"
 
 // Board, calendar and archive list (FR-M1-04/05/13). All three apply the caller's task scope (ruling D5) and leave archived tasks out, except the archive
@@ -118,6 +118,7 @@ export const CALENDAR_CAP = 1000
 export const CalendarQuery = z.object({
   from: z.string().max(10).optional().openapi({ description: "First tenant-local day, YYYY-MM-DD", example: "2026-11-16" }),
   to: z.string().max(10).optional().openapi({ description: "Last tenant-local day, inclusive; at most 42 days from `from`", example: "2026-11-29" }),
+  teamId: z.uuid().optional().openapi({ description: "Tasks filed under this department or assigned to one of its members, inside the caller's scope (the same rule as GET /v1/tasks?teamId=); a team the caller cannot reach or that does not exist is an empty calendar, never a 404" }),
 })
 export const CalendarSchema = z
   .object({ days: z.array(z.object({ date: z.string(), tasks: z.array(TaskCardSchema) })), truncated: z.boolean() })
@@ -134,11 +135,11 @@ const realDay = (d: string | undefined): d is string => {
 export const dayFor = (day: string, dates: string[]): string => (dates.includes(day) ? day : day < dates[0] ? dates[0] : dates[dates.length - 1])
 
 /** Tasks due in [lo, hi) (UTC instants made from tenant-local midnights, so a DST day is 23 or 25 hours long): tasks_live_due_idx. */
-export const calendarQuery = (tx: TenantTx, ctx: TaskCtx, lo: Date, hi: Date, take: number) =>
+export const calendarQuery = (tx: TenantTx, ctx: TaskCtx, lo: Date, hi: Date, take: number, teamId?: string) =>
   tx
     .select()
     .from(tasks)
-    .where(and(eq(tasks.tenantId, ctx.tenantId), sql`${tasks.archivedAt} is null`, taskScopeWhere(ctx.scope, ctx.reports), sql`${tasks.dueAt} >= ${lo.toISOString()}::timestamptz`, sql`${tasks.dueAt} < ${hi.toISOString()}::timestamptz`))
+    .where(and(eq(tasks.tenantId, ctx.tenantId), sql`${tasks.archivedAt} is null`, taskScopeWhere(ctx.scope, ctx.reports), sql`${tasks.dueAt} >= ${lo.toISOString()}::timestamptz`, sql`${tasks.dueAt} < ${hi.toISOString()}::timestamptz`, teamId ? teamTaskWhere(teamId) : undefined))
     .orderBy(asc(tasks.dueAt), asc(tasks.id))
     .limit(take)
 
@@ -149,7 +150,7 @@ export async function calendarView(tx: TenantTx, ctx: TaskCtx, q: z.infer<typeof
   if (dates.length > CALENDAR_MAX_DAYS) throw unprocessable("invalid_range")
   const lo = new Date(wallToEpoch(`${q.from}T00:00:00`, ctx.tz))
   const hi = new Date(wallToEpoch(`${addDays(q.to, 1)}T00:00:00`, ctx.tz))
-  const rows = await calendarQuery(tx, ctx, lo, hi, CALENDAR_CAP + 1)
+  const rows = await calendarQuery(tx, ctx, lo, hi, CALENDAR_CAP + 1, q.teamId)
   const page = rows.slice(0, CALENDAR_CAP)
   const byDay = new Map<string, TaskCard[]>(dates.map((d) => [d, []]))
   for (const card of await taskCards(tx, ctx, page)) byDay.get(dayFor(card.due.slice(0, 10), dates))!.push(card) // the tenant-local day of the due instant

@@ -35,7 +35,7 @@ const boardR = createRoute({
 })
 const calendarR = createRoute({
   method: "get", path: "/v1/tasks/calendar", middleware: read, request: { query: CalendarQuery },
-  responses: { 200: { description: "Cards grouped by the tenant-local due date, every day of the range present (at most 42 days, 1000 cards). 422 invalid_range", content: content(CalendarSchema) } },
+  responses: { 200: { description: "Cards grouped by the tenant-local due date, every day of the range present (at most 42 days, 1000 cards). `teamId` keeps one team (filed under it or assigned to its members). 400 validation_failed (teamId not a uuid); 422 invalid_range", content: content(CalendarSchema) } },
 })
 
 /** Static task paths: registered BEFORE `/v1/tasks/{id}` (app.ts), so "archive", "board" and "calendar" are never read as an id. */

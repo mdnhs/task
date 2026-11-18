@@ -18,7 +18,7 @@ export function eventJobId(eventId: string, subscriber: string, name: string, ke
   return createHash("sha256").update(JSON.stringify([eventId, subscriber, name, key ?? ""])).digest("hex")
 }
 
-type JobIntent = { name: string; data: unknown; opts: { delayMs?: number; jobId: string } }
+type JobIntent = { name: string; data: unknown; opts: { delayMs?: number; jobId: string; requestId?: string } }
 
 /**
  * One relay pass. Returns the number of events completed (every current subscriber delivered or dead).
@@ -101,7 +101,7 @@ async function relayTenant(deps: Deps, tenantId: string, batch: number): Promise
         const buffered: JobIntent[] = []
         const enqueue = (name: string, data: unknown, o?: EnqueueOpts) => {
           if (!SAFE_NAME.test(name) || (o?.key !== undefined && !SAFE_NAME.test(o.key))) throw new Error("Invalid job name or key (allowed: A-Z a-z 0-9 . _ -)")
-          buffered.push({ name, data, opts: { delayMs: o?.delayMs, jobId: eventJobId(event.id, sub.name, name, o?.key) } })
+          buffered.push({ name, data, opts: { delayMs: o?.delayMs, jobId: eventJobId(event.id, sub.name, name, o?.key), requestId: event.id } }) // the event id correlates the job in the worker's logs
         }
         try {
           await tx.transaction(async (sp) => {

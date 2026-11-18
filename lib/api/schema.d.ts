@@ -1222,6 +1222,8 @@ export interface paths {
                     from?: string;
                     /** @description Last tenant-local day, inclusive; at most 42 days from `from` */
                     to?: string;
+                    /** @description Tasks filed under this department or assigned to one of its members, inside the caller's scope (the same rule as GET /v1/tasks?teamId=); a team the caller cannot reach or that does not exist is an empty calendar, never a 404 */
+                    teamId?: string;
                 };
                 header?: never;
                 path?: never;
@@ -1229,7 +1231,7 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description Cards grouped by the tenant-local due date, every day of the range present (at most 42 days, 1000 cards). 422 invalid_range */
+                /** @description Cards grouped by the tenant-local due date, every day of the range present (at most 42 days, 1000 cards). `teamId` keeps one team (filed under it or assigned to its members). 400 validation_failed (teamId not a uuid); 422 invalid_range */
                 200: {
                     headers: {
                         [name: string]: unknown;
