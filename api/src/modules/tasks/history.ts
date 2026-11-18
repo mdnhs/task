@@ -2,14 +2,14 @@ import { and, desc, eq, inArray, lt, or } from "drizzle-orm"
 import { withholdDriveText } from "@opsdesk/domain/devices"
 import { formatChange, type RawChange } from "@opsdesk/domain/task-history"
 import type { FieldChange } from "@opsdesk/domain/task-model"
-import { projectMilestones, projects, taskHistory, teams, user } from "../../db/schema"
+import { projectMilestones, projects, taskHistory, tasks, teams, user } from "../../db/schema"
 import type { TenantTx } from "../../db/tenant-tx"
 import { decodeCursor, encodeCursor } from "./cursor"
-import type { TaskCtx } from "./scope"
+import { taskScopeWhere, type TaskCtx } from "./scope"
 import { wallOf } from "./time"
 
 export type HistoryInput = { kind: string; text?: string | null; changes?: RawChange[]; notified?: string[]; updateId?: string | null }
-export type HistoryDto = { id: string; at: string; atUtc: string; actorId: string | null; by: string; kind: string; text: string; changes: FieldChange[]; notified: string[]; hiddenNotified: number; updateId?: string }
+export type HistoryDto = { id: string; at: string; atUtc: string; actorId: string | null; by: string; kind: string; text: string; changes: FieldChange[]; notified: string[]; hiddenNotified: number; hiddenDependencies: number; updateId?: string }
 type HistoryRow = typeof taskHistory.$inferSelect
 
 /** Appends one history line (tenant-time instant = ctx.now). The text is device-agnostic, so a Drive link in it is always withheld at write time (ruling E13).  Returns its id. A repeated (task, update_id) is a unique violation: callers check first. */
@@ -65,25 +65,43 @@ export async function historyDtos(tx: TenantTx, ctx: Pick<TaskCtx, "tenantId" | 
   const projectNames = new Map(projectRows.map((p) => [p.id, p.name]))
   const milestoneRows = ref.milestoneIds.length ? await tx.select({ id: projectMilestones.id, name: projectMilestones.name }).from(projectMilestones).where(and(eq(projectMilestones.tenantId, ctx.tenantId), inArray(projectMilestones.id, ref.milestoneIds))) : []
   const milestoneNames = new Map(milestoneRows.map((m) => [m.id, m.name]))
+  // "Updated Depends on" lines hold the task refs (TSK-n) the writer typed. A reader sees only the refs of tasks inside their own scope (the rule that decides
+  // a dependency is visible); the others are a count, never the ref (no existence oracle).
+  const depRefs = new Set<string>()
+  for (const r of rows) for (const c of r.changes) if (c.field === "dependsOn") for (const v of [c.from, c.to]) if (Array.isArray(v)) v.forEach((x) => depRefs.add(String(x)))
+  const refNos = [...depRefs].map((x) => /^TSK-(\d+)$/.exec(x)?.[1]).filter((n): n is string => !!n).map(Number)
+  const seeable = refNos.length
+    ? new Set((await tx.select({ refNo: tasks.refNo }).from(tasks).where(and(eq(tasks.tenantId, ctx.tenantId), inArray(tasks.refNo, refNos), taskScopeWhere(ctx.scope, ctx.reports)))).map((t) => `TSK-${t.refNo}`))
+    : new Set<string>()
+  const depVisible = (x: unknown) => seeable.has(String(x))
   const fmt = {
     tz: ctx.tz, nameOf, teamName: (id: string) => teamNames.get(id) ?? "Former team",
     projectName: (id: string) => projectNames.get(id) ?? "Former project", milestoneName: (id: string) => milestoneNames.get(id) ?? "Former milestone",
   }
   // Drive links (ruling D22): old and new values of free text can hold one, so a device without Drive access gets them withheld here too.
   const free = (v: string) => (ctx.drive ? v : withholdDriveText(v))
-  return rows.map((r) => ({
-    id: r.id,
-    at: wallOf(r.at, ctx.tz),
-    atUtc: r.at.toISOString(),
-    actorId: r.actorId,
-    by: r.actorId ? nameOf(r.actorId) : FORMER,
-    kind: r.kind,
-    text: free(r.text ?? ""),
-    changes: r.changes.map((c) => formatChange(c, fmt)).map((c) => ({ ...c, from: free(c.from), to: free(c.to) })),
-    notified: r.notified.filter((n) => personVisible(ctx, n)),
-    hiddenNotified: r.notified.filter((n) => !personVisible(ctx, n)).length, // out-of-scope people: a count only (as hidden dependencies), never their ids
-    ...(r.updateId ? { updateId: r.updateId } : {}),
-  }))
+  return rows.map((r) => {
+    const hiddenDeps = new Set<string>()
+    const changes = r.changes.map((c) => {
+      if (c.field !== "dependsOn") return c
+      const keep = (v: unknown) => (Array.isArray(v) ? v.filter((x) => (depVisible(x) ? true : (hiddenDeps.add(String(x)), false))) : v)
+      return { ...c, from: keep(c.from), to: keep(c.to) }
+    })
+    return {
+      id: r.id,
+      at: wallOf(r.at, ctx.tz),
+      atUtc: r.at.toISOString(),
+      actorId: r.actorId,
+      by: r.actorId ? nameOf(r.actorId) : FORMER,
+      kind: r.kind,
+      text: free(r.text ?? ""),
+      changes: changes.map((c) => formatChange(c, fmt)).map((c) => ({ ...c, from: free(c.from), to: free(c.to) })),
+      notified: r.notified.filter((n) => personVisible(ctx, n)),
+      hiddenNotified: r.notified.filter((n) => !personVisible(ctx, n)).length, // out-of-scope people: a count only (as hidden dependencies), never their ids
+      hiddenDependencies: hiddenDeps.size,
+      ...(r.updateId ? { updateId: r.updateId } : {}),
+    }
+  })
 }
 
 /** History newest first, keyset on (at, id) descending. `limit + 1` rows are read to know whether there is a next page. */

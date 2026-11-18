@@ -40,9 +40,9 @@ const FieldChangeSchema = z.object({ field: z.string(), from: z.string(), to: z.
 export const HistoryItem = z
   .object({
     id: z.string(), at: z.string(), atUtc: z.string(), actorId: z.string().nullable(), by: z.string(), kind: z.string(), text: z.string(),
-    changes: z.array(FieldChangeSchema), notified: z.array(z.string()), hiddenNotified: z.number().int(), updateId: z.string().optional(),
+    changes: z.array(FieldChangeSchema), notified: z.array(z.string()), hiddenNotified: z.number().int(), hiddenDependencies: z.number().int(), updateId: z.string().optional(),
   })
-  .openapi({ example: { id: TID, at: WALL_EX, atUtc: UTC_EX, actorId: UID, by: "Ann Byrne", kind: "updated", text: "Updated Due", changes: [{ field: "Due", from: "20 Nov 17:00", to: "21 Nov 17:00" }], notified: [], hiddenNotified: 0 } })
+  .openapi({ example: { id: TID, at: WALL_EX, atUtc: UTC_EX, actorId: UID, by: "Ann Byrne", kind: "updated", text: "Updated Due", changes: [{ field: "Due", from: "20 Nov 17:00", to: "21 Nov 17:00" }], notified: [], hiddenNotified: 0, hiddenDependencies: 0 } })
 
 const ChecklistItemDto = z.object({ id: z.string(), text: z.string(), done: z.boolean() }).openapi({ example: { id: TID, text: "Ground floor", done: true } })
 const SubtaskDto = z.object({ id: z.string(), ref: z.string(), title: z.string(), status: Status }).openapi({ example: { id: TID, ref: "TSK-1002", title: "Stairwell", status: "not_started" } })

@@ -222,6 +222,27 @@ describe("archive and restore", () => {
     expect(all.hiddenNotified).toBe(0)
   })
 
+  test("history 'Updated Depends on' never shows a task ref the reader cannot see; it is a count (B6 final I2)", async () => {
+    const w = await world()
+    await w.manages(w.manager, w.staff)
+    const t = await w.mk(w.ops, { title: "In team", primary: w.staff.userId })
+    const inScope = await w.mk(w.ops, { title: "Also in team", primary: w.staff.userId })
+    const hidden = await w.mk(w.ops, { title: "Secret", primary: w.staff2.userId })
+    const put = await w.req("PUT", `/v1/tasks/${t.id}/dependencies`, w.ops, { version: 1, dependsOnIds: [inScope.id, hidden.id] })
+    expect(put.status).toBe(200)
+    const line = async (who: unknown) => (await w.json(await w.req("GET", `/v1/tasks/${t.id}/history`, who as never))).items.find((i: { text: string }) => i.text === "Updated Depends on")
+    const team = await line(w.manager)
+    expect(JSON.stringify(team)).not.toContain(hidden.ref)
+    expect(JSON.stringify(team)).toContain(inScope.ref)
+    expect(team.hiddenDependencies).toBe(1)
+    const asStaff = await line(w.staff)
+    expect(JSON.stringify(asStaff)).not.toContain(hidden.ref)
+    expect(asStaff.hiddenDependencies).toBe(1)
+    const all = await line(w.owner)
+    expect(JSON.stringify(all)).toContain(hidden.ref)
+    expect(all.hiddenDependencies).toBe(0)
+  })
+
   test("only managers archive or restore (D6), scope applies (404), version is checked, archived twice is 409, a live task cannot be restored", async () => {
     const w = await world()
     await w.manages(w.manager, w.staff)
