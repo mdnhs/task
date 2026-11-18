@@ -11443,11 +11443,15 @@ export interface paths {
                         weeks: number;
                         /** @description Replace an existing DRAFT target week (without it 409 week_exists_draft) */
                         replace?: boolean;
+                        /** @description With `replace`: the version of each target draft the caller saw, by its Monday. A target whose version moved since is 409 version_conflict and nothing is written. A target left out of the map is not checked. */
+                        targetVersions?: {
+                            [key: string]: number;
+                        };
                     };
                 };
             };
             responses: {
-                /** @description Copies the week's people and individual times to the next 1..12 weeks as DRAFTS (a supervisor of the site too: the copies are drafts, the publish lock is not touched), all or nothing. Every copied shift is re-checked: a block (approved leave, a clash anywhere, a person who left or lacks a qualification) makes it an OPEN shift with a conflict row (open true), a warning or a public holiday keeps the person with a line (open false); copied = kept + warned + opened. Nobody is notified. 404 not_found for a week or shift of a site the caller may not see, a missing or another tenant's one and an id that is not a uuid (all the same answer); 403 forbidden (a role that edits nothing); 409 version_conflict | week_published (a target is published) | week_exists_draft (a target is a draft and replace is not true) | location_archived; 422 invalid_weeks */
+                /** @description Copies the week's people and individual times to the next 1..12 weeks as DRAFTS (a supervisor of the site too: the copies are drafts, the publish lock is not touched), all or nothing. Every copied shift is re-checked: a block (approved leave, a clash anywhere, a person who left or lacks a qualification) makes it an OPEN shift with a conflict row (open true), a warning or a public holiday keeps the person with a line (open false); copied = kept + warned + opened. Nobody is notified. 404 not_found for a week or shift of a site the caller may not see, a missing or another tenant's one and an id that is not a uuid (all the same answer); 403 forbidden (a role that edits nothing); 409 version_conflict (the source version, or a targetVersions entry of a draft being replaced, is stale) | week_published (a target is published) | week_exists_draft (a target is a draft and replace is not true) | location_archived; 422 invalid_weeks */
                 201: {
                     headers: {
                         [name: string]: unknown;
@@ -13731,6 +13735,8 @@ export interface paths {
                             reports: number;
                             /** @description Upcoming shifts of the caller's own that are published and not confirmed yet (0 without the roster module) */
                             roster?: number;
+                            /** @description Open shifts the caller could claim: published weeks, the next 7 days, at a site they are homed at or rostered at that week (0 without the roster module). Plain staff have no attention feed, this is how open shifts reach them */
+                            openShifts?: number;
                         };
                     };
                 };

@@ -6,7 +6,7 @@ import { can } from "@opsdesk/domain/permissions"
 import { AppError } from "../../core/errors"
 import { taskEvidence, teams } from "../../db/schema"
 import type { TenantTx } from "../../db/tenant-tx"
-import { countRosterAttention, countUnconfirmed, loadRosterAttention } from "../rosters"
+import { countOpenShiftsForMe, countRosterAttention, countUnconfirmed, loadRosterAttention } from "../rosters"
 import { occurrencesBetween } from "../shifts"
 import { buildInboxQuery, currentItem, inboxRange, virtualRows, type InboxFilter } from "../shift-reports"
 import { assigneesOf, decodeCursor, encodeCursor, namesOf, wallOf } from "../tasks"
@@ -296,6 +296,7 @@ export async function loadToday(tx: TenantTx, s: RmScope, mode: DayMode): Promis
   const reports = alerts.length
   const rosterCtx = s.roster ? await s.roster() : null
   const roster = rosterCtx ? await countUnconfirmed(tx, rosterCtx) : 0
+  const openShifts = rosterCtx ? await countOpenShiftsForMe(tx, rosterCtx) : 0
   const counts = todayCounts(tasks, nowWall, { evidence: review, reports })
   const order = dayOrder(tasks, nowWall, mode)
   const summary = daySummary(tasks, nowWall, mode)
@@ -318,6 +319,7 @@ export async function loadToday(tx: TenantTx, s: RmScope, mode: DayMode): Promis
     ...(team ? { team } : {}),
     reports,
     roster,
+    openShifts,
   }
 }
 

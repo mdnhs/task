@@ -157,6 +157,38 @@ describe("repeat (FR-RS-26, 27, AC-RS-06, R8-12)", () => {
     expect(await weekIdAt(w, w.a, "2027-01-04")).toBeUndefined()
   })
 
+  test("replace with targetVersions: a target draft edited after the caller looked (stale version) is 409 version_conflict and nothing is written; the current versions pass", async () => {
+    const w = await sites()
+    const { wk } = await coppers(w)
+    const t1 = await w.week(w.p.owner, w.a, T1)
+    await w.addOk(w.p.owner, t1, [{ date: T1, userIds: [w.p.owner.userId], shiftTypeId: w.ta }])
+    const seen = await version(w, t1)
+    await w.addOk(w.p.owner, t1, [{ date: T1, userIds: [w.staff3.userId], shiftTypeId: w.ta }]) // someone edits the target after the caller looked
+    const v = await version(w, wk)
+    expect(seen).not.toBe(await version(w, t1))
+    const before = await shiftsOf(w, t1)
+    expect((await w.fail("POST", `/v1/roster/weeks/${wk}/repeat`, w.p.owner, { version: v, weeks: 1, replace: true, targetVersions: { [T1]: seen } }, 409)).code).toBe("version_conflict")
+    expect(await shiftsOf(w, t1)).toHaveLength(before.length) // untouched
+    expect((await shiftsOf(w, t1)).some((r) => r.user_id === w.staff3.userId)).toBe(true)
+    await repeatOk(w, w.p.owner, wk, { replace: true, targetVersions: { [T1]: await version(w, t1) } })
+    expect((await shiftsOf(w, t1)).some((r) => r.user_id === w.staff3.userId)).toBe(false)
+  })
+
+  test("a location in another zone than the tenant keeps its wall times across ITS clock change: Sydney 09:00 on Mon 29 Mar 2027 (AEDT) repeats to 09:00 on Mon 5 Apr (AEST, the clocks went back on the 4th), not 09:00 Dublin", async () => {
+    const w = await sites()
+    await w.rows("update locations set time_zone = 'Australia/Sydney' where id = $1", [w.a])
+    const src = await w.week(w.p.owner, w.a, "2027-03-29")
+    await w.addOk(w.p.owner, src, [{ date: "2027-03-29", userIds: [w.p.employee.userId], shiftTypeId: w.ta, start: "09:00", end: "17:00" }])
+    await publish(w, src)
+    const out = await repeatOk(w, w.p.owner, src, {})
+    const [from] = await shiftsOf(w, src)
+    const [copy] = await shiftsOf(w, out.created[0].id)
+    expect([from.date, from.start_time, new Date(from.start_at).toISOString()]).toEqual(["2027-03-29", "09:00", "2027-03-28T22:00:00.000Z"]) // 09:00 AEDT (UTC+11)
+    expect([copy.date, copy.start_time, copy.end_time]).toEqual(["2027-04-05", "09:00", "17:00"]) // the wall time is kept
+    expect(new Date(copy.start_at).toISOString()).toBe("2027-04-04T23:00:00.000Z") // 09:00 AEST (UTC+10): an hour later than the same wall time before the change
+    expect(new Date(copy.end_at).toISOString()).toBe("2027-04-05T07:00:00.000Z")
+  })
+
   test("a published target is 409 week_published; a draft target needs replace: true (without it 409 week_exists_draft, with it the old shifts are replaced, never duplicated); weeks outside 1..12 is 422; a stale version is 409", async () => {
     const w = await sites()
     const { wk } = await coppers(w)

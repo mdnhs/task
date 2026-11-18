@@ -60,7 +60,7 @@ export async function myIcs(tx: TenantTx, ctx: RosterCtx, q: { from?: string; to
   const mine = await myRoster(tx, ctx, q)
   return buildIcs(
     mine.items.map((s) => ({
-      id: s.id, date: s.date, start: s.start, end: s.end, startAt: Date.parse(s.startAt), endAt: Date.parse(s.endAt),
+      id: s.id, version: s.version, date: s.date, start: s.start, end: s.end, startAt: Date.parse(s.startAt), endAt: Date.parse(s.endAt),
       title: `${s.role} at ${s.locationName}`, location: s.locationAddress ? `${s.locationName}, ${s.locationAddress}` : s.locationName,
       description: s.unpaidBreakMin > 0 ? `${s.shiftType}. Unpaid break ${s.unpaidBreakMin} min.` : s.shiftType,
     })),

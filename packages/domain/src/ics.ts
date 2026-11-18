@@ -13,6 +13,8 @@ export type IcsShift = Pick<RosterShift, "id" | "date" | "start" | "end"> & {
   /** Epoch ms of the start and end when the caller already has the instants (the API's stored `start_at` / `end_at`): used as they are, no zone needed. */
   startAt?: number
   endAt?: number
+  /** The shift's version: written as SEQUENCE so a retimed shift replaces the calendar entry instead of duplicating it. Omitted = no SEQUENCE line. */
+  version?: number
 }
 
 /** Options of `buildIcs`. `tz` is the zone of shifts that carry no instants; `now` (epoch ms) only sets DTSTAMP; `uidHost` is what follows the `@` of every UID. */
@@ -58,15 +60,17 @@ export function buildIcs(shifts: IcsShift[], o: IcsOptions): string {
   const host = o.uidHost ?? "roster"
   const lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Roster//Shifts//EN", "CALSCALE:GREGORIAN", "METHOD:PUBLISH"]
   if (o.calendarName) lines.push(`X-WR-CALNAME:${icsEscape(o.calendarName)}`)
+  const stamp = utc(o.now) // one stamp for the whole export (the caller passes the request's clock reading)
   for (const s of shifts) {
     const start = s.startAt ?? wallToEpoch(`${s.date}T${s.start}`, o.tz)
     const end = s.endAt ?? wallToEpoch(shiftEnd(s, o.tz), o.tz)
     lines.push(
       "BEGIN:VEVENT",
       `UID:${icsEscape(s.id)}@${icsEscape(host)}`,
-      `DTSTAMP:${utc(o.now)}`,
+      `DTSTAMP:${stamp}`,
       `DTSTART:${utc(start)}`,
       `DTEND:${utc(end)}`,
+      ...(s.version !== undefined ? [`SEQUENCE:${Math.max(0, Math.trunc(s.version))}`] : []),
       `SUMMARY:${icsEscape(s.title ?? s.role ?? "Shift")}`,
     )
     if (s.location) lines.push(`LOCATION:${icsEscape(s.location)}`)

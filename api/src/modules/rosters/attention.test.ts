@@ -1,11 +1,17 @@
 import pg from "pg"
-import { afterEach, beforeEach, describe, expect, test } from "vitest"
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest"
 import { fakeCacheStamp, fakeClock } from "../../../test/fakes"
 import { resetDb } from "../../../test/harness"
 import { makeReadModelCache } from "../read-models"
 import { sites, type Json, type Who } from "./testkit"
 
 // B8 Task 14: roster items in the attention feed, the dashboard count and Today (FR-RS-12, 33, 40; Review Focus 1). The clock is 2026-11-16T09:00Z (a Monday, Dublin = UTC+0).
+
+const rulesReads = vi.hoisted(() => ({ n: 0 }))
+vi.mock("./rules", async (orig) => {
+  const m = await orig<typeof import("./rules")>()
+  return { ...m, readRules: (...a: Parameters<typeof m.readRules>) => ((rulesReads.n += 1), m.readRules(...a)) }
+})
 
 beforeEach(resetDb)
 
@@ -45,6 +51,29 @@ describe("who sees which roster item (Review Focus 1)", () => {
     for (const secret of ["Bravo", w.b, sb.id]) expect(JSON.stringify(rm), secret).not.toContain(secret)
     const owner = await feed(w, w.p.owner)
     expect(kinds(owner, "roster_open_shift").map((i) => i.rosterRef)).toEqual([sa.id, sb.id])
+  })
+
+  test("plain staff have no attention feed (403): the open shifts they could claim reach them as Today's `openShifts` count: published weeks at the site they are homed at or rostered at that week (claims rules AF1), never another site or a draft week", async () => {
+    const w = await sites()
+    const { sa, sb, a } = await openShifts(w)
+    const openFor = async (who: Who) => {
+      w.clock.advance({ minutes: 1 }) // the 30 s read-model cache
+      return (await w.ok("GET", "/v1/today", who)).openShifts
+    }
+    await w.ok("GET", "/v1/attention", w.p.employee, undefined, 403) // staff have no feed
+    expect(await openFor(w.p.employee)).toBe(0) // located nowhere yet
+    await w.ok("PUT", `/v1/members/${w.p.employee.userId}/home-location`, w.p.owner, { locationId: w.a })
+    expect(await openFor(w.p.employee)).toBe(1) // Alpha's, not Bravo's
+    expect(JSON.stringify(await w.ok("GET", "/v1/today", w.p.employee))).not.toContain(sb.id)
+    // rostered at Bravo that week (a cross-site loan) is located there too
+    await w.rows("insert into roster_shifts (tenant_id, week_id, location_id, shift_type_id, role, user_id, date, start_time, end_time, start_at, end_at, created_at, updated_at) select tenant_id, week_id, location_id, shift_type_id, role, $2, '2026-11-20', '08:00', '16:00', '2026-11-20T08:00Z', '2026-11-20T16:00Z', now(), now() from roster_shifts where id = $1", [sb.id, w.p.employee.userId])
+    expect(await openFor(w.p.employee)).toBe(2)
+    // somebody else, located nowhere, sees none
+    expect(await openFor(w.staff2)).toBe(0)
+    // a draft week is shown to staff nowhere
+    await w.rows("update roster_weeks set status = 'draft' where id = $1", [a])
+    expect(await openFor(w.p.employee)).toBe(1)
+    expect(sa.id).toBeTruthy()
   })
 
   test("open shifts: published weeks only, from now to 7 days ahead, at sites the caller sees; a draft week's, a later one's and an ended one's are not items", async () => {
@@ -262,5 +291,17 @@ describe("cost", () => {
     const ownerWith = await read(w.p.owner)
     expect(ownerWith - ownerWithout).toBeLessThanOrEqual(12) // the roster context (4 reads) and the six counts
     expect(ownerWith).toBeGreaterThan(ownerWithout)
+  })
+})
+
+describe("draft-week kind reads the rules once per request (Task 14 review minor)", () => {
+  test("with more draft weeks than the cap (count() runs after rows()) the feed still reads the rules setting once", async () => {
+    const w = await sites()
+    await w.rows(`insert into locations (tenant_id, name, created_at, updated_at) select $1, 'L' || g, now(), now() from generate_series(1, 101) g`, [w.tenant.id])
+    await w.rows(`insert into roster_weeks (tenant_id, location_id, week_start, created_at, updated_at) select tenant_id, id, '2026-11-16', now(), now() from locations where tenant_id = $1 and name like 'L%'`, [w.tenant.id])
+    rulesReads.n = 0
+    const f = await feed(w, w.p.owner, "?limit=100")
+    expect(Number(f.total)).toBeGreaterThan(100)
+    expect(rulesReads.n).toBe(1)
   })
 })

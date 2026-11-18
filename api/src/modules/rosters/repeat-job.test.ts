@@ -1,5 +1,7 @@
+import { randomUUID } from "node:crypto"
 import { readFileSync } from "node:fs"
-import { beforeEach, describe, expect, test } from "vitest"
+import pg from "pg"
+import { afterAll, beforeEach, describe, expect, test } from "vitest"
 import { ownerQuery } from "../../../test/db"
 import { fakeClock, resetDb } from "../../../test/harness"
 import { runJob } from "../../core/queue/queue"
@@ -240,8 +242,67 @@ describe("auto-repeat sweep (R8-12)", () => {
     expect(errors).toHaveLength(1)
     expect(Object.keys(errors[0]).sort()).toEqual(["errCode", "level", "msg", "tenantId"])
     expect(JSON.stringify(s.lines)).not.toMatch(/Aoife|Cian|secret|insert into/i)
+    setClock(w, "2026-12-10T09:31:00.000Z") // the first failure backs the site off for 30 minutes
     await run(w)
     expect(await drafts(w)).toHaveLength(1)
+  })
+
+  // a trigger that makes the copy fail for the given locations (the chosen ones, or every one but `except`)
+  const failFor = async (cond: string) => {
+    await ownerQuery(`create function fail_next_week() returns trigger language plpgsql as $$ begin if new.week_start = '${NEXT}' and ${cond} then raise exception 'boom'; end if; return new; end $$`)
+    await ownerQuery("create trigger fail_next_week before insert on roster_weeks for each row execute function fail_next_week()")
+  }
+  const healFor = async () => {
+    await ownerQuery("drop trigger if exists fail_next_week on roster_weeks")
+    await ownerQuery("drop function if exists fail_next_week()")
+  }
+  const failures = async (w: W, id: string) => (await w.rows("select auto_repeat_failures::int as n, auto_repeat_attempt_at from locations where id = $1", [id]))[0]
+
+  test("a persistently failing location backs off (30 min, then 1 h, ...) instead of failing every 15 minutes forever; a healthy location is never held back; success clears the count", async () => {
+    const w = await world()
+    await due(w) // Alpha fails
+    await due(w, 7, w.b, w.tb, [w.staff3.userId, w.p.manager.userId]) // Bravo is healthy
+    await failFor(`new.location_id = '${w.a}'`)
+    const attempts = async (at: number) => {
+      setClock(w, new Date(Date.parse("2026-12-10T09:00:00.000Z") + at * 60_000).toISOString())
+      const s = spy()
+      await run(w, {}, 1, { ...w.deps, logger: s.logger })
+      return s.lines.filter((l) => l.level === "error").length
+    }
+    try {
+      expect(await attempts(0)).toBe(1) // first try fails
+      expect((await failures(w, w.a)).n).toBe(1)
+      expect(await drafts(w, w.b)).toHaveLength(1) // Bravo was done in the same run
+      expect(await attempts(15)).toBe(0) // the next scheduled run: Alpha is backing off, no attempt
+      expect(await attempts(30)).toBe(1) // 30 minutes after the failure: tried again
+      expect((await failures(w, w.a)).n).toBe(2)
+      expect(await attempts(45)).toBe(0)
+      expect(await attempts(89)).toBe(0) // the second delay is 1 h
+      expect(await attempts(90)).toBe(1)
+      expect((await failures(w, w.a)).n).toBe(3)
+    } finally {
+      await healFor()
+    }
+    expect(await attempts(90 + 15)).toBe(0)
+    expect(await attempts(90 + 120)).toBe(0) // the next delay (2 h) has passed and the copy works: no error
+    expect(await drafts(w, w.a)).toHaveLength(1)
+    expect((await failures(w, w.a)).n).toBe(0) // success resets the count
+  })
+
+  test("more than a batch of failing locations never starve a healthy one: candidates are ordered by last attempt, the failing ones back off", async () => {
+    const w = await world()
+    const GOOD = "ffffffff-ffff-4fff-8fff-ffffffffffff" // the largest id: last in a plain id order
+    await w.rows(`insert into locations (id, tenant_id, name, created_at, updated_at) select case when g = 52 then '${GOOD}'::uuid else gen_random_uuid() end, $1, 'S' || g, now(), now() from generate_series(1, 52) g`, [w.tenant.id])
+    await w.rows(`insert into roster_weeks (tenant_id, location_id, week_start, status, auto_repeat_days, published_at, created_at, updated_at) select tenant_id, id, '${SRC}', 'published', 7, now(), now(), now() from locations where name like 'S%'`)
+    await failFor(`new.location_id <> '${GOOD}'`)
+    try {
+      await run(w) // 50 failing sites tried, the good one is not in the first 50 by id
+      expect(await drafts(w, GOOD)).toHaveLength(0)
+      await run(w) // the 50 are backing off: the 51st failing site and the good one are next
+    } finally {
+      await healFor()
+    }
+    expect(await drafts(w, GOOD)).toHaveLength(1)
   })
 
   test("a successful run drops the tenant's read-model cache (the new draft is in the attention feed within one read)", async () => {
@@ -270,5 +331,62 @@ describe("auto-repeat sweep (R8-12)", () => {
     const worker = readFileSync(new URL("../../worker.ts", import.meta.url), "utf8")
     expect(worker).toMatch(/registerRosters\(\)/)
     expect(worker).toMatch(/upsertJobScheduler\(AUTO_REPEAT_JOB, \{ every: 15 \* 60_000 \}/)
+  })
+})
+
+describe("migration 0047 SQL run for real", () => {
+  const owner = new pg.Pool({ connectionString: process.env.TEST_DATABASE_OWNER_URL, max: 2 })
+  afterAll(() => owner.end())
+  const file = readFileSync(new URL("../../db/migrations/0047_roster_auto_repeat_backoff.sql", import.meta.url), "utf8")
+
+  test("the real file replayed as app_owner WITHOUT tenant context over 3 tenants adds the two job-state columns (null, 0) and leaves every location as it was", async () => {
+    const ids: string[] = []
+    for (const label of ["A", "B", "C"]) {
+      const id = randomUUID()
+      await owner.query("insert into tenants (id, slug, name) values ($1, $2, $3)", [id, `r-${id.slice(0, 8)}`, label])
+      const c = await owner.connect()
+      try {
+        await c.query("begin")
+        await c.query("select set_config('app.tenant_id', $1, true)", [id])
+        for (const n of ["One", "Two"]) await c.query("insert into locations (tenant_id, name, created_at, updated_at) values ($1, $2, now(), now())", [id, `${label}${n}`])
+        await c.query("commit")
+      } finally {
+        c.release()
+      }
+      ids.push(id)
+    }
+    const c = await owner.connect()
+    try {
+      await c.query("begin") // rolled back
+      expect(String((await c.query("select current_setting('app.tenant_id', true) as t")).rows[0].t ?? "")).toBe("")
+      await c.query("alter table locations drop column auto_repeat_attempt_at, drop column auto_repeat_failures") // the state before 0047
+      for (const stmt of file.split("--> statement-breakpoint")) if (stmt.trim()) await c.query(stmt)
+      expect(String((await c.query("select current_setting('app.tenant_id', true) as t")).rows[0].t ?? "")).toBe("")
+      expect((await c.query("select column_name, is_nullable, column_default from information_schema.columns where table_name = 'locations' and column_name like 'auto_repeat_%' order by column_name")).rows).toEqual([
+        { column_name: "auto_repeat_attempt_at", is_nullable: "YES", column_default: null },
+        { column_name: "auto_repeat_failures", is_nullable: "NO", column_default: "0" },
+      ])
+      let seen = 0
+      for (const id of ids) {
+        await c.query("select set_config('app.tenant_id', $1, true)", [id])
+        const rows = (await c.query("select auto_repeat_attempt_at, auto_repeat_failures from locations")).rows
+        expect(rows).toEqual([{ auto_repeat_attempt_at: null, auto_repeat_failures: 0 }, { auto_repeat_attempt_at: null, auto_repeat_failures: 0 }])
+        seen += rows.length
+      }
+      expect(seen).toBe(6)
+      await c.query("select set_config('app.tenant_id', '', true)")
+      expect((await c.query("select count(*)::int as n from locations")).rows[0].n).toBe(0) // FORCE RLS still hides every row with no tenant
+    } finally {
+      await c.query("rollback")
+      c.release()
+    }
+  })
+
+  test("the journal and the 0047 snapshot follow 0046", () => {
+    const j = JSON.parse(readFileSync(new URL("../../db/migrations/meta/_journal.json", import.meta.url), "utf8")) as { entries: { idx: number; tag: string }[] }
+    expect(j.entries.slice(46, 48).map((e) => [e.idx, e.tag])).toEqual([[46, "0046_leave_decision_note"], [47, "0047_roster_auto_repeat_backoff"]])
+    const s = JSON.parse(readFileSync(new URL("../../db/migrations/meta/0047_snapshot.json", import.meta.url), "utf8")) as { prevId: string }
+    const prev = JSON.parse(readFileSync(new URL("../../db/migrations/meta/0046_snapshot.json", import.meta.url), "utf8")) as { id: string }
+    expect(s.prevId).toBe(prev.id)
   })
 })

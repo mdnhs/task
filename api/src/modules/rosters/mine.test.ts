@@ -140,7 +140,7 @@ describe("GET /v1/roster/mine.ics (R8-16, Review Focus 3)", () => {
     expect(text).not.toContain("20261109")
     for (const secret of [w.staff2.userId, "Cian", "Aoife", w.a, w.b, w.p.employee.userId, w.p.owner.userId]) expect(text, secret).not.toContain(secret)
     const keys = new Set(text.split("\r\n").map((l) => l.split(":")[0].split(";")[0]).filter((k) => k && !k.startsWith(" ")))
-    expect([...keys].sort()).toEqual(["BEGIN", "CALSCALE", "DESCRIPTION", "DTEND", "DTSTAMP", "DTSTART", "END", "LOCATION", "METHOD", "PRODID", "SUMMARY", "UID", "VERSION", "X-WR-CALNAME"])
+    expect([...keys].sort()).toEqual(["BEGIN", "CALSCALE", "DESCRIPTION", "DTEND", "DTSTAMP", "DTSTART", "END", "LOCATION", "METHOD", "PRODID", "SEQUENCE", "SUMMARY", "UID", "VERSION", "X-WR-CALNAME"])
   })
 
   test("response headers: Content-Type text/calendar; charset=utf-8, Content-Disposition attachment, X-Content-Type-Options nosniff, no caching", async () => {
@@ -183,5 +183,6 @@ describe("GET /v1/roster/mine.ics (R8-16, Review Focus 3)", () => {
     const a = await (await ics(w, w.p.employee, "?from=2026-11-01&to=2026-11-30")).text()
     const b = await (await ics(w, w.p.employee, "?from=2026-11-01&to=2026-11-30")).text()
     expect(b).toBe(a)
+    expect(a).toMatch(/SEQUENCE:\d+\r\n/) // the shift version: a retime bumps it so calendar apps replace the entry
   })
 })

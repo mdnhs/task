@@ -26,6 +26,9 @@ export const locations = pgTable(
     contact: text("contact").notNull().default(""),
     swapApprovalDelegated: boolean("swap_approval_delegated").notNull().default(false),
     timeZone: text("time_zone"),
+    /** The auto-repeat job's own state (not part of the location's edit version): when it last tried to copy this site's week and how many tries in a row failed (0 after a success). Backs a failing site off and orders the sweep. */
+    autoRepeatAttemptAt: ts("auto_repeat_attempt_at"),
+    autoRepeatFailures: integer("auto_repeat_failures").notNull().default(0),
     version: integer("version").notNull().default(1),
     archivedAt: ts("archived_at"),
     createdAt: ts("created_at").notNull(),

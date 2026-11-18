@@ -330,6 +330,13 @@
       "when": 1795014554716,
       "tag": "0046_leave_decision_note",
       "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1795039741840,
+      "tag": "0047_roster_auto_repeat_backoff",
+      "breakpoints": true
     }
   ]
 }

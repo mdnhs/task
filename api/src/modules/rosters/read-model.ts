@@ -153,14 +153,16 @@ function kinds(tx: TenantTx, ctx: RosterCtx): Kind[] {
 
   const draftWhere = (warn: number) => and(eq(w.tenantId, ctx.tenantId), eq(w.status, "draft"), between(w.weekStart, addDays(today, -DRAFT_LOOKBACK_DAYS), addDays(today, warn)), isNull(l.archivedAt), inScopeSql(ctx, w.locationId))
   const draftBase = () => tx.select({ w, name: l.name }).from(w).innerJoin(l, and(eq(l.tenantId, w.tenantId), eq(l.id, w.locationId)))
+  let draftWarn: Promise<number> | undefined // one rules read per request: count() and rows() share it
+  const warnDays = () => (draftWarn ??= readRules(tx, ctx.tenantId).then((r) => r.draftWarnDays))
   const drafts: Kind = {
     kind: "roster_draft_week", applies: ctx.access.editDraft && sees,
     count: async () => {
-      const { draftWarnDays } = await readRules(tx, ctx.tenantId)
+      const draftWarnDays = await warnDays()
       return (await tx.select({ n: count() }).from(w).innerJoin(l, and(eq(l.tenantId, w.tenantId), eq(l.id, w.locationId))).where(draftWhere(draftWarnDays)))[0].n
     },
     rows: async (limit) => {
-      const { draftWarnDays } = await readRules(tx, ctx.tenantId)
+      const draftWarnDays = await warnDays()
       return (await draftBase().where(draftWhere(draftWarnDays)).orderBy(asc(w.weekStart), asc(w.id)).limit(limit)).map((r) => {
         const ahead = daysBetween(today, r.w.weekStart)
         return {
@@ -196,4 +198,26 @@ export async function countRosterAttention(tx: TenantTx, ctx: RosterCtx): Promis
 export async function countUnconfirmed(tx: TenantTx, ctx: RosterCtx): Promise<number> {
   const k = kinds(tx, ctx).find((x) => x.kind === "roster_unconfirmed")!
   return k.count()
+}
+
+/**
+ * How many open shifts the caller could claim (Today, for plain staff who have no attention feed): shifts nobody holds, on PUBLISHED weeks, from now to OPEN_SHIFT_DAYS ahead, at a site that is not
+ * archived and where the caller is LOCATED, the claim rule (AF1): homed there, or rostered at it that week. Another site's, a draft week's and an ended shift's are not counted. One statement.
+ */
+export async function countOpenShiftsForMe(tx: TenantTx, ctx: RosterCtx): Promise<number> {
+  const today = todayOf(ctx)
+  const s = rosterShifts
+  const w = rosterWeeks
+  const l = locations
+  const located = or(
+    sql`${s.locationId} = (select ${memberships.homeLocationId} from ${memberships} where ${memberships.tenantId} = ${ctx.tenantId} and ${memberships.userId} = ${ctx.me})`,
+    sql`exists (select 1 from roster_shifts mine where mine.tenant_id = ${s.tenantId} and mine.week_id = ${s.weekId} and mine.user_id = ${ctx.me})`,
+  )
+  const [r] = await tx
+    .select({ n: count() })
+    .from(s)
+    .innerJoin(w, and(eq(w.tenantId, s.tenantId), eq(w.id, s.weekId), eq(w.status, "published")))
+    .innerJoin(l, and(eq(l.tenantId, s.tenantId), eq(l.id, s.locationId)))
+    .where(and(eq(s.tenantId, ctx.tenantId), isNull(s.userId), between(s.date, today, addDays(today, OPEN_SHIFT_DAYS)), gt(s.endAt, ctx.now), isNull(l.archivedAt), located))
+  return r.n
 }

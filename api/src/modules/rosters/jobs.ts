@@ -25,6 +25,10 @@ export const AUTO_REPEAT_ACTOR = "system:roster-auto-repeat"
 export const AUTO_REPEAT_JOB = "roster.auto-repeat"
 /** Weeks one run copies per tenant; the rest are done by the next run (the schedule is 15 minutes). */
 export const AUTO_REPEAT_BATCH = 50
+/** A site whose copy failed is left alone for 15 min x 2^failures (30 min, 1 h, 2 h ... at most 12 h) from its last attempt; a success clears the count. */
+export const AUTO_REPEAT_BACKOFF_MS = 15 * 60_000
+export const AUTO_REPEAT_BACKOFF_MAX_MS = 12 * 3_600_000
+export const autoRepeatBackoffMs = (failures: number): number => Math.min(AUTO_REPEAT_BACKOFF_MAX_MS, AUTO_REPEAT_BACKOFF_MS * 2 ** Math.min(failures, 10))
 
 /** The context a job runs a roster operation in: it sees and edits every location (the roster lock is held by the caller). */
 export async function systemCtx(tx: TenantTx, tenantId: string, tz: string, now: Date, actorId: string): Promise<RosterCtx> {
@@ -55,12 +59,12 @@ export type Candidate = { id: string; locationId: string; weekStart: string; day
 
 /**
  * The published weeks with auto-repeat on whose successor does not exist yet and whose next Monday is within `days` of TODAY in the location's own zone (never before it starts: a week
- * that began is not drafted late). One per location (the latest), near-due ones only, at most `limit`. The SQL window is a day wider than the exact test so the zone cannot hide one.
+ * that began is not drafted late). One per location (the latest), near-due ones only, at most `limit`, longest-waiting site first; a site that failed recently is skipped until its back-off is over. The SQL window is a day wider than the exact test so the zone cannot hide one.
  */
 async function candidates(tx: TenantTx, tenantId: string, tenantTz: string, now: Date, limit: number): Promise<Candidate[]> {
   const utcDay = epochToWall(now.getTime(), "UTC").slice(0, 10)
   const rows = await tx
-    .select({ id: rosterWeeks.id, locationId: rosterWeeks.locationId, weekStart: rosterWeeks.weekStart, days: rosterWeeks.autoRepeatDays, zone: locations.timeZone })
+    .select({ id: rosterWeeks.id, locationId: rosterWeeks.locationId, weekStart: rosterWeeks.weekStart, days: rosterWeeks.autoRepeatDays, zone: locations.timeZone, attemptAt: locations.autoRepeatAttemptAt, failures: locations.autoRepeatFailures })
     .from(rosterWeeks)
     .innerJoin(locations, and(eq(locations.tenantId, rosterWeeks.tenantId), eq(locations.id, rosterWeeks.locationId)))
     .where(
@@ -71,12 +75,13 @@ async function candidates(tx: TenantTx, tenantId: string, tenantTz: string, now:
         sql`(${rosterWeeks.weekStart} + 7) >= ${addDays(utcDay, -1)}::date`,
       ),
     )
-    .orderBy(asc(rosterWeeks.locationId), sql`${rosterWeeks.weekStart} desc`)
+    .orderBy(sql`${locations.autoRepeatAttemptAt} asc nulls first`, asc(rosterWeeks.locationId), sql`${rosterWeeks.weekStart} desc`) // the longest-waiting site first: a run that stops at `limit` cannot starve the same sites behind it
   const seen = new Set<string>()
   const out: Candidate[] = []
   for (const r of rows) {
     if (seen.has(r.locationId)) continue // the latest published week of the location is the source
     seen.add(r.locationId)
+    if (r.failures > 0 && r.attemptAt && now.getTime() < r.attemptAt.getTime() + autoRepeatBackoffMs(r.failures)) continue // backing off after failures
     const zone = r.zone ?? tenantTz
     const today = epochToWall(now.getTime(), zone).slice(0, 10)
     const next = addDays(r.weekStart, 7)
@@ -104,6 +109,7 @@ export async function repeatOne(deps: Deps, tenantId: string, tz: string, c: Can
     const [row] = await tx.insert(rosterAutoRepeatRuns).values({ tenantId, sourceWeekId: src.id, targetWeekStart: target, createdAt: now }).onConflictDoNothing().returning({ w: rosterAutoRepeatRuns.sourceWeekId })
     if (!row) return false // another worker (or an earlier run) already did this one
     await copyWeek(tx, ctx, { week: src as WeekRow, zone: c.zone }, [{ weekStart: target, existing: null }], "auto_repeat")
+    await tx.update(locations).set({ autoRepeatAttemptAt: now, autoRepeatFailures: 0 }).where(and(eq(locations.tenantId, tenantId), eq(locations.id, src.locationId)))
     const everyone = await approversOf(tx, tenantId, src.locationId, { supervisors: true, exclude: [] })
     const office = new Set(await approversOf(tx, tenantId, src.locationId, { supervisors: false, exclude: [] }))
     const supervisors = everyone.filter((u) => !office.has(u))
@@ -111,6 +117,17 @@ export async function repeatOne(deps: Deps, tenantId: string, tz: string, c: Can
     await notifyActive(tx, ctx, env, told.map((userId) => ({ userId, title: DRAFT_READY.title, body: DRAFT_READY.body(target) })))
     return true
   })
+}
+
+/** Counts one failed copy at a site (its own transaction, after the copy rolled back). Never throws: the back-off is an aid, the run goes on without it. */
+async function recordFailure(deps: Deps, tenantId: string, locationId: string, now: Date): Promise<void> {
+  try {
+    await withTenant(deps.db, tenantId, (tx) =>
+      tx.update(locations).set({ autoRepeatAttemptAt: now, autoRepeatFailures: sql`${locations.autoRepeatFailures} + 1` }).where(and(eq(locations.tenantId, tenantId), eq(locations.id, locationId))),
+    )
+  } catch (err) {
+    deps.logger.error({ tenantId, errCode: safeCode(err) }, "roster auto-repeat could not record a failure")
+  }
 }
 
 /**
@@ -134,6 +151,7 @@ export async function runAutoRepeatJob(data: unknown, deps: Deps): Promise<void>
           } catch (err) {
             // a conflict, a lock timeout or a bad row wrote nothing (the ledger row rolled back with it): the next run tries again; ids and a safe code only
             deps.logger.error({ tenantId: t.id, errCode: safeCode(err) }, "roster auto-repeat failed for a week")
+            await recordFailure(deps, t.id, c.locationId, now) // outside the rolled-back copy: the back-off survives it
           }
         }
         if (created > 0) await deps.readModelCache.bust(t.id) // the new drafts show in the attention feed within one read

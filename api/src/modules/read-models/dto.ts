@@ -94,6 +94,7 @@ export const TodayOut = z
     team: z.object({ count: z.number().int(), items: z.array(z.object({ ref: z.string(), title: z.string(), who: z.string(), reason: z.string() })) }).optional(),
     reports: z.number().int(),
     roster: z.number().int().optional().openapi({ description: "Upcoming shifts of the caller's own that are published and not confirmed yet (0 without the roster module)" }),
+    openShifts: z.number().int().optional().openapi({ description: "Open shifts the caller could claim: published weeks, the next 7 days, at a site they are homed at or rostered at that week (0 without the roster module). Plain staff have no attention feed, this is how open shifts reach them" }),
   })
   .openapi({
     example: {
@@ -101,7 +102,7 @@ export const TodayOut = z
       workingDay: { key: "2026-11-20", startsAt: "2026-11-20T04:00:00.000Z", hasShift: false },
       order: [{ taskId: TID, ref: "TSK-1001", title: "Check fire exits", priority: 3, status: "in_progress", dueAt: UTC, due: WALL, evidenceRequired: false, project: "Cleaning", group: "overdue", reason: "overdue by 1 day; high priority" }],
       summary: { headline: "1 overdue", lines: [{ ref: null, text: "Today you have 1 overdue." }], spoken: "Today you have 1 overdue." },
-      reports: 1, roster: 2,
+      reports: 1, roster: 2, openShifts: 1,
     },
   })
 

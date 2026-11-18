@@ -95,6 +95,13 @@ describe("parity with the builder it replaced", () => {
 })
 
 describe("buildIcs (B8 T14)", () => {
+  it("SEQUENCE is the shift version when given (a retimed shift updates the calendar entry), absent otherwise (legacy bytes), and DTSTAMP is the same for every event of one export", () => {
+    const a = buildIcs([{ ...day, version: 3 }, { ...day, id: "rs-2", version: 1 }], { tz: TZ, now: NOW })
+    expect(a).toContain("SEQUENCE:3\r\n")
+    expect(a).toContain("SEQUENCE:1\r\n")
+    expect(new Set(a.match(/DTSTAMP:\S+/g)).size).toBe(1)
+    expect(buildIcs([day], { tz: TZ, now: NOW })).not.toContain("SEQUENCE")
+  })
   it("uses the UID host, stored instants when given, and a calendar name when asked", () => {
     const s = buildIcs([{ ...day, startAt: Date.UTC(2026, 9, 20, 8, 0), endAt: Date.UTC(2026, 9, 20, 16, 0) }], { tz: TZ, now: NOW, uidHost: "api.example.com", calendarName: "My roster, Nov" })
     expect(s).toContain("UID:rs-1@api.example.com\r\n")

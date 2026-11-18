@@ -154,9 +154,9 @@ async function lockTargets(tx: TenantTx, ctx: RosterCtx, locationId: string, sta
 /**
  * POST /v1/roster/weeks/{id}/repeat (`{ version, weeks 1..12, replace? }`, FR-RS-26, 27, R8-12). The source is any week of a location the caller may edit drafts at (a supervisor repeats their own
  * published week: the COPIES are drafts, so the publish lock is not touched). A published target is 409 `week_published` for everybody; a draft target needs `replace` (409 `week_exists_draft`),
- * then its shifts are replaced. A stale source `version` is 409 `version_conflict`; an archived site 409 `location_archived`. Nothing is written unless every target is acceptable.
+ * then its shifts are replaced. A stale source `version`, or a stale `targetVersions[monday]` of a draft being replaced, is 409 `version_conflict`; an archived site 409 `location_archived`. Nothing is written unless every target is acceptable.
  */
-export async function repeatWeek(tx: TenantTx, ctx: RosterCtx, weekId: string, input: { version: number; weeks: number; replace?: boolean }): Promise<RepeatDto> {
+export async function repeatWeek(tx: TenantTx, ctx: RosterCtx, weekId: string, input: { version: number; weeks: number; replace?: boolean; targetVersions?: Record<string, number> }): Promise<RepeatDto> {
   const loaded = await loadWeek(tx, ctx, weekId, true)
   if (!ctx.access.editDraft) throw Forbidden("forbidden")
   const week = loaded.week
@@ -169,6 +169,7 @@ export async function repeatWeek(tx: TenantTx, ctx: RosterCtx, weekId: string, i
     const t = found.get(s)
     if (t?.status === "published") throw Conflict("week_published")
     if (t && !input.replace) throw Conflict("week_exists_draft")
+    if (t && input.targetVersions?.[s] !== undefined && input.targetVersions[s] !== t.version) throw Conflict("version_conflict") // the target draft changed since the caller looked
   }
   const out = await copyWeek(tx, ctx, { week, zone: loaded.zone }, starts.map((s) => ({ weekStart: s, existing: found.get(s) ?? null })), "repeat")
   return { created: await weekDtos(tx, ctx, out.weeks), conflicts: out.conflicts, counts: out.counts }
