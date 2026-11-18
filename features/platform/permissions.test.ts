@@ -14,8 +14,9 @@ describe("staffCan", () => {
     for (const a of PLATFORM_ACTIONS) expect(staffCan("owner", a)).toBe(true)
   })
 
-  it("viewer can only do *.read actions", () => {
-    for (const a of PLATFORM_ACTIONS) expect(staffCan("viewer", a)).toBe(a.endsWith(".read"))
+  it("viewer reads: tenants, billing figures, audit and data requests (the API's read routes); nothing else", () => {
+    const reads = ["tenants.read", "billing.read", "audit.read", "data.requests"]
+    for (const a of PLATFORM_ACTIONS) expect(staffCan("viewer", a)).toBe(reads.includes(a))
   })
 
   it("support handles support access and data requests, not billing or plans", () => {
@@ -32,7 +33,7 @@ describe("staffCan", () => {
     expect(staffCan("billing", "plans.write")).toBe(true)
     expect(staffCan("billing", "tenants.read")).toBe(true)
     expect(staffCan("billing", "support.request")).toBe(false)
-    expect(staffCan("billing", "data.requests")).toBe(false)
+    expect(staffCan("billing", "data.requests")).toBe(true) // the API lets every staff role read the queue
   })
 
   it("only the owner manages the team and settings", () => {
@@ -44,8 +45,8 @@ describe("staffCan", () => {
 })
 
 describe("settings", () => {
-  it("every staff role can open Settings (read only without settings.write)", () => {
-    for (const r of STAFF_ROLES) expect(staffCan(r, "settings.read")).toBe(true)
+  it("only the owner can open Settings: the API's settings routes are owner-only", () => {
+    for (const r of STAFF_ROLES) expect(staffCan(r, "settings.read")).toBe(r === "owner")
   })
 })
 

@@ -1,12 +1,6 @@
-import { DeniedSkeleton, PlansSkeleton, getPlatformSeed, plansData } from "@/features/platform"
-import { getMockOrg } from "@/lib/org"
+import { MockPageSkeleton } from "@/features/platform"
 
-import { skeletonGate } from "../../skeleton-gate"
-
-// Same gate and view model as the page, rendered masked: identical layout.
-export default async function Loading() {
-  const g = await skeletonGate("billing.read", "platform plans")
-  if ("denied" in g) return <DeniedSkeleton />
-  const [seed, org] = await Promise.all([getPlatformSeed(), getMockOrg()])
-  return <PlansSkeleton data={plansData(seed, g.op)} today={org.today} operator={{ name: g.op.name, role: g.op.role }} />
+// Static (B6 K1): an unbacked page (shown only with ENABLE_MOCK_MODULES=1) cannot know in a loading file whether it will show data or the unavailable state, so this is a plain page shape.
+export default function Loading() {
+  return <MockPageSkeleton />
 }

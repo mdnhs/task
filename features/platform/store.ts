@@ -6,7 +6,6 @@ import type { AuditEntry, DataRequest, Invoice, Plan, PlatformSettings, Platform
 export const tenantsStore = createStore<PlatformTenant[]>()
 export const plansStore = createStore<Plan[]>()
 export const entitlementsStore = createStore<EntitlementsData>()
-export { supportStore as requestsStore } from "@/hooks/use-support-access"
 export const auditStore = createStore<AuditEntry[]>()
 
 export const subscriptionsStore = createStore<SubEvent[]>()

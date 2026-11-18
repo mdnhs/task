@@ -1,12 +1,5 @@
-import { DeniedSkeleton, SettingsSkeleton, getPlatformSettings, requireStaff } from "@/features/platform"
-import { getMockOrg } from "@/lib/org"
+import { LiveSettingsSkeleton } from "@/features/platform"
 
-import { skeletonGate } from "../../skeleton-gate"
-
-// Same gate, settings and write permission as the page, rendered masked: identical layout.
-export default async function Loading() {
-  const g = await skeletonGate("settings.read", "platform settings")
-  if ("denied" in g) return <DeniedSkeleton />
-  const [settings, org] = await Promise.all([getPlatformSettings(), getMockOrg()])
-  return <SettingsSkeleton settings={settings} today={org.today} tzLabel={org.tzLabel} operator={{ name: g.op.name, role: g.op.role }} canWrite={requireStaff(g.op, "settings.write")} />
+export default function Loading() {
+  return <LiveSettingsSkeleton />
 }

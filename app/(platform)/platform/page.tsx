@@ -1,15 +1,25 @@
-import { OverviewDashboard, getPlatformSeed, overviewData } from "@/features/platform"
-import { getMockOrg } from "@/lib/org"
+import { LiveOverview, loadMetrics, loadTenantList, requireStaff, unavailablePlatformPage } from "@/features/platform"
+import { apiServer } from "@/lib/api/server"
 
 import { gate } from "../gate"
+import { refused, settle } from "../settle"
+import { MockOverview } from "./mock-overview"
 
 export const metadata = { title: "Overview · Platform · OpsDesk" }
 
-// The console overview (D2, Task 3). The view model is built here on the server, so only what the page shows reaches the
-// client (not the raw seed with its usage points and invoices). The tenants list lives at /platform/tenants.
+// The console overview on the API (B6 T6.8): KPIs from GET /v1/platform/metrics (MRR counts active subscriptions only, past due is separate, C11) and the tenant count. Roles without
+// billing.read (support) get no revenue and no metrics request. The plan-mix, recent-activity and MRR-history cards need data the API does not have: they are sample data, shown only with
+// ENABLE_MOCK_MODULES=1.
 export default async function Page() {
   const g = await gate("tenants.read", "the platform overview")
   if ("denied" in g) return g.denied
-  const [seed, org] = await Promise.all([getPlatformSeed(), getMockOrg()])
-  return <OverviewDashboard data={overviewData(seed, org.today, g.op)} today={org.today} tzLabel={org.tzLabel} />
+  const canRevenue = requireStaff(g.op, "billing.read")
+  const r = await settle(apiServer().then((api) => Promise.all([loadTenantList(api, { pageSize: 1 }), canRevenue ? loadMetrics(api) : null])))
+  if (!r.ok) return refused(r.e, "the platform overview")
+  const [list, metrics] = r.v
+  return (
+    <LiveOverview metrics={metrics} tenants={list.total} canRevenue={canRevenue} mock={!unavailablePlatformPage()}>
+      <MockOverview op={g.op} />
+    </LiveOverview>
+  )
 }

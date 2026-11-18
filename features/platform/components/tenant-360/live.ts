@@ -2,7 +2,6 @@
 
 import { useMemo, useSyncExternalStore } from "react"
 
-import { useSupportAccess } from "@/hooks/use-support-access"
 import type { InvoiceRow } from "../../billing"
 import { withoutAmounts } from "../../tenant-360"
 import { auditEntry, filterAudit, nowIso, sensitiveEntry } from "../../logic"
@@ -11,7 +10,7 @@ import {
   auditOutbox, auditStore, dataRequestOutbox, dataRequestsStore, invoicesStore, subEventOutbox, subscriptionsStore, tenantPatchStore,
   tenantsStore, useDataRequestOutbox, useInvoicePatches, useOutbox, usePatches,
 } from "../../store"
-import type { AuditEntry, DataRequest, PlatformTenant, StaffRole, SubEvent, SupportRequest } from "../../types"
+import type { AuditEntry, DataRequest, PlatformTenant, StaffRole, SubEvent } from "../../types"
 
 // The tenant 360 follows the store patch contract (store.ts): it renders its server record overlaid by the full tenants
 // store (when a full page already loaded it) and then by the patches, and writes only patches and outboxes. So the
@@ -65,12 +64,6 @@ export function useLiveDataRequests(server: DataRequest[], tenantId: string): Da
     () => [...filed, ...(full ?? server)].filter((r) => r.tenantId === tenantId && r.subject === "tenant"),
     [filed, full, server, tenantId],
   )
-}
-
-/** Support requests are one shared store with the tenant app (lib/support-access.ts); seeded from this tenant's slice. */
-export function useTenantRequests(server: SupportRequest[], tenantId: string): SupportRequest[] {
-  const [all] = useSupportAccess(server)
-  return useMemo(() => all.filter((r) => r.tenantId === tenantId).sort((a, b) => b.requestedAt.localeCompare(a.requestedAt)), [all, tenantId])
 }
 
 /** Ids known on the client for a prefix: the platform-wide floor from the server, the store (if loaded) and the outbox. */

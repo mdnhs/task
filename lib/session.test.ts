@@ -136,6 +136,24 @@ describe("T6.3 getPlatformSession: the console accepts a user with no company", 
     expect(s.user.email).toBe("s@x.ie")
     expect(s.platformRole).toBe("owner")
   })
+  test("the console second factor comes from the API (carry-in a): ok, challenge, enrol, and a user with no factor never calls it", async () => {
+    state.current = world({ me: { user, platformRole: "owner", tenants: [] } })
+    expect((await getPlatformSession()).mfa).toBe("ok")
+    state.memos.forEach((m) => m.clear())
+    state.current = world({ me: { user, platformRole: "owner", tenants: [] }, platform: { status: 401, code: "mfa_challenge" } })
+    expect((await getPlatformSession()).mfa).toBe("challenge")
+    state.memos.forEach((m) => m.clear())
+    state.current = world({ me: { user, platformRole: "owner", tenants: [] }, platform: { status: 401, code: "mfa_enrolment_required" } })
+    expect((await getPlatformSession()).mfa).toBe("enrol")
+    state.memos.forEach((m) => m.clear())
+    const calls = (state.current = world({ me: { user: { ...user, twoFactorEnabled: false }, platformRole: "owner", tenants: [] } })).calls
+    expect((await getPlatformSession()).mfa).toBe("enrol")
+    expect(calls.map((c) => c.path)).not.toContain("/v1/platform/tenants")
+  })
+  test("a company member who is staff gets the console's own factor state, not the company's", async () => {
+    state.current = world({ me: { user, platformRole: "support", tenants: [{ slug: "alpha", name: "Alpha Co", roleKey: "owner" }] }, platform: { status: 401, code: "mfa_challenge" } })
+    expect((await getPlatformSession()).mfa).toBe("challenge")
+  })
   test("a non-staff user with no membership is sent to /onboarding; no session to /sign-in; expired to the clearing route", async () => {
     state.current = world({ me: { user, platformRole: null, tenants: [] } })
     expect(await redirectOf(getPlatformSession())).toBe("/onboarding")

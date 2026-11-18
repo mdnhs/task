@@ -31,7 +31,7 @@ import type { BillingView, InvoiceSort } from "../types"
 import { tenantPath } from "../tenant-360"
 import { invoiceActions } from "./invoice-actions"
 import { InvoiceSheet } from "./invoice-sheet"
-import type { Operator } from "./tenants-view"
+import type { Operator } from "./tenant-360/live"
 
 const SORTS: { value: string; label: string }[] = [
   { value: "issued:desc", label: "Newest" },

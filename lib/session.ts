@@ -10,7 +10,7 @@ import { hasSessionCookie } from "./api/cookies"
 import { DEFAULT_BRAND } from "./brand"
 import { getData } from "./data"
 import type { EntitlementsData } from "./entitlements"
-import { resolveSession, type Me, type Resolved, type Session } from "./session-core"
+import { resolvePlatformMfa, resolveSession, type Me, type Resolved, type Session } from "./session-core"
 import { TENANT_COOKIE, isTenantSlug } from "./api/tenant"
 import type { Role, Tenant } from "./types"
 
@@ -100,19 +100,22 @@ export async function peekPlatformSession(): Promise<Session | null> {
   return null
 }
 
+/** One staff-gated read per request says whether this session passed the second factor (see resolvePlatformMfa). */
+const platformMfa = cache(async (me: Me): Promise<"ok" | "enrol" | "challenge"> => resolvePlatformMfa(me, await apiServer({ tenant: null })))
+
 async function platformSessionOf(r: Extract<Resolved, { kind: "ok" } | { kind: "no_tenant" }>): Promise<Session> {
   if (r.kind === "ok") {
     if (r.session.platformRole === null) return r.session
-    const role = await platformRole()
-    return { ...r.session, role, roles: [role] }
+    const [role, mfa] = await Promise.all([platformRole(), platformMfa(r.me)])
+    return { ...r.session, role, roles: [role], mfa }
   }
-  const role = await platformRole()
+  const [role, mfa] = await Promise.all([platformRole(), platformMfa(r.me)])
   const tenant: Tenant = { id: "platform", name: "OpsDesk", slug: "opsdesk", initials: "OD", brand: DEFAULT_BRAND, status: "active", plan: "" }
   const entData = await getData<EntitlementsData>("billing/entitlements.json")
   return {
     signedIn: true, role, roles: [role], tenant, tenants: [], entitlements: { planId: entData.defaultPlan, allowed: [], modules: entData.modules, assistant: entData.assistant },
     user: { id: r.me.user.id, email: r.me.user.email, name: r.me.user.name }, tenantSlug: "", billingState: "ok", trialEndsAt: null, graceEndsAt: null, device: { id: null, label: "Unregistered browser", trusted: false },
-    drive: false, mfa: "ok", twoFactorEnabled: r.me.user.twoFactorEnabled, mfaPolicy: { mode: "off", roles: [] }, platformRole: r.me.platformRole,
+    drive: false, mfa, twoFactorEnabled: r.me.user.twoFactorEnabled, mfaPolicy: { mode: "off", roles: [] }, platformRole: r.me.platformRole,
   }
 }
 

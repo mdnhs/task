@@ -1,11 +1,6 @@
-import { DeniedSkeleton, PlanNewSkeleton, getPlatformSeed } from "@/features/platform"
+import { MockPageSkeleton } from "@/features/platform"
 
-import { skeletonGate } from "../../../skeleton-gate"
-
-export default async function Loading() {
-  const g = await skeletonGate("plans.write", "platform plan editing")
-  if ("denied" in g) return <DeniedSkeleton />
-  const { plans, entitlements } = await getPlatformSeed()
-  // The new plan takes the first plan's currency (see NewPlanForm).
-  return <PlanNewSkeleton modules={entitlements.productModules.map((m) => m.label)} currency={plans[0]?.currency} />
+// Static (B6 K1): an unbacked page (shown only with ENABLE_MOCK_MODULES=1) cannot know in a loading file whether it will show data or the unavailable state, so this is a plain page shape.
+export default function Loading() {
+  return <MockPageSkeleton />
 }

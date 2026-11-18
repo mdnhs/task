@@ -1,7 +1,9 @@
+import { unavailablePlatformPage } from "@/features/platform"
 import { BillingLedger, billingData, getPlatformSeed, getPlatformSettings, isBillingView } from "@/features/platform"
 import { getMockOrg } from "@/lib/org"
 
 import { gate } from "../../gate"
+import { Unavailable } from "../../unavailable"
 
 export const metadata = { title: "Billing · Platform · OpsDesk" }
 
@@ -10,6 +12,7 @@ export const metadata = { title: "Billing · Platform · OpsDesk" }
 export default async function Page({ searchParams }: { searchParams: Promise<{ view?: string | string[]; q?: string | string[] }> }) {
   const g = await gate("billing.read", "platform billing")
   if ("denied" in g) return g.denied
+  if (unavailablePlatformPage()) return <Unavailable label="Billing" />
   const [seed, settings, org, { view, q }] = await Promise.all([getPlatformSeed(), getPlatformSettings(), getMockOrg(), searchParams])
   return (
     <BillingLedger

@@ -11,13 +11,15 @@ export const PLATFORM_ACTIONS: PlatformAction[] = [
 
 export const STAFF_ROLE_LABEL: Record<StaffRole, string> = { owner: "Owner", support: "Support", billing: "Billing", viewer: "Viewer" }
 
-const READ = PLATFORM_ACTIONS.filter((a) => a.endsWith(".read"))
-
+// Mirrors the API's role matrix (api/src/modules/platform-*: requirePlatformStaff). The API is the authority; this only hides controls and pages it would refuse.
+//   tenants list/360: all roles · suspend, reactivate, extend trial, support grants: owner, support · modules, staff, settings: owner
+//   metrics: owner, billing, viewer · audit: owner, viewer · data requests: all roles (read only)
+// `billing.write`, `plans.write`, `tenants.lifecycle` and `tenants.notes` have no API route yet (mock pages only, shown with ENABLE_MOCK_MODULES).
 const MAP: Record<StaffRole, ReadonlySet<PlatformAction>> = {
   owner: new Set(PLATFORM_ACTIONS),
-  support: new Set<PlatformAction>(["tenants.read", "tenants.notes", "support.request", "data.requests", "settings.read"]),
-  billing: new Set<PlatformAction>(["tenants.read", "tenants.notes", "billing.read", "billing.write", "plans.write", "settings.read"]),
-  viewer: new Set(READ),
+  support: new Set<PlatformAction>(["tenants.read", "tenants.suspend", "tenants.notes", "support.request", "data.requests"]),
+  billing: new Set<PlatformAction>(["tenants.read", "tenants.notes", "billing.read", "billing.write", "plans.write", "data.requests"]),
+  viewer: new Set<PlatformAction>(["tenants.read", "billing.read", "audit.read", "data.requests"]),
 }
 
 export const isStaffRole = (v: unknown): v is StaffRole => typeof v === "string" && (STAFF_ROLES as string[]).includes(v)
@@ -41,7 +43,7 @@ const PAGE_ACTIONS: [string, PlatformAction][] = [
   ["/platform/data-requests", "data.requests"],
   ["/platform/audit", "audit.read"],
   ["/platform/team", "team.manage"],
-  ["/platform/settings", "settings.read"], // every role views it; saving needs settings.write
+  ["/platform/settings", "settings.read"], // the settings routes are owner-only in the API
   ["/platform", "tenants.read"],
 ]
 

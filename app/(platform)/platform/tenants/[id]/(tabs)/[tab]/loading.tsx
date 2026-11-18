@@ -1,15 +1,6 @@
-import { DeniedSkeleton, Tenant360Skeleton, requireStaff, tabAction } from "@/features/platform"
+import { Live360TabSkeleton } from "@/features/platform"
 
-import { skeletonGate } from "../../../../../skeleton-gate"
-import { TabBody, isTenantTab, load360, pathParts } from "../../t360"
-
-// Switching tabs: the header stays (layout); the new tab renders masked from the same gate and view model as its page.
-export default async function Loading() {
-  const g = await skeletonGate("tenants.read", "platform tenants")
-  if ("denied" in g) return <DeniedSkeleton />
-  const { id, rest } = await pathParts()
-  const v = id ? await load360(id, g.op) : null
-  if (!v || !isTenantTab(rest)) return null
-  if (!requireStaff(g.op, tabAction(rest))) return <DeniedSkeleton />
-  return <Tenant360Skeleton label="Loading tab"><TabBody tab={rest} v={v} /></Tenant360Skeleton>
+// Switching tabs: the header stays (layout). Static (B6 K1): the typical overview card, masked.
+export default function Loading() {
+  return <Live360TabSkeleton />
 }

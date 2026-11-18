@@ -1,12 +1,6 @@
-import { DeniedSkeleton, OverviewDashboardSkeleton, getPlatformSeed, overviewData } from "@/features/platform"
-import { getMockOrg } from "@/lib/org"
+import { LiveOverviewSkeleton } from "@/features/platform"
 
-import { skeletonGate } from "../skeleton-gate"
-
-// Same gate and view model as the page: a viewer the page will refuse gets no data in the loading HTML either.
-export default async function Loading() {
-  const g = await skeletonGate("tenants.read", "the platform overview")
-  if ("denied" in g) return <DeniedSkeleton />
-  const [seed, org] = await Promise.all([getPlatformSeed(), getMockOrg()])
-  return <OverviewDashboardSkeleton data={overviewData(seed, org.today, g.op)} today={org.today} tzLabel={org.tzLabel} />
+// Static (B6 K1): no data layer, no session. The real overview replaces it.
+export default function Loading() {
+  return <LiveOverviewSkeleton />
 }

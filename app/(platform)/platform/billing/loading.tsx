@@ -1,21 +1,6 @@
-import { BillingSkeleton, DeniedSkeleton, billingData, getPlatformSeed, getPlatformSettings, isBillingView } from "@/features/platform"
-import { getMockOrg } from "@/lib/org"
-import { requestParam } from "@/lib/request-path"
+import { MockPageSkeleton } from "@/features/platform"
 
-import { skeletonGate } from "../../skeleton-gate"
-
-// Same gate, view model and saved view (`?view=`, forwarded by proxy.ts) as the page, rendered masked: identical layout.
-export default async function Loading() {
-  const g = await skeletonGate("billing.read", "platform billing")
-  if ("denied" in g) return <DeniedSkeleton />
-  const [seed, settings, org, view] = await Promise.all([getPlatformSeed(), getPlatformSettings(), getMockOrg(), requestParam("view")])
-  return (
-    <BillingSkeleton
-      data={billingData(seed, g.op, settings.payments)}
-      view={isBillingView(view) ? view : "all"}
-      today={org.today}
-      tzLabel={org.tzLabel}
-      operator={{ name: g.op.name, role: g.op.role }}
-    />
-  )
+// Static (B6 K1): an unbacked page (shown only with ENABLE_MOCK_MODULES=1) cannot know in a loading file whether it will show data or the unavailable state, so this is a plain page shape.
+export default function Loading() {
+  return <MockPageSkeleton />
 }

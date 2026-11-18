@@ -1,8 +1,6 @@
-import { PlanEditSkeleton, getPlatformSeed } from "@/features/platform"
+import { MockPageSkeleton } from "@/features/platform"
 
-// loading.tsx gets no params, so the plan's own values are blocks; labels and module names are the real text.
-export default async function Loading() {
-  const { plans, entitlements } = await getPlatformSeed()
-  const currencies = new Set(plans.map((p) => p.currency))
-  return <PlanEditSkeleton modules={entitlements.productModules.map((m) => m.label)} currency={currencies.size === 1 ? plans[0].currency : undefined} />
+// Static (B6 K1): an unbacked page (shown only with ENABLE_MOCK_MODULES=1) cannot know in a loading file whether it will show data or the unavailable state, so this is a plain page shape.
+export default function Loading() {
+  return <MockPageSkeleton />
 }

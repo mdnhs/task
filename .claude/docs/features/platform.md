@@ -1,13 +1,34 @@
 # Platform console (SaaS admin)
 
-The operator's console for running the SaaS: revenue, tenants, billing, trust and the platform team. Front end only
-(mock JSON seed in `public/data/platform/` + client stores), shaped so a backend can implement the same types as its
-API contract. Design and decisions D1–D11: `superpowers/specs/2026-10-30-platform-console-design.md`.
+The operator's console for running the SaaS: revenue, tenants, trust and the platform team. Since B6 T6.8 the backed pages run on the platform
+staff API (`/v1/platform/*`); the pages with no API route keep their mock seed (`public/data/platform/`) and are shown only with `ENABLE_MOCK_MODULES=1`.
+Design and decisions D1–D11: `superpowers/specs/2026-10-30-platform-console-design.md`.
 Requirements: SRS FR-M0-01, 02, 13, 14, 15, 19; old spec FR-SAAS-06..15 (`requirements/SRS-v1.2-built.md`).
 
-Code: `features/platform/**` (pure logic next to its `*.test.ts`, views in `components/`), routes in `app/(platform)/**`,
-the ⌘K index action in `app/actions/platform-search.ts`. Only the session role with `platform: true` gets in; everyone
-else sees "Access restricted" without the console's nav, alerts or search.
+Code: live side `features/platform/{api,adapters,client}.ts` (server loaders, pure DTO mappers, the one write client) and `components/live-*.tsx`;
+mock side `features/platform/mock.ts` plus the old seed-driven components (billing ledger, plans, usage, notes); routes in `app/(platform)/**`; the ⌘K
+index action in `app/actions/platform-search.ts`. Only active platform staff (`/v1/me.platformRole`) get in; everyone else sees "Access restricted"
+without the console's nav or search.
+
+### Live pages: how they work
+
+- **Operator** = the signed-in user: `getOperator()` builds the staff member from `getPlatformSession()` (role from `/v1/me.platformRole`). No seed, no `od-staff-role`.
+- **Second factor** (T6.3 carry-in): every `/v1/platform/*` route needs an enrolled factor and a session that passed it (401 `mfa_enrolment_required` / `mfa_challenge`).
+  `getPlatformSession()` computes `session.mfa` with `resolvePlatformMfa` (`lib/session-core.ts`: no factor on `/v1/me` is "enrol" without a call, otherwise one one-row
+  `GET /v1/platform/tenants` probe). `gate()` returns the same `MfaGate` / `MfaStepUp` a company page gets, and the layout swaps its children for it; the search action returns nothing.
+- **Reads**: pages call `gate()`, then `apiServer()` through `settle()` (JSX is never built inside try/catch); a 403 is the "Access restricted" state, anything else the error page.
+- **Writes**: `usePlatform()` (`components/use-platform.ts`) wraps `makePlatformClient(apiBrowser)` in `use-api-action`: one request per key, mapped copy plus "Ref", refresh after every answer.
+  The client refuses a bad reason (1 to 500), trial days (1 to 30), grant hours (1 to 24) before any request.
+- **Tenants**: the list is the API's page (`?page=`, `?q=`, 100 per page, newest first); saved views other than suspended and every sort work on the loaded page and the list says so.
+  Metadata only; the 360 is aggregates (counts, one date), never a member name or email.
+- **Modules**: the tab drafts changes, then one `PUT .../modules` sends the FULL overrides array with the reason (the API replaces the list). Core modules can't be revoked.
+- **Support access**: `POST .../support-grants` (reason, hours) for the caller and `DELETE /v1/platform/support-grants/{id}`. There is no staff list route, so the page shows the grants made in this visit;
+  the tenant owner sees every grant under `/settings/support-access`.
+- **Settings** (owner only): email (Resend), storage (R2) and billing (Stripe). The forms start empty; an empty secret keeps the stored one; only the last 4 come back. The Test / Live pill comes from the
+  Stripe publishable key prefix (`pk_test_` / `pk_live_`), owner only.
+- **Times** show in UTC (the console is not inside a company). Money is the API's integer minor units per currency.
+- **Skeletons**: every `loading.tsx` is static (K1): it renders the real view masked (`SkMask`) with typical sample rows, no data layer. Mock pages use `MockPageSkeleton`.
+- **Not carried over**: the platform bell (alerts) is empty, the old health score, MRR per tenant and plan-mix columns need data the API does not have, support requests and data-request resolving have no routes.
 
 ## API coverage (B6 T6.8)
 
@@ -61,23 +82,20 @@ is in the payload. The sidebar, the bell's alerts and the ⌘K index are filtere
 ## Staff roles (D3)
 
 `features/platform/permissions.ts` is the one map: `staffCan(role, action)` for buttons, `requireStaff(op, action)`
-(active member + role) for pages. The operator comes from `platform/staff.json` (`operatorId`); the dev-only
-`od-staff-role` cookie overrides the role for testing.
+(active member + role) for pages. It mirrors the API's `requirePlatformStaff` roles; the API stays the authority (a refused call is a 403 `platform_forbidden`).
 
 | Action | owner | support | billing | viewer |
 | --- | :-: | :-: | :-: | :-: |
-| `tenants.read` | ✓ | ✓ | ✓ | ✓ |
-| `tenants.notes` | ✓ | ✓ | ✓ | |
-| `tenants.suspend`, `tenants.lifecycle`, `tenants.modules` | ✓ | | | |
-| `billing.read` | ✓ | | ✓ | ✓ |
-| `billing.write`, `plans.write` | ✓ | | ✓ | |
-| `support.request`, `data.requests` | ✓ | ✓ | | |
+| `tenants.read` (list, 360) | ✓ | ✓ | ✓ | ✓ |
+| `tenants.suspend` (suspend, reactivate, extend trial) | ✓ | ✓ | | |
+| `tenants.modules`, `team.manage`, `settings.read`, `settings.write` | ✓ | | | |
+| `billing.read` (metrics) | ✓ | | ✓ | ✓ |
+| `support.request` (support grants) | ✓ | ✓ | | |
+| `data.requests` (read) | ✓ | ✓ | ✓ | ✓ |
 | `audit.read` | ✓ | | | ✓ |
-| `team.manage`, `settings.write` | ✓ | | | |
-| `settings.read` | ✓ | ✓ | ✓ | ✓ |
+| `tenants.notes`, `tenants.lifecycle`, `billing.write`, `plans.write` (mock pages only) | owner: all; support, billing: notes; billing: billing.write, plans.write | | | |
 
-Viewer gets every `*.read` action and nothing else. Owner needs two-step verification (MFA); the last active owner
-can't be demoted or disabled (`team.ts`).
+Owner, and every other staff member, needs two-step verification on every request (the API refuses without it). The API refuses demoting or suspending the last active owner (409 `last_platform_owner`).
 
 ## Metrics (D4, `metrics.ts`)
 
@@ -154,19 +172,18 @@ carry only the fields their page shows; the tenants, overview and billing tests 
 ## ⌘K command palette
 
 The console reuses the global search (`features/search`, `scope="platform"`, own recent searches). Its index is loaded
-lazily on the first open by `platformSearchIndex()` and filtered on the server by staff role (`search-index.ts`):
+lazily on the first open by `platformSearchIndex()` (only for active staff whose factor is in order) and filtered on the server by staff role (`search-index.ts`):
 
-- pages (the filtered nav);
-- tenants by name, subdomain, slug or id (slug and id are hidden keywords);
-- invoices by number (only with `billing.read`) → `/platform/billing?q=<number>`;
-- support requests and data requests (→ `/platform/data-requests?view=all&q=<id>`);
-- staff (`team.manage`);
-- actions: "Request support access for …" per tenant (`support.request`) → `/platform/support?request=<id>`.
+- pages (the filtered nav; the unbacked pages are not listed without the mock flag);
+- tenants from `GET /v1/platform/tenants` (one page of 100) by name, slug or id (slug and id are hidden keywords);
+- actions: "Request support access for …" per live tenant (`support.request`) → `/platform/support?request=<id>`.
 
-Before typing, quick actions show (at-risk tenants, failed payments, new plan, support requests, data requests due soon),
-gated by the same page map.
+Before typing, quick actions show (past due tenants, suspended tenants, support access, data requests), gated by the same page map.
 
-## Mock limitations (backend later)
+## Mock limitations (the unbacked pages only)
+
+The items below describe the seed-driven pages (plans, invoice ledger, usage, notes, change plan, schedule deletion, the sample overview cards), shown only with `ENABLE_MOCK_MODULES=1`.
+The platform announcement shown in the tenant shell is mock too: `lib/platform-notice-data.ts` returns nothing without the flag.
 
 - Console edits live in client stores for this browser tab only. They don't reach tenant apps (the tenant banner reads
   the seed `platform/settings.json`), other operators, or server-computed numbers (overview KPIs, health and MRR are

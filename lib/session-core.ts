@@ -175,3 +175,21 @@ async function gate(me: Me, slug: string, mfa: "enrol" | "challenge", deps: Sess
   }
   return { kind: "ok", session, me, cookieStale: slug !== deps.tenantCookie }
 }
+
+/**
+ * The console's second-factor state (B6 T6.8, carry-in from T6.3): the same three answers a company page gets, from the same source. Every /v1/platform route needs an
+ * enrolled factor AND a session that passed it (401 mfa_enrolment_required / mfa_challenge), always, with no policy switch. A person with no factor is known from /v1/me
+ * alone; otherwise one cheap staff-gated read (a one-row tenants page, open to every staff role) shows whether this session passed the code step. Any other refusal is
+ * not an MFA answer and is thrown.
+ */
+export async function resolvePlatformMfa(me: Pick<Me, "user">, api: { get(path: "/v1/platform/tenants", o?: { query?: { pageSize?: number } }): Promise<unknown> }): Promise<"ok" | "enrol" | "challenge"> {
+  if (!me.user.twoFactorEnabled) return "enrol"
+  try {
+    await api.get("/v1/platform/tenants", { query: { pageSize: 1 } })
+    return "ok"
+  } catch (e) {
+    if (isStatus(e, 401, "mfa_enrolment_required")) return "enrol"
+    if (isStatus(e, 401, "mfa_challenge")) return "challenge"
+    throw e
+  }
+}

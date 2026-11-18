@@ -15,7 +15,7 @@ import { SlugConfirmDialog } from "../slug-confirm-dialog"
 import { CreditDialog } from "./dialogs"
 import { invoiceActions } from "../invoice-actions"
 import { commitTenant, useLiveInvoices, useLiveTenant, type T360Ctx } from "./live"
-import { SubscriptionFacts } from "./overview"
+import { SubscriptionFacts } from "./subscription-facts"
 
 // Billing tab (route gated on billing.read): the subscription with its write actions (billing.write), the tenant's
 // invoices with the shared InvoiceSheet (Task 6), and the credit balance.

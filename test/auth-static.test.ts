@@ -209,7 +209,7 @@ describe("K2: pages and actions that call the API use requireMfaOk()", () => {
 
   test("every server action that calls the API gates itself, except the ones that exist to establish or leave a session", () => {
     // session.ts: switchTenant/afterSignIn/signOut run before any workspace page; onboarding creates the first company (no tenant, so no tenant MFA policy);
-    // platform-search: the console gate (T6.8 adds the console MFA gate).
+    // platform-search: the console's own gate (it returns nothing unless session.mfa is ok; test/t68-static.test.ts checks it).
     const exempt = new Set(["app/actions/session.ts", "app/actions/onboarding.ts", "app/actions/platform-search.ts"])
     const offenders: string[] = []
     for (const f of walkAll("app").filter((x) => /\/actions(\/[^/]+)?\.tsx?$/.test(x) && !/\.test\./.test(x))) {

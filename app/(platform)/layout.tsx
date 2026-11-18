@@ -1,44 +1,43 @@
 import { platformSearchIndex } from "@/app/actions/platform-search"
-import { STAFF_ROLE_LABEL, filterForStaff, requireStaff, getOperator, getPlatformEnv, getPlatformNav, getPlatformSeed, platformAlerts } from "@/features/platform"
+import { MfaGate, MfaStepUp } from "@/features/account"
+import { STAFF_ROLE_LABEL, filterForStaff, getOperator, getPlatformNav, loadEnv, nowUtc, requireStaff } from "@/features/platform"
 import { GlobalSearch } from "@/features/search"
 import { AppShell, getUser } from "@/features/shell"
 import { initialsOf } from "@/lib/branding"
-import { getMockOrg } from "@/lib/org"
+import { apiServer } from "@/lib/api/server"
 import { getPlatformSession } from "@/lib/session"
 
 import "../styles/search.css"
 
-// The Platform console (D1): the shared shell in its platform variant: grouped navigation (D2) filtered by the operator's
-// staff role (D3), the operator from platform/staff.json as the user, platform alerts in the bell and the platform search index.
+// The Platform console (D1): the shared shell in its platform variant: grouped navigation (D2) filtered by the operator's staff role (D3), the signed-in staff member as the user, and the
+// Test / Live pill from the billing settings (owner only). B6 T6.8: the operator and the second factor come from the API. Anyone who is not active staff gets the restricted page without the
+// console's navigation or search; staff whose second factor is outstanding get the gate instead of the page (as a company page does), and nothing platform-side is asked meanwhile.
 export default async function PlatformLayout({ children }: { children: React.ReactNode }) {
   // Real check (proxy.ts only looks for a cookie): active staff need no company; anyone else gets the restricted page or /onboarding.
   const session = await getPlatformSession()
-  const allowed = !!session.role.platform
-  const [navigation, org, op, env] = await Promise.all([getPlatformNav(), getMockOrg(), getOperator(), getPlatformEnv()])
-  // Other roles get the restricted page without the console's navigation, alerts or search.
-  const nav = allowed ? { ...navigation, menu: filterForStaff(navigation.menu, op) } : { ...navigation, menu: [], general: [] }
-  const seed = allowed ? await getPlatformSeed() : null
-  // Only the platform role sees the operator; anyone else keeps their own identity on the restricted page.
-  const user = allowed ? { name: op.name, role: `${STAFF_ROLE_LABEL[op.role]} · Platform staff`, email: op.email, initials: initialsOf(op.name) } : await getUser()
+  const op = await getOperator()
+  const mfaOk = session.mfa === "ok"
+  const [navigation, env] = await Promise.all([getPlatformNav(), op && mfaOk ? loadEnv(await apiServer()) : null])
+  const nav = op ? { ...navigation, menu: filterForStaff(navigation.menu, op) } : { ...navigation, menu: [], general: [] }
+  // Only staff see their staff identity; anyone else keeps their own on the restricted page.
+  const user = op ? { name: op.name, role: `${STAFF_ROLE_LABEL[op.role]} · Platform staff`, email: op.email, initials: initialsOf(op.name) } : await getUser()
 
   return (
     <AppShell
       variant="platform"
-      env={allowed ? env : undefined}
-      // Platform alerts keep their own read state per operator, apart from any tenant's bell.
-      bellScope={`platform:${op.id}`}
+      env={env ?? undefined}
+      bellScope={`platform:${op?.id ?? "none"}`}
       navigation={nav}
       user={user}
       // The operator isn't inside a company, so no tenant banner.
       session={{ role: session.role, roles: session.roles, tenant: { ...session.tenant, status: "active" }, tenants: session.tenants }}
-      tzLabel={org.tzLabel}
-      today={org.today}
-      // Each alert links to a console page; it shows only when the operator may open that page.
-      notifications={seed ? filterForStaff(platformAlerts(seed.tenants, seed.requests, org.today), op) : []}
+      tzLabel="UTC"
+      today={nowUtc()}
+      notifications={[]}
       departments={false}
-      search={allowed ? <GlobalSearch key="search" scope="platform" load={platformSearchIndex} departments={[]} today={org.today} placeholder={requireStaff(op, "billing.read") ? "Search tenants, invoices, pages…" : "Search tenants, pages…"} /> : undefined}
+      search={op && mfaOk ? <GlobalSearch key="search" scope="platform" load={platformSearchIndex} departments={[]} today={nowUtc()} placeholder={requireStaff(op, "billing.read") ? "Search tenants and pages…" : "Search tenants, pages…"} /> : undefined}
     >
-      {children}
+      {op && session.mfa === "enrol" ? <MfaGate account={session.user.email} /> : op && session.mfa === "challenge" ? <MfaStepUp account={session.user.email} /> : children}
     </AppShell>
   )
 }

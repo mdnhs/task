@@ -10,9 +10,9 @@ import type { QuickAction, SearchConfig, SearchItem } from "./types"
 // Shift reports are the API's now (B6 T6.7): their search hits come from GET /v1/search as the user types (T6.8), so the mock index holds no reports.
 
 async function getSources(): Promise<RawSources> {
-  const [people, tasks, issues, payroll, orders, staff, candidates, clients, documents] = await Promise.all([
+  // Tasks are the API's now (B6 T6.6): their hits come from GET /v1/search as the user types, so the mock index holds none (T6.8 carry-in: tasks/tasks.json is deleted).
+  const [people, issues, payroll, orders, staff, candidates, clients, documents] = await Promise.all([
     getData<{ people: RawSources["people"] }>("tasks/people.json"),
-    getData<{ tasks: RawSources["tasks"] }>("tasks/tasks.json"),
     getData<{ items: RawSources["issues"] }>("attention/items.json"),
     getData<{ issues: RawSources["payroll"] }>("payroll/issues.json"),
     getData<{ orders: RawSources["orders"] }>("orders/orders.json"),
@@ -23,7 +23,7 @@ async function getSources(): Promise<RawSources> {
   ])
   return {
     people: people.people,
-    tasks: tasks.tasks,
+    tasks: [],
     reports: [],
     issues: issues.items,
     payroll: payroll.issues,

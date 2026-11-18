@@ -18,6 +18,8 @@ export function SlugConfirmDialog({
   text,
   slug,
   reason = false,
+  reasonMin = REASON_MIN,
+  reasonMax = 300,
   confirmLabel,
   destructive,
   onConfirm,
@@ -28,6 +30,9 @@ export function SlugConfirmDialog({
   text: string
   slug?: string
   reason?: boolean
+  /** The shortest and longest reason accepted. The mock pages keep the D7 minimum; the live console follows the API (1 to 500). */
+  reasonMin?: number
+  reasonMax?: number
   confirmLabel: string
   destructive?: boolean
   onConfirm(reason: string): void
@@ -43,7 +48,7 @@ export function SlugConfirmDialog({
     }
   }
 
-  const reasonOk = !reason || why.trim().length >= REASON_MIN
+  const reasonOk = !reason || why.trim().length >= reasonMin
   // An empty slug never matches: a destructive dialog without a slug to type fails closed rather than skipping the check.
   const slugOk = slug === undefined || (slug !== "" && typed.trim() === slug)
 
@@ -59,8 +64,8 @@ export function SlugConfirmDialog({
       onConfirm={() => onConfirm(why.trim())}
     >
       {reason && (
-        <Field label="Reason" htmlFor="pf-confirm-reason" hint={`At least ${REASON_MIN} characters`} required>
-          <Textarea id="pf-confirm-reason" value={why} rows={2} maxLength={300} onChange={(e) => setWhy(e.target.value)} />
+        <Field label="Reason" htmlFor="pf-confirm-reason" hint={reasonMin <= 1 ? `Up to ${reasonMax} characters` : `At least ${reasonMin} characters`} required>
+          <Textarea id="pf-confirm-reason" value={why} rows={2} maxLength={reasonMax} onChange={(e) => setWhy(e.target.value)} />
         </Field>
       )}
       {slug !== undefined && (
