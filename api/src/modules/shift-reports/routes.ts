@@ -1,7 +1,7 @@
-import { createRoute } from "@hono/zod-openapi"
+import { createRoute, z } from "@hono/zod-openapi"
 import type { Context } from "hono"
 import type { AppEnv } from "../../core/context"
-import { Forbidden } from "../../core/errors"
+import { AppError, Forbidden } from "../../core/errors"
 import { requireModule } from "../../core/middleware/module"
 import { actorIdOf } from "../../core/middleware/principal"
 import { requirePermission } from "../../core/middleware/permission"
@@ -14,13 +14,14 @@ import { currentItem, openReport, saveDraft } from "./draft"
 import { exportDownload, exportStatus, requestExport } from "./exports"
 import { decodeInboxCursor, inboxPage, inboxRange } from "./inbox"
 import { reviewReport } from "./review"
-import { saveTemplate, templatesInScope } from "./template"
+import { saveTemplate, templateEtag, templatesInScope } from "./template"
 import { AcceptBody, CurrentOut, DraftBody, ExportBody, ExportCreated, ExportIdParam, ExportOut, FileParams, IdParam, InboxOut, InboxQuery, OpenBody, ReportFileSchema, ReportSchema, ReturnBody, SubmitBody, TemplateBody, TemplateOut, UploadBody, UploadIntent, VersionsOut } from "./dto"
 import { getReport, loadReportCtx, type ReportCtx } from "./scope"
 import { submitReport } from "./submit"
 import { completeReportUpload, reportFileDownload, reportUploadIntent } from "./uploads"
 import { reportDtos, versionDtos } from "./view"
 
+const ETAG_HEADER = { ETag: { description: "Strong ETag of the stored template", schema: { type: "string" as const, example: '"3f2a9c0d1b7e4a58c6d2e9f01a4b7c3d"' } } }
 const guard = (need: "read" | "write") => [requireTenant, requireModule("M1"), requirePermission("reports", need)]
 const json = <S extends object>(schema: S, description: string) => ({ description, content: { "application/json": { schema } } })
 const body = <S extends object>(schema: S) => ({ content: { "application/json": { schema } }, required: true as const })
@@ -59,11 +60,11 @@ const inboxR = createRoute({
 })
 const templateGetR = createRoute({
   method: "get", path: "/v1/shift-reports/template", middleware: guard("read"),
-  responses: { 200: json(TemplateOut, "The report templates of the TEAMS IN THE CALLER'S SCOPE (a department is matched to a team by name; a team with no entry shows the one it is validated against). custom false = the default from the onboarding data") },
+  responses: { 200: { ...json(TemplateOut, "The report templates of the TEAMS IN THE CALLER'S SCOPE (a department is matched to a team by name; a team with no entry shows the one it is validated against). custom false = the default from the onboarding data. The `ETag` header (strong, quoted) names the STORED template, the same for every caller: send it back as `If-Match` on the PUT"), headers: ETAG_HEADER } },
 })
 const templatePutR = createRoute({
-  method: "put", path: "/v1/shift-reports/template", middleware: [requireTenant, requireModule("M1"), requirePermission("settings", "write")], request: { body: body(TemplateBody) },
-  responses: { 200: json(TemplateOut, "Replaces the whole template (at most 50 departments, 12 sections of 12 fields, ids [a-z0-9_]{1,40}); applies to NEW submissions only. Audited. 400 validation_failed; 422 invalid_template (duplicate ids, or a field a built-in section does not have) with errors[{key,message}]") },
+  method: "put", path: "/v1/shift-reports/template", middleware: [requireTenant, requireModule("M1"), requirePermission("settings", "write")], request: { body: body(TemplateBody), headers: z.object({ "if-match": z.string().optional().openapi({ description: "The ETag of the template the edit started from (GET /template). Required: missing is 428 precondition_required, stale is 412 precondition_failed (the current ETag in the ETag header). Strong comparison; a weak tag or * never matches", example: '"3f2a9c0d1b7e4a58c6d2e9f01a4b7c3d"' }) }) },
+  responses: { 200: { ...json(TemplateOut, "Replaces the whole template (at most 50 departments, 12 sections of 12 fields, ids [a-z0-9_]{1,40}); applies to NEW submissions only. Audited. 400 validation_failed; 422 invalid_template (duplicate ids, or a field a built-in section does not have) with errors[{key,message}]. 428 precondition_required (no If-Match) and 412 precondition_failed (stale If-Match) are decided under the settings lock; the new ETag is in the ETag header"), headers: ETAG_HEADER } },
 })
 const acceptR = createRoute({
   method: "post", path: "/v1/shift-reports/{id}/accept", middleware: guard("write"), request: { params: IdParam, body: body(AcceptBody) },
@@ -129,12 +130,21 @@ export const shiftReportRoutes = newRouter()
       200,
     )
   })
-  .openapi(templateGetR, async (c) => c.json(await read(c, (tx, ctx) => templatesInScope(tx, ctx)), 200))
+  .openapi(templateGetR, async (c) => {
+    const { etag, out } = await read(c, async (tx, ctx) => ({ etag: await templateEtag(tx, ctx.tenantId), out: await templatesInScope(tx, ctx) }))
+    c.header("ETag", etag)
+    return c.json(out, 200)
+  })
   .openapi(templatePutR, async (c) => {
     const deps = c.get("deps")
     const t = c.get("tenant")!
-    await saveTemplate(deps, t.id, actorIdOf(c), c.req.valid("json"))
-    return c.json(await withTenant(deps.db, t.id, async (tx) => templatesInScope(tx, { tenantId: t.id, access: { kind: "all" }, reports: [], me: actorIdOf(c) })), 200)
+    const ifMatch = c.req.header("if-match")?.trim()
+    if (!ifMatch) throw new AppError(428, "precondition_required", "Precondition Required")
+    await saveTemplate(deps, t.id, actorIdOf(c), c.req.valid("json"), ifMatch)
+    // the tag and the body are read together, so they always describe the same stored template
+    const { etag, out } = await withTenant(deps.db, t.id, async (tx) => ({ etag: await templateEtag(tx, t.id), out: await templatesInScope(tx, { tenantId: t.id, access: { kind: "all" }, reports: [], me: actorIdOf(c) }) }))
+    c.header("ETag", etag)
+    return c.json(out, 200)
   })
   .openapi(openR, async (c) => {
     const { dto, created } = await write(c, async (tx, _env, ctx) => {

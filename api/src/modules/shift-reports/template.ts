@@ -4,7 +4,7 @@ import { AppError } from "../../core/errors"
 import { shiftAssignments, shiftPatterns, teamMembers, teams } from "../../db/schema"
 import type { TenantTx } from "../../db/tenant-tx"
 import type { Deps } from "../../deps"
-import { putReportTemplate, readReportTemplate } from "../settings"
+import { putReportTemplate, readReportTemplate, readReportTemplateEtag } from "../settings"
 import { defaultReportTemplate } from "../tenants"
 import type { ReportCtx } from "./scope"
 
@@ -90,8 +90,11 @@ export async function templatesInScope(tx: TenantTx, ctx: Pick<ReportCtx, "tenan
 export const TEMPLATE_MAX_BYTES = 64 * 1024
 
 /** PUT /template: validate, then the settings module takes its locks, writes and audits. */
-export async function saveTemplate(deps: Deps, tenantId: string, actorId: string, data: TemplateData): Promise<void> {
+export async function saveTemplate(deps: Deps, tenantId: string, actorId: string, data: TemplateData, ifMatch: string): Promise<void> {
   if (Buffer.byteLength(JSON.stringify(data), "utf8") > TEMPLATE_MAX_BYTES) throw new AppError(422, "template_too_large", "Unprocessable Entity") // per-field limits alone allow ~1.8 MB and the app has no body-limit middleware
   validateTemplate(data)
-  await putReportTemplate(deps, tenantId, actorId, { departments: data.departments.map((d) => ({ dept: d.dept.trim(), sections: d.sections })) })
+  await putReportTemplate(deps, tenantId, actorId, { departments: data.departments.map((d) => ({ dept: d.dept.trim(), sections: d.sections })) }, ifMatch)
 }
+
+/** The strong ETag of the stored template (ruling S6), the same for every caller: it names the stored value, not a caller's scoped view. */
+export const templateEtag = readReportTemplateEtag

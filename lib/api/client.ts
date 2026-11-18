@@ -19,7 +19,8 @@ export type ResOf<O> = O extends { responses: infer R }
   ? { [S in keyof R & OkStatus]: R[S] extends { content: { "application/json": infer J } } ? J : undefined }[keyof R & OkStatus]
   : never
 
-type Common = { signal?: AbortSignal }
+/** `headers`: extra request headers for this call (for example `if-match`). `onResponse`: sees every 2xx response before its body is parsed (for example to read an `ETag`). */
+type Common = { signal?: AbortSignal; headers?: Record<string, string>; onResponse?: (res: Response) => void }
 type Required_<O> = ([PathParams<O>] extends [never] ? unknown : { path: PathParams<O> }) & ([BodyOf<O>] extends [never] ? unknown : { body: BodyOf<O> })
 type Optional_<O> = ([QueryParams<O>] extends [never] ? unknown : { query?: QueryParams<O> }) & ([BodyOf<O>] extends [never] ? ([OptBodyOf<O>] extends [never] ? unknown : { body?: OptBodyOf<O> }) : unknown)
 export type Req<P extends keyof paths, M extends Method> = Required_<Op<P, M>> & Optional_<Op<P, M>> & Common
@@ -75,6 +76,7 @@ export function makeApiClient(o: ClientOptions): ApiClient {
     const url = `${base}${fill(template, opt.path)}${queryString(opt.query)}`
     const headers = new Headers({ accept: "application/json" })
     for (const [k, v] of (await o.headers?.({ method: verb }))?.entries() ?? []) headers.set(k, v)
+    for (const [k, v] of Object.entries(opt.headers ?? {})) headers.set(k, v)
     let body: string | undefined
     if (opt.body !== undefined) {
       body = JSON.stringify(opt.body)
@@ -83,6 +85,7 @@ export function makeApiClient(o: ClientOptions): ApiClient {
     const doFetch = o.fetch ?? globalThis.fetch
     const res = await doFetch(url, { method: verb, headers, body, signal: opt.signal, ...(o.cache ? { cache: o.cache } : {}), ...(o.credentials ? { credentials: o.credentials } : {}) })
     if (!res.ok) throw await ApiError.fromResponse(res)
+    opt.onResponse?.(res)
     if (res.status === 204 || res.status === 205) return undefined
     const text = await res.text()
     return text ? (JSON.parse(text) as unknown) : undefined

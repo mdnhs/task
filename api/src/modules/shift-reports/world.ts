@@ -34,7 +34,12 @@ export async function world(over: { now?: string; reporting?: boolean; slug?: st
   const staff = await who("employee")
   const staff2 = await who("employee")
   const staff3 = await who("employee")
-  const req = (method: string, path: string, as: { cookie: string } | null, body?: unknown) => call(t.app, method, path, { cookie: as?.cookie, tenant: slug, body })
+  const req = (method: string, path: string, as: { cookie: string } | null, body?: unknown, headers?: Record<string, string>) => call(t.app, method, path, { cookie: as?.cookie, tenant: slug, body, headers })
+  /** PUT the report template as `as`. Without `ifMatch` it sends the ETag the template has right now (a client that just loaded it); pass a string to send that, or null to send none. */
+  const putTemplate = async (as: { cookie: string } | null, departments: unknown, ifMatch?: string | null) => {
+    const tag = ifMatch === undefined ? ((await req("GET", "/v1/shift-reports/template", as)).headers.get("etag") ?? (await req("GET", "/v1/shift-reports/template", owner)).headers.get("etag")) : ifMatch
+    return req("PUT", "/v1/shift-reports/template", as, { departments }, tag === null ? undefined : { "if-match": tag })
+  }
   const json = async (r: Response) => (await r.json()) as Json
   const q = <R = Json>(sqlText: string, params: unknown[] = []) => ownerTenantQuery(tenant.id, sqlText, params) as Promise<R[]>
   const team = (await json(await req("POST", "/v1/teams", owner, { name: "Night team", kind: "team" }))).id as string
@@ -85,7 +90,7 @@ export async function world(over: { now?: string; reporting?: boolean; slug?: st
   const drain = async () => {
     for (let i = 0; i < 6 && t.queue.jobs.length > 0; i++) for (const j of t.queue.jobs.splice(0)) await runJob(j.name, j.data, t.deps)
   }
-  return { ...t, tenant, who, owner, manager, ops, staff, staff2, staff3, req, json, q, team, pattern, manages, task, open, opened, get, draftBody, put, saved, submit, filled, taskRow, hist, relay, drain }
+  return { ...t, tenant, who, owner, manager, ops, staff, staff2, staff3, req, putTemplate, json, q, team, pattern, manages, task, open, opened, get, draftBody, put, saved, submit, filled, taskRow, hist, relay, drain }
 }
 export type W = Awaited<ReturnType<typeof world>>
 export const code = async (r: Response) => ((await r.clone().json()) as Json).code as string

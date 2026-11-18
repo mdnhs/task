@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto"
 import { and, between, eq, sql } from "drizzle-orm"
 import { AppError } from "../../core/errors"
 import { files, publicHolidays, tenants, tenantSettings } from "../../db/schema"
@@ -166,6 +167,15 @@ const REPORT_TEMPLATE_KEY = "report_template"
 /** The stored report template (`TemplateData`, validated by the shift-reports module before it gets here), or undefined when the tenant never set one (then the default is DATA, ruling F13). */
 export const readReportTemplate = (tx: TenantTx, tenantId: string): Promise<unknown> => readSetting(tx, tenantId, REPORT_TEMPLATE_KEY)
 
+/** The strong ETag of the STORED template (ruling S6): a hash of what the settings row holds, so any rewrite of it (a save, a team rename carrying the department name) changes it. Unset hashes as null. */
+export const reportTemplateEtag = (stored: unknown): string => `"${createHash("sha256").update(JSON.stringify(stored ?? null)).digest("hex").slice(0, 32)}"`
+
+/** RFC 9110 If-Match, strong comparison: a list of quoted tags; a weak tag (W/) and `*` never match (the template always exists, so `*` would defeat the check). */
+export const ifMatchHolds = (header: string, etag: string): boolean => header.split(",").some((t) => t.trim() === etag)
+
+/** The current ETag, read in the caller's tx. */
+export const readReportTemplateEtag = async (tx: TenantTx, tenantId: string): Promise<string> => reportTemplateEtag(await readSetting(tx, tenantId, REPORT_TEMPLATE_KEY))
+
 const shape = (v: unknown): { custom: boolean; departments: number } => {
   const d = (v as { departments?: unknown } | undefined)?.departments
   return Array.isArray(d) ? { custom: true, departments: d.length } : { custom: false, departments: 0 }
@@ -175,11 +185,15 @@ const shape = (v: unknown): { custom: boolean; departments: number } => {
  * Replaces the tenant's report template. Lock order: the settings advisory lock, the actor lock (`settings:write`, role re-read FOR SHARE), the write, the audit (ids and counts only,
  * never the labels). It applies to NEW submissions only: a saved report is never re-validated, and submit reads the template in force when it runs.
  */
-export async function putReportTemplate(deps: Deps, tenantId: string, actorId: string, value: object): Promise<void> {
+export async function putReportTemplate(deps: Deps, tenantId: string, actorId: string, value: object, ifMatch: string): Promise<void> {
   await withTenant(deps.db, tenantId, async (tx) => {
     await lockSettings(tx, tenantId)
     await lockActor(tx, tenantId, actorId, "settings", "write")
-    const before = shape(await readSetting(tx, tenantId, REPORT_TEMPLATE_KEY))
+    const stored = await readSetting(tx, tenantId, REPORT_TEMPLATE_KEY)
+    // compared AFTER the locks: the loser of two PUTs with the same tag reads what the winner committed (412 with the current tag, nothing written)
+    const current = reportTemplateEtag(stored)
+    if (!ifMatchHolds(ifMatch, current)) throw new AppError(412, "precondition_failed", "Precondition Failed", undefined, { etag: current })
+    const before = shape(stored)
     await writeSetting(tx, tenantId, REPORT_TEMPLATE_KEY, value)
     await recordAudit(tx, tenantId, { action: "tenant.report_template_updated", entity: "tenant", entityId: tenantId, actorId, before, after: shape(value) }, deps.clock.now())
   })

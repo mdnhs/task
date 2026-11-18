@@ -72,6 +72,7 @@ function kindOf(status: number, code: string): ErrorKind {
     if (code === "tenant_changed") return "tenant_changed"
     return "unprocessable" // evidence_not_ready, slug_taken, ...: the code says which
   }
+  if (status === 412) return "version_conflict" // If-Match no longer holds (the report template): the same "Changed by someone else"
   if (status === 429) return "rate_limited"
   if (status === 400 || status === 413) return "validation"
   if (status === 422) return "unprocessable"

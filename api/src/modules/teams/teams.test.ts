@@ -270,7 +270,10 @@ describe("people", () => {
 // ---------------------------------------------------------------- B6 T6.5 (ruling I26): a rename carries the report template
 describe("renaming a team keeps its report template", () => {
   const dept = (name: string) => ({ dept: name, sections: [{ id: "summary", title: "Summary", enabled: true, fields: [{ id: "summary", label: "Shift summary", required: true }] }] })
-  const putTemplate = (w: Awaited<ReturnType<typeof world>>, departments: unknown) => w.req("PUT", "/v1/shift-reports/template", w.owner, { departments })
+  const putTemplate = async (w: Awaited<ReturnType<typeof world>>, departments: unknown) => {
+    const tag = (await w.req("GET", "/v1/shift-reports/template", w.owner)).headers.get("etag")!
+    return call(w.app, "PUT", "/v1/shift-reports/template", { cookie: w.owner.cookie, tenant: "acme", body: { departments }, headers: { "if-match": tag } })
+  }
   const stored = async (w: Awaited<ReturnType<typeof world>>) => (await ownerTenantQuery(w.tenant.id, "select value from tenant_settings where key = 'report_template'"))[0]?.value as { departments: { dept: string }[] } | undefined
 
   test("the matching template department is renamed in the same transaction; other departments are untouched; the audit says so", async () => {

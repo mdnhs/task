@@ -5,7 +5,7 @@ import { isAllowedRedirect } from "@/features/billing/redirect"
 import type { DeviceAllow, DeviceFeature, DeviceOwner, DeviceType } from "@/lib/devices"
 import type { MfaPolicy } from "@/lib/mfa"
 import type { Access, Module } from "@/lib/types"
-import { toTemplateBody, toTemplateData } from "@/lib/report-template"
+import { fetchTemplate, putTemplate, type TemplateWithEtag } from "@/lib/report-template"
 import type { TemplateData } from "@opsdesk/domain/shift-report"
 import { roleUuid } from "./adapters"
 import { OAUTH_REDIRECT_HOSTS } from "./constants"
@@ -25,8 +25,12 @@ export function makeSettingsClient(api: ApiClient, nav: Navigator) {
     },
 
     // the report template (FR-M1-25): the WHOLE template is replaced; the answer is what the API holds now (department names follow a team rename, I26). Over 64 KB it throws template_too_large before any request.
-    async saveReportTemplate(data: TemplateData): Promise<TemplateData> {
-      return toTemplateData(await api.put("/v1/shift-reports/template", { body: toTemplateBody(data) }))
+    // It carries the ETag the edit started from as If-Match: 412 means someone else saved first (ruling S6); the answer holds the new tag.
+    async saveReportTemplate(data: TemplateData, etag: string | null): Promise<TemplateWithEtag> {
+      return putTemplate(api, data, etag)
+    },
+    async loadReportTemplate(): Promise<TemplateWithEtag> {
+      return fetchTemplate(api)
     },
 
     // departments are teams of kind "department"

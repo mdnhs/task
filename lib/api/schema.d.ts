@@ -8839,9 +8839,11 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description The report templates of the TEAMS IN THE CALLER'S SCOPE (a department is matched to a team by name; a team with no entry shows the one it is validated against). custom false = the default from the onboarding data */
+                /** @description The report templates of the TEAMS IN THE CALLER'S SCOPE (a department is matched to a team by name; a team with no entry shows the one it is validated against). custom false = the default from the onboarding data. The `ETag` header (strong, quoted) names the STORED template, the same for every caller: send it back as `If-Match` on the PUT */
                 200: {
                     headers: {
+                        /** @description Strong ETag of the stored template */
+                        ETag?: string;
                         [name: string]: unknown;
                     };
                     content: {
@@ -8868,7 +8870,10 @@ export interface paths {
         put: {
             parameters: {
                 query?: never;
-                header?: never;
+                header?: {
+                    /** @description The ETag of the template the edit started from (GET /template). Required: missing is 428 precondition_required, stale is 412 precondition_failed (the current ETag in the ETag header). Strong comparison; a weak tag or * never matches */
+                    "if-match"?: string;
+                };
                 path?: never;
                 cookie?: never;
             };
@@ -8892,9 +8897,11 @@ export interface paths {
                 };
             };
             responses: {
-                /** @description Replaces the whole template (at most 50 departments, 12 sections of 12 fields, ids [a-z0-9_]{1,40}); applies to NEW submissions only. Audited. 400 validation_failed; 422 invalid_template (duplicate ids, or a field a built-in section does not have) with errors[{key,message}] */
+                /** @description Replaces the whole template (at most 50 departments, 12 sections of 12 fields, ids [a-z0-9_]{1,40}); applies to NEW submissions only. Audited. 400 validation_failed; 422 invalid_template (duplicate ids, or a field a built-in section does not have) with errors[{key,message}]. 428 precondition_required (no If-Match) and 412 precondition_failed (stale If-Match) are decided under the settings lock; the new ETag is in the ETag header */
                 200: {
                     headers: {
+                        /** @description Strong ETag of the stored template */
+                        ETag?: string;
                         [name: string]: unknown;
                     };
                     content: {

@@ -79,7 +79,7 @@ export default async function Page({ params, searchParams }: { params: Promise<{
       }
       case "template": {
         const t = await readable(() => loadReportTemplate(api))
-        return t && <TemplatePanel data={t} canWrite={write} />
+        return t && <TemplatePanel data={t.data} etag={t.etag} canWrite={write} />
       }
       // MOCK: no backend until B9 (tenant-default notification settings and the delivery log): demo deployments only (I16).
       case "notifications":

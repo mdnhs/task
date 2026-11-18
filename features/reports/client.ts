@@ -7,8 +7,9 @@
 //  - an attachment is intent -> direct PUT of the bytes -> complete -> wait until the malware scan says clean; an infected file is refused, never attached.
 import type { ApiClient } from "@/lib/api/client"
 import { ApiError, classifyApiError } from "@/lib/api/problem"
+import { fetchTemplate, putTemplate, type TemplateWithEtag } from "@/lib/report-template"
 import type { TemplateData } from "@opsdesk/domain/shift-report"
-import { sizeText, toReport, toReportBody, toTemplateBody, toTemplateData, toVersions } from "./adapters"
+import { sizeText, toReport, toReportBody, toTemplateData, toVersions } from "./adapters"
 import type { ReportAttachment, ReportVersionRow, ShiftReport } from "./types"
 
 const needId = (r: Pick<ShiftReport, "reportId">): string => r.reportId ?? bad("open the report first (a shift with no report yet has no id)")
@@ -77,8 +78,12 @@ export function makeReportsClient(api: ApiClient, tz: string, put: typeof fetch 
     async template(): Promise<TemplateData> {
       return toTemplateData(await api.get("/v1/shift-reports/template"))
     },
-    async saveTemplate(data: TemplateData): Promise<TemplateData> {
-      return toTemplateData(await api.put("/v1/shift-reports/template", { body: toTemplateBody(data) }))
+    async templateWithEtag(): Promise<TemplateWithEtag> {
+      return fetchTemplate(api)
+    },
+    /** `etag` is the tag the template was read with (If-Match); the answer holds the new one. */
+    async saveTemplate(data: TemplateData, etag: string | null): Promise<TemplateWithEtag> {
+      return putTemplate(api, data, etag)
     },
   }
 }

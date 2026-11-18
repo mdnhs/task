@@ -7,7 +7,7 @@ import { getData } from "@/lib/data"
 import { getPeople } from "@/lib/people"
 import { toDataRequest, toDepartments, toDevice, toGrant, toIntegration, toInvites, toOrganisation, toRoles, toUsers } from "./adapters"
 import { MATRIX_MODULE_LABELS } from "./constants"
-import { toTemplateData } from "@/lib/report-template"
+import { fetchTemplate } from "@/lib/report-template"
 import type { BrandingData, DataRequestRow, DeliveryRow, Department, Integration, Invite, MatrixData, NotificationsData, Organisation, OrganisationData, SettingsUser, SupportGrant, TemplateData } from "./types"
 import type { Device, DevicePolicy } from "@/lib/devices"
 import type { MfaPolicy } from "@/lib/mfa"
@@ -89,7 +89,7 @@ export async function getMockUserActivity(): Promise<Record<string, { status: "a
 }
 
 // The report template (T6.7): the API's, one department per team (matched by name).
-export const loadReportTemplate = async (api: Reader): Promise<TemplateData> => toTemplateData(await api.get("/v1/shift-reports/template"))
+export const loadReportTemplate = (api: Reader) => fetchTemplate(api) // { data, etag }: the tag is the If-Match of the first save
 
 // ---- MOCK: no backend until B9 (tenant-default notification settings, delivery log). Shown only on a demo deployment (I16). ----
 export const getNotificationSettings = () => getData<NotificationsData>("settings/notifications.json")

@@ -271,15 +271,15 @@ describe("T6.7 contract (real API): shifts, reports, template, exports, dashboar
   test("a support session gets 403 on Today and the staff dashboard; template and exports as a plain member", async () => {
     const w = await world()
     const s = browser(w, w.staff)
-    const forbidden = await s.api.put("/v1/shift-reports/template", { body: { departments: [{ dept: "Night team", sections: [] }] } }).then(() => null, (e: unknown) => e)
+    const forbidden = await s.api.put("/v1/shift-reports/template", { headers: { "if-match": "\"x\"" }, body: { departments: [{ dept: "Night team", sections: [] }] } }).then(() => null, (e: unknown) => e)
     expect(classifyApiError(forbidden).kind).toBe("forbidden") // settings:write only
     const o = browser(w, w.owner)
-    const t = await o.reports.template()
-    t.departments[0]!.sections = [{ id: "summary", title: "Summary", enabled: true, fields: [{ id: "summary", label: "Shift summary", required: true }] }]
-    const saved = await o.reports.saveTemplate(t)
-    expect(saved.departments[0]!.sections[0]!.fields[0]).toMatchObject({ id: "summary", required: true })
+    const t = await o.reports.templateWithEtag()
+    t.data.departments[0]!.sections = [{ id: "summary", title: "Summary", enabled: true, fields: [{ id: "summary", label: "Shift summary", required: true }] }]
+    const saved = await o.reports.saveTemplate(t.data, t.etag)
+    expect(saved.data.departments[0]!.sections[0]!.fields[0]).toMatchObject({ id: "summary", required: true })
     // 422 invalid_template maps to field errors
-    const bad = await o.reports.saveTemplate({ departments: [{ dept: "A", sections: [] }, { dept: "a", sections: [] }] }).then(() => null, (e: unknown) => e)
+    const bad = await o.reports.saveTemplate({ departments: [{ dept: "A", sections: [] }, { dept: "a", sections: [] }] }, saved.etag).then(() => null, (e: unknown) => e)
     expect(classifyApiError(bad).kind).toBe("unprocessable")
     // report adapter strictness on the real payload: a renamed key must throw
     const opened = await browser(w, w.staff).reports.open(w.pattern, "2026-10-24").catch(() => null)

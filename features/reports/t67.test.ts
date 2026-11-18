@@ -383,8 +383,8 @@ describe("the template", () => {
     const big = { departments: [{ dept: "Security", sections: [{ id: "x", title: "x".repeat(70_000), enabled: true, fields: [] }] }] }
     expect(() => toTemplateBody(big)).toThrow(/template_too_large/)
     const api = fakeApi({ "PUT /v1/shift-reports/template": templateDto() })
-    const out = await makeReportsClient(api.client, TZ).saveTemplate(data)
-    expect(out.departments[0]!.dept).toBe("Security")
+    const out = await makeReportsClient(api.client, TZ).saveTemplate(data, '"t1"')
+    expect(out.data.departments[0]!.dept).toBe("Security")
     expect(api.calls[0]!.body).toEqual({ departments: templateDto().departments })
   })
   test("422 invalid_template shows field errors; 409 template_dept_exists and template_too_large have copy", () => {

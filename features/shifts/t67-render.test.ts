@@ -41,12 +41,12 @@ describe("the shifts screen on the API", () => {
 describe("the report template editor on the API", () => {
   test("it lists the API's sections for the department; read-only without write access, with switches when allowed", () => {
     const data = toTemplateData(templateDto())
-    const writable = renderToStaticMarkup(createElement(TemplatePanel, { data, canWrite: true }))
+    const writable = renderToStaticMarkup(createElement(TemplatePanel, { data, etag: "\"t\"", canWrite: true }))
     expect(writable).toContain("Report template")
     expect(writable).toContain("Tasks in the shift")
     expect(writable).toContain("Keys returned")
     expect(writable).not.toContain("data-readonly")
-    const readOnly = renderToStaticMarkup(createElement(TemplatePanel, { data, canWrite: false }))
+    const readOnly = renderToStaticMarkup(createElement(TemplatePanel, { data, etag: "\"t\"", canWrite: false }))
     expect(readOnly).toContain("data-readonly")
     expect(readOnly).toMatch(/disabled/)
   })

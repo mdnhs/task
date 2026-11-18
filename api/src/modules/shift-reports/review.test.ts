@@ -514,7 +514,7 @@ describe("template (FR-M1-25, F13)", () => {
     { id: "blockers", title: "Blockers", enabled: true, fields: [{ id: "blockers", label: "Blockers", required: true }] },
     ...(o.extra ?? []),
   ]
-  const put = (w: W, as: Who, departments: unknown) => w.req("PUT", "/v1/shift-reports/template", as, { departments })
+  const put = (w: W, as: Who, departments: unknown) => w.putTemplate(as, departments)
 
   test("GET with nothing set: the default template (onboarding data) for each team in the caller's scope; `custom` is false", async () => {
     const w = await world()
@@ -598,15 +598,19 @@ describe("template (FR-M1-25, F13)", () => {
     expect((await w.submit(w.staff2, fixed)).status).toBe(200)
   })
 
-  test("the PUT is serialised and idempotent: two concurrent PUTs both succeed (last write wins, one audit row each) and a repeated identical PUT changes nothing but still audits", async () => {
+  test("the PUT is serialised: two concurrent PUTs with the same ETag, exactly one wins (200) and the other is 412 with the current ETag; a repeated identical PUT with the fresh ETag still audits", async () => {
     const w = await world()
     const admin = await w.who("admin")
     const a = [{ dept: "Night team", sections: sections() }]
     const b = [{ dept: "Night team", sections: sections().slice(0, 2) }]
-    const rs = await Promise.all([put(w, admin, a), put(w, admin, b)])
-    expect(rs.map((r) => r.status)).toEqual([200, 200])
-    expect((await w.q("select count(*)::int n from audit_events where action = 'tenant.report_template_updated'"))[0].n).toBe(2)
+    const tag = (await w.req("GET", "/v1/shift-reports/template", admin)).headers.get("etag")!
+    const rs = await Promise.all([w.putTemplate(admin, a, tag), w.putTemplate(admin, b, tag)])
+    expect(rs.map((r) => r.status).sort()).toEqual([200, 412])
+    expect((await w.q("select count(*)::int n from audit_events where action = 'tenant.report_template_updated'"))[0].n).toBe(1)
     expect((await w.q("select count(*)::int n from tenant_settings where key = 'report_template'"))[0].n).toBe(1)
+    const again = await put(w, admin, JSON.parse(JSON.stringify((await w.json(await w.req("GET", "/v1/shift-reports/template", admin))).departments)))
+    expect(again.status).toBe(200)
+    expect((await w.q("select count(*)::int n from audit_events where action = 'tenant.report_template_updated'"))[0].n).toBe(2)
   })
 })
 
@@ -758,7 +762,7 @@ describe("database and plans (R8, EXPLAIN)", () => {
     const a = await world()
     const b = await world({ slug: "other" })
     const admin = await a.who("admin")
-    expect((await a.req("PUT", "/v1/shift-reports/template", admin, { departments: [{ dept: "Night team", sections: [{ id: "summary", title: "S", enabled: true, fields: [{ id: "summary", label: "Summary", required: false }] }] }] })).status).toBe(200)
+    expect((await a.putTemplate(admin, [{ dept: "Night team", sections: [{ id: "summary", title: "S", enabled: true, fields: [{ id: "summary", label: "Summary", required: false }] }] }])).status).toBe(200)
     expect((await b.json(await b.req("GET", "/v1/shift-reports/template", b.ops))).custom).toBe(false)
     expect((await a.json(await a.req("GET", "/v1/shift-reports/template", a.ops))).custom).toBe(true)
   })
@@ -787,7 +791,7 @@ describe("T5.3 review carry-ins (T5.4 first commit)", () => {
       dept: `Dept ${i}`.padEnd(60, "x"),
       sections: Array.from({ length: 12 }, (_, s) => ({ id: `s${s}`, title: "T".repeat(80), enabled: true, fields: Array.from({ length: 12 }, (_, f) => ({ id: `f${f}`, label: "L".repeat(80), required: false })) })),
     }))
-    const r = await w.req("PUT", "/v1/shift-reports/template", admin, { departments: big })
+    const r = await w.putTemplate(admin, big)
     expect([r.status, await code(r)]).toEqual([422, "template_too_large"])
     expect((await w.q("select count(*)::int n from tenant_settings where key = 'report_template'"))[0].n).toBe(0)
   })
@@ -829,13 +833,13 @@ describe("T5.3 review carry-ins (T5.4 first commit)", () => {
     const ok = sized(63 * 1024)
     expect(ok.bytes).toBeGreaterThan(62 * 1024)
     expect(ok.bytes).toBeLessThanOrEqual(64 * 1024)
-    const r1 = await w.req("PUT", "/v1/shift-reports/template", admin, { departments: ok.departments })
+    const r1 = await w.putTemplate(admin, ok.departments)
     expect([r1.status, await r1.clone().text()].join(" ")).toMatch(/^200 /)
     expect((await w.q("select count(*)::int n from tenant_settings where key = 'report_template'"))[0].n).toBe(1)
     const bad = sized(65 * 1024)
     expect(bad.bytes).toBeGreaterThan(64 * 1024)
     expect(bad.bytes).toBeLessThan(66 * 1024)
-    const r2 = await w.req("PUT", "/v1/shift-reports/template", admin, { departments: bad.departments })
+    const r2 = await w.putTemplate(admin, bad.departments)
     expect([r2.status, await code(r2)]).toEqual([422, "template_too_large"])
     const stored = (await w.q("select value from tenant_settings where key = 'report_template'"))[0].value
     expect(Buffer.byteLength(JSON.stringify(stored), "utf8")).toBeLessThanOrEqual(64 * 1024) // the second PUT wrote nothing
