@@ -9,8 +9,8 @@ export async function MockOverview({ op }: { op: StaffMember }) {
   const [seed, org] = await Promise.all([getPlatformSeed(), getMockOrg()])
   return (
     <section aria-label="Sample data">
-      <p className="pf-note">Sample data: plan mix, recent activity and the MRR history have no API yet.</p>
-      <OverviewDashboard data={overviewData(seed, org.today, op)} today={org.today} tzLabel={org.tzLabel} />
+      <p className="pf-note pf-note-info">Sample data: MRR history, plan mix and activity have no API yet.</p>
+      <OverviewDashboard sample data={overviewData(seed, org.today, op)} today={org.today} tzLabel={org.tzLabel} />
     </section>
   )
 }

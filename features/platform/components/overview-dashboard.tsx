@@ -25,15 +25,16 @@ const KIND: Record<AttentionKind, { icon: string; tone: string; label: string }>
   data_request: { icon: "download", tone: "amber", label: "Data request" },
 }
 
-type Props = { data: OverviewData; today: string; tzLabel: string; skeleton?: boolean }
+// `sample`: only the sections the API has no data for (charts, plan mix, attention, activity), under the live overview: no header and no mock KPI row (they would contradict the API numbers above).
+type Props = { data: OverviewData; today: string; tzLabel: string; skeleton?: boolean; sample?: boolean }
 
-export function OverviewDashboard({ data, today, tzLabel, skeleton = false }: Props) {
+export function OverviewDashboard({ data, today, tzLabel, skeleton = false, sample = false }: Props) {
   const { title, subtitle } = PAGE_HEADS.overview
   return (
     <>
-      <PageHead title={title} subtitle={`${data.revenue ? subtitle : "Tenant growth and what needs attention across the platform"} · ${data.monthLabel}`} />
+      {!sample && <PageHead title={title} subtitle={`${data.revenue ? subtitle : "Tenant growth and what needs attention across the platform"} · ${data.monthLabel}`} />}
 
-      <section className={data.revenue ? "stats pf-kpis" : "stats pf-kpis pf-kpis-3"} aria-label="Platform numbers">
+      {!sample && <section className={data.revenue ? "stats pf-kpis" : "stats pf-kpis pf-kpis-3"} aria-label="Platform numbers">
         {data.kpis.map((k, i) => (
           <article key={k.key} className="stat">
             <div className="stat-top">
@@ -60,7 +61,7 @@ export function OverviewDashboard({ data, today, tzLabel, skeleton = false }: Pr
             </div>
           </article>
         ))}
-      </section>
+      </section>}
 
       {data.revenue ? (
         <>
