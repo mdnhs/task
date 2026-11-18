@@ -1,5 +1,5 @@
 import { defineConfig, devices } from "@playwright/test"
-import { apiEnv, API_ORIGIN, WEB_ORIGIN, webEnv } from "./e2e/stack-env"
+import { apiEnv, API_ORIGIN, PROXY_ORIGIN, WEB_ORIGIN, webEnv } from "./e2e/stack-env"
 
 // B6 T6.9: one spec per first-client requirement (CR-01..CR-06) against the REAL stack: web (next dev), API, worker, Postgres, Redis, MinIO, ClamAV.
 // Backing services come from docker-compose.e2e.yml (`npm run e2e:stack`); everything is local demo data with fake credentials, no live provider.
@@ -33,11 +33,18 @@ export default defineConfig({
       stdout: "pipe",
     },
     {
-      command: "npx next dev -p 3100",
+      command: "node e2e/slow-api.mjs",
+      url: `${PROXY_ORIGIN}/healthz`,
+      reuseExistingServer: !process.env.CI,
+      timeout: 30_000,
+    },
+    {
+      // The production build, like the deployment (E2E_DEV=1 for the dev server while writing specs).
+      command: process.env.E2E_DEV ? "npx next dev -p 3100" : "npm run build && npx next start -p 3100",
       url: `${WEB_ORIGIN}/sign-in`,
       env: { ...(webEnv as unknown as Record<string, string>), NEXT_TELEMETRY_DISABLED: "1" },
       reuseExistingServer: !process.env.CI,
-      timeout: 120_000,
+      timeout: 360_000,
     },
   ],
 })

@@ -4,6 +4,9 @@ export const API_PORT = 3101
 export const WEB_PORT = 3100
 export const WEB_ORIGIN = `http://localhost:${WEB_PORT}`
 export const API_ORIGIN = `http://localhost:${API_PORT}`
+// The web reaches the API through e2e/slow-api.mjs (a transparent proxy; it only delays answers when a skeleton test asks).
+export const PROXY_PORT = 3102
+export const PROXY_ORIGIN = `http://localhost:${PROXY_PORT}`
 export const PLATFORM_TOTP = "e2eplatformtotpsecret0123456789"
 export const PLATFORM_EMAIL = "platform.owner@demo.example"
 export const DEMO_PASSWORD = "e2e-demo-password-12"
@@ -65,7 +68,7 @@ export const apiEnv = {
 } as const
 
 export const webEnv = {
-  API_URL: API_ORIGIN,
+  API_URL: PROXY_ORIGIN,
   APP_ORIGIN: WEB_ORIGIN,
   ENABLE_MOCK_MODULES: "",
 } as const
