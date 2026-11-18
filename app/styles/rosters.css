@@ -28,7 +28,7 @@
 .ros-day[data-today]{background:color-mix(in srgb,var(--brand-soft) 70%,var(--mute-bg))}
 .ros-day-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
 .ros-day-name{font-size:12.5px;font-weight:700;line-height:18px;color:var(--ink-2)}
-.ros-day[data-today] .ros-day-name{color:var(--brand)}
+.ros-day[data-today] .ros-day-name{color:var(--brand-text)}
 .ros-count{font-size:13px;font-weight:700;line-height:18px;color:var(--ink)}
 .ros-target{color:var(--ink-3)}
 .ros-day[data-short] .ros-count{color:var(--bad)}
@@ -49,7 +49,7 @@
 /* Person grid */
 .ros-grid{table-layout:fixed}
 .ros-grid th:first-child{width:170px}
-.ros-grid th.ros-today{color:var(--brand)}
+.ros-grid th.ros-today{color:var(--brand-text)}
 .ros-grid td{vertical-align:top}
 .ros-grid td.ros-today{background:color-mix(in srgb,var(--brand-soft) 45%,transparent)}
 .ros-person .tt{overflow-wrap:anywhere}
@@ -66,7 +66,7 @@
   .ros-grid th:first-child{width:auto}
   .ros-grid td{vertical-align:middle}
   .ros-grid td.ros-today{background:none}
-  .ros-grid td.ros-today::before{color:var(--brand)}
+  .ros-grid td.ros-today::before{color:var(--brand-text)}
   .ros-grid .ros-shifts{align-items:flex-end}
   .ros-grid .ros-shift{align-items:flex-end;text-align:right}
   .ros-grid .ros-none{padding:0}

@@ -108,7 +108,7 @@
 .set-int-grid{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
 .set-int{display:flex;flex-direction:column;gap:8px;padding:18px;border-radius:var(--r-lg);background:var(--shell);min-width:0}
 .set-int-top{display:flex;align-items:center;gap:14px}
-.set-int-ico{display:grid;place-items:center;width:44px;height:44px;border-radius:50%;background:var(--brand-soft);color:var(--brand);flex:none}
+.set-int-ico{display:grid;place-items:center;width:44px;height:44px;border-radius:50%;background:var(--brand-soft);color:var(--brand-text);flex:none}
 .set-int-ico .ico{width:22px;height:22px}
 .set-int-name{display:flex;flex-direction:column;align-items:flex-start;gap:6px;min-width:0}
 .set-int-name h3{margin:0;font-size:16px;font-weight:700}
@@ -125,7 +125,7 @@
 .set-card .set-upload .btn{cursor:pointer}
 .set-preview{display:flex;flex-direction:column;gap:10px}
 .set-preview-bar{display:flex;align-items:center;gap:12px;padding:22px 18px;border-radius:var(--r-lg);background:var(--panel)}
-.set-preview-chip{display:grid;place-items:center;width:42px;height:42px;border-radius:calc(14px * var(--radius-scale,1));color:#fff;font-weight:800;font-size:15px;overflow:hidden;flex:none}
+.set-preview-chip{display:grid;place-items:center;width:42px;height:42px;border-radius:calc(14px * var(--radius-scale,1));background:var(--brand);color:var(--on-brand);font-weight:800;font-size:15px;overflow:hidden;flex:none}
 .set-preview-chip.has-logo{background:var(--card)!important;padding:4px}
 .set-preview-chip img{width:100%;height:100%;object-fit:contain;display:block}
 .set-drop{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;width:100%;height:76px;padding:0 14px;border:0;font:inherit;border-radius:var(--r-lg);background:var(--panel);color:var(--ink-2);font-size:13px;text-align:center;cursor:pointer;transition:background .2s,color .2s}
@@ -172,7 +172,7 @@
 .set-appear{display:flex;flex-direction:column;gap:12px}
 .set-appear-head{display:flex;align-items:center;justify-content:space-between;gap:12px}
 .set-appear-head .od-field-label{font-size:12.5px;font-weight:700;color:var(--ink-2)}
-.set-appear-reset{font-size:12.5px;font-weight:600;color:var(--brand);transition:color var(--dur-fast) var(--ease)}
+.set-appear-reset{font-size:12.5px;font-weight:600;color:var(--brand-text);transition:color var(--dur-fast) var(--ease)}
 .set-appear-reset:hover{color:var(--brand-deep)}
 :root[data-theme="dark"] .set-appear-reset{color:var(--brand-3)}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .set-appear-reset{color:var(--brand-3)}}
@@ -199,4 +199,4 @@
 .dev-policy .seg.od-seg{background:var(--card)}
 /* the hidden logo input must keep .sr-only size (.od-field input sets width:100%, which made the page scroll sideways) */
 .set-upload>input.sr-only{width:1px;min-height:0;height:1px;padding:0}
-.set-matrix th[data-fresh]{color:var(--brand)}
+.set-matrix th[data-fresh]{color:var(--brand-text)}

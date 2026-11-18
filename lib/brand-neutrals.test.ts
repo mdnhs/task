@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest"
 
 import { DEFAULT_BRAND, brandCss } from "./brand"
 import {
-  DEFAULT_NEUTRALS_DARK, DEFAULT_NEUTRALS_LIGHT, brandChromaFactor, retint, tintNeutrals, toOklch, type NeutralTokens,
+  DEFAULT_NEUTRALS_DARK, DEFAULT_NEUTRALS_LIGHT, DEFAULT_STATUS_DARK, DEFAULT_STATUS_LIGHT, brandChromaFactor, retint, tintNeutrals, toOklch, type NeutralTokens,
 } from "./brand-neutrals"
 
 const lin = (c: number) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4)
@@ -86,6 +86,10 @@ describe("neutral tokens in opsdesk.css", () => {
   it("light and dark default definitions match the TS defaults (single source for the tint)", () => {
     grab(css.slice(css.indexOf(":root{"), css.indexOf("@media (prefers-color-scheme:dark)")), DEFAULT_NEUTRALS_LIGHT)
     grab(css.slice(css.indexOf(':root[data-theme="dark"]{'), css.indexOf("*{box-sizing")), DEFAULT_NEUTRALS_DARK)
+  })
+  it("status text colours mirror the TS defaults (brand-soft is kept readable against them)", () => {
+    grab(css.slice(css.indexOf(":root{"), css.indexOf("@media (prefers-color-scheme:dark)")), DEFAULT_STATUS_LIGHT)
+    grab(css.slice(css.indexOf(':root[data-theme="dark"]{'), css.indexOf("*{box-sizing")), DEFAULT_STATUS_DARK)
   })
   it("no other stylesheet or component hard-codes a default green neutral hex", () => {
     const hexes = [...Object.values(DEFAULT_NEUTRALS_LIGHT), ...Object.values(DEFAULT_NEUTRALS_DARK)]

@@ -7,13 +7,16 @@ export type NeutralTokens = Record<string, string>
 
 // The default scale, mirrored from :root / dark :root in app/opsdesk.css (a test keeps both in step).
 export const DEFAULT_NEUTRALS_LIGHT: NeutralTokens = {
-  page: "#e8ebe6", shell: "#f5f6f2", panel: "#eef1eb", card: "#fcfdfa", ink: "#1f2a24", "ink-2": "#56625b", "ink-3": "#8b958f",
-  placeholder: "#67736c", line: "#e0e5dd", "mute-bg": "#eef0ea",
+  page: "#e8ebe6", shell: "#f5f6f2", panel: "#eef1eb", card: "#fcfdfa", ink: "#1f2a24", "ink-2": "#56625b", "ink-3": "#5d6661",
+  placeholder: "#606b65", line: "#e0e5dd", "mute-bg": "#eef0ea",
 }
 export const DEFAULT_NEUTRALS_DARK: NeutralTokens = {
-  page: "#111614", shell: "#161c19", panel: "#1a211d", card: "#1f2722", ink: "#e2e8e3", "ink-2": "#a9b5ad", "ink-3": "#7a867e",
-  placeholder: "#8a968e", line: "#2a332e", "mute-bg": "#252d29",
+  page: "#111614", shell: "#161c19", panel: "#1a211d", card: "#1f2722", ink: "#e2e8e3", "ink-2": "#a9b5ad", "ink-3": "#94a198",
+  placeholder: "#95a199", line: "#2a332e", "mute-bg": "#252d29",
 }
+// Status text colours, mirrored from the same blocks (not tinted; brand-soft is darkened/lightened so they stay readable on it).
+export const DEFAULT_STATUS_LIGHT: NeutralTokens = { ok: "#14783b", warn: "#905e07", bad: "#aa4845", info: "#406b98" }
+export const DEFAULT_STATUS_DARK: NeutralTokens = { ok: "#7cc49b", warn: "#d6a865", bad: "#dc8b85", info: "#90b2d8" }
 // Light shadow colour (rgb 30,50,38) as hex so it is tinted the same way.
 export const DEFAULT_SHADOW_RGB = "#1e3226"
 export const DEFAULT_BRAND_HUE = 147 // hue of the default brand #1a8a3a in OKLCH; tokens keep their offset from it
@@ -65,6 +68,57 @@ export function retint(hex: string, hue: number, C: number): string {
     chroma *= 0.85
   }
   return toHex(oklchToLinear(toOklch(hex).L, 0, 0))
+}
+
+/** Colour with OKLCH lightness `L` (hue kept; chroma kept, reduced until it fits sRGB). */
+export function withLightness(hex: string, L: number): string {
+  const { C, h } = toOklch(hex)
+  let chroma = C
+  for (let i = 0; i < 40; i++) {
+    const rgb = oklchToLinear(L, chroma, h)
+    if (inGamut(rgb)) return toHex(rgb)
+    chroma *= 0.92
+  }
+  return toHex(oklchToLinear(L, 0, 0))
+}
+
+/** WCAG 2.x relative luminance and contrast ratio of #rrggbb colours. */
+export const relLuminance = (hex: string) => lumaOf(toLinear(hex))
+export function contrastRatio(a: string, b: string): number {
+  const [hi, lo] = [relLuminance(a), relLuminance(b)].sort((x, y) => y - x)
+  return (hi + 0.05) / (lo + 0.05)
+}
+
+/** CSS `color-mix(in oklab, a pct%, b)` resolved to a hex (opaque #rrggbb inputs). */
+export function mixOklab(a: string, pct: number, b: string): string {
+  const lab = (hex: string) => {
+    const { L, C, h } = toOklch(hex)
+    return [L, C * Math.cos((h * Math.PI) / 180), C * Math.sin((h * Math.PI) / 180)]
+  }
+  const [la, aa, ba] = lab(a)
+  const [lb, ab, bb] = lab(b)
+  const t = pct / 100
+  const A = aa * t + ab * (1 - t)
+  const B = ba * t + bb * (1 - t)
+  return toHex(oklchToLinear(la * t + lb * (1 - t), Math.hypot(A, B), ((Math.atan2(B, A) * 180) / Math.PI + 360) % 360))
+}
+
+/**
+ * Only the lightness of `hex` changes (hue and chroma kept) until it reaches `min`:1 against every colour in `bgs`.
+ * `dir` is the way to move: "darker" for text on light surfaces, "lighter" on dark ones. Returns `hex` untouched if it already passes.
+ */
+export function ensureContrast(hex: string, bgs: string[], min: number, dir: "darker" | "lighter"): string {
+  const worst = (c: string) => Math.min(...bgs.map((bg) => contrastRatio(c, bg)))
+  if (worst(hex) >= min) return hex
+  let L = toOklch(hex).L
+  const step = dir === "darker" ? -0.002 : 0.002
+  for (let i = 0; i < 600; i++) {
+    L += step
+    if (L <= 0 || L >= 1) break
+    const c = withLightness(hex, L)
+    if (worst(c) >= min) return c
+  }
+  return dir === "darker" ? "#000000" : "#ffffff"
 }
 
 /** 0 for greys, 1 for any clearly coloured brand (a loud brand is capped, never louder than the default scale). */

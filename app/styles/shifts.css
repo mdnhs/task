@@ -14,7 +14,7 @@
 /* Week grid */
 .sh-week{table-layout:fixed;min-width:980px}
 .sh-week th:first-child{width:170px}
-.sh-week th.sh-today{color:var(--brand)}
+.sh-week th.sh-today{color:var(--brand-text)}
 .sh-week td{vertical-align:top}
 .sh-week td.sh-today{background:color-mix(in srgb,var(--brand-soft) 45%,transparent)}
 .sh-person .tt{overflow-wrap:anywhere}
@@ -43,7 +43,7 @@
 .sh-rep-on{font-weight:700;color:var(--ink)}
 .sh-rep-state{display:inline-flex;align-items:center;padding:2px 10px;border-radius:var(--r-pill);font-size:12px;font-weight:700;line-height:18px;background:var(--mute-bg);color:var(--ink-2)}
 .sh-rep-state[data-on]{background:var(--ok-bg);color:var(--ok)}
-.sh-link{padding:0;background:none;border:0;font:inherit;font-size:12px;font-weight:600;line-height:18px;color:var(--brand);cursor:pointer;transition:color var(--dur-fast) var(--ease)}
+.sh-link{padding:0;background:none;border:0;font:inherit;font-size:12px;font-weight:600;line-height:18px;color:var(--brand-text);cursor:pointer;transition:color var(--dur-fast) var(--ease)}
 .sh-link:hover{color:var(--brand-deep)}
 :root[data-theme="dark"] .sh-link:hover{color:var(--brand-3)}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .sh-link:hover{color:var(--brand-3)}}
@@ -76,7 +76,7 @@ td.sh-act{text-align:right;white-space:nowrap}
   .sh-week th:first-child{width:auto}
   .sh-week td{vertical-align:middle}
   .sh-week td.sh-today{background:none}
-  .sh-week td.sh-today::before{color:var(--brand)}
+  .sh-week td.sh-today::before{color:var(--brand-text)}
   .sh-chips{align-items:flex-end}
   .sh-chip{align-items:flex-end}
   .sh-off{padding:0}

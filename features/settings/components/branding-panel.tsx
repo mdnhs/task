@@ -128,7 +128,7 @@ export function BrandingPanel({ name, color, logoFileId, presets, canWrite, canU
         </form>
         <div className="set-preview" aria-label="Sidebar preview">
           <div className="set-preview-bar">
-            <span className="set-preview-chip" style={{ background: chip }}>{initialsOf(name)}</span>
+            <span className="set-preview-chip">{initialsOf(name)}</span>
             <span className="set-preview-name">{name.trim() || "Your company"}</span>
           </div>
           <p className="od-field-hint">Live preview of the sidebar logo</p>
