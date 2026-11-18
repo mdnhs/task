@@ -17,7 +17,7 @@
 .set-body{display:flex;flex-direction:column;gap:18px;min-width:0}
 @media (max-width:900px){
   .set-layout{grid-template-columns:minmax(0,1fr)}
-  .set-tabs{flex-direction:row;overflow-x:auto;position:relative;padding:6px;scrollbar-width:none}
+  .set-tabs{flex-direction:row;overflow-x:auto;position:relative;top:auto;padding:6px;scrollbar-width:none}
   .set-tabs::-webkit-scrollbar{display:none}
 }
 

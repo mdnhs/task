@@ -41,6 +41,8 @@ export { LiveSupport } from "./components/live-support"
 export { LiveAudit } from "./components/live-audit"
 export { LiveTeam } from "./components/live-team"
 export { LiveSettings } from "./components/live-settings"
+export { parseSection, SETTINGS_SECTIONS } from "./settings-sections"
+export type { SettingsSection } from "./settings-sections"
 export {
   LiveTenantsSkeleton, LiveOverviewSkeleton, Live360Skeleton, Live360TabSkeleton, LiveAuditSkeleton, LiveDataRequestsSkeleton, LiveTeamSkeleton, LiveSupportSkeleton, LiveSettingsSkeleton, MockPageSkeleton,
 } from "./components/live-skeletons"

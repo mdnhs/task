@@ -6,29 +6,40 @@
 // Everything is local and fake: demo data, throwaway credentials, no live provider. It reuses docker-compose.local.yml and the e2e preparation
 // (api/scripts/e2e-prepare.ts: roles.sql, migrations as app_owner, MinIO bucket) and the demo seed (api/scripts/seed-demo.ts, same env as e2e/stack-env.ts).
 // It never reads or writes a .env file and refuses to run if a DATABASE_URL-like variable of the shell points anywhere but localhost.
+// By default it runs the local `main` branch from a detached runner worktree (DEV_ALL_USE_CURRENT=1 runs this checkout instead).
 // Ports are overridable: LOCAL_WEB_PORT, LOCAL_API_PORT, LOCAL_PG_PORT, LOCAL_REDIS_PORT, LOCAL_MINIO_PORT. LOCAL_CLAMAV=1 adds ClamAV (heavy, amd64).
 import { spawn, spawnSync } from "node:child_process"
 import { createHmac } from "node:crypto"
 import { mkdirSync, openSync, existsSync } from "node:fs"
 import net from "node:net"
 import { fileURLToPath } from "node:url"
-import pg from "pg"
+import { describeHead, enterRunner } from "./dev-all-runner.mjs"
 
 const ROOT = fileURLToPath(new URL("..", import.meta.url))
 const API_DIR = `${ROOT}api`
-const LOG_DIR = `${ROOT}.local-run`
-const COMPOSE = ["docker", "compose", "-p", "opsdesk-local", "-f", `${ROOT}docker-compose.local.yml`]
+// LOCAL_COMPOSE_PROJECT lets a second checkout run its own stack beside the default one (own containers + volumes).
+const PROJECT = process.env.LOCAL_COMPOSE_PROJECT || "opsdesk-local"
+const COMPOSE = ["docker", "compose", "-p", PROJECT, "-f", `${ROOT}docker-compose.local.yml`]
+
+function die(msg, code = 1) {
+  console.error(`\ndev-all: ${msg}`)
+  process.exit(code)
+}
+
+// `main` only: unless DEV_ALL_USE_CURRENT=1, every command is re-run from a detached runner worktree of local main (see dev-all-runner.mjs).
+const entered = enterRunner({ root: ROOT, argv: process.argv.slice(2), die })
+if (entered.handedOff) await new Promise(() => {}) // the runner child ends this process
+const LOG_DIR = entered.logDir
+const HEAD = describeHead(ROOT)
+const RUNNING = process.env.DEV_ALL_IN_RUNNER === "1"
+  ? `Running ${process.env.DEV_ALL_BRANCH || "main"} @ ${HEAD.hash} ${HEAD.subject}`
+  : `Running CURRENT checkout (${HEAD.branch || "detached"}) @ ${HEAD.hash} ${HEAD.subject}`
 
 const port = (name, def) => {
   const v = Number(process.env[name] ?? def)
   if (!Number.isInteger(v) || v < 1 || v > 65535) die(`${name} must be a port number`)
   return v
 }
-function die(msg, code = 1) {
-  console.error(`\ndev-all: ${msg}`)
-  process.exit(code)
-}
-
 const WEB_PORT = port("LOCAL_WEB_PORT", 3200)
 const API_PORT = port("LOCAL_API_PORT", 3201)
 const PG_PORT = port("LOCAL_PG_PORT", 54330)
@@ -138,11 +149,12 @@ function down() {
   // Remove the optional ClamAV too, whichever way it was started.
   const r = run(COMPOSE[0], [...COMPOSE.slice(1), "--profile", "scan", "down", "-v", "--remove-orphans"], { env: composeEnv() })
   if (r.status !== 0) die("docker compose down failed")
-  console.log("dev-all: containers and volumes removed (project opsdesk-local).")
+  console.log(`dev-all: containers and volumes removed (project ${PROJECT}).`)
 }
 
 async function start() {
   assertLocalEnv()
+  console.log(`dev-all: ${RUNNING}`)
   dockerOrDie()
   if (!existsSync(`${ROOT}node_modules/.bin/next`)) die("dependencies are not installed: run `npm ci` first.")
   mkdirSync(LOG_DIR, { recursive: true })
@@ -154,7 +166,7 @@ async function start() {
   for (const [name, p, envName] of need) if (!(await portFree(p))) die(`port ${p} (${name}) is already in use. Stop whatever uses it (lsof -nP -iTCP:${p} -sTCP:LISTEN) or set ${envName}=<free port>.`)
 
   console.log("dev-all: starting Postgres, Redis, MinIO" + (CLAMAV ? ", ClamAV (slow)" : "") + " ...")
-  if (compose(["up", "-d", "--wait"]).status !== 0) die("docker compose up failed (a port clash or a failed healthcheck; see `docker compose -p opsdesk-local logs`).")
+  if (compose(["up", "-d", "--wait"]).status !== 0) die(`docker compose up failed (a port clash or a failed healthcheck; see \`docker compose -p ${PROJECT} logs\`).`)
 
   const tsx = `${ROOT}node_modules/.bin/tsx`
   console.log("dev-all: roles, migrations (as app_owner) and MinIO bucket ...")
@@ -163,6 +175,7 @@ async function start() {
     die(`database preparation failed (exit ${r.status}).`)
   }
 
+  const { default: pg } = await import("pg") // loaded here so the launcher part works without node_modules
   const su = new pg.Client({ connectionString: PG_ADMIN })
   await su.connect()
   const empty = Number((await su.query("select count(*)::int as n from tenants")).rows[0].n) === 0
@@ -221,6 +234,7 @@ async function start() {
 
   console.log(`
 ==================================================================================================
+  ${RUNNING}
   OpsDesk is running locally (demo data, nothing leaves this machine)
 
   Web        ${WEB}/sign-in
