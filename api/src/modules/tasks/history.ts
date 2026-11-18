@@ -29,7 +29,9 @@ const CAUSE_TEXT: Record<string, { visible: (ref: string) => string; hidden: str
   created: { visible: (r) => `Created from recurring task ${r}`, hidden: "Created from a recurring task", neutral: "Created from a recurring task" },
 }
 const DETACHED_NEUTRAL = "The parent task was removed; this is now a task of its own"
-const HAS_REF = /\bTSK-\d+\b/
+// The exact legacy shapes (the ones migration 0040 rewrites); free text that merely mentions a ref is user text and renders as stored.
+const LEGACY_CAUSE = /^(?:Moved because|Archived with|Restored with|Created from recurring task) TSK-\d+(?: was rescheduled)?$/
+const LEGACY_DETACHED = /^TSK-\d+ was removed; this is now a task of its own$/
 
 const FORMER = "Former member"
 /** Display names NOW (never snapshotted): an erased or unknown person is "Former member"; keys and the system have fixed labels. */
@@ -97,9 +99,9 @@ export async function historyDtos(tx: TenantTx, ctx: Pick<TaskCtx, "tenantId" | 
       return ref ? c.visible(ref) : c.hidden
     }
     // Safety net: a legacy row whose cause was purged (or never resolved) must not keep a raw ref in its text.
-    if (r.text && HAS_REF.test(r.text)) {
-      if (c) return c.neutral
-      if (r.kind === "detached") return DETACHED_NEUTRAL
+    if (r.text) {
+      if (c && LEGACY_CAUSE.test(r.text)) return c.neutral
+      if (r.kind === "detached" && LEGACY_DETACHED.test(r.text)) return DETACHED_NEUTRAL
     }
     return r.text ?? ""
   }

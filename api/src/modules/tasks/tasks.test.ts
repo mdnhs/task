@@ -1429,6 +1429,23 @@ describe("projects, milestones, dependencies, knock-on and date proposals (T4.3)
       expect(raw).toContain("The parent task was removed; this is now a task of its own")
     })
 
+    test("free text that mentions a ref is untouched: a root reschedule reason, and created/restored rows with a typed ref", async () => {
+      const w = await world()
+      await w.manages(w.manager, w.staff)
+      const t = await w.mk(w.ops, { title: "Solo", primary: w.staff.userId })
+      const r = await resched(w, t.id, { version: 1, start: "2026-11-20T09:00:00", due: "2026-11-21T17:00:00", reason: "Waiting on TSK-12", knockOn: { apply: false } })
+      expect(r.status, await r.clone().text()).toBe(200)
+      for (const [kind, text] of [["created", "Created from recurring task TSK-12 by hand"], ["restored", "Restored with TSK-12 per Ann"]]) {
+        await w.q("insert into task_history (tenant_id, task_id, at, kind, text) values ($1, $2, now(), $3, $4)", [w.tenant.id, t.id, kind, text])
+      }
+      for (const who of [w.manager, w.owner]) {
+        const texts = textsOf(await histOf(w, t.id, who))
+        expect(texts).toContain("Rescheduled: Waiting on TSK-12")
+        expect(texts).toContain("Created from recurring task TSK-12 by hand")
+        expect(texts).toContain("Restored with TSK-12 per Ann")
+      }
+    })
+
     test("a purged cause task: SET NULL, then the line is neutral for everyone", async () => {
       const w = await world()
       const { a, b } = await moved(w)
