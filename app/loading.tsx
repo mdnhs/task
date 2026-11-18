@@ -1,5 +1,6 @@
 import { getPlatformNav } from "@/features/platform"
 import { AppShellSkeleton, PageSkeleton, getNavigation } from "@/features/shell"
+import { mockEnabled } from "@/lib/mock-registry"
 import { requestPath } from "@/lib/request-path"
 
 // First load: the (app) layout is still fetching nav/user, so show the whole shell as a skeleton.
@@ -20,8 +21,9 @@ export default async function Loading() {
   }
   if (!path || /^\/(?:sign-in|sign-up|forgot-password|verify-email|reset-password|onboarding)(?:\/|$)/.test(path)) return <PageSkeleton />
   const navigation = await getNavigation()
+  // The mock-only entries and the assistant exist only on a demo deployment (ENABLE_MOCK_MODULES=1), same as the real shell.
   return (
-    <AppShellSkeleton departments={navigation.departments} assistant>
+    <AppShellSkeleton departments={navigation.departments} assistant={mockEnabled()} mock={mockEnabled()}>
       <PageSkeleton />
     </AppShellSkeleton>
   )

@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation"
 
 import { GapPage, getDerivedGaps, getRosters } from "@/features/staff-rosters"
-import { AccessRestricted, getUser } from "@/features/shell"
+import { AccessRestricted, getUser, mockGate } from "@/features/shell"
 import { getMockOrg } from "@/lib/org"
 import { can } from "@/lib/permissions"
 import { canWrite, getSession } from "@/lib/session"
@@ -18,6 +18,8 @@ const decode = (id: string) => {
 // (FR-STAFF-03) and scopeKey as /staff-rosters, so cover updates made here show on the list. Unknown id: notFound() (the
 // not-found page; the status stays 200 because loading.tsx has already streamed, like /tasks/[ref]).
 export default async function Page({ params }: { params: Promise<{ id: string }> }) {
+  const off = mockGate("Staff & Rosters")
+  if (off) return off
   const [{ id }, session, org, user] = await Promise.all([params, getSession(), getMockOrg(), getUser()])
   if (!can(session.role, "staff")) return <AccessRestricted moduleLabel="Staff & Rosters" />
   const gid = decode(id)

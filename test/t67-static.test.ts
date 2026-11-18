@@ -89,9 +89,8 @@ describe("T6.7 exports and report files: no URL is ever kept", () => {
 describe("T6.7 attention (I18)", () => {
   test("the /manager-attention page is the mock queue: unavailable unless ENABLE_MOCK_MODULES is set; the dashboard card reads GET /v1/attention", () => {
     const page = read("app/(app)/manager-attention/page.tsx")
-    expect(page).toContain("mockEnabled()")
-    expect(page).toContain("NotAvailableYet")
-    expect(page.indexOf("mockEnabled()")).toBeLessThan(page.indexOf("getAttention()"))
+    expect(page).toContain('mockGate("Manager Attention")') // mockGate = the unavailable state unless ENABLE_MOCK_MODULES=1 (lib/mock-registry.ts, T6.9)
+    expect(page.indexOf("mockGate(")).toBeLessThan(page.indexOf("getAttention()"))
     expect(read("features/dashboard/api.ts")).toContain('"/v1/attention"')
   })
 })

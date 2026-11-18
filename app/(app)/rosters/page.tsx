@@ -1,6 +1,6 @@
 import { checkAssignRules, checkWeekRules } from "./actions"
 import { RostersView, getRosterData, rosterScopeKey, getHolidayDates, getRosterExchange, getRosterHistory, getRosterRequests, getRosterRules, getWeekTemplates, rosterEdit, rosterViewData } from "@/features/rosters"
-import { AccessRestricted, getUser } from "@/features/shell"
+import { AccessRestricted, getUser, mockGate } from "@/features/shell"
 import { getData } from "@/lib/data"
 import { getMockOrg } from "@/lib/org"
 import { can } from "@/lib/permissions"
@@ -11,6 +11,8 @@ import { getSession } from "@/lib/session"
 // Location Rosters (Module 1A, FR-RS-10/11/12/33). The role's location access cuts the payload on the server (D4); a location the
 // role may not open shows "no access" and none of its data is sent.
 export default async function Page({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  const off = mockGate("Location Rosters")
+  if (off) return off
   const [sp, session, org, user] = await Promise.all([searchParams, getSession(), getMockOrg(), getUser()])
   if (!can(session.role, "roster")) return <AccessRestricted moduleLabel="Location Rosters" />
   const [{ locations }, { grants, limits }, people] = await Promise.all([

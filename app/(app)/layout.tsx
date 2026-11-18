@@ -10,6 +10,7 @@ import { getPlatformNotice } from "@/lib/platform-notice-data"
 import { BillingBanner } from "@/components/billing-banner"
 import { canOpenBilling } from "@/lib/billing-state"
 import { PlatformNoticeBanner } from "@/components/platform-notice"
+import { hideMockNav, mockEnabled } from "@/lib/mock-registry"
 import { filterNav } from "@/lib/permissions"
 import { getSession } from "@/lib/session"
 import { AppShell, getNavigation, getUser } from "@/features/shell"
@@ -29,7 +30,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   // Filtered on the server so hidden modules never reach the client payload.
   // session.role is already narrowed to the plan; filterByEntitlement states the plan check (FR-M0-15) on its own.
-  const inPlan = <T extends { href: string }>(items: T[]) => filterByEntitlement(filterNav(items, session.role), session.entitlements)
+  const inPlan = <T extends { href: string }>(items: T[]) => hideMockNav(filterByEntitlement(filterNav(items, session.role), session.entitlements)) // mock-only routes are hidden unless ENABLE_MOCK_MODULES=1
   // The department filter is the company's own departments (GET /v1/teams?kind=department), not the seed file's.
   const nav = { ...navigation, menu: inPlan(navigation.menu), general: inPlan(navigation.general), departments: [{ dep: "all", label: "All" }, ...org.departments.map((d) => ({ dep: d, label: d }))] }
 
@@ -63,7 +64,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         />
       }
       assistant={
-        !hasProductModule(session.entitlements, session.entitlements.assistant) ? undefined : <AiAssistant
+        !mockEnabled() || !hasProductModule(session.entitlements, session.entitlements.assistant) ? undefined : <AiAssistant
           key="assistant"
           data={fillAssistant(assistant, {
             firstName: user.name.split(" ")[0] ?? user.name,

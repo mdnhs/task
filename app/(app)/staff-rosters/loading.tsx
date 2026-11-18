@@ -1,3 +1,4 @@
+import { mockEnabled } from "@/lib/mock-registry"
 import { headers } from "next/headers"
 
 import { StaffRostersSkeleton, gapGroups, getDerivedGaps, getRosters } from "@/features/staff-rosters"
@@ -11,6 +12,7 @@ import { getSkeletonSession, getSkeletonUser } from "@/lib/skeleton-session"
 // loading.tsx gets no search params either: coming back from a gap page (Save, Cancel, back link → ?tab=gaps) is told
 // by the referrer, so that return shows the Roster gaps skeleton. Anything else shows the default Attendance tab.
 export default async function Loading() {
+  if (!mockEnabled()) return <PageSkeleton /> // the page is the unavailable state: no seed to size a skeleton from
   const session = await getSkeletonSession()
   if (!can(session.role, "staff")) return <PageSkeleton />
   const [org, user] = await Promise.all([getMockOrg(), getSkeletonUser()])

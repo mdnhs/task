@@ -1,3 +1,4 @@
+import { mockEnabled } from "@/lib/mock-registry"
 import { GapPage, GapPageSkeleton, getDerivedGaps, getRosters } from "@/features/staff-rosters"
 import { PageSkeleton } from "@/features/shell"
 import { SkMask } from "@/components/sk"
@@ -10,6 +11,7 @@ import { getSkeletonSession, getSkeletonUser } from "@/lib/skeleton-session"
 // Like /tasks/[ref]: the id comes from the pathname header proxy.ts sets, and the real gap is rendered masked (SkMask).
 // Unknown id: the typical skeleton (the page then 404s).
 export default async function Loading() {
+  if (!mockEnabled()) return <PageSkeleton /> // the page is the unavailable state: no seed to size a skeleton from
   const session = await getSkeletonSession()
   if (!can(session.role, "staff")) return <PageSkeleton />
   const write = canWrite(session, "staff")

@@ -1,6 +1,12 @@
 import Link from "next/link"
 
 import { Icon } from "@/components/icons"
+import { mockEnabled } from "@/lib/mock-registry"
+
+/** First line of every mock page: `const off = mockGate("Orders & Stock"); if (off) return off`. The unavailable state unless the demo flag is on; the page then loads no data. */
+export function mockGate(moduleLabel: string, text?: string): React.ReactElement | null {
+  return mockEnabled() ? null : <NotAvailableYet moduleLabel={moduleLabel} text={text} />
+}
 
 // The page body of a screen that has no backend yet and is shown only on a demo deployment (B6 ruling I16, ENABLE_MOCK_MODULES=1). Used first for the mock Manager Attention queue (T6.7);
 // T6.9 adds the registry list and uses it for every mock screen. Same markup as the other full-page states (.head and .card.soon).

@@ -1,10 +1,12 @@
 import { RecruitmentView, forRole, getCandidates } from "@/features/recruitment"
-import { AccessRestricted, getUser } from "@/features/shell"
+import { AccessRestricted, getUser, mockGate } from "@/features/shell"
 import { getMockOrg } from "@/lib/org"
 import { can } from "@/lib/permissions"
 import { canWrite, getSession } from "@/lib/session"
 
 export default async function Page() {
+  const off = mockGate("Recruitment")
+  if (off) return off
   const [session, org, user] = await Promise.all([getSession(), getMockOrg(), getUser()])
   if (!can(session.role, "recruitment")) return <AccessRestricted moduleLabel="Recruitment" />
   const write = canWrite(session, "recruitment")

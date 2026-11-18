@@ -3,6 +3,7 @@
 import { getUser } from "@/features/shell"
 import { assignmentViolations, weekViolations } from "@/features/rosters"
 import { getData } from "@/lib/data"
+import { mockEnabled } from "@/lib/mock-registry"
 import { getMockOrg } from "@/lib/org"
 import { can } from "@/lib/permissions"
 import { getMockPeople, todayUserId } from "@/lib/people"
@@ -18,7 +19,7 @@ import { getSession } from "@/lib/session"
  * generic message for causes elsewhere.
  */
 export async function checkWeekRules(weekId: string, shifts?: unknown): Promise<RuleViolation[]> {
-  if (typeof weekId !== "string") return []
+  if (!mockEnabled() || typeof weekId !== "string") return []
   const [session, org, user] = await Promise.all([getSession(), getMockOrg(), getUser()])
   if (!can(session.role, "roster")) return []
   const [{ locations }, { grants, limits }, people] = await Promise.all([
@@ -37,7 +38,7 @@ export async function checkWeekRules(weekId: string, shifts?: unknown): Promise<
  * so a clash at a site the caller can't see is found. The caller comes from the session; only the shift and person ids are taken.
  */
 export async function checkAssignRules(assign: { shiftId: string; personId: string }[]): Promise<RuleViolation[]> {
-  if (!Array.isArray(assign) || assign.some((x) => typeof x?.shiftId !== "string" || typeof x?.personId !== "string")) return []
+  if (!mockEnabled() || !Array.isArray(assign) || assign.some((x) => typeof x?.shiftId !== "string" || typeof x?.personId !== "string")) return []
   const [session, org, user] = await Promise.all([getSession(), getMockOrg(), getUser()])
   if (!can(session.role, "roster")) return []
   const [{ locations }, { grants, limits }, people] = await Promise.all([

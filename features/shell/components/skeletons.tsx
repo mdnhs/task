@@ -8,6 +8,8 @@ import { AppPromo, Logo, PlatformContext } from "./sidebar-parts"
 // Mirrors AppShell: static parts (logo, nav labels, promo card) render for real, data parts are blocks.
 // Nav item counts match public/data/shell/navigation.json (9 menu, 2 general).
 const NAV_WIDTHS = { menu: [92, 60, 110, 140, 120, 100, 170, 120, 116], general: [72, 80] }
+/** Without ENABLE_MOCK_MODULES the mock-only entries are not in the nav (lib/mock-registry): Dashboard, Tasks, Shift Reports and Shifts remain. */
+export const NAV_MENU_REAL = [NAV_WIDTHS.menu[0], NAV_WIDTHS.menu[1], NAV_WIDTHS.menu[2], NAV_WIDTHS.menu[7]]
 
 // Mirrors DeptSeg. Up to SEG_MAX pills: one block sized by the real labels, set invisible, so the width matches
 // exactly for any tenant. Beyond that: the carousel's fixed-basis block.
@@ -69,6 +71,7 @@ function GroupedNavSkeleton({ items }: { items: NavItemData[] }) {
 export function AppShellSkeleton({
   departments,
   assistant = true,
+  mock = true,
   platform,
   children,
 }: {
@@ -76,6 +79,8 @@ export function AppShellSkeleton({
   departments: NavigationData["departments"] | false
   /** Topbar icons shown by the real shell: the AI assistant (plan module). */
   assistant?: boolean
+  /** The demo deployment (ENABLE_MOCK_MODULES=1): the nav lists the mock-only entries too. Default true. */
+  mock?: boolean
   /** The platform console variant (AppShell variant="platform"): its filtered menu and environment pill; no promo card. */
   platform?: { menu: NavItemData[]; env?: { label: string; live: boolean } }
   children: React.ReactNode
@@ -93,7 +98,7 @@ export function AppShellSkeleton({
               <>
                 <div>
                   <div className="nav-label">Menu</div>
-                  <NavSkeleton widths={NAV_WIDTHS.menu} />
+                  <NavSkeleton widths={mock ? NAV_WIDTHS.menu : NAV_MENU_REAL} />
                 </div>
                 <div>
                   <div className="nav-label">General</div>

@@ -1,3 +1,4 @@
+import { mockEnabled } from "@/lib/mock-registry"
 import { RostersSkeleton, getRosterData, rosterScopeKey, getHolidayDates, getRosterExchange, getRosterHistory, getRosterRequests, getRosterRules, getWeekTemplates, rosterEdit, rosterViewData } from "@/features/rosters"
 import { PageSkeleton } from "@/features/shell"
 import { getData } from "@/lib/data"
@@ -9,6 +10,7 @@ import { getSkeletonSession, getSkeletonUser } from "@/lib/skeleton-session"
 
 // Async so the skeleton is the real view for the role's default location and the current week (loading.tsx gets no params).
 export default async function Loading() {
+  if (!mockEnabled()) return <PageSkeleton /> // the page is the unavailable state: no seed to size a skeleton from
   const [session, org, user] = await Promise.all([getSkeletonSession(), getMockOrg(), getSkeletonUser()])
   if (!can(session.role, "roster")) return <PageSkeleton />
   const [{ locations }, { grants, limits }, people] = await Promise.all([
