@@ -1,5 +1,5 @@
-import { and, eq, inArray, notExists, sql } from "drizzle-orm"
-import { locationSupervisors, memberships, roles, rosterOfficeLimits } from "../../db/schema"
+import { and, eq, exists, inArray, ne, notExists, or, sql } from "drizzle-orm"
+import { locationSupervisors, memberQualifications, memberships, roles, rosterOfficeLimits, rosterShifts } from "../../db/schema"
 import type { TenantTx } from "../../db/tenant-tx"
 import { notifyMany } from "../notifications"
 import type { RosterCtx } from "./scope"
@@ -77,4 +77,36 @@ export async function approversOf(tx: TenantTx, tenantId: string, locationId: st
     : []
   const skip = new Set(o.exclude)
   return [...new Set([...office, ...sup].map((r) => r.userId))].filter((u) => !skip.has(u)).sort()
+}
+
+const OPEN_AUDIENCE_MAX = 500
+
+/**
+ * FR-RS-43: open shifts of a PUBLISHED week are posted to the people who could take them: ACTIVE members located at the site (homed there, or rostered at it that week) who hold every
+ * qualification a shift needs, valid on its date. One notice per person however many shifts; never the person who posted them; generic text (no site, time or role). Three queries however
+ * many people (candidates, their qualifications, one batch of notices). Returns the people told.
+ */
+export async function notifyOpenShifts(tx: TenantTx, ctx: Pick<RosterCtx, "tenantId" | "actorId">, env: RosterEnv, week: { id: string; locationId: string; weekStart: string }, open: { date: string; requires: string[] }[]): Promise<string[]> {
+  if (open.length === 0) return []
+  const candidates = (
+    await tx
+      .select({ userId: memberships.userId })
+      .from(memberships)
+      .where(
+        and(
+          eq(memberships.tenantId, ctx.tenantId), eq(memberships.status, "active"), ne(memberships.userId, ctx.actorId),
+          or(eq(memberships.homeLocationId, week.locationId), exists(tx.select({ one: sql`1` }).from(rosterShifts).where(and(eq(rosterShifts.tenantId, ctx.tenantId), eq(rosterShifts.weekId, week.id), eq(rosterShifts.userId, memberships.userId))))),
+        ),
+      )
+      .orderBy(memberships.userId)
+      .limit(OPEN_AUDIENCE_MAX)
+  ).map((m) => m.userId)
+  if (candidates.length === 0) return []
+  const needs = open.some((o) => o.requires.length > 0)
+  const quals = needs ? await tx.select({ userId: memberQualifications.userId, type: memberQualifications.type, expiresOn: memberQualifications.expiresOn }).from(memberQualifications).where(and(eq(memberQualifications.tenantId, ctx.tenantId), inArray(memberQualifications.userId, candidates))) : []
+  const eligible = candidates.filter((u) =>
+    open.some((o) => o.requires.every((need) => quals.some((q) => q.userId === u && q.type.toLowerCase() === need.toLowerCase() && (q.expiresOn === null || q.expiresOn >= o.date)))),
+  )
+  await notifyActive(tx, ctx, env, eligible.map((userId) => ({ userId, title: "Open shift available", body: `A shift is open at your site for the week starting ${week.weekStart}. Claim it in the roster.` })))
+  return eligible
 }

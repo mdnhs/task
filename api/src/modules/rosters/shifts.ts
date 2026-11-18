@@ -12,7 +12,7 @@ import { realDate } from "./qualifications"
 import { checkWeek, type NewShift } from "./rules"
 import { assertLocation, canSeePerson, weekEditGate, type RosterCtx } from "./scope"
 import { loadWeek, shiftDto, shiftSnap, type LoadedWeek, type ShiftRow } from "./weeks"
-import { notifyRostered, shiftChangedPayload } from "./events"
+import { notifyOpenShifts, notifyRostered, shiftChangedPayload } from "./events"
 import { auditRoster, checkOverrideIds, cleanReason, isUuid, publishRoster, writeHistory, type RosterEnv } from "./write"
 
 export const unprocessable = (code: string, extra?: Record<string, unknown>) => new AppError(422, code, "Unprocessable Entity", extra)
@@ -112,7 +112,7 @@ export async function ruleGate(tx: TenantTx, ctx: RosterCtx, week: { id: string;
   return { violations: fresh, overrides: blocks.map((v) => ({ rule: v.rule, shiftId: v.shiftId, personId: v.personId })) }
 }
 
-type Spec = { id: string; date: string; userId: string | null; type: TypeRow; role: string; start: string; end: string; unpaidBreakMin: number; startAt: number; endAt: number }
+export type Spec = { id: string; date: string; userId: string | null; type: TypeRow; role: string; start: string; end: string; unpaidBreakMin: number; startAt: number; endAt: number }
 
 /** Validates the wall values and computes the instants in the location's zone (R8-2; the DST rule is wallToEpoch's). End at or before start is overnight; equal is refused; the break fits inside. */
 function instants(date: string, start: string, end: string, unpaidBreakMin: number, zone: string): { startAt: number; endAt: number } {
@@ -137,7 +137,7 @@ export async function guarded<T>(fn: () => Promise<T>): Promise<T> {
 }
 
 /** The exact same person, date, type and times already on the week (a double click or a retried request): 409 shift_exists. Open shifts may repeat (three guards needed = three rows). */
-async function assertNoDuplicate(tx: TenantTx, ctx: RosterCtx, weekId: string, specs: Spec[], exceptId?: string): Promise<void> {
+export async function assertNoDuplicate(tx: TenantTx, ctx: RosterCtx, weekId: string, specs: Spec[], exceptId?: string): Promise<void> {
   const assigned = specs.filter((s) => s.userId !== null)
   if (assigned.length === 0) return
   const rows = await tx
@@ -155,6 +155,10 @@ export const bumpWeek = (tx: TenantTx, ctx: RosterCtx, w: { id: string; version:
 /** An office edit of a PUBLISHED week tells the people it touches once each (R8-17); a draft edit tells nobody. */
 export const tellPeople = (tx: TenantTx, ctx: RosterCtx, env: RosterEnv, week: { status: string; weekStart: string }, userIds: (string | null)[]): Promise<string[]> =>
   week.status === "published" ? notifyRostered(tx, ctx, env, userIds, "changed", week.weekStart) : Promise.resolve([])
+/** An open shift on a PUBLISHED week is posted to the active people who are located at the site and qualified (FR-RS-43); a draft week posts nothing. */
+const postOpen = async (tx: TenantTx, ctx: RosterCtx, env: RosterEnv, week: { id: string; locationId: string; weekStart: string; status: string }, open: { date: string; requires: string[] }[]): Promise<void> => {
+  if (week.status === "published" && open.length > 0) await notifyOpenShifts(tx, ctx, env, week, open)
+}
 /** The reason travels with the audit line of a published-week edit (history has its own `reason` column). */
 export const reasonIf = (week: { status: string }, reason: string | null): { reason?: string } => (week.status === "published" && reason ? { reason } : {})
 /** `roster.shift_changed` for an office edit of a published week (ids only); a draft publishes no event. Call LAST. */
@@ -221,6 +225,7 @@ export async function addShifts(tx: TenantTx, ctx: RosterCtx, env: RosterEnv, we
     await writeHistory(tx, ctx, { locationId: week.locationId, weekId: week.id, shiftId: r.id, action: "shift_added", reason, after: { ...shiftSnap(r), ...(o.length ? { overrides: o } : {}) } })
   }
   const told = await tellPeople(tx, ctx, env, week, sorted.map((r) => r.userId))
+  await postOpen(tx, ctx, env, week, specs.filter((s) => s.userId === null).map((s) => ({ date: s.date, requires: s.type.requires })))
   for (const r of sorted) await auditRoster(tx, ctx, { action: "roster.shift_added", entity: "roster_shift", entityId: r.id, before: null, after: { ...shiftSnap(r), ...(reasonIf(week, reason)) } })
   await announce(tx, ctx, week, { action: "added", shiftIds: sorted.map((r) => r.id), userIds: told })
   return { shifts: sorted.map(shiftDto), violations: gate.violations }
@@ -317,6 +322,7 @@ export async function applyShiftPatch(
     after: { ...shiftSnap(row), ...(o.extra ?? {}), ...(gate.overrides.length ? { overrides: gate.overrides } : {}) },
   })
   const told = await tellPeople(tx, ctx, env, week, [cur.userId, row.userId])
+  if (row.userId === null && cur.userId !== null) await postOpen(tx, ctx, env, week, [{ date: row.date, requires: t.requires }]) // the shift was taken off a person: it is open now
   await auditRoster(tx, ctx, { action: "roster.shift_moved", entity: "roster_shift", entityId: cur.id, before: shiftSnap(cur), after: { ...shiftSnap(row), ...(o.extra ?? {}), ...reasonIf(week, o.reason) } })
   return { shift: shiftDto(row), violations: gate.violations, changed: true, done: () => announce(tx, ctx, week, { action: "moved", shiftIds: [cur.id], userIds: told }) }
 }

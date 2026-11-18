@@ -278,3 +278,36 @@ export const DecideChangeBody = z
 export const DecideChangeOut = z
   .object({ request: ChangeRequestOut, shift: ShiftOut.nullable(), violations: z.array(ViolationOut) })
   .openapi({ example: { request: { ...changeRequestEx, status: "approved", decidedBy: UID, decidedAt: "2026-11-16T10:00:00.000Z", decisionNote: "Agreed with the client" }, shift: { ...shiftEx, start: "09:00", end: "17:00", version: 3 }, violations: [] } })
+
+// ------------------------------------------------------------------ open shifts, claims and swaps (FR-RS-38, 42, 43; R8-11)
+
+const EX_ID = "6b2d9f41-7c3a-4e85-b0d2-5a8e1f3c9d64"
+export const ExchangeOut = z.object({
+  id: z.uuid(), kind: z.enum(["claim", "swap"]), shiftId: z.uuid(), weekId: z.uuid(), locationId: z.uuid(), date: z.string(), start: z.string(), end: z.string(),
+  fromUserId: z.string(), toUserId: z.string().nullable(), status: z.enum(["requested", "recommended", "approved", "rejected", "cancelled"]), note: z.string(),
+  decidedBy: z.string().nullable(), decidedAt: z.string().nullable(), createdAt: z.string(), expired: z.boolean(),
+})
+export type ExchangeDto = z.infer<typeof ExchangeOut>
+const exchangeEx = {
+  id: EX_ID, kind: "claim", shiftId: SHIFT_ID, weekId: WEEK_ID, locationId: LID, date: "2026-11-23", start: "08:00", end: "16:00", fromUserId: UID, toUserId: null, status: "requested", note: "",
+  decidedBy: null, decidedAt: null, createdAt: "2026-11-16T09:00:00.000Z", expired: false,
+}
+export const ExchangeSchema = ExchangeOut.openapi({ example: exchangeEx })
+export const SwapBody = z
+  .object({ toUserId: z.string().min(1).max(128), note: z.string().max(2000).optional() })
+  .openapi({ example: { toUserId: "usr_3Hn7vB5cQ9", note: "Dentist appointment" } })
+export const ExchangeListOut = z
+  .object({ items: z.array(ExchangeOut), nextCursor: z.string().nullable() })
+  .openapi({ example: { items: [exchangeEx], nextCursor: "MjAyNi0xMS0xNlQwOTowMDowMC4wMDBafDNmMmI4YzFkLTZhNDctNGUwYi05ZDE1LTJjN2U1YTliNGYxMA" } })
+export const ExchangeQuery = z.object({
+  status: z.string().max(20).optional().openapi({ description: "requested | recommended | approved | rejected | cancelled; anything else is 422 invalid_filter", example: "requested" }),
+  shiftId: z.string().max(64).optional().openapi({ description: "Only the exchanges of one shift (a shift the caller may not see simply has none for them; a non-uuid is 422 invalid_filter)", example: SHIFT_ID }),
+  limit: z.string().max(5).optional().openapi({ description: "Page size 1..100 (default 50); anything else is 422 invalid_filter", example: "50" }),
+  cursor: z.string().max(200).optional().openapi({ description: "The nextCursor of the previous page (newest first, keyset on creation time and id); garbage is 400 invalid_cursor", example: "MjAyNi0xMS0xNlQwOTowMDowMC4wMDBafDNmMmI4YzFkLTZhNDctNGUwYi05ZDE1LTJjN2U1YTliNGYxMA" }),
+})
+export const DecideExchangeOut = z
+  .object({ exchange: ExchangeOut, shift: ShiftOut.nullable(), violations: z.array(ViolationOut) })
+  .openapi({ example: { exchange: { ...exchangeEx, status: "approved", decidedBy: UID, decidedAt: "2026-11-16T10:00:00.000Z" }, shift: { ...shiftEx, version: 2 }, violations: [] } })
+export const DecideExchangeBody = z
+  .object({ decision: z.enum(["approve", "reject"]), note: z.string().max(2000).optional(), overrideReason: z.string().max(2000).optional(), overrideRuleIds: z.array(z.string().max(40)).max(20).optional() })
+  .openapi({ example: { decision: "approve", note: "Covered" } })

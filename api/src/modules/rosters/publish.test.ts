@@ -229,14 +229,15 @@ describe("office edit of a published week (R8-8, R8-17, FR-RS-37)", () => {
     expect(await w.rows("select 1 from domain_events where type = 'roster.week_published'")).toHaveLength(1) // an edit never republishes
   })
 
-  test("add, reassign and remove on a published week tell the right people once; an open shift tells nobody; a draft edit publishes no event", async () => {
+  test("add, reassign and remove on a published week tell the right people once; an open shift names nobody (it is posted to the located people, Task 12); a draft edit publishes no event", async () => {
     const w = await sites()
     const { mon } = await published(w)
     const mine = mon.find((s) => s.userId === w.p.employee.userId)!
     const open = mon.find((s) => s.userId === null)!
     // add: a new assigned shift and an open one
     const added = await w.addOk(w.p.owner, w.wa, [{ date: "2026-11-05", userIds: [w.staff3.userId, null], shiftTypeId: w.ta }], { reason: "Extra cover" })
-    expect((await notices(w)).map((x) => x.user_id)).toEqual([w.staff3.userId])
+    expect((await notices(w, "title = 'Shift changed'")).map((x) => x.user_id)).toEqual([w.staff3.userId]) // the open shift names nobody
+    expect((await notices(w, "title = 'Open shift available'")).map((x) => x.user_id).sort()).toEqual([w.p.employee.userId, w.staff2.userId, w.staff3.userId].sort()) // FR-RS-43: it is posted to the people rostered at the site that week
     expect((await w.rows("select 1 from roster_shifts where id = any($1) and confirmed_at is null", [added.shifts.map((s: Json) => s.id)]))).toHaveLength(2)
     await w.rows("delete from notifications")
     // reassign: both the old and the new person hear, once each

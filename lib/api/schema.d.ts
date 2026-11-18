@@ -10867,6 +10867,489 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/roster/shifts/{id}/claim": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The caller's own open claim of this shift, returned as it is (a double click) */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** Format: uuid */
+                            id: string;
+                            /** @enum {string} */
+                            kind: "claim" | "swap";
+                            /** Format: uuid */
+                            shiftId: string;
+                            /** Format: uuid */
+                            weekId: string;
+                            /** Format: uuid */
+                            locationId: string;
+                            date: string;
+                            start: string;
+                            end: string;
+                            fromUserId: string;
+                            toUserId: string | null;
+                            /** @enum {string} */
+                            status: "requested" | "recommended" | "approved" | "rejected" | "cancelled";
+                            note: string;
+                            decidedBy: string | null;
+                            decidedAt: string | null;
+                            createdAt: string;
+                            expired: boolean;
+                        };
+                    };
+                };
+                /** @description The caller asks for an OPEN shift of a published, upcoming week at a site they are located at (homed there or rostered there that week); approvers are told. The same open claim again is the same exchange with 200. 404 not_found for a week or shift of a site the caller may not see, a missing or another tenant's one and an id that is not a uuid (all the same answer) (also for a shift of a site the caller is not located at); 409 week_not_published | shift_not_open | shift_started | location_archived; 422 ineligible (left, a required qualification missing or expired) */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** Format: uuid */
+                            id: string;
+                            /** @enum {string} */
+                            kind: "claim" | "swap";
+                            /** Format: uuid */
+                            shiftId: string;
+                            /** Format: uuid */
+                            weekId: string;
+                            /** Format: uuid */
+                            locationId: string;
+                            date: string;
+                            start: string;
+                            end: string;
+                            fromUserId: string;
+                            toUserId: string | null;
+                            /** @enum {string} */
+                            status: "requested" | "recommended" | "approved" | "rejected" | "cancelled";
+                            note: string;
+                            decidedBy: string | null;
+                            decidedAt: string | null;
+                            createdAt: string;
+                            expired: boolean;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/roster/shifts/{id}/swap": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        toUserId: string;
+                        note?: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description The same open swap to the same colleague, returned as it is (a double click) */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** Format: uuid */
+                            id: string;
+                            /** @enum {string} */
+                            kind: "claim" | "swap";
+                            /** Format: uuid */
+                            shiftId: string;
+                            /** Format: uuid */
+                            weekId: string;
+                            /** Format: uuid */
+                            locationId: string;
+                            date: string;
+                            start: string;
+                            end: string;
+                            fromUserId: string;
+                            toUserId: string | null;
+                            /** @enum {string} */
+                            status: "requested" | "recommended" | "approved" | "rejected" | "cancelled";
+                            note: string;
+                            decidedBy: string | null;
+                            decidedAt: string | null;
+                            createdAt: string;
+                            expired: boolean;
+                        };
+                    };
+                };
+                /** @description The person on the shift hands it over to a named colleague (homed at the shift's site, rostered there that week, or within the caller's scope); the colleague and the approvers are told. Someone else who can see the shift: 403 forbidden. 404 not_found for a week or shift of a site the caller may not see, a missing or another tenant's one and an id that is not a uuid (all the same answer); 404 member_not_found (the colleague does not exist, is another tenant's or of a site the caller does not know: one answer); 409 exchange_open (another open swap of the shift) | shift_started | location_archived; 422 invalid_swap (yourself) | invalid_note | ineligible (generic for a person the caller may not know) */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** Format: uuid */
+                            id: string;
+                            /** @enum {string} */
+                            kind: "claim" | "swap";
+                            /** Format: uuid */
+                            shiftId: string;
+                            /** Format: uuid */
+                            weekId: string;
+                            /** Format: uuid */
+                            locationId: string;
+                            date: string;
+                            start: string;
+                            end: string;
+                            fromUserId: string;
+                            toUserId: string | null;
+                            /** @enum {string} */
+                            status: "requested" | "recommended" | "approved" | "rejected" | "cancelled";
+                            note: string;
+                            decidedBy: string | null;
+                            decidedAt: string | null;
+                            createdAt: string;
+                            expired: boolean;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/roster/exchanges": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    /** @description requested | recommended | approved | rejected | cancelled; anything else is 422 invalid_filter */
+                    status?: string;
+                    /** @description Only the exchanges of one shift (a shift the caller may not see simply has none for them; a non-uuid is 422 invalid_filter) */
+                    shiftId?: string;
+                    /** @description Page size 1..100 (default 50); anything else is 422 invalid_filter */
+                    limit?: string;
+                    /** @description The nextCursor of the previous page (newest first, keyset on creation time and id); garbage is 400 invalid_cursor */
+                    cursor?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The exchanges the caller is a party to plus those of the sites they see (a supervisor: their own; office: in scope), newest first. `expired` is true for an open one whose shift has started. 400 invalid_cursor; 422 invalid_filter */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            items: {
+                                /** Format: uuid */
+                                id: string;
+                                /** @enum {string} */
+                                kind: "claim" | "swap";
+                                /** Format: uuid */
+                                shiftId: string;
+                                /** Format: uuid */
+                                weekId: string;
+                                /** Format: uuid */
+                                locationId: string;
+                                date: string;
+                                start: string;
+                                end: string;
+                                fromUserId: string;
+                                toUserId: string | null;
+                                /** @enum {string} */
+                                status: "requested" | "recommended" | "approved" | "rejected" | "cancelled";
+                                note: string;
+                                decidedBy: string | null;
+                                decidedAt: string | null;
+                                createdAt: string;
+                                expired: boolean;
+                            }[];
+                            nextCursor: string | null;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/roster/exchanges/{id}/recommend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description A supervisor (or office) passes an open exchange of a PUBLISHED week to the office: requested becomes recommended (a repeat is a 200 and writes nothing). 404 exchange_not_found for an exchange of a site the caller may not see, a missing or another tenant's one and an id that is not a uuid (all the same answer); 403 forbidden (a role that edits nothing) | self_decision (a party to it); 409 already_decided | week_not_published (a draft week is decided directly) | exchange_expired */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** Format: uuid */
+                            id: string;
+                            /** @enum {string} */
+                            kind: "claim" | "swap";
+                            /** Format: uuid */
+                            shiftId: string;
+                            /** Format: uuid */
+                            weekId: string;
+                            /** Format: uuid */
+                            locationId: string;
+                            date: string;
+                            start: string;
+                            end: string;
+                            fromUserId: string;
+                            toUserId: string | null;
+                            /** @enum {string} */
+                            status: "requested" | "recommended" | "approved" | "rejected" | "cancelled";
+                            note: string;
+                            decidedBy: string | null;
+                            decidedAt: string | null;
+                            createdAt: string;
+                            expired: boolean;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/roster/exchanges/{id}/decide": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** @enum {string} */
+                        decision: "approve" | "reject";
+                        note?: string;
+                        overrideReason?: string;
+                        overrideRuleIds?: string[];
+                    };
+                };
+            };
+            responses: {
+                /** @description Approve (the shift changes hands, rules and eligibility run again, the new person confirms) or reject. Who: a supervisor or office on a draft week; on a published week office only, unless the location delegates swap approval (then its supervisor too); staff never. 404 exchange_not_found for an exchange of a site the caller may not see, a missing or another tenant's one and an id that is not a uuid (all the same answer); 403 forbidden (a role that edits nothing) | roster_locked (a supervisor on a published week without delegation) | self_decision (a party to it or the person on the shift); 409 already_decided | exchange_expired | shift_taken (a claim whose shift was assigned meanwhile) | shift_changed (a swap whose shift changed hands) | location_archived | version_conflict | shift_exists; 422 rule_blocked (a block: office needs overrideReason and, on a published week, overrideRuleIds) | ineligible | invalid_override | invalid_reason | invalid_decision */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            exchange: {
+                                /** Format: uuid */
+                                id: string;
+                                /** @enum {string} */
+                                kind: "claim" | "swap";
+                                /** Format: uuid */
+                                shiftId: string;
+                                /** Format: uuid */
+                                weekId: string;
+                                /** Format: uuid */
+                                locationId: string;
+                                date: string;
+                                start: string;
+                                end: string;
+                                fromUserId: string;
+                                toUserId: string | null;
+                                /** @enum {string} */
+                                status: "requested" | "recommended" | "approved" | "rejected" | "cancelled";
+                                note: string;
+                                decidedBy: string | null;
+                                decidedAt: string | null;
+                                createdAt: string;
+                                expired: boolean;
+                            };
+                            shift: {
+                                /** Format: uuid */
+                                id: string;
+                                /** Format: uuid */
+                                weekId: string;
+                                /** Format: uuid */
+                                locationId: string;
+                                date: string;
+                                userId: string | null;
+                                /** Format: uuid */
+                                shiftTypeId: string;
+                                role: string;
+                                start: string;
+                                end: string;
+                                unpaidBreakMin: number;
+                                startAt: string;
+                                endAt: string;
+                                confirmedAt: string | null;
+                                version: number;
+                            } | null;
+                            violations: {
+                                /** @enum {string} */
+                                rule: "double_booking" | "approved_leave" | "unavailable" | "daily_rest" | "weekly_rest" | "avg_48h" | "expired_licence" | "left" | "elsewhere";
+                                shiftId: string;
+                                personId: string;
+                                /** @enum {string} */
+                                severity: "block" | "warn";
+                                message: string;
+                                otherShiftIds: string[];
+                            }[];
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/roster/exchanges/{id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The requester withdraws their own open exchange (also after the shift started). Someone who can see it but did not ask: 403 forbidden. 404 exchange_not_found for an exchange of a site the caller may not see, a missing or another tenant's one and an id that is not a uuid (all the same answer); 409 already_decided */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** Format: uuid */
+                            id: string;
+                            /** @enum {string} */
+                            kind: "claim" | "swap";
+                            /** Format: uuid */
+                            shiftId: string;
+                            /** Format: uuid */
+                            weekId: string;
+                            /** Format: uuid */
+                            locationId: string;
+                            date: string;
+                            start: string;
+                            end: string;
+                            fromUserId: string;
+                            toUserId: string | null;
+                            /** @enum {string} */
+                            status: "requested" | "recommended" | "approved" | "rejected" | "cancelled";
+                            note: string;
+                            decidedBy: string | null;
+                            decidedAt: string | null;
+                            createdAt: string;
+                            expired: boolean;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/members/{userId}/deactivate": {
         parameters: {
             query?: never;
