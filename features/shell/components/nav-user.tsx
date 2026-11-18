@@ -20,6 +20,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { signOutAction, switchTenant } from "@/app/actions/session"
+import { clearCompanyScopedStores } from "@/lib/client-stores"
 import { userMenu } from "../menu"
 import type { ShellSession, UserData } from "../types"
 
@@ -128,7 +129,7 @@ export function NavUser({ user, session, variant = "app" }: { user: UserData; se
             </DropdownMenuSubTrigger>
             <DropdownMenuSubContent className="od-menu min-w-56">
               {menu.companies.map((c) => (
-                <DropdownMenuItem key={c.slug} onClick={() => startTransition(async () => { if (!c.current && !(await switchTenant(c.slug)).ok) toast.error("Could not switch company.") })}>
+                <DropdownMenuItem key={c.slug} onClick={() => startTransition(async () => { if (c.current) return; if ((await switchTenant(c.slug)).ok) clearCompanyScopedStores(); else toast.error("Could not switch company.") })}>
                   {c.name}
                   {c.current && <Check className="od-check" />}
                 </DropdownMenuItem>
@@ -141,7 +142,7 @@ export function NavUser({ user, session, variant = "app" }: { user: UserData; se
           <CircleHelp />
           Help
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => startTransition(() => signOutAction())}>
+        <DropdownMenuItem onClick={() => startTransition(() => { clearCompanyScopedStores(); return signOutAction() })}>
           <LogOut />
           Log out
         </DropdownMenuItem>

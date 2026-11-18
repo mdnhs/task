@@ -729,7 +729,7 @@ body{padding:0;background:#fff}
 /* Stat value: 46px line, 36px at ≤640 (.stat .value font-size) */
 @media (max-width:640px){.sk-line:has(> .sk-val){height:36px !important}.sk-val{height:30px !important}}
 /* FilterSearch starts closed: a 48px round icon (.od-filter-search without [data-open]) */
-.sk-fsearch{flex:none;width:var(--ctl-h)}
+.sk-fsearch{flex:none;width:var(--ctl-h) !important} /* the Sk helper sets an inline width:100%; without !important the search box fills the row and wraps (found in the T6.9 skeleton measurements) */
 /* PageHeadSkeleton: h1 line 40px (31px at ≤640, 28px font), buttons drop 2px and share the row at ≤640 like .head-actions .btn,
    and a description that wraps on phones gets its second line only there (.sk-wrap; .sk-wrap-md = wraps at ≤900) */
 .sk-h1{height:40px}
