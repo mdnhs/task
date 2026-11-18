@@ -65,11 +65,11 @@ describe("create, wall clock and refs", () => {
     expect(new Date(row.due_at as string).toISOString()).toBe("2026-10-25T00:30:00.000Z")
   })
 
-  test("due 2027-03-28T01:30:00 (spring-forward gap) is stored as 01:30Z and shown as 02:30 local", async () => {
+  test("due 2027-03-28T01:30:00 (spring-forward gap) is stored as 01:00Z and shown as 02:00 local (ruling S9: the first valid minute)", async () => {
     const w = await world()
     const r = await w.mk(w.ops, { start: "2027-03-27T09:00:00", due: "2027-03-28T01:30:00" })
-    expect(r.dueAt).toBe("2027-03-28T01:30:00.000Z")
-    expect(r.due).toBe("2027-03-28T02:30:00")
+    expect(r.dueAt).toBe("2027-03-28T01:00:00.000Z")
+    expect(r.due).toBe("2027-03-28T02:00:00")
   })
 
   test("invalid dates are 422 invalid_dates (start after due, a date that does not exist)", async () => {
@@ -1222,6 +1222,37 @@ describe("projects, milestones, dependencies, knock-on and date proposals (T4.3)
   const resched = (w: W, id: string, body: Json, as: Who = w.ops) => w.req("POST", `/v1/tasks/${id}/reschedule`, as, body)
   const tt = async (w: W, id: string) => (await w.q("select start_at, due_at, version from tasks where id = $1", [id]))[0]
 
+  test("B7 T11 (S9): a knock-on across the 29 Mar 2026 spring-forward keeps each task's 09:00 wall time; a date inside the gap resolves forward", async () => {
+    const w = await world({ timezone: "Europe/Dublin" })
+    const a = await w.mk(w.ops, { title: "A", start: "2026-03-27T09:00:00", due: "2026-03-27T17:00:00" })
+    const b = await w.mk(w.ops, { title: "B", start: "2026-03-28T09:00:00", due: "2026-03-28T17:00:00" })
+    expect((await putDeps(w, b.id, [a.id])).status).toBe(200)
+    const p = await preview(w, a.id, "2026-03-27T09:00:00", "2026-03-28T17:00:00")
+    expect(p.moves[0].to).toEqual({ start: "2026-03-29T09:00:00", due: "2026-03-29T17:00:00" })
+    const r = await resched(w, a.id, { version: 1, start: "2026-03-27T09:00:00", due: "2026-03-28T17:00:00", knockOn: { apply: true, previewHash: p.previewHash } })
+    expect(r.status, await r.clone().text()).toBe(200)
+    expect((await getT(w, b.id)).start).toBe("2026-03-29T09:00:00")
+    expect((await getT(w, b.id)).due).toBe("2026-03-29T17:00:00")
+    expect((await tt(w, b.id)).start_at.toISOString()).toBe("2026-03-29T08:00:00.000Z") // 09:00 BST, one hour less than the 28th's UTC offset
+    // a date typed inside the gap (01:30 does not exist) is stored as 02:00 local
+    const c = await w.json(await resched(w, a.id, { version: 2, start: "2026-03-29T01:30:00", due: "2026-03-29T17:00:00", knockOn: { apply: false } }))
+    expect(c.start).toBe("2026-03-29T02:00:00")
+    expect((await tt(w, a.id)).start_at.toISOString()).toBe("2026-03-29T01:00:00.000Z")
+  })
+
+  test("B7 T11 (S9): due before start after the gap adjustment is a 422 invalid_dates, never a 500", async () => {
+    const w = await world({ timezone: "Europe/Dublin" })
+    const a = await w.mk(w.ops, { title: "A", start: "2026-03-27T09:00:00", due: "2026-03-27T17:00:00" })
+    const bad = await w.req("POST", `/v1/tasks/${a.id}/reschedule/preview`, w.ops, { start: "2026-03-29T02:10:00", due: "2026-03-29T01:50:00" }) // 02:10 vs 01:50 -> 02:00
+    expect(bad.status).toBe(422)
+    expect(await code(bad)).toBe("invalid_dates")
+    const bad2 = await resched(w, a.id, { version: 1, start: "2026-03-29T02:10:00", due: "2026-03-29T01:50:00", knockOn: { apply: false } })
+    expect(bad2.status).toBe(422)
+    expect(await code(bad2)).toBe("invalid_dates")
+    const same = await resched(w, a.id, { version: 1, start: "2026-03-29T01:10:00", due: "2026-03-29T01:50:00", knockOn: { apply: false } }) // both in the gap: both 02:00, equal is allowed
+    expect(same.status, await same.clone().text()).toBe(200)
+  })
+
   test("concurrent opposite dependency edits cannot form a cycle", async () => {
     for (let round = 0; round < 3; round++) {
       if (round) await resetDb()
@@ -2059,7 +2090,7 @@ describe("projects, milestones, dependencies, knock-on and date proposals (T4.3)
     expect((await resched(w, a.id, { version: 1, start: "2026-11-20T09:00:00", due: "2026-12-25T17:00:00", knockOn: { apply: false } })).status).toBe(200)
   }, 60_000)
 
-  test("DST: a reschedule and a knock-on into the 28 Mar 2027 spring-forward gap (Europe/Dublin) land at 01:30Z and show 02:30", async () => {
+  test("DST: a reschedule and a knock-on into the 28 Mar 2027 spring-forward gap (Europe/Dublin) land at 01:00Z and show 02:00 (ruling S9)", async () => {
     const w = await world({ timezone: "Europe/Dublin" })
     const a = await w.mk(w.ops, { title: "A", start: "2027-03-26T09:00:00", due: "2027-03-26T17:00:00" })
     const b = await w.mk(w.ops, { title: "B", start: "2027-03-27T01:30:00", due: "2027-03-27T17:00:00" })
@@ -2069,13 +2100,13 @@ describe("projects, milestones, dependencies, knock-on and date proposals (T4.3)
     expect(p.moves[0].to).toEqual({ start: "2027-03-28T01:30:00", due: "2027-03-28T17:00:00" })
     const r = await resched(w, a.id, { version: 1, start: "2027-03-26T09:00:00", due: "2027-03-28T01:30:00", knockOn: { apply: false } })
     const moved = await w.json(r)
-    expect(moved.dueAt).toBe("2027-03-28T01:30:00.000Z") // 01:30 does not exist: it moves forward
-    expect(moved.due).toBe("2027-03-28T02:30:00")
+    expect(moved.dueAt).toBe("2027-03-28T01:00:00.000Z") // 01:30 does not exist: it moves forward to the first valid minute, 02:00
+    expect(moved.due).toBe("2027-03-28T02:00:00")
     const r2 = await resched(w, a.id, { version: 2, start: "2027-03-26T09:00:00", due: "2027-03-27T09:00:00", knockOn: { apply: true, previewHash: p.previewHash } })
     expect(r2.status, await r2.clone().text()).toBe(200)
     const after = await tt(w, b.id)
-    expect(after.start_at.toISOString()).toBe("2027-03-28T01:30:00.000Z")
-    expect((await getT(w, b.id)).start).toBe("2027-03-28T02:30:00")
+    expect(after.start_at.toISOString()).toBe("2027-03-28T01:00:00.000Z")
+    expect((await getT(w, b.id)).start).toBe("2027-03-28T02:00:00")
     expect(after.due_at.toISOString()).toBe("2027-03-28T16:00:00.000Z") // 17:00 BST
   })
 
