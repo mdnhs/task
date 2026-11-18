@@ -14,7 +14,7 @@ export default async function Page() {
   const g = await gate("tenants.read", "the platform overview")
   if ("denied" in g) return g.denied
   const canRevenue = requireStaff(g.op, "billing.read")
-  const r = await settle(apiServer().then((api) => Promise.all([loadTenantList(api, { pageSize: 1 }), canRevenue ? loadMetrics(api) : null])))
+  const r = await settle(apiServer({ tenant: null }).then((api) => Promise.all([loadTenantList(api, { pageSize: 1 }), canRevenue ? loadMetrics(api) : null])))
   if (!r.ok) return refused(r.e, "the platform overview")
   const [list, metrics] = r.v
   return (

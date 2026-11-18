@@ -21,7 +21,7 @@ without the console's nav or search.
   The client refuses a bad reason (1 to 500), trial days (1 to 30), grant hours (1 to 24) before any request.
 - **Tenants**: the list is the API's page (`?page=`, `?q=`, 100 per page, newest first); saved views other than suspended and every sort work on the loaded page and the list says so.
   Metadata only; the 360 is aggregates (counts, one date), never a member name or email.
-- **Modules**: the tab drafts changes, then one `PUT .../modules` sends the FULL overrides array with the reason (the API replaces the list). Core modules can't be revoked.
+- **Modules**: the module catalogue and plan table come from the static `billing/entitlements.json`, which can drift from the API's plans table (the API stays the authority and refuses unknown modules). The tab drafts changes, then one `PUT .../modules` sends the FULL overrides array with the reason (the API replaces the list). Core modules can't be revoked.
 - **Support access**: `POST .../support-grants` (reason, hours) for the caller and `DELETE /v1/platform/support-grants/{id}`. There is no staff list route, so the page shows the grants made in this visit;
   the tenant owner sees every grant under `/settings/support-access`.
 - **Settings** (owner only): email (Resend), storage (R2) and billing (Stripe). The forms start empty; an empty secret keeps the stored one; only the last 4 come back. The Test / Live pill comes from the

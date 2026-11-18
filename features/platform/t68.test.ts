@@ -240,10 +240,14 @@ describe("the live views", () => {
 })
 
 describe("unbacked pages are isolated behind ENABLE_MOCK_MODULES (I16)", () => {
-  test("off: the unavailable state; on: the mock page", () => {
-    expect(unavailablePlatformPage({})).toBe(true)
-    expect(unavailablePlatformPage({ ENABLE_MOCK_MODULES: "0" })).toBe(true)
-    expect(unavailablePlatformPage({ ENABLE_MOCK_MODULES: "1" })).toBe(false)
+  test("off: the unavailable state; on: the mock page (one reader of the flag)", () => {
+    vi.stubEnv("ENABLE_MOCK_MODULES", "")
+    expect(unavailablePlatformPage()).toBe(true)
+    vi.stubEnv("ENABLE_MOCK_MODULES", "0")
+    expect(unavailablePlatformPage()).toBe(true)
+    vi.stubEnv("ENABLE_MOCK_MODULES", "1")
+    expect(unavailablePlatformPage()).toBe(false)
+    vi.unstubAllEnvs()
   })
 })
 

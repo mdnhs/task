@@ -11,7 +11,7 @@ export default async function Layout({ children, params }: { children: React.Rea
   const g = await gate("tenants.read", "platform tenants")
   if ("denied" in g) return g.denied
   const { id } = await params
-  const r = await settle(apiServer().then((api) => loadTenant360(api, id)))
+  const r = await settle(apiServer({ tenant: null }).then((api) => loadTenant360(api, id)))
   if (!r.ok) return refused(r.e, "platform tenants")
   if (!r.v) return <TenantNotFound />
   return (

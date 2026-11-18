@@ -15,7 +15,7 @@ export async function platformSearchIndex(): Promise<{ items: PlatformSearchItem
   if (!session.signedIn || !session.platformRole || session.mfa !== "ok") return empty
   const op = await getOperator()
   if (!op) return empty
-  const [nav, list] = await Promise.all([getPlatformNav(), loadTenantList(await apiServer())])
+  const [nav, list] = await Promise.all([getPlatformNav(), loadTenantList(await apiServer({ tenant: null }))])
   const items = buildPlatformIndex({ pages: nav.menu, tenants: list.rows }, op)
   return { items, config: { popular: [], actions: platformQuickActions(op) } }
 }

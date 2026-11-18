@@ -29,7 +29,7 @@ export default async function Page({ params }: { params: Promise<{ id: string; t
     const v = await loadMock360(id, g.op)
     return v ? <MockTabBody tab={tab as "billing" | "usage" | "settings"} v={v} /> : <MockNotInSeed />
   }
-  const r = await settle(apiServer().then(async (api) => {
+  const r = await settle(apiServer({ tenant: null }).then(async (api) => {
     const t = await loadTenant360(api, id)
     return t ? { t, node: await liveBody(tab, t, g.op, api) } : null
   }))

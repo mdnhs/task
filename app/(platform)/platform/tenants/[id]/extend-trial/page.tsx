@@ -12,7 +12,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
   const g = await gate("tenants.suspend", "trial extensions")
   if ("denied" in g) return g.denied
   const { id } = await params
-  const r = await settle(apiServer().then((api) => loadTenant360(api, id)))
+  const r = await settle(apiServer({ tenant: null }).then((api) => loadTenant360(api, id)))
   if (!r.ok) return refused(r.e, "trial extensions")
   return r.v ? <LiveExtendTrial t={r.v} /> : <TenantNotFound />
 }

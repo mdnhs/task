@@ -10,6 +10,6 @@ export const metadata = { title: "Audit log · Platform · OpsDesk" }
 export default async function Page() {
   const g = await gate("audit.read", "the platform audit log")
   if ("denied" in g) return g.denied
-  const r = await settle(apiServer().then((api) => loadAudit(api, { limit: 200 })))
+  const r = await settle(apiServer({ tenant: null }).then((api) => loadAudit(api, { limit: 200 })))
   return r.ok ? <LiveAudit lines={r.v} /> : refused(r.e, "the platform audit log")
 }

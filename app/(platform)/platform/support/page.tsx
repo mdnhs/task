@@ -11,6 +11,6 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
   const g = await gate("support.request", "platform support access")
   if ("denied" in g) return g.denied
   const { request } = await searchParams
-  const r = await settle(apiServer().then((api) => loadTenantList(api)))
+  const r = await settle(apiServer({ tenant: null }).then((api) => loadTenantList(api)))
   return r.ok ? <LiveSupport tenants={r.v.rows} requestFor={typeof request === "string" ? request : undefined} /> : refused(r.e, "platform support access")
 }

@@ -10,6 +10,6 @@ export const metadata = { title: "Data requests · Platform · OpsDesk" }
 export default async function Page() {
   const g = await gate("data.requests", "platform data requests")
   if ("denied" in g) return g.denied
-  const r = await settle(apiServer().then((api) => loadDataRequests(api)))
+  const r = await settle(apiServer({ tenant: null }).then((api) => loadDataRequests(api)))
   return r.ok ? <LiveDataRequests data={r.v} /> : refused(r.e, "platform data requests")
 }

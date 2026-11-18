@@ -10,6 +10,6 @@ export const metadata = { title: "Team · Platform · OpsDesk" }
 export default async function Page() {
   const g = await gate("team.manage", "platform team management")
   if ("denied" in g) return g.denied
-  const r = await settle(apiServer().then((api) => loadStaff(api)))
+  const r = await settle(apiServer({ tenant: null }).then((api) => loadStaff(api)))
   return r.ok ? <LiveTeam staff={r.v} meId={g.op.id} /> : refused(r.e, "platform team management")
 }

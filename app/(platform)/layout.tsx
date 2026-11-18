@@ -17,7 +17,7 @@ export default async function PlatformLayout({ children }: { children: React.Rea
   const session = await getPlatformSession()
   const op = await getOperator()
   const mfaOk = session.mfa === "ok"
-  const [navigation, env] = await Promise.all([getPlatformNav(), op && mfaOk ? loadEnv(await apiServer()) : null])
+  const [navigation, env] = await Promise.all([getPlatformNav(), op && mfaOk ? loadEnv(await apiServer({ tenant: null })) : null])
   const nav = op ? { ...navigation, menu: filterForStaff(navigation.menu, op) } : { ...navigation, menu: [], general: [] }
   // Only staff see their staff identity; anyone else keeps their own on the restricted page.
   const user = op ? { name: op.name, role: `${STAFF_ROLE_LABEL[op.role]} · Platform staff`, email: op.email, initials: initialsOf(op.name) } : await getUser()

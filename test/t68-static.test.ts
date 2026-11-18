@@ -91,3 +91,17 @@ describe("T6.8 pages read through apiServer, not the seed", () => {
     expect(read("features/platform/components/live-audit.tsx")).toContain("/v1/platform/audit/export")
   })
 })
+
+describe("T6.8 review: no tenant header and one flag reader", () => {
+  test("every apiServer() in the console is called with tenant:null", () => {
+    for (const f of [...walk("app/(platform)").filter((x) => /\.tsx?$/.test(x)), "app/actions/platform-search.ts"]) {
+      const calls = strip(read(f)).match(/apiServer\([^)]*\)/g) ?? []
+      for (const c of calls) expect(c, f).toBe("apiServer({ tenant: null })")
+    }
+  })
+  test("mock-gate reads the flag through mockEnabled(), not process.env", () => {
+    const s = strip(read("features/platform/mock-gate.ts"))
+    expect(s).toContain("mockEnabled")
+    expect(s).not.toContain("process.env")
+  })
+})
