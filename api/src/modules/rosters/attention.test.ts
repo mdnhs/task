@@ -36,6 +36,23 @@ async function openShifts(w: W) {
   return { a, b, sa: sa.shifts[0] as Json, sb: sb.shifts[0] as Json }
 }
 
+describe("default role template: location-supervisor and the attention feed (Task 17 carry-in)", () => {
+  test("VERIFIED: the supervisor's TASK attention items are tenant-wide (the task scope of a manager-home role without a team scope is `all`), not limited to their sites or teams, so the template keeps attention: none; roster items for the same role ARE site-scoped (above), and a role the owner grants attention to sees every task item", async () => {
+    const w = await sites()
+    const role = (await w.rows("select access->>'attention' as a, access->>'tasks' as t, access->>'reports' as r from roles where tenant_id = $1 and key = 'location-supervisor'", [w.tenant.id]))[0]
+    expect(role).toEqual({ a: "none", t: "read", r: "none" }) // the shipped template (public/data/shell/roles.json)
+    await w.ok("GET", "/v1/attention", w.p["location-supervisor"], undefined, 403)
+    // a task that has nothing to do with the supervisor's sites or people, overdue
+    const t = await w.ok("POST", "/v1/tasks", w.p.owner, { title: "Overdue elsewhere", description: "x", priority: 2, start: "2026-11-20T09:00:00", due: "2026-11-20T17:00:00", primary: w.staff3.userId }, 201)
+    await w.rows("update tasks set start_at = '2026-11-09T09:00:00Z', due_at = '2026-11-10T09:00:00Z' where id = $1", [t.id])
+    await supervisorsSeeFeed(w) // the grant a tenant owner could make
+    const sup = await feed(w, w.p["location-supervisor"])
+    const task = (sup.items as Json[]).filter((i) => i.taskId === t.id)
+    expect(task, "if this fails the task attention became site-scoped: grant attention: read in roles.json and flip this test").toHaveLength(1)
+    expect((await w.rows("select 1 from tasks where id = $1", [t.id])).length).toBe(1)
+  })
+})
+
 describe("who sees which roster item (Review Focus 1)", () => {
   test("a supervisor's feed names no other location; an office role with an except list gets none of the excepted site; the owner sees both", async () => {
     const w = await sites()

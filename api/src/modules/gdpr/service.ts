@@ -9,6 +9,7 @@ import type { Deps } from "../../deps"
 import { recordAudit } from "../audit"
 import { expireFile, storeGeneratedFile } from "../files/service"
 import { notify, withTenantAfterCommit, type Enqueue } from "../notifications"
+import { recordPlatformAudit } from "../platform-audit"
 import { lockActor, lockRbac } from "../rbac"
 import { ERASED } from "./core-handlers"
 import { dsrHandlers } from "./registry"
@@ -231,6 +232,27 @@ export async function rejectRequest(deps: Deps, tenantId: string, actor: Actor, 
     const [row] = await tx.update(dataRequests).set({ status: "rejected", completedAt: now, notes }).where(and(eq(dataRequests.id, id), eq(dataRequests.tenantId, tenantId))).returning()
     await recordAudit(tx, tenantId, { action: "dsr.rejected", entity: "data_request", entityId: id, actorId: actor.userId, before: { status: cur.status }, after: { status: "rejected", kind: cur.kind, subjectUserId: cur.subjectUserId } }, now)
     if (cur.requestedBy !== actor.userId) await tellRequester(tx, deps, enqueue, cur, "Data request rejected", "A data request was rejected.")
+    return dto(row, now)
+  })
+}
+
+/**
+ * Platform staff close a request that a worker is processing (status `running`; B8 Task 17): the tenant side goes through THIS service (the tenant's own RLS context, never a bypass), so
+ * the tenant sees the same status, note and notification as for its own decision. `outcome` is `completed` (it was dealt with outside the job) or `rejected`. Any other status is 409
+ * `request_not_processing`, so a second call changes nothing; a job still running sees a finished request and stops (every job step re-checks `running`). Order: DSR lock, row FOR UPDATE,
+ * the change, the tenant audit row (actor `platform:<staffId>`), the notification and event, and the PLATFORM audit row last (its lock is taken last). The note is stored on the request only.
+ */
+export async function resolveByPlatform(deps: Deps, tenantId: string, staff: Actor, id: string, outcome: "completed" | "rejected", note: string): Promise<DataRequestDto> {
+  return withTenantAfterCommit(deps, tenantId, async (tx, enqueue) => {
+    await lockDsr(tx, tenantId)
+    const cur = await requestIn(tx, tenantId, id, true)
+    if (cur.status !== "running") throw Conflict("request_not_processing")
+    const now = deps.clock.now()
+    const [row] = await tx.update(dataRequests).set({ status: outcome, completedAt: now, notes: note }).where(and(eq(dataRequests.id, id), eq(dataRequests.tenantId, tenantId))).returning()
+    await recordAudit(tx, tenantId, { action: outcome === "completed" ? "dsr.completed" : "dsr.rejected", entity: "data_request", entityId: id, actorId: `platform:${staff.userId}`, before: { status: "running" }, after: { status: outcome, kind: cur.kind, subjectUserId: cur.subjectUserId } }, now)
+    await tellRequester(tx, deps, enqueue, cur, outcome === "completed" ? "Data request completed" : "Data request rejected", outcome === "completed" ? "A data request was completed by the platform team." : "A data request was rejected by the platform team.")
+    if (outcome === "completed") await publish(tx, { tenantId, type: "dsr.completed", payload: { requestId: id, kind: cur.kind, subjectUserId: cur.subjectUserId }, actorId: null }, now)
+    await recordPlatformAudit(tx, { action: `platform.data_request.${outcome}`, entity: "data_request", entityId: id, actorId: staff.userId, targetTenantId: tenantId, before: { status: "running" }, after: { status: outcome, kind: cur.kind, noteLength: note.length } }, now)
     return dto(row, now)
   })
 }

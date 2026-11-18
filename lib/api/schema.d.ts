@@ -16037,6 +16037,37 @@ export interface paths {
                                 planId: string | null;
                                 subscriptionStatus: string | null;
                                 seats: number | null;
+                                /**
+                                 * @description Monthly recurring revenue in minor units of `currency`: the FLAT plan price of an ACTIVE subscription (seats never multiply it, rulings C10/C11); 0 for trialing, past_due, unpaid, canceled or no subscription
+                                 * @example 14900
+                                 */
+                                mrrCents: number;
+                                /**
+                                 * @description ISO currency of the plan; null without a subscription
+                                 * @example EUR
+                                 */
+                                currency: string | null;
+                                /**
+                                 * @description RED: payment state past_due or unpaid. AMBER: a trial ends within 7 days, or no activity for more than 30 days (a tenant that never had any counts from its creation). GREEN: everything else. No error-rate rule exists yet (the platform holds no per-tenant error metric).
+                                 * @enum {string}
+                                 */
+                                health: "green" | "amber" | "red";
+                                /**
+                                 * @description Counts and sums only, read tenant by tenant under that tenant's own context
+                                 * @example {
+                                 *       "seats": 12,
+                                 *       "activeUsers30d": 9,
+                                 *       "storageBytes": 48211234
+                                 *     }
+                                 */
+                                usage: {
+                                    /** @description Active members */
+                                    seats: number;
+                                    /** @description Active members seen in the last 30 days */
+                                    activeUsers30d: number;
+                                    /** @description Bytes of uploaded files whose object is still stored */
+                                    storageBytes: number;
+                                };
                             }[];
                             page: number;
                             pageSize: number;
@@ -16110,6 +16141,37 @@ export interface paths {
                             /** @description Date (YYYY-MM-DD, UTC) of the newest tenant audit event; no detail */
                             lastActivityDate: string | null;
                             openDataRequests: number;
+                            /**
+                             * @description Monthly recurring revenue in minor units of `currency`: the FLAT plan price of an ACTIVE subscription (seats never multiply it, rulings C10/C11); 0 for trialing, past_due, unpaid, canceled or no subscription
+                             * @example 14900
+                             */
+                            mrrCents: number;
+                            /**
+                             * @description ISO currency of the plan; null without a subscription
+                             * @example EUR
+                             */
+                            currency: string | null;
+                            /**
+                             * @description RED: payment state past_due or unpaid. AMBER: a trial ends within 7 days, or no activity for more than 30 days (a tenant that never had any counts from its creation). GREEN: everything else. No error-rate rule exists yet (the platform holds no per-tenant error metric).
+                             * @enum {string}
+                             */
+                            health: "green" | "amber" | "red";
+                            /**
+                             * @description Counts and sums only, read tenant by tenant under that tenant's own context
+                             * @example {
+                             *       "seats": 12,
+                             *       "activeUsers30d": 9,
+                             *       "storageBytes": 48211234
+                             *     }
+                             */
+                            usage: {
+                                /** @description Active members */
+                                seats: number;
+                                /** @description Active members seen in the last 30 days */
+                                activeUsers30d: number;
+                                /** @description Bytes of uploaded files whose object is still stored */
+                                storageBytes: number;
+                            };
                         };
                     };
                 };
@@ -16374,6 +16436,152 @@ export interface paths {
         };
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/platform/notifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The bell, derived (no table of its own): pending data requests, past_due or unpaid subscriptions, trials ending within 7 days and your own support grants expiring within 24 h, newest first (at most 100). Ids, names and dates only. `unread` = items newer than your last `seen` */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            items: {
+                                /** @enum {string} */
+                                kind: "data_request" | "failed_payment" | "trial_ending" | "grant_expiring";
+                                tenantId: string;
+                                tenantName: string;
+                                /** @description The data request or support grant id; null for a payment or trial item */
+                                refId: string | null;
+                                /** @description When the item began (request opened, last provider event, 7 days before the trial end, grant start); unread = after your last `seen` */
+                                at: string;
+                                /** @description Due date, trial end or grant expiry */
+                                until: string | null;
+                            }[];
+                            unread: number;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/platform/notifications/seen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Stamps your own `notifications_seen_at` from the server clock; unread becomes 0 */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            seenAt: string;
+                            unread: number;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/platform/data-requests/{id}/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /**
+                         * @description `completed` or `rejected` (422 invalid_outcome otherwise)
+                         * @example completed
+                         */
+                        outcome?: unknown;
+                        /**
+                         * @description Required: 1..500 characters, stored on the request and shown to the tenant (422 invalid_note otherwise)
+                         * @example Handled with the controller by hand
+                         */
+                        note?: unknown;
+                    };
+                };
+            };
+            responses: {
+                /** @description Closes a request that is `running` (being processed) as completed or rejected; the tenant sees the status and the note and its requester is told. Audited in the tenant chain (actor platform:<staffId>) and the platform chain. 404 data_request_not_found; 409 request_not_processing (any other status, so a second call changes nothing); 422 invalid_outcome | invalid_note */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            id: string;
+                            tenantId: string;
+                            kind: string;
+                            /** @enum {string} */
+                            status: "completed" | "rejected";
+                            completedAt: string | null;
+                        };
+                    };
+                };
+            };
+        };
         delete?: never;
         options?: never;
         head?: never;

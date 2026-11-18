@@ -1,4 +1,5 @@
 import { beforeAll, describe, expect, test } from "vitest"
+import { ownerTenantQuery } from "./db"
 import { call, resetDb, testApp } from "./harness"
 import { makeStaff, makeTenant } from "./factories"
 import { actorIn, routeInventory, type Actor } from "./route-fixtures"
@@ -126,5 +127,25 @@ describe("platform routes as staff", () => {
     // the masked views really show only the last 4
     const storage = (await (await call(t.app, "GET", "/v1/platform/settings/storage", { cookie: staffCookie })).json()) as Json
     expect(storage.secretLast4).toBe(secrets[1].slice(-4))
+  })
+})
+
+describe("B8 T17 platform routes carry counts and ids, never tenant rows", () => {
+  test("a pending data request of tenant A (subject, requester and reason are marked) shows in the bell, the list, the 360 and the resolve answer without any of the marks; the resolve of a nil uuid is 404 and writes nothing", async () => {
+    const id = crypto.randomUUID()
+    await ownerTenantQuery(tenantA.id, "insert into data_requests (id, tenant_id, subject_user_id, kind, status, requested_by, reason, created_at, due_at) values ($1, $2, 'usr_SUBJECT_MARK', 'export', 'pending', 'usr_REQUESTER_MARK', 'REASON_MARK private words', now(), now() + interval '30 days')", [id, tenantA.id])
+    const marks = ["usr_SUBJECT_MARK", "usr_REQUESTER_MARK", "REASON_MARK", ownerA.email]
+    for (const path of ["/v1/platform/notifications", "/v1/platform/data-requests", "/v1/platform/tenants", `/v1/platform/tenants/${tenantA.id}`]) {
+      const text = await (await call(t.app, "GET", path, { cookie: staffCookie })).text()
+      for (const m of marks) expect(text, `${path} leaks ${m}`).not.toContain(m)
+      if (path === "/v1/platform/notifications") expect(text).toContain(id) // the item is there, as an id
+    }
+    await ownerTenantQuery(tenantA.id, "update data_requests set status = 'running' where id = $1", [id])
+    const nil = await call(t.app, "POST", `/v1/platform/data-requests/${NIL}/resolve`, { cookie: staffCookie, body: { outcome: "completed", note: "x" } })
+    expect([nil.status, ((await nil.json()) as Json).code]).toEqual([404, "data_request_not_found"])
+    const ok = await call(t.app, "POST", `/v1/platform/data-requests/${id}/resolve`, { cookie: staffCookie, body: { outcome: "rejected", note: "No." } })
+    const text = await ok.text()
+    expect(ok.status, text).toBe(200)
+    for (const m of marks) expect(text).not.toContain(m)
   })
 })

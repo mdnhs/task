@@ -48,6 +48,8 @@ export const platformStaff = pgTable(
     status: text("status").notNull().default("active"),
     addedBy: text("added_by").notNull(),
     addedAt: timestamp("added_at", { withTimezone: true }).notNull(),
+    /** When this staff member last opened the console bell (B8 T17): the feed items newer than this are unread. */
+    notificationsSeenAt: timestamp("notifications_seen_at", { withTimezone: true }),
   },
   () => [
     check("platform_staff_role_check", sql`role IN ('owner','support','billing','viewer')`),

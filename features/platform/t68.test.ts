@@ -23,11 +23,12 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh() {}, push() {},
 vi.mock("next/link", () => ({ default: ({ href, children, ...rest }: { href: string; children: React.ReactNode }) => createElement("a", { href, ...rest }, children) }))
 
 const TID = "0b9d6f3e-5c1a-4f6e-9a57-2f1d3c8e7a10"
-const listDto = { items: [{ id: TID, slug: "coppers", name: "Coppers Cafe", status: "active", createdAt: "2026-10-01T09:00:00.000Z", planId: "business", subscriptionStatus: "past_due", seats: 40 }, { id: "t2", slug: "acme", name: "Acme", status: "suspended", createdAt: "2026-09-01T09:00:00.000Z", planId: null, subscriptionStatus: null, seats: null }], page: 1, pageSize: 50, total: 2 }
+const figures = { mrrCents: 14900, currency: "EUR" as string | null, health: "green" as "green" | "amber" | "red", usage: { seats: 12, activeUsers30d: 9, storageBytes: 48211234 } }
+const listDto = { items: [{ id: TID, slug: "coppers", name: "Coppers Cafe", status: "active", createdAt: "2026-10-01T09:00:00.000Z", planId: "business", subscriptionStatus: "past_due", seats: 40, ...figures }, { id: "t2", slug: "acme", name: "Acme", status: "suspended", createdAt: "2026-09-01T09:00:00.000Z", planId: null, subscriptionStatus: null, seats: null, ...figures, mrrCents: 0, currency: null }], page: 1, pageSize: 50, total: 2 }
 const detailDto = {
   tenant: { id: TID, slug: "coppers", name: "Coppers Cafe", status: "active", timezone: "Europe/Dublin", currency: "EUR", locale: "en-IE", createdAt: "2026-10-01T09:00:00.000Z" },
   subscription: { planId: "business", status: "trialing", seats: 40, trialEndsAt: "2026-11-24T09:00:00.000Z", currentPeriodEnd: null, cancelAtPeriodEnd: false, hasProviderSubscription: false },
-  seatsUsed: 12, memberCount: 14, moduleOverrides: [{ module: "M2", mode: "grant" as const, reason: "Pilot", setAt: "2026-11-01T09:00:00.000Z" }], lastActivityDate: "2026-11-16", openDataRequests: 1,
+  seatsUsed: 12, memberCount: 14, moduleOverrides: [{ module: "M2", mode: "grant" as const, reason: "Pilot", setAt: "2026-11-01T09:00:00.000Z" }], lastActivityDate: "2026-11-16", openDataRequests: 1, ...figures,
 }
 const metricsDto = { mrrMinor: { EUR: 1450000, GBP: 5000 }, arrMinor: { EUR: 17400000, GBP: 60000 }, trials: 4, pastDue: 1, churnLast30Days: 2 }
 
