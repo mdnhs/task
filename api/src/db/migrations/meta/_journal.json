@@ -316,6 +316,13 @@
       "when": 1795008530684,
       "tag": "0044_roster_weeks",
       "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "7",
+      "when": 1795010479052,
+      "tag": "0045_member_lifecycle",
+      "breakpoints": true
     }
   ]
 }

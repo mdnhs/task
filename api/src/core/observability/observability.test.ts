@@ -22,7 +22,7 @@ describe("metrics", () => {
     m.gauge("event_relay_lag_seconds").set(4)
     m.counter("rate_limited_total", { bucket: "auth" }).inc()
     const out = m.render()
-    for (const name of ["http_requests_total", "http_request_duration_seconds", "db_pool_waiting", "queue_jobs_total", "queue_job_duration_seconds", "sweep_tenants_processed", "event_relay_lag_seconds", "rate_limited_total"]) {
+    for (const name of ["http_requests_total", "http_request_duration_seconds", "db_pool_waiting", "queue_jobs_total", "queue_job_duration_seconds", "sweep_tenants_processed", "event_relay_lag_seconds", "rate_limited_total", "last_active_stamp_total"]) {
       expect(out, name).toContain(`# TYPE ${name} `)
     }
     expect(out).toContain('http_requests_total{method="GET",route="/v1/tasks",status_class="2xx"} 1')

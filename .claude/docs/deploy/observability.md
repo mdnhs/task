@@ -17,7 +17,7 @@ No vendor SDK and no live provider is needed for any of this (ruling S10). A Sen
 ## Metrics (internal port only)
 
 - `METRICS_PORT` (API) and `WORKER_METRICS_PORT` (worker): off when unset. `METRICS_HOST` defaults to `127.0.0.1`. A container sets it to its private-network address; **never publish the port, never route it through the public proxy / Cloudflare**, and do not map it in `docker-compose.prod.yml`. It must differ from `PORT` (the API refuses to start otherwise). The public app has no `/metrics`.
-- Prometheus text at `GET /metrics`. Series: `http_requests_total{method,route,status_class}`, `http_request_duration_seconds{route}`, `db_pool_waiting`, `queue_jobs_total{name,result}`, `queue_job_duration_seconds{name}`, `sweep_tenants_processed{job}`, `event_relay_lag_seconds`, `rate_limited_total{bucket}`.
+- Prometheus text at `GET /metrics`. Series: `http_requests_total{method,route,status_class}`, `http_request_duration_seconds{route}`, `db_pool_waiting`, `queue_jobs_total{name,result}`, `queue_job_duration_seconds{name}`, `sweep_tenants_processed{job}`, `event_relay_lag_seconds`, `rate_limited_total{bucket}`, `last_active_stamp_total{result}` (a failed member last-active stamp is counted and swallowed, never a failed request).
 - The tenant id is never a label (cardinality); a label named like a tenant id throws in the registry. The tenant id is a log and error-report field only.
 
 ## Health and readiness

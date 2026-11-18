@@ -15,6 +15,7 @@ import { webhookRoutes } from "./modules/webhooks-out"
 import { deviceRoutes, probeRoutes } from "./modules/devices"
 import { billingRoutes, billingSettingsRoutes, billingWebhookRoutes } from "./modules/billing"
 import { entitlementProbeRoutes, entitlementRoutes } from "./modules/entitlements"
+import { memberLifecycleRoutes } from "./modules/members"
 import { rosterProbeRoutes, rosterRoutes } from "./modules/rosters"
 import { fileRoutes } from "./modules/files"
 import { gdprRoutes } from "./modules/gdpr"
@@ -113,6 +114,7 @@ export function createApp(deps: Deps) {
   app.route("/", templateRoutes)
   app.route("/", shiftRoutes)
   app.route("/", rosterRoutes)
+  app.route("/", memberLifecycleRoutes)
   app.route("/", shiftReportRoutes)
   app.route("/", readModelRoutes)
   app.route("/", mfaRoutes)

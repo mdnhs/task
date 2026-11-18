@@ -10,6 +10,7 @@ const DEFS = {
   sweep_tenants_processed: { type: "gauge", help: "Tenants handled by the last run of a sweep job" },
   event_relay_lag_seconds: { type: "gauge", help: "Age of the oldest domain event not yet relayed" },
   rate_limited_total: { type: "counter", help: "Requests refused by a rate limit bucket" },
+  last_active_stamp_total: { type: "counter", help: "Member last-active stamps (result ok or failed; a failure never fails the request)" },
 } as const
 export type MetricName = keyof typeof DEFS
 type Labels = Record<string, string>

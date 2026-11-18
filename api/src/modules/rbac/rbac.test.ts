@@ -10,6 +10,7 @@ import { changeMemberRole, cloneRole, updateRole } from "./service"
 import { requireTenant } from "../../core/middleware/tenant"
 import { requirePermission } from "../../core/middleware/permission"
 import { redactFields } from "./index"
+import { flushLastActive } from "../../core/middleware/last-active"
 
 type Json = Record<string, any> // eslint-disable-line @typescript-eslint/no-explicit-any
 const rolesJson = (JSON.parse(readFileSync(new URL("../../../../public/data/shell/roles.json", import.meta.url), "utf8")) as { roles: { id: string; access: Record<string, string> }[] }).roles.filter((r) => r.id !== "platform")
@@ -64,6 +65,8 @@ describe("templates and guard", () => {
   test("the member's role is loaded once per request, however many guards stack", async () => {
     const w = await world()
     const emp = await w.who("employee")
+    await w.req("GET", "/v1/_probe/tasks", emp) // warm-up: the first request of a member also stamps last_active_at (one background transaction, at most every 5 minutes)
+    await flushLastActive()
     const spy = vi.spyOn(w.deps.db, "transaction")
     await w.req("GET", "/v1/_probe/tasks", emp)
     const one = spy.mock.calls.length

@@ -1,6 +1,6 @@
 # Migrations runbook (B7 Task 19)
 
-Migrations are numbered SQL files in `api/src/db/migrations/` (drizzle; 45 at the time of writing, 0000 to 0044), applied as `app_owner`. The API connects as `app_user`, which cannot create or alter anything and has no BYPASSRLS.
+Migrations are numbered SQL files in `api/src/db/migrations/` (drizzle; 46 at the time of writing, 0000 to 0045), applied as `app_owner`. The API connects as `app_user`, which cannot create or alter anything and has no BYPASSRLS.
 
 Note on 0044: it swaps the `shift_types` name unique index to `lower(name)`; on a database that already has case-variant duplicate active shift type names in one location (e.g. "Day" and "day") it fails, so rename them first. 0043 and 0044 were unreleased (never applied outside tests) when 0044 was last edited in place.
 
@@ -38,3 +38,5 @@ Note on 0044: it swaps the `shift_types` name unique index to `lower(name)`; on 
 The run is one transaction: the database is unchanged and the error class and code are printed (`migrate: failed (...); the database is at its previous version`). Do **not** roll api, worker or web: the current release keeps serving. Read the error in the database log (the driver message can carry data and is deliberately not printed), fix the migration in a new commit (never edit one that has run anywhere), rebuild, rerun `migrate`. If a lock timeout is the cause, a long transaction holds a table; find it (`pg_stat_activity`) rather than killing at random.
 
 If `migrate` succeeded but the new api misbehaves, go to [rollback.md](rollback.md): migrations are **forward-only**; the old image works against the new schema by rule 1.
+
+Note on 0045: additive only (three nullable `memberships` columns: `deactivated_at`, `last_active_at`, `home_location_id` with a composite FK to `locations` that clears only that column on a location delete, plus its index). No backfill, so existing rows are untouched. Tested by replaying the real file as `app_owner` with no tenant context over seeded tenants.

@@ -12,6 +12,7 @@ import { enforceBilling } from "./module"
 import { enterSupportPath } from "./support"
 import { bindLog } from "../observability/logger"
 import { enterApiKeyPath, presentedApiKey } from "./api-key"
+import { touchLastActive } from "./last-active"
 
 /**
  * Resolves the tenant from X-Tenant and the caller's membership of it. Self-contained (it authenticates):
@@ -50,7 +51,7 @@ export const requireTenant: MiddlewareHandler<AppEnv> = async (c, next) => {
   const userId = c.get("session")!.userId
   const member = await withTenant(deps.db, tenant.id, async (tx) => {
     const [row] = await tx
-      .select({ roleId: memberships.roleId, roleKey: roles.key, status: memberships.status })
+      .select({ roleId: memberships.roleId, roleKey: roles.key, status: memberships.status, lastActiveAt: memberships.lastActiveAt })
       .from(memberships)
       .innerJoin(roles, eq(roles.id, memberships.roleId))
       .where(and(eq(memberships.tenantId, tenant.id), eq(memberships.userId, userId)))
@@ -82,5 +83,6 @@ export const requireTenant: MiddlewareHandler<AppEnv> = async (c, next) => {
   await loadDevice(c, async () => {})
   // Unpaid / expired trial (after the grace): non-GET routes answer 402, except billing and data export.
   await enforceBilling(c)
+  touchLastActive(deps, tenant.id, userId, member.lastActiveAt) // background, at most once per 5 minutes, never fails the request
   await next()
 }

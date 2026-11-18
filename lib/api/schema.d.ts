@@ -1025,6 +1025,8 @@ export interface paths {
             parameters: {
                 query?: {
                     scope?: "own" | "team" | "all";
+                    /** @description Default active. deactivated and all need settings:read (Settings -> Users); anyone else gets 403 forbidden */
+                    status?: "active" | "deactivated" | "all";
                 };
                 header?: never;
                 path?: never;
@@ -1032,7 +1034,7 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description People in the caller's report scope */
+                /** @description People in the caller's report scope with their status (active | deactivated) and lastActiveAt (the last authenticated request, stamped at most every 5 minutes; null = never seen) */
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -1044,6 +1046,9 @@ export interface paths {
                             email: string;
                             roleKey: string;
                             managerId: string | null;
+                            /** @enum {string} */
+                            status: "active" | "deactivated";
+                            lastActiveAt: string | null;
                         }[];
                     };
                 };
@@ -9291,6 +9296,134 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/members/{userId}/qualifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    userId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The person's qualifications with `expired` computed on the clock (valid through the expiry date). Read: the person, an office role, a supervisor of a location the person is homed or rostered at. 404 member_not_found for a person who does not exist, is of another tenant or out of the caller's reach */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            userId: string;
+                            items: {
+                                type: string;
+                                expiresOn: string | null;
+                                expired: boolean;
+                            }[];
+                        };
+                    };
+                };
+            };
+        };
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    userId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        qualifications: {
+                            type: string;
+                            expiresOn?: string | null;
+                        }[];
+                    };
+                };
+            };
+            responses: {
+                /** @description The person's whole set of qualifications, replaced (office only: 403 forbidden). Types are free-text keys, trimmed and unique (max 50); an unchanged set writes nothing. 404 member_not_found; 422 invalid_qualification */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            userId: string;
+                            items: {
+                                type: string;
+                                expiresOn: string | null;
+                                expired: boolean;
+                            }[];
+                        };
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/members/{userId}/home-location": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    userId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        locationId: string | null;
+                    };
+                };
+            };
+            responses: {
+                /** @description The person's home location (null clears it; office only). 404 member_not_found | not_found (a location the caller may not see, missing, another tenant's or not a uuid: one answer); 409 location_archived */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            userId: string;
+                            /** Format: uuid */
+                            homeLocationId: string | null;
+                        };
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/roster/office-limits/{userId}": {
         parameters: {
             query?: never;
@@ -9331,6 +9464,90 @@ export interface paths {
             };
         };
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/members/{userId}/deactivate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    userId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The member is deactivated (owner or admin: settings write): they cannot reach the workspace, keep their history and shifts, their open shift assignments end today and their pending roster requests are closed. Sessions are revoked when this was their last workspace. 404 member_not_found; 403 role_escalation (acting on a role above yours); 409 already_deactivated; 422 last_owner | self_deactivation */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            userId: string;
+                            /** @enum {string} */
+                            status: "active" | "deactivated";
+                            deactivatedAt: string | null;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/members/{userId}/reactivate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    userId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The member is active again (needs a free seat). 404 member_not_found; 403 role_escalation; 409 not_deactivated | seat_limit */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            userId: string;
+                            /** @enum {string} */
+                            status: "active" | "deactivated";
+                            deactivatedAt: string | null;
+                        };
+                    };
+                };
+            };
+        };
         delete?: never;
         options?: never;
         head?: never;

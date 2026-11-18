@@ -1,10 +1,12 @@
 import { createRoute } from "@hono/zod-openapi"
 import { newRouter } from "../../core/router"
 import {
-  CreateLocationBody, CreateShiftTypeBody, LocationSchema, LocationsOut, LocationsQuery, OfficeLimitBody, OfficeLimitOut, PatchLocationBody, PatchShiftTypeBody, RosterIdParam, RosterUserParam,
+  HomeLocationBody, HomeLocationOut, QualificationsBody, QualificationsOut, CreateLocationBody, CreateShiftTypeBody, LocationSchema, LocationsOut, LocationsQuery, OfficeLimitBody, OfficeLimitOut, PatchLocationBody, PatchShiftTypeBody, RosterIdParam, RosterUserParam,
   ShiftTypeSchema, ShiftTypesOut, ShiftTypesQuery, SupervisorsBody, SupervisorsOut, TargetsBody,
 } from "./dto"
 import { archiveLocation, archiveShiftType, createLocation, createShiftType, getLocation, listLocations, listShiftTypes, patchLocation, patchShiftType, setOfficeLimit, setSupervisors, setTargets } from "./locations"
+import { setHomeLocation } from "./people"
+import { getQualifications, setQualifications } from "./qualifications"
 import { rosterGuard } from "./scope"
 import { rosterRead, rosterWrite } from "./write"
 
@@ -63,6 +65,19 @@ const limitR = createRoute({
   responses: { 200: json(OfficeLimitOut, "The sites a Roster Manager does NOT manage (an office role with no limit of its own only: 403 forbidden). 404 member_not_found; 422 not_roster_office (not an active member with office level and roster write) | invalid_location") },
 })
 
+const qualsR = createRoute({
+  method: "get", path: "/v1/members/{userId}/qualifications", middleware: guard("read"), request: { params: RosterUserParam },
+  responses: { 200: json(QualificationsOut, "The person's qualifications with `expired` computed on the clock (valid through the expiry date). Read: the person, an office role, a supervisor of a location the person is homed or rostered at. 404 member_not_found for a person who does not exist, is of another tenant or out of the caller's reach") },
+})
+const putQualsR = createRoute({
+  method: "put", path: "/v1/members/{userId}/qualifications", middleware: guard("write"), request: { params: RosterUserParam, body: body(QualificationsBody) },
+  responses: { 200: json(QualificationsOut, "The person's whole set of qualifications, replaced (office only: 403 forbidden). Types are free-text keys, trimmed and unique (max 50); an unchanged set writes nothing. 404 member_not_found; 422 invalid_qualification") },
+})
+const homeR = createRoute({
+  method: "put", path: "/v1/members/{userId}/home-location", middleware: guard("write"), request: { params: RosterUserParam, body: body(HomeLocationBody) },
+  responses: { 200: json(HomeLocationOut, "The person's home location (null clears it; office only). 404 member_not_found | not_found (a location the caller may not see, missing, another tenant's or not a uuid: one answer); 409 location_archived") },
+})
+
 export const rosterRoutes = newRouter()
   .openapi(listR, async (c) => c.json(await rosterRead(c, (tx, ctx) => listLocations(tx, ctx, { includeArchived: c.req.valid("query").includeArchived === "true" })), 200))
   .openapi(createR, async (c) => c.json(await rosterWrite(c, (tx, ctx) => createLocation(tx, ctx, c.req.valid("json"))), 201))
@@ -78,4 +93,7 @@ export const rosterRoutes = newRouter()
     return c.body(null, 204)
   })
   .openapi(targetsR, async (c) => c.json(await rosterWrite(c, (tx, ctx) => setTargets(tx, ctx, c.req.valid("param").id, c.req.valid("json").targets)), 200))
+  .openapi(qualsR, async (c) => c.json(await rosterRead(c, (tx, ctx) => getQualifications(tx, ctx, c.req.valid("param").userId)), 200))
+  .openapi(putQualsR, async (c) => c.json(await rosterWrite(c, (tx, ctx) => setQualifications(tx, ctx, c.req.valid("param").userId, c.req.valid("json").qualifications)), 200))
+  .openapi(homeR, async (c) => c.json(await rosterWrite(c, (tx, ctx) => setHomeLocation(tx, ctx, c.req.valid("param").userId, c.req.valid("json").locationId)), 200))
   .openapi(limitR, async (c) => c.json(await rosterWrite(c, (tx, ctx) => setOfficeLimit(tx, ctx, c.req.valid("param").userId, c.req.valid("json").except)), 200))

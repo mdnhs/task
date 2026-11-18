@@ -83,3 +83,17 @@ export const TargetsBody = z
 
 export const OfficeLimitBody = z.object({ except: z.array(z.string().max(64)).max(500) }).openapi({ example: { except: [LID] } })
 export const OfficeLimitOut = z.object({ userId: z.string(), except: z.array(z.uuid()) }).openapi({ example: { userId: UID, except: [LID] } })
+
+// ------------------------------------------------------------------ member qualifications and home location
+
+const QualOut = z.object({ type: z.string(), expiresOn: z.string().nullable(), expired: z.boolean() })
+export const QualificationsOut = z
+  .object({ userId: z.string(), items: z.array(QualOut) })
+  .openapi({ example: { userId: UID, items: [{ type: "SIA licence", expiresOn: "2027-03-31", expired: false }, { type: "First aid", expiresOn: null, expired: false }] } })
+export type QualificationsDto = z.infer<typeof QualificationsOut>
+export const QualificationsBody = z
+  .object({ qualifications: z.array(z.object({ type: z.string().max(200), expiresOn: z.string().max(10).nullable().optional() })).max(100) })
+  .openapi({ example: { qualifications: [{ type: "SIA licence", expiresOn: "2027-03-31" }, { type: "First aid", expiresOn: null }] } })
+
+export const HomeLocationBody = z.object({ locationId: z.string().max(64).nullable() }).openapi({ example: { locationId: LID } })
+export const HomeLocationOut = z.object({ userId: z.string(), homeLocationId: z.uuid().nullable() }).openapi({ example: { userId: UID, homeLocationId: LID } })

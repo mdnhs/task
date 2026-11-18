@@ -1,7 +1,8 @@
 import { sql } from "drizzle-orm"
-import { boolean, check, index, integer, jsonb, pgPolicy, pgTable, primaryKey, text, timestamp, unique, uuid } from "drizzle-orm/pg-core"
+import { boolean, check, foreignKey, index, integer, jsonb, pgPolicy, pgTable, primaryKey, text, timestamp, unique, uuid } from "drizzle-orm/pg-core"
 import type { MfaPolicy } from "@opsdesk/domain/mfa"
 import { user } from "./auth"
+import { locations } from "./rosters" // circular on purpose: only read lazily inside the memberships table callback
 
 // No tenant_id column, so no RLS: looked up by slug before a tenant context exists.
 // Defaults mirror public/data/auth/onboarding-defaults.json (FR-M0-20); services seed from that data.
@@ -67,10 +68,18 @@ export const memberships = pgTable(
     roleId: uuid("role_id").notNull().references(() => roles.id),
     status: text("status").notNull().default("active"),
     joinedAt: timestamp("joined_at", { withTimezone: true }).notNull(),
+    /** Set when status becomes 'deactivated' (the `left` rule's input: leftOn = this date in the tenant zone); cleared on reactivation. */
+    deactivatedAt: timestamp("deactivated_at", { withTimezone: true }),
+    /** Last request of this member, stamped at most once per 5 minutes by the session path (never on the response hot path). Null = never seen. */
+    lastActiveAt: timestamp("last_active_at", { withTimezone: true }),
+    /** The member's home location (M1A); leave approval and supervisor reads of the person follow it. Deleting the location clears only this column. */
+    homeLocationId: uuid("home_location_id"),
   },
   (t) => [
     primaryKey({ columns: [t.tenantId, t.userId] }),
     index("memberships_user_idx").on(t.userId),
+    foreignKey({ columns: [t.tenantId, t.homeLocationId], foreignColumns: [locations.tenantId, locations.id], name: "memberships_home_location_fk" }).onDelete("set null"), // column list added by hand in the SQL
+    index("memberships_home_location_idx").on(t.tenantId, t.homeLocationId), // the SET NULL FK scans this when a location is deleted
     tenantPolicy(),
     pgPolicy("own_memberships_read", { as: "permissive", for: "select", using: userMatch }),
   ],

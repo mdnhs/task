@@ -1,4 +1,5 @@
 import { createRoute, z } from "@hono/zod-openapi"
+import { can } from "@opsdesk/domain/permissions"
 import { Forbidden } from "../../core/errors"
 import { requirePermission } from "../../core/middleware/permission"
 import { subjectUserId } from "../../core/middleware/principal"
@@ -13,7 +14,7 @@ const UserId = z.string().min(1).max(128)
 const Kind = z.enum(["team", "department"])
 const Name = z.string().trim().min(1).max(80).regex(/^[^\r\n]+$/)
 export const TeamDto = z.object({ id: z.string(), name: z.string(), kind: Kind, memberIds: z.array(z.string()) })
-export const PersonDto = z.object({ userId: z.string(), name: z.string(), email: z.string(), roleKey: z.string(), managerId: z.string().nullable() })
+export const PersonDto = z.object({ userId: z.string(), name: z.string(), email: z.string(), roleKey: z.string(), managerId: z.string().nullable(), status: z.enum(["active", "deactivated"]), lastActiveAt: z.string().nullable() })
 
 const CreateBody = z.object({ name: Name, kind: Kind.default("team") }).openapi({ example: { name: "Night shift", kind: "team" } })
 const PatchBody = z
@@ -55,8 +56,8 @@ const managerRoute = createRoute({
 })
 const peopleRoute = createRoute({
   method: "get", path: "/v1/people", middleware: [requireTenant, requireModule("M1"), requirePermission("reports", "read")] as const,
-  request: { query: z.object({ scope: z.enum(["own", "team", "all"]).optional() }) },
-  responses: { 200: { description: "People in the caller's report scope", content: { "application/json": { schema: z.array(PersonDto) } } } },
+  request: { query: z.object({ scope: z.enum(["own", "team", "all"]).optional(), status: z.enum(["active", "deactivated", "all"]).optional().openapi({ description: "Default active. deactivated and all need settings:read (Settings -> Users); anyone else gets 403 forbidden", example: "active" }) }) },
+  responses: { 200: { description: "People in the caller's report scope with their status (active | deactivated) and lastActiveAt (the last authenticated request, stamped at most every 5 minutes; null = never seen)", content: { "application/json": { schema: z.array(PersonDto) } } } },
 })
 
 export const teamRoutes = newRouter()
@@ -104,7 +105,9 @@ export const teamRoutes = newRouter()
     const rows = await withTenant(c.get("deps").db, t.id, async (tx) => {
       const scope = resolveScope(await peopleAccess(tx, t.id, role, me), c.req.valid("query").scope)
       if (scope === "forbidden") throw Forbidden("forbidden")
-      return listPeople(tx, t.id, scope, me)
+      const status = c.req.valid("query").status ?? "active"
+      if (status !== "active" && !can(role, "settings", "read")) throw Forbidden("forbidden") // deactivated people are an admin view
+      return listPeople(tx, t.id, scope, me, status)
     })
     return c.json(rows, 200)
   })

@@ -204,19 +204,25 @@ export function resolveScope(access: ReportAccess | null, requested: Scope | und
   return RANK[want] <= RANK[ceiling] ? want : "forbidden"
 }
 
-export type PersonDto = { userId: string; name: string; email: string; roleKey: string; managerId: string | null }
+export type PersonStatus = "active" | "deactivated"
+export type PersonDto = { userId: string; name: string; email: string; roleKey: string; managerId: string | null; status: PersonStatus; lastActiveAt: string | null }
 
-export async function listPeople(tx: TenantTx, tenantId: string, scope: Scope, meId: string): Promise<PersonDto[]> {
-  const conds = [eq(memberships.tenantId, tenantId), eq(memberships.status, "active")]
+/**
+ * People in the caller's scope. `status` is "active" (the default: pickers and assignees never see a deactivated person), "deactivated" or "all" (Settings -> Users,
+ * which the route allows only to a caller who can read settings). `lastActiveAt` is the member's last authenticated request (stamped at most every 5 minutes), null when never seen.
+ */
+export async function listPeople(tx: TenantTx, tenantId: string, scope: Scope, meId: string, status: PersonStatus | "all" = "active"): Promise<PersonDto[]> {
+  const conds = [eq(memberships.tenantId, tenantId)]
+  if (status !== "all") conds.push(eq(memberships.status, status))
   if (scope === "own") conds.push(eq(memberships.userId, meId))
   if (scope === "team") conds.push(eq(reportingLines.managerId, meId))
   const rows = await tx
-    .select({ userId: memberships.userId, name: user.name, email: user.email, roleKey: roles.key, managerId: reportingLines.managerId })
+    .select({ userId: memberships.userId, name: user.name, email: user.email, roleKey: roles.key, managerId: reportingLines.managerId, status: memberships.status, lastActiveAt: memberships.lastActiveAt })
     .from(memberships)
     .innerJoin(user, eq(user.id, memberships.userId))
     .innerJoin(roles, eq(roles.id, memberships.roleId))
     .leftJoin(reportingLines, and(eq(reportingLines.tenantId, memberships.tenantId), eq(reportingLines.userId, memberships.userId)))
     .where(and(...conds))
     .orderBy(asc(user.name), asc(memberships.userId))
-  return rows
+  return rows.map((r) => ({ ...r, status: r.status === "deactivated" ? "deactivated" : "active", lastActiveAt: r.lastActiveAt ? r.lastActiveAt.toISOString() : null }))
 }

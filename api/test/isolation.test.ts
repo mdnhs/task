@@ -169,6 +169,12 @@ const SPECS: Record<string, Spec> = {
   "DELETE /v1/shift-types/{id}": { actor: "owner", expect: "not_found" },
   "PUT /v1/shift-types/{id}/targets": { actor: "owner", expect: "not_found" },
   "PUT /v1/roster/office-limits/{userId}": { actor: "owner", expect: "member_not_found" },
+  // B8 T6: member lifecycle (controls: deactivate 200 of a throwaway member, reactivate 409 not_deactivated, qualifications GET/PUT 200, home location 200 with A's own location)
+  "POST /v1/members/{userId}/deactivate": { actor: "owner", expect: "member_not_found" },
+  "POST /v1/members/{userId}/reactivate": { actor: "owner", expect: "member_not_found" },
+  "GET /v1/members/{userId}/qualifications": { actor: "owner", expect: "member_not_found" },
+  "PUT /v1/members/{userId}/qualifications": { actor: "owner", expect: "member_not_found" },
+  "PUT /v1/members/{userId}/home-location": { actor: "owner", expect: "member_not_found", body: (w) => ({ locationId: w.resources.location }) },
   "PATCH /v1/task-templates/{id}": { actor: "owner", expect: "template_not_found" },
   "DELETE /v1/task-templates/{id}": { actor: "owner", expect: "template_not_found" },
   // T5.1: shift patterns (control: PATCH 200, DELETE 204), assignments (control: PATCH 200 with an end date after the fixture's start, DELETE 204 for the future one),
