@@ -140,13 +140,13 @@ export const AvailabilityBody = z
 const WEEK_ID = "5d8b2f4a-1c3e-4a7b-8f60-9e2d1c0b3a44"
 const severityEx = { double_booking: "block", approved_leave: "block", unavailable: "warn", daily_rest: "warn", weekly_rest: "warn", avg_48h: "warn", expired_licence: "warn", left: "warn" }
 export const RulesOut = z
-  .object({ severity: z.record(z.string(), z.enum(["block", "warn", "ignore"])), avgWeekReferenceWeeks: z.number().int() })
-  .openapi({ example: { severity: severityEx, avgWeekReferenceWeeks: 17 } })
+  .object({ severity: z.record(z.string(), z.enum(["block", "warn", "ignore"])), avgWeekReferenceWeeks: z.number().int(), draftWarnDays: z.number().int().openapi({ description: "Days before a week starts that a still-unpublished draft becomes an attention item (0..28, default 3)" }) })
+  .openapi({ example: { severity: severityEx, avgWeekReferenceWeeks: 17, draftWarnDays: 3 } })
 export type RulesDto = z.infer<typeof RulesOut>
 // Loose on purpose: the service answers 422 invalid_rules / invalid_avg_weeks with a specific code instead of the generic 400.
 export const RulesBody = z
-  .object({ severity: z.record(z.string().max(40), z.string().max(20)), avgWeekReferenceWeeks: z.number().optional() })
-  .openapi({ example: { severity: { daily_rest: "block" }, avgWeekReferenceWeeks: 26 } })
+  .object({ severity: z.record(z.string().max(40), z.string().max(20)), avgWeekReferenceWeeks: z.number().optional(), draftWarnDays: z.number().optional() })
+  .openapi({ example: { severity: { daily_rest: "block" }, avgWeekReferenceWeeks: 26, draftWarnDays: 3 } })
 export const RulesHeaders = z.object({
   "if-match": z.string().optional().openapi({ description: "The ETag of the settings the edit started from (GET /v1/roster/rules). Required: missing is 428 precondition_required, stale is 412 precondition_failed (the current ETag in the ETag header). Strong comparison; a weak tag or * never matches", example: '"3f2a9c0d1b7e4a58c6d2e9f01a4b7c3d"' }),
 })

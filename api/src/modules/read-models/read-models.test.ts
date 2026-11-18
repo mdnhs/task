@@ -415,7 +415,7 @@ describe("attention (F17: derived, never stored)", () => {
     expect(kinds("report_returned").map((i) => i.reportId)).toEqual([rep2.id])
     expect(JSON.stringify(feed)).not.toContain("Archived overdue")
     expect(JSON.stringify(feed)).not.toContain("Add the keys count") // no free text of a report
-    for (const i of feed.items as Json[]) expect(Object.keys(i).sort()).toEqual(["dueAt", "kind", "owner", "ownerId", "reason", "ref", "reportId", "reportKey", "taskId", "title"].sort())
+    for (const i of feed.items as Json[]) expect(Object.keys(i).sort()).toEqual(["dueAt", "kind", "owner", "ownerId", "reason", "ref", "reportId", "reportKey", "rosterRef", "taskId", "title"].sort())
     expect(feed.total).toBe((feed.items as Json[]).length)
     // order: the kinds in the documented order
     const order = (feed.items as Json[]).map((i) => i.kind)

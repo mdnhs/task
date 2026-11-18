@@ -251,6 +251,17 @@ describe("repeat (FR-RS-26, 27, AC-RS-06, R8-12)", () => {
     expect(out.counts).toEqual({ copied: 3, kept: 2, warned: 1, opened: 0 })
   })
 
+  test("an empty week repeats to empty drafts (nothing invented, counts zero)", async () => {
+    const w = await sites()
+    const wk = await w.week(w.p.owner, w.a, SRC)
+    await publish(w, wk)
+    const out = await repeatOk(w, w.p.owner, wk, { weeks: 2 })
+    expect(out.created.map((c: Json) => c.weekStart)).toEqual([T1, T2])
+    expect(out.counts).toEqual({ copied: 0, kept: 0, warned: 0, opened: 0 })
+    expect(out.conflicts).toEqual([])
+    expect(await w.rows("select 1 from roster_shifts where week_id = any($1)", [out.created.map((c: Json) => c.id)])).toHaveLength(0)
+  })
+
   test("the rule check runs against the whole roster under the lock: a person already rostered at ANOTHER site in the target week makes the copy an open shift", async () => {
     const w = await sites()
     const { wk } = await coppers(w)
@@ -389,6 +400,21 @@ describe("week templates (FR-RS-27, 28, 29)", () => {
     expect(await weekIdAt(w, w.b, T3)).toBeUndefined()
     // the same template at its own location needs no match
     await w.ok("POST", "/v1/roster/week-templates/apply", w.p.owner, { templateId: tpl2.id, locationId: w.a, weekStart: T3 }, 201)
+  })
+
+  test("a location holds at most 50 templates (409 template_limit); an archived location refuses an apply (409 location_archived); a template of open shifts only applies and checks nobody", async () => {
+    const w = await sites()
+    const wk = await w.week(w.p.owner, w.a, SRC)
+    await w.addOk(w.p.owner, wk, [{ date: SRC, userIds: [null, null], shiftTypeId: w.ta }])
+    const tpl = (await (await save(w, w.p.owner, wk, "Open only")).json()) as Json
+    const applied = await w.ok("POST", "/v1/roster/week-templates/apply", w.p.owner, { templateId: tpl.id, locationId: w.a, weekStart: T1 }, 201)
+    expect(applied).toMatchObject({ conflicts: [], counts: { copied: 2, kept: 2, warned: 0, opened: 0 } })
+    expect((await shiftsOf(w, applied.week.id)).map((r) => r.user_id)).toEqual([null, null])
+    await w.rows("insert into roster_week_templates (tenant_id, location_id, name, shifts, created_at, updated_at) select $1, $2, 'T' || g, '[]'::jsonb, now(), now() from generate_series(1, 49) g", [w.tenant.id, w.a])
+    expect((await w.fail("POST", `/v1/roster/weeks/${wk}/save-template`, w.p.owner, { name: "One too many" }, 409)).code).toBe("template_limit")
+    await w.ok("POST", `/v1/locations/${w.a}/archive`, w.p.owner)
+    expect((await w.fail("POST", "/v1/roster/week-templates/apply", w.p.owner, { templateId: tpl.id, locationId: w.a, weekStart: T2 }, 409)).code).toBe("location_archived")
+    expect(await weekIdAt(w, w.a, T2)).toBeUndefined()
   })
 
   test("a template cannot be applied to a location the caller cannot see (404), and a supervisor cannot reach another site's template", async () => {

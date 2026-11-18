@@ -65,16 +65,16 @@ export const StaffOut = z
   })
 
 // ---------- attention ----------
-export const ATTENTION_KINDS = ["overdue", "blocked", "evidence_review", "report_missing", "report_returned"] as const
+export const ATTENTION_KINDS = ["overdue", "blocked", "evidence_review", "report_missing", "report_returned", "roster_leave", "roster_change_request", "roster_open_shift", "roster_draft_week", "qualification_expiring", "roster_unconfirmed"] as const
 const AttentionItem = z.object({
-  kind: z.enum(ATTENTION_KINDS), ref: nullable(z.string()), taskId: nullable(z.string()), reportId: nullable(z.string()), reportKey: nullable(z.string()), title: z.string(), ownerId: nullable(z.string()), owner: z.string(), dueAt: z.string(), reason: z.string(),
+  kind: z.enum(ATTENTION_KINDS), ref: nullable(z.string()), taskId: nullable(z.string()), reportId: nullable(z.string()), reportKey: nullable(z.string()), rosterRef: nullable(z.string()).openapi({ description: "Roster items (B8): the id to open: a shift, change request, leave or week; for an expiring qualification the person" }), title: z.string(), ownerId: nullable(z.string()), owner: z.string(), dueAt: z.string(), reason: z.string(),
 })
 export const AttentionQuery = z.object({ limit: z.coerce.number().int().min(1).max(100).default(25), cursor: z.string().max(300).optional() })
 export const AttentionOut = z
   .object({ items: z.array(AttentionItem), total: z.number().int(), nextCursor: nullable(z.string()) })
   .openapi({
     example: {
-      items: [{ kind: "overdue", ref: "TSK-1001", taskId: TID, reportId: null, reportKey: null, title: "Check fire exits", ownerId: UID, owner: "Ann Byrne", dueAt: UTC, reason: "Overdue by 2 days" }],
+      items: [{ kind: "overdue", ref: "TSK-1001", taskId: TID, reportId: null, reportKey: null, rosterRef: null, title: "Check fire exits", ownerId: UID, owner: "Ann Byrne", dueAt: UTC, reason: "Overdue by 2 days" }],
       total: 9, nextCursor: null,
     },
   })
@@ -93,6 +93,7 @@ export const TodayOut = z
     summary: z.object({ headline: z.string(), lines: z.array(z.object({ ref: nullable(z.string()), text: z.string() })), spoken: z.string() }),
     team: z.object({ count: z.number().int(), items: z.array(z.object({ ref: z.string(), title: z.string(), who: z.string(), reason: z.string() })) }).optional(),
     reports: z.number().int(),
+    roster: z.number().int().optional().openapi({ description: "Upcoming shifts of the caller's own that are published and not confirmed yet (0 without the roster module)" }),
   })
   .openapi({
     example: {
@@ -100,7 +101,7 @@ export const TodayOut = z
       workingDay: { key: "2026-11-20", startsAt: "2026-11-20T04:00:00.000Z", hasShift: false },
       order: [{ taskId: TID, ref: "TSK-1001", title: "Check fire exits", priority: 3, status: "in_progress", dueAt: UTC, due: WALL, evidenceRequired: false, project: "Cleaning", group: "overdue", reason: "overdue by 1 day; high priority" }],
       summary: { headline: "1 overdue", lines: [{ ref: null, text: "Today you have 1 overdue." }], spoken: "Today you have 1 overdue." },
-      reports: 1,
+      reports: 1, roster: 2,
     },
   })
 

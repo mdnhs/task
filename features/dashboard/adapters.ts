@@ -214,6 +214,13 @@ const ATTENTION = {
   evidence_review: { kind: "blue", icon: "folder", status: { tone: "info", label: "Evidence" } },
   report_missing: { kind: "red", icon: "report", status: { tone: "bad", label: "Missing report" } },
   report_returned: { kind: "amber", icon: "report", status: { tone: "warn", label: "Returned" } },
+  // roster items (B8 T14); the roster screens come with the web tasks: they all open /rosters for now
+  roster_leave: { kind: "blue", icon: "roster", status: { tone: "info", label: "Leave request" } },
+  roster_change_request: { kind: "blue", icon: "roster", status: { tone: "info", label: "Change request" } },
+  roster_open_shift: { kind: "amber", icon: "roster", status: { tone: "warn", label: "Open shift" } },
+  roster_draft_week: { kind: "amber", icon: "roster", status: { tone: "warn", label: "Draft roster" } },
+  qualification_expiring: { kind: "amber", icon: "badge", status: { tone: "warn", label: "Licence" } },
+  roster_unconfirmed: { kind: "blue", icon: "roster", status: { tone: "info", label: "Confirm shift" } },
 } as const
 
 export function toAttention(dto: unknown): ManagerAttentionData & { nextCursor: string | null } {
@@ -225,12 +232,12 @@ export function toAttention(dto: unknown): ManagerAttentionData & { nextCursor: 
     nextCursor: R.strOrNull(r, "nextCursor"),
     items: R.arr(r, "items").map((v): AttentionRow => {
       const x = R.rec(v, "attention item")
-      R.exact(x, ["kind", "ref", "taskId", "reportId", "reportKey", "title", "ownerId", "owner", "dueAt", "reason"])
+      R.exact(x, ["kind", "ref", "taskId", "reportId", "reportKey", "title", "ownerId", "owner", "dueAt", "reason"], ["rosterRef"])
       const kind = R.oneOf(x, "kind", Object.keys(ATTENTION) as (keyof typeof ATTENTION)[])
       const ref = R.strOrNull(x, "ref")
       const reportId = R.strOrNull(x, "reportId")
       const key = R.strOrNull(x, "reportKey")
-      const href = ref ? `/tasks/${ref}` : reportId ? `/daily-reports/${reportId}` : key ? `/daily-reports/${encodeURIComponent(key)}` : "/daily-reports"
+      const href = kind.startsWith("roster_") || kind === "qualification_expiring" ? "/rosters" : ref ? `/tasks/${ref}` : reportId ? `/daily-reports/${reportId}` : key ? `/daily-reports/${encodeURIComponent(key)}` : "/daily-reports"
       return { ...ATTENTION[kind], title: R.str(x, "title"), by: R.str(x, "owner"), note: R.str(x, "reason"), href }
     }),
   }
@@ -298,7 +305,7 @@ export function toStaff(dto: unknown, ctx: { tz: string }): StaffHome {
 /** `GET /v1/today`. The day key is the SERVER's working day (H6); counts, order and the written summary are the server's. */
 export function toToday(dto: unknown, ctx: { meId: string; subject?: string; tz: string; nowAt: string; now: string; tzLabel: string; mode: TodayMode }): TodayData {
   const r = R.rec(dto, "today")
-  R.exact(r, ["counts", "workingDay", "order", "summary", "reports"], ["team"])
+  R.exact(r, ["counts", "workingDay", "order", "summary", "reports"], ["team", "roster"])
   const c = R.rec(r.counts, "counts")
   R.exact(c, ["overdue", "dueToday", "high", "review", "reports", "blocked"])
   const wd = R.rec(r.workingDay, "workingDay")

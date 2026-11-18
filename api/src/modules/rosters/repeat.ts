@@ -199,6 +199,8 @@ type StoredShift = WeekTemplateShift & { typeName: string }
 type TemplateRow = typeof rosterWeekTemplates.$inferSelect
 const templateDto = (r: TemplateRow): TemplateDto => ({ id: r.id, locationId: r.locationId, name: r.name, shifts: r.shifts.length, createdAt: r.createdAt.toISOString(), createdBy: r.createdBy })
 const CTRL = /[\u0000-\u001f\u007f]/
+/** A person id that matches nobody: the loader reads the shifts of the people it is given, so "no people" must not mean "everybody". */
+const NO_PERSON = "__no_person__"
 
 /**
  * POST /v1/roster/weeks/{id}/save-template (`{ name }`): a named copy of the week's people and individual times by weekday (a draft or a published week; the week itself is untouched). The shift
@@ -288,7 +290,7 @@ export async function applyTemplate(tx: TenantTx, ctx: RosterCtx, input: { templ
   if (missing.length > 0) throw unprocessable("no_matching_type", { typeNames: missing })
   const mapped: WeekTemplate = { id: tpl.id, name: tpl.name, locationId: input.locationId, shifts: stored.map((s) => ({ day: s.day, personId: s.personId, templateId: resolve(s)!.id, role: s.role, start: s.start, end: s.end, unpaidBreakMin: s.unpaidBreakMin })) }
   const people = [...new Set(stored.flatMap((s) => (s.personId ? [s.personId] : [])))].sort()
-  const rc = await loadRuleContext(tx, ctx, { personIds: people, from: input.weekStart, to: addDays(input.weekStart, 6) })
+  const rc = await loadRuleContext(tx, ctx, { personIds: people.length > 0 ? people : [NO_PERSON], from: input.weekStart, to: addDays(input.weekStart, 6) }) // a template of open shifts only loads nobody else's roster
   rc.zones = { ...rc.zones, [input.locationId]: zone }
   for (const t of types) if (!rc.templates.some((x) => x.id === t.id)) rc.templates.push({ id: t.id, locationId: t.locationId, name: t.name, start: t.startTime, end: t.endTime, unpaidBreakMin: t.unpaidBreakMin, role: t.role, requires: t.requires } satisfies ShiftTemplate)
   const ids = [existing?.id ?? randomUUID(), ...mapped.shifts.map(() => randomUUID())]

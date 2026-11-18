@@ -6,7 +6,7 @@ import { registerFiles } from "./modules/files"
 import { registerGdpr, SWEEP_JOB } from "./modules/gdpr"
 import { registerIntegrations } from "./modules/integrations"
 import { NOTIFICATION_SWEEP_JOB, registerNotifications } from "./modules/notifications"
-import { AUTO_REPEAT_JOB, registerRosters } from "./modules/rosters"
+import { AUTO_REPEAT_JOB, QUALIFICATION_EXPIRY_JOB, registerRosters } from "./modules/rosters"
 import { registerSearchIndexers } from "./modules/search"
 import { DEADLINE_JOB, EXPORT_SWEEP_JOB, registerShiftReports } from "./modules/shift-reports"
 import { ARCHIVE_PURGE_JOB, RECURRENCE_JOB, registerTasks } from "./modules/tasks"
@@ -29,7 +29,7 @@ export async function startWorkerProcess(env: Env = parseEnv(process.env)) {
   registerGdpr() // core DSR handlers + dsr.export / dsr.erase / dsr.export-expire jobs
   registerTasks() // tasks DSR handler (after the core ones: it runs before the membership is removed by the erase job) + the tasks.recurrence and tasks.archive-purge jobs
   registerShiftReports() // shift-reports DSR handler (after the core ones: it runs before the membership is removed by the erase job)
-  registerRosters() // the roster sweeps: roster.auto-repeat (B8 T13)
+  registerRosters() // the roster sweeps: roster.auto-repeat (T13) and roster.qualification-expiry (T14)
   registerJob("events.relay", async (_data, d) => {
     await relayOnce(d)
   })
@@ -44,6 +44,7 @@ export async function startWorkerProcess(env: Env = parseEnv(process.env)) {
   await queue.raw.upsertJobScheduler(DEADLINE_JOB, { every: 5 * 60_000 }, { name: DEADLINE_JOB, opts: { removeOnComplete: true, removeOnFail: 100 } }) // shift-end prompt and missing-report alerts (T5.4); exactly once per (member, shift, day, kind) via the ledger, safe with two workers
   await queue.raw.upsertJobScheduler(EXPORT_SWEEP_JOB, { every: 10 * 60_000 }, { name: EXPORT_SWEEP_JOB, opts: { removeOnComplete: true, removeOnFail: 100 } }) // report exports (T5.5): re-enqueue lost exports, expire files after 7 days; safe with two workers
   await queue.raw.upsertJobScheduler(AUTO_REPEAT_JOB, { every: 15 * 60_000 }, { name: AUTO_REPEAT_JOB, opts: { removeOnComplete: true, removeOnFail: 100 } }) // next week's roster draft N days ahead (B8 T13); exactly once per (source week, target week) via the ledger, safe with two workers
+  await queue.raw.upsertJobScheduler(QUALIFICATION_EXPIRY_JOB, { every: 60 * 60_000 }, { name: QUALIFICATION_EXPIRY_JOB, opts: { removeOnComplete: true, removeOnFail: 100 } }) // qualification expiry notices (B8 T14); exactly once per (person, qualification, expiry date, lead) via the ledger, safe with two workers
   const beatRedis = new Redis(env.REDIS_URL, { enableOfflineQueue: false, maxRetriesPerRequest: 1, connectTimeout: 2000, retryStrategy: (n) => Math.min(n * 200, 2000) })
   beatRedis.on("error", () => {}) // reconnects on its own; a failed beat just lets the key expire
   const heartbeat = startHeartbeat(beatRedis, { host: hostname() }) // the compose healthcheck reads this (scripts/worker-healthcheck.mjs)

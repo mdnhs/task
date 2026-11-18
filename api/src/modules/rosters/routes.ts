@@ -1,4 +1,5 @@
-import { createRoute } from "@hono/zod-openapi"
+import { createHash } from "node:crypto"
+import { createRoute, z } from "@hono/zod-openapi"
 import { newRouter } from "../../core/router"
 import {
   HomeLocationBody, HomeLocationOut, QualificationsBody, QualificationsOut, CreateLocationBody, CreateShiftTypeBody, LocationSchema, LocationsOut, LocationsQuery, OfficeLimitBody, OfficeLimitOut, PatchLocationBody, PatchShiftTypeBody, RosterIdParam, RosterUserParam,
@@ -23,13 +24,23 @@ import { DecideExchangeBody, DecideExchangeOut, ExchangeListOut, ExchangeQuery, 
 import { cancelExchange, claimShift, declineExchange, decideExchange, listExchanges, recommendExchange, swapShift } from "./exchange"
 import { ApplyTemplateBody, ApplyTemplateOut, AutoRepeatBody, RepeatBody, RepeatOut, SaveTemplateBody, TemplateSchema, TemplatesOut, TemplatesQuery } from "./dto"
 import { applyTemplate, deleteTemplate, listTemplates, repeatWeek, saveTemplate, setAutoRepeat } from "./repeat"
-import { rosterGuard } from "./scope"
+import { CoverageOut, CoverageQuery, MineOut, MineQuery } from "./dto-reads"
+import { ICS_RATE, myIcs, myRoster } from "./mine"
+import { coverage } from "./read-model"
+import { rateLimit } from "../../core/middleware/rate-limit"
+import { subjectUserId } from "../../core/middleware/principal"
+import { readModelKey, readModelTtl } from "../read-models/cache"
+import { rosterGuard, type RosterCtx } from "./scope"
 import { rosterRead, rosterWrite } from "./write"
+import { todayOf } from "./qualifications"
 
 const guard = (need: "read" | "write") => rosterGuard(need)
 const ETAG_HEADER = { ETag: { description: "Strong ETag of the stored rule settings", schema: { type: "string" as const, example: '"3f2a9c0d1b7e4a58c6d2e9f01a4b7c3d"' } } }
 const json = <S extends Parameters<typeof Object>[0]>(schema: S, description: string) => ({ description, content: { "application/json": { schema } } })
 const body = <S extends Parameters<typeof Object>[0]>(schema: S) => ({ content: { "application/json": { schema } }, required: true as const })
+
+/** The part of a roster read-model cache key that names what the caller may see: the scope and the exact set of sites (hashed), so two callers with different cuts never share an entry. */
+const scopeKey = (ctx: RosterCtx): string => `rs=${ctx.access.scope}:${createHash("sha1").update([...(ctx.access.locationIds ?? [])].sort().join(",")).digest("hex").slice(0, 16)}`
 
 const HIDDEN = "404 not_found for a location the caller may not see, one that does not exist, another tenant's and an id that is not a uuid (all the same answer)"
 
@@ -250,6 +261,21 @@ const applyTemplateR = createRoute({
   responses: { 201: json(ApplyTemplateOut, `A new DRAFT week at a location from a template (an empty draft week is filled). At another location the shift types are matched by name and people who are not on that site's team become open shifts with a conflict; leave, a clash, a person who left or lacks a qualification are opened as in a repeat. Nobody is notified. ${HIDDEN} (for the template and for the location); 403 forbidden; 409 week_exists (the existing week with shifts, its id in weekId) | week_published | location_archived; 422 invalid_week_start (a real Monday) | no_matching_type (typeNames lists them)`) },
 })
 
+const mineR = createRoute({
+  method: "get", path: "/v1/roster/mine", middleware: guard("read"), request: { query: MineQuery },
+  responses: { 200: json(MineOut, "The caller's OWN shifts of PUBLISHED weeks across every location as one list (FR-RS-33), by start date: the place's name and address, the times (wall strings and instants), the confirmation state. Never another person, never a draft week. An API key reads its creator's. `from` defaults to today (tenant zone), `to` to 27 days later (at most 366 days). 422 invalid_range") },
+})
+const mineIcsR = createRoute({
+  method: "get", path: "/v1/roster/mine.ics", middleware: [...guard("read"), rateLimit("roster-ics", ICS_RATE, (c) => `${c.get("tenant")!.id}:${subjectUserId(c)}`)] as const, request: { query: MineQuery },
+  responses: {
+    200: { description: "The same shifts as an iCalendar download (R8-16, FR-RS-40): `text/calendar; charset=utf-8`, `Content-Disposition: attachment`, `X-Content-Type-Options: nosniff`, `Cache-Control: private, no-store`. UTC times from the stored instants (no VTIMEZONE), UID `<shift uuid>@<host of APP_URL>`, CRLF lines folded at 75 octets, every text escaped. Summary: role at place; location: name and address; nothing about another person. Needs the caller's own session (or API key): there is no secret URL. 20 downloads a minute per person (429 rate_limited with Retry-After). 422 invalid_range (a problem document, not a calendar)", content: { "text/calendar": { schema: z.string().openapi({ example: "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nEND:VCALENDAR\r\n" }) } } },
+  },
+})
+const coverageR = createRoute({
+  method: "get", path: "/v1/roster/coverage", middleware: guard("read"), request: { query: CoverageQuery },
+  responses: { 200: json(CoverageOut, "Per location the caller sees and per day of the range: people assigned (`staff`), the staffing target, `short` and `over` (the domain day columns: an open shift is not a person, so it counts as short) and the open shifts, for draft and published weeks. A supervisor: their sites; an office role: all but its except list; staff: an empty list. Derived on read (cached 30 s per scope, dropped by any write). 404 not_found for a location the caller may not see, a missing one and a non-uuid id; 422 invalid_range (at most 62 days)") },
+})
+
 export const rosterRoutes = newRouter()
   .openapi(listR, async (c) => c.json(await rosterRead(c, (tx, ctx) => listLocations(tx, ctx, { includeArchived: c.req.valid("query").includeArchived === "true" })), 200))
   .openapi(createR, async (c) => c.json(await rosterWrite(c, (tx, ctx) => createLocation(tx, ctx, c.req.valid("json"))), 201))
@@ -328,6 +354,20 @@ export const rosterRoutes = newRouter()
   .openapi(deleteTemplateR, async (c) => {
     await rosterWrite(c, (tx, ctx) => deleteTemplate(tx, ctx, c.req.valid("param").id))
     return c.body(null, 204)
+  })
+  .openapi(mineR, async (c) => c.json(await rosterRead(c, (tx, ctx) => myRoster(tx, ctx, c.req.valid("query"))), 200))
+  .openapi(mineIcsR, async (c) => {
+    const text = await rosterRead(c, (tx, ctx) => myIcs(tx, ctx, c.req.valid("query"), new URL(c.get("deps").env.APP_URL).hostname))
+    return c.body(text, 200, { "content-type": "text/calendar; charset=utf-8", "content-disposition": 'attachment; filename="roster.ics"', "x-content-type-options": "nosniff", "cache-control": "private, no-store" })
+  })
+  .openapi(coverageR, async (c) => {
+    const q = c.req.valid("query")
+    const out = await rosterRead(c, (tx, ctx) => {
+      const deps = c.get("deps")
+      const key = readModelKey(c, `coverage:${createHash("sha1").update(JSON.stringify([q.from ?? null, q.to ?? null, q.locationId ?? null])).digest("hex").slice(0, 16)}`, scopeKey(ctx), false, todayOf(ctx))
+      return deps.readModelCache.cached(key, readModelTtl(!!c.get("support")), () => coverage(tx, ctx, q), ctx.now)
+    })
+    return c.json(out, 200)
   })
   .openapi(shiftDeleteR, async (c) => {
     await rosterWrite(c, (tx, ctx, env) => deleteShift(tx, ctx, env, c.req.valid("param").id, c.req.valid("query")))

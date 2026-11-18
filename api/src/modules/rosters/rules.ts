@@ -34,30 +34,35 @@ const SEVERITIES: readonly string[] = ["block", "warn", "ignore"]
 export const STATUTORY_RULES: readonly RuleId[] = ["daily_rest", "weekly_rest", "avg_48h"]
 const allowed = (rule: RuleId, s: string): boolean => SEVERITIES.includes(s) && !(s === "ignore" && STATUTORY_RULES.includes(rule))
 
-export type RuleSettings = { severity: Record<RuleId, RuleSeverity>; avgWeekReferenceWeeks: number }
+/** Days before a week starts that a still-unpublished draft becomes an attention item (B8 T14, 0 = only from the day it starts). */
+export const DEFAULT_DRAFT_WARN_DAYS = 3
+const MAX_DRAFT_WARN_DAYS = 28
 
+export type RuleSettings = { severity: Record<RuleId, RuleSeverity>; avgWeekReferenceWeeks: number; draftWarnDays: number }
+
+const isDraftDays = (v: unknown): v is number => typeof v === "number" && Number.isInteger(v) && v >= 0 && v <= MAX_DRAFT_WARN_DAYS
 const isWeeks = (v: unknown): v is number => typeof v === "number" && Number.isInteger(v) && v >= 1 && v <= MAX_AVG_WEEKS
 
 /** The tenant's setting over the defaults. A stored value that is damaged or names a rule this version does not know falls back per field, never fails a check. */
 export async function readRules(tx: TenantTx, tenantId: string): Promise<RuleSettings> {
-  const v = (await readSetting(tx, tenantId, RULES_SETTING)) as { severity?: Record<string, unknown>; avgWeekReferenceWeeks?: unknown } | undefined
+  const v = (await readSetting(tx, tenantId, RULES_SETTING)) as { severity?: Record<string, unknown>; avgWeekReferenceWeeks?: unknown; draftWarnDays?: unknown } | undefined
   const severity = { ...DEFAULT_SEVERITY }
   for (const r of RULE_IDS) {
     const s = v?.severity?.[r]
     if (typeof s === "string" && SEVERITIES.includes(s)) severity[r] = (s === "ignore" && STATUTORY_RULES.includes(r) ? "warn" : s) as RuleSeverity // a stored ignore on a statutory rule reads as warn
   }
-  return { severity, avgWeekReferenceWeeks: isWeeks(v?.avgWeekReferenceWeeks) ? v.avgWeekReferenceWeeks : DEFAULT_AVG_WEEKS }
+  return { severity, avgWeekReferenceWeeks: isWeeks(v?.avgWeekReferenceWeeks) ? v.avgWeekReferenceWeeks : DEFAULT_AVG_WEEKS, draftWarnDays: isDraftDays(v?.draftWarnDays) ? v.draftWarnDays : DEFAULT_DRAFT_WARN_DAYS }
 }
 
 /** The strong ETag of the settings the engine reads (normalised, fixed key order), so a stored value that normalises to the same reading has the same tag. */
 export const rulesEtag = (r: RuleSettings): string =>
-  `"${createHash("sha256").update(JSON.stringify({ severity: RULE_IDS.map((id) => [id, r.severity[id]]), avgWeekReferenceWeeks: r.avgWeekReferenceWeeks })).digest("hex").slice(0, 32)}"`
+  `"${createHash("sha256").update(JSON.stringify({ severity: RULE_IDS.map((id) => [id, r.severity[id]]), avgWeekReferenceWeeks: r.avgWeekReferenceWeeks, draftWarnDays: r.draftWarnDays })).digest("hex").slice(0, 32)}"`
 
 /**
  * PUT /v1/roster/rules (admin or owner: roster write AND settings write), with If-Match (428 without it, a stale one is 412, both decided under the roster lock). PATCH-like: a rule or the window left out KEEPS its stored value. Severity per rule is block | warn | ignore, except the statutory rules (daily_rest, weekly_rest,
- * avg_48h), which take only warn | block. An unknown rule id or a bad severity is 422 invalid_rules, a bad window 422 invalid_avg_weeks (1..52). An unchanged set writes nothing.
+ * avg_48h), which take only warn | block. An unknown rule id or a bad severity is 422 invalid_rules, a bad window 422 invalid_avg_weeks (1..52), a bad `draftWarnDays` (0..28, the days before a week starts that an unpublished draft shows in the attention feed) 422 invalid_draft_days. An unchanged set writes nothing.
  */
-export async function putRules(tx: TenantTx, ctx: RosterCtx, input: { severity: Record<string, string>; avgWeekReferenceWeeks?: number }, ifMatch: string | undefined): Promise<RuleSettings> {
+export async function putRules(tx: TenantTx, ctx: RosterCtx, input: { severity: Record<string, string>; avgWeekReferenceWeeks?: number; draftWarnDays?: number }, ifMatch: string | undefined): Promise<RuleSettings> {
   if (!can(ctx.role, "settings", "write")) throw Forbidden("forbidden") // the permission first: a caller who may not change the rules learns nothing about preconditions
   if (!ifMatch) throw new AppError(428, "precondition_required", "Precondition Required")
   const old = await readRules(tx, ctx.tenantId)
@@ -69,7 +74,8 @@ export async function putRules(tx: TenantTx, ctx: RosterCtx, input: { severity: 
     severity[rule as RuleId] = s as RuleSeverity
   }
   if (input.avgWeekReferenceWeeks !== undefined && !isWeeks(input.avgWeekReferenceWeeks)) throw unprocessable("invalid_avg_weeks")
-  const next: RuleSettings = { severity, avgWeekReferenceWeeks: input.avgWeekReferenceWeeks ?? old.avgWeekReferenceWeeks }
+  if (input.draftWarnDays !== undefined && !isDraftDays(input.draftWarnDays)) throw unprocessable("invalid_draft_days")
+  const next: RuleSettings = { severity, avgWeekReferenceWeeks: input.avgWeekReferenceWeeks ?? old.avgWeekReferenceWeeks, draftWarnDays: input.draftWarnDays ?? old.draftWarnDays }
   if (JSON.stringify(old) === JSON.stringify(next)) return old
   await writeSetting(tx, ctx.tenantId, RULES_SETTING, next)
   await auditRoster(tx, ctx, { action: "roster.rules_changed", entity: "roster_rules", entityId: ctx.tenantId, before: old, after: next })

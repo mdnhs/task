@@ -1,15 +1,15 @@
-import { and, asc, eq, sql } from "drizzle-orm"
+import { and, asc, between, eq, notExists, sql } from "drizzle-orm"
 import { addDays, epochToWall } from "@opsdesk/domain/shifts"
 import { rosterAccess } from "@opsdesk/domain/roster-access"
 import type { ResolvedRole } from "../../core/context"
 import { registerJob } from "../../core/queue/queue"
 import { startSweep } from "../../core/observability/sweep"
-import { locations, rosterAutoRepeatRuns, rosterWeeks, tenants } from "../../db/schema"
+import { locations, memberQualifications, memberships, qualificationExpiryNotices, rosterAutoRepeatRuns, rosterWeeks, tenants } from "../../db/schema"
 import { withTenant, type TenantTx } from "../../db/tenant-tx"
 import type { Deps } from "../../deps"
 import { errorInfo } from "../../core/safe-error"
 import { tenantEntitlements } from "../entitlements/service"
-import { withTenantAfterCommit } from "../notifications"
+import { notifyMany, SUBJECT_TOKEN, withTenantAfterCommit, type NotifyInput } from "../notifications"
 import { approversOf, notifyActive } from "./events"
 import { copyWeek } from "./repeat"
 import { lockRoster, type RosterCtx } from "./scope"
@@ -146,7 +146,111 @@ export async function runAutoRepeatJob(data: unknown, deps: Deps): Promise<void>
   }
 }
 
+// ------------------------------------------------------------------ qualification expiry (FR-RS-40)
+
+export const QUALIFICATION_EXPIRY_JOB = "roster.qualification-expiry"
+export const EXPIRY_ACTOR = "system:roster-qualification-expiry"
+/** Qualifications one run enters in the ledger and tells about per tenant; the rest are done by the next run (the schedule is hourly). */
+export const EXPIRY_BATCH = 200
+/** The days before the expiry date at which the person and the office are told (the SMALLEST lead that covers the days left is the current one). */
+export const EXPIRY_LEADS = [1, 7, 14, 30] as const
+/** A licence that expired up to this many days ago is still reported once (an outage must not lose it); an older one is not, so the first run on a new tenant is not a flood. */
+export const EXPIRY_CATCH_UP_DAYS = 7
+/** The "no site" id of an office audience: no except-list row can match it, so every office role is asked. */
+const NO_SITE = "00000000-0000-0000-0000-000000000000"
+
+/** The lead bucket of `daysLeft` days to the expiry date: 0 once it has expired (reported once), else the smallest lead that covers it; null when outside the window. */
+export function expiryLead(daysLeft: number): number | null {
+  if (daysLeft < -EXPIRY_CATCH_UP_DAYS) return null
+  if (daysLeft < 0) return 0
+  return EXPIRY_LEADS.find((l) => daysLeft <= l) ?? null
+}
+
+type Due = { userId: string; type: string; expiresOn: string; lead: number; home: string | null }
+
+/** The qualifications that need a notice today: active members, inside the window, and no ledger row for their CURRENT lead. Soonest first, at most `limit`. */
+async function dueQualifications(tx: TenantTx, tenantId: string, today: string, limit: number): Promise<Due[]> {
+  const mq = memberQualifications
+  const n = qualificationExpiryNotices
+  const left = sql`(${mq.expiresOn} - ${today}::date)`
+  const lead = sql<number>`(case when ${left} < 0 then 0 ${sql.join(EXPIRY_LEADS.map((l) => sql`when ${left} <= ${l} then ${l}`), sql` `)} else null end)`
+  const max = EXPIRY_LEADS[EXPIRY_LEADS.length - 1]
+  const rows = await tx
+    .select({ userId: mq.userId, type: mq.type, expiresOn: mq.expiresOn, lead, home: memberships.homeLocationId })
+    .from(mq)
+    .innerJoin(memberships, and(eq(memberships.tenantId, mq.tenantId), eq(memberships.userId, mq.userId)))
+    .where(
+      and(
+        eq(mq.tenantId, tenantId), eq(memberships.status, "active"), between(mq.expiresOn, addDays(today, -EXPIRY_CATCH_UP_DAYS), addDays(today, max)),
+        notExists(tx.select({ one: sql`1` }).from(n).where(and(eq(n.tenantId, mq.tenantId), eq(n.userId, mq.userId), eq(n.type, mq.type), eq(n.expiresOn, mq.expiresOn), sql`${n.leadDays} = ${lead}`))),
+      ),
+    )
+    .orderBy(asc(mq.expiresOn), asc(mq.userId), asc(mq.type))
+    .limit(limit)
+  const daysLeft = (date: string): number => Math.round((Date.parse(`${date}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) / 86_400_000)
+  // the SQL above only narrows the candidates; `expiryLead` is the rule: a row the two disagree on is never told
+  return rows.map((r) => ({ userId: r.userId, type: r.type, expiresOn: r.expiresOn!, lead: Number(r.lead), home: r.home })).filter((d) => expiryLead(daysLeft(d.expiresOn)) === d.lead)
+}
+
+/**
+ * One tenant's notices, ONE transaction under the roster lock: the ledger rows are inserted ON CONFLICT DO NOTHING RETURNING and only the rows that came back are told (a second worker, a retry
+ * or a restart inserts nothing and so sends nothing; a failure rolls the ledger back with the notices). The person hears "Your <licence> expires on <date>"; the office roles that cover the
+ * person's home site (all of them for a person homed nowhere; a Roster Manager excepted from the site is not asked) hear `{{subject}}: <licence> expires on <date>`: the name is rendered when it is
+ * read, never stored. Active people only, in one `notifyMany` batch. Returns how many licences were told.
+ */
+async function noticesOne(deps: Deps, tenantId: string, tz: string, now: Date, limit: number): Promise<number> {
+  return withTenantAfterCommit(deps, tenantId, async (tx, enqueue) => {
+    await lockRoster(tx, tenantId)
+    const today = epochToWall(now.getTime(), tz).slice(0, 10)
+    const due = await dueQualifications(tx, tenantId, today, limit)
+    if (due.length === 0) return 0
+    const fresh = await tx
+      .insert(qualificationExpiryNotices)
+      .values(due.map((d) => ({ tenantId, userId: d.userId, type: d.type, expiresOn: d.expiresOn, leadDays: d.lead, createdAt: now })))
+      .onConflictDoNothing()
+      .returning({ userId: qualificationExpiryNotices.userId, type: qualificationExpiryNotices.type, expiresOn: qualificationExpiryNotices.expiresOn, lead: qualificationExpiryNotices.leadDays })
+    const told = new Set(fresh.map((f) => `${f.userId}|${f.type}|${f.expiresOn}|${f.lead}`))
+    const send = due.filter((d) => told.has(`${d.userId}|${d.type}|${d.expiresOn}|${d.lead}`))
+    const audience = new Map<string, string[]>()
+    const inputs: NotifyInput[] = []
+    for (const d of send) {
+      const expired = d.lead === 0
+      const title = expired ? "Qualification expired" : "Qualification expiring"
+      const what = `${d.type} ${expired ? "expired" : "expires"} on ${d.expiresOn}`
+      inputs.push({ userId: d.userId, kind: "member", title, body: `Your ${what}. Please renew it.`, link: "/rosters" })
+      const key = d.home ?? NO_SITE
+      if (!audience.has(key)) audience.set(key, await approversOf(tx, tenantId, key, { supervisors: false, exclude: [] }))
+      for (const userId of audience.get(key)!) if (userId !== d.userId) inputs.push({ userId, kind: "member", title, body: `${SUBJECT_TOKEN}: ${what}`, link: "/rosters", subjectUserId: d.userId })
+    }
+    await notifyMany(tx, tenantId, inputs, deps, enqueue)
+    return send.length
+  })
+}
+
+/**
+ * Job `roster.qualification-expiry` (every hour, `{ batch? }`; FR-RS-40): the person and the office are told at 30, 14, 7 and 1 days before a qualification's expiry date and once when it has
+ * expired (see `expiryLead`: only the CURRENT lead is sent, never a backlog). Exactly once per (person, qualification, expiry date, lead) through the ledger `qualification_expiry_notices`, so renewing
+ * (a new expiry date) starts a new cycle. Tenants with M1A only; the day is the tenant's (deps.clock); ids and a safe code are logged, never a name.
+ */
+export async function runQualificationExpiryJob(data: unknown, deps: Deps): Promise<void> {
+  const batch = Math.max(1, Math.min(EXPIRY_BATCH, Number((data as { batch?: unknown } | null)?.batch) || EXPIRY_BATCH))
+  const sweep = startSweep(deps, QUALIFICATION_EXPIRY_JOB)
+  try {
+    for (const t of await rosterTenants(deps)) {
+      sweep.tenant()
+      try {
+        await noticesOne(deps, t.id, t.tz, deps.clock.now(), batch)
+      } catch (err) {
+        deps.logger.error({ tenantId: t.id, errCode: safeCode(err) }, "roster qualification expiry failed for a tenant")
+      }
+    }
+  } finally {
+    sweep.done()
+  }
+}
+
 /** Registers the roster jobs (worker.ts, tests). Safe to call again. */
 export function registerRosters(): void {
   registerJob(AUTO_REPEAT_JOB, runAutoRepeatJob)
+  registerJob(QUALIFICATION_EXPIRY_JOB, runQualificationExpiryJob)
 }

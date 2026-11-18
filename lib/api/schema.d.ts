@@ -9791,6 +9791,8 @@ export interface paths {
                                 [key: string]: "block" | "warn" | "ignore";
                             };
                             avgWeekReferenceWeeks: number;
+                            /** @description Days before a week starts that a still-unpublished draft becomes an attention item (0..28, default 3) */
+                            draftWarnDays: number;
                         };
                     };
                 };
@@ -9813,6 +9815,7 @@ export interface paths {
                             [key: string]: string;
                         };
                         avgWeekReferenceWeeks?: number;
+                        draftWarnDays?: number;
                     };
                 };
             };
@@ -9830,6 +9833,8 @@ export interface paths {
                                 [key: string]: "block" | "warn" | "ignore";
                             };
                             avgWeekReferenceWeeks: number;
+                            /** @description Days before a week starts that a still-unpublished draft becomes an attention item (0..28, default 3) */
+                            draftWarnDays: number;
                         };
                     };
                 };
@@ -11788,6 +11793,175 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/roster/mine": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    /** @description First date YYYY-MM-DD (default: today in the tenant zone) */
+                    from?: string;
+                    /** @description Last date, inclusive (default: 27 days after `from`; at most 366 days after it) */
+                    to?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The caller's OWN shifts of PUBLISHED weeks across every location as one list (FR-RS-33), by start date: the place's name and address, the times (wall strings and instants), the confirmation state. Never another person, never a draft week. An API key reads its creator's. `from` defaults to today (tenant zone), `to` to 27 days later (at most 366 days). 422 invalid_range */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            from: string;
+                            to: string;
+                            items: {
+                                /** Format: uuid */
+                                id: string;
+                                date: string;
+                                start: string;
+                                end: string;
+                                startAt: string;
+                                endAt: string;
+                                unpaidBreakMin: number;
+                                role: string;
+                                shiftType: string;
+                                confirmedAt: string | null;
+                                version: number;
+                                /** Format: uuid */
+                                locationId: string;
+                                locationName: string;
+                                locationAddress: string;
+                                timeZone: string;
+                            }[];
+                            /** @description true when the range holds more than the 2000 shifts returned (narrow `from` / `to`) */
+                            truncated: boolean;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/roster/mine.ics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    /** @description First date YYYY-MM-DD (default: today in the tenant zone) */
+                    from?: string;
+                    /** @description Last date, inclusive (default: 27 days after `from`; at most 366 days after it) */
+                    to?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The same shifts as an iCalendar download (R8-16, FR-RS-40): `text/calendar; charset=utf-8`, `Content-Disposition: attachment`, `X-Content-Type-Options: nosniff`, `Cache-Control: private, no-store`. UTC times from the stored instants (no VTIMEZONE), UID `<shift uuid>@<host of APP_URL>`, CRLF lines folded at 75 octets, every text escaped. Summary: role at place; location: name and address; nothing about another person. Needs the caller's own session (or API key): there is no secret URL. 20 downloads a minute per person (429 rate_limited with Retry-After). 422 invalid_range (a problem document, not a calendar) */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/calendar": string;
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/roster/coverage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    /** @description First date YYYY-MM-DD (default: today in the tenant zone) */
+                    from?: string;
+                    /** @description Last date, inclusive (default: 6 days after `from`; at most 62 days after it) */
+                    to?: string;
+                    /** @description One location (404 when the caller may not see it); omitted: every location the caller sees */
+                    locationId?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Per location the caller sees and per day of the range: people assigned (`staff`), the staffing target, `short` and `over` (the domain day columns: an open shift is not a person, so it counts as short) and the open shifts, for draft and published weeks. A supervisor: their sites; an office role: all but its except list; staff: an empty list. Derived on read (cached 30 s per scope, dropped by any write). 404 not_found for a location the caller may not see, a missing one and a non-uuid id; 422 invalid_range (at most 62 days) */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            from: string;
+                            to: string;
+                            locations: {
+                                /** Format: uuid */
+                                locationId: string;
+                                name: string;
+                                days: {
+                                    date: string;
+                                    /** Format: uuid */
+                                    weekId: string;
+                                    /** @enum {string} */
+                                    status: "draft" | "published";
+                                    /** @description People assigned that day (open shifts are not people) */
+                                    staff: number;
+                                    target: number;
+                                    /** @description target - staff, never below 0: an open shift counts as short until somebody takes it */
+                                    short: number;
+                                    over: number;
+                                    /** @description Open shifts that day */
+                                    open: number;
+                                }[];
+                            }[];
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/members/{userId}/deactivate": {
         parameters: {
             query?: never;
@@ -13456,11 +13630,13 @@ export interface paths {
                         "application/json": {
                             items: {
                                 /** @enum {string} */
-                                kind: "overdue" | "blocked" | "evidence_review" | "report_missing" | "report_returned";
+                                kind: "overdue" | "blocked" | "evidence_review" | "report_missing" | "report_returned" | "roster_leave" | "roster_change_request" | "roster_open_shift" | "roster_draft_week" | "qualification_expiring" | "roster_unconfirmed";
                                 ref: string | null;
                                 taskId: string | null;
                                 reportId: string | null;
                                 reportKey: string | null;
+                                /** @description Roster items (B8): the id to open: a shift, change request, leave or week; for an expiring qualification the person */
+                                rosterRef: string | null;
                                 title: string;
                                 ownerId: string | null;
                                 owner: string;
@@ -13553,6 +13729,8 @@ export interface paths {
                                 }[];
                             };
                             reports: number;
+                            /** @description Upcoming shifts of the caller's own that are published and not confirmed yet (0 without the roster module) */
+                            roster?: number;
                         };
                     };
                 };

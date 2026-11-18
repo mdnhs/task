@@ -135,7 +135,7 @@ describe("the check endpoint (FR-RS-44)", () => {
     const leave = (await w.ok("POST", "/v1/leave", staff, { from: "2026-11-03", to: "2026-11-03", kind: "annual", note: "" }, 201)).id
     await w.ok("POST", `/v1/leave/${leave}/decide`, w.p.owner, { decision: "approve", note: "" })
     const wk = await w.week(w.a, MON)
-    expect(await w.ok("GET", "/v1/roster/rules", w.p.owner)).toEqual({ severity: DEFAULT_SEVERITY, avgWeekReferenceWeeks: 17 })
+    expect(await w.ok("GET", "/v1/roster/rules", w.p.owner)).toEqual({ severity: DEFAULT_SEVERITY, avgWeekReferenceWeeks: 17, draftWarnDays: 3 })
     expect(DEFAULT_SEVERITY).toMatchObject({ double_booking: "block", approved_leave: "block" })
     for (const r of RULE_IDS.filter((x) => x !== "double_booking" && x !== "approved_leave")) expect(DEFAULT_SEVERITY[r], r).toBe("warn")
     const before = await w.violations(w.p.owner, wk)
@@ -273,25 +273,25 @@ describe("the check endpoint (FR-RS-44)", () => {
 describe("settings: GET and PUT /v1/roster/rules", () => {
   test("PUT: supervisor 403; unknown rule id 422; avgWeekReferenceWeeks outside 1..52 is 422; admin and owner change it with an audit line; an unchanged set writes nothing", async () => {
     const w = await sites()
-    const good = { severity: { ...DEFAULT_SEVERITY, daily_rest: "block" }, avgWeekReferenceWeeks: 26 }
+    const good = { severity: { ...DEFAULT_SEVERITY, daily_rest: "block" }, avgWeekReferenceWeeks: 26, draftWarnDays: 3 } // the PUT body leaves draftWarnDays out (it keeps its stored value); the readings carry it
     for (const who of [w.p["location-supervisor"], w.p["roster-manager"], w.p.manager, w.p.employee]) expect((await w.req("PUT", "/v1/roster/rules", who, good)).status, who.email).toBe(403)
-    expect(await w.ok("GET", "/v1/roster/rules", w.p.owner)).toEqual({ severity: DEFAULT_SEVERITY, avgWeekReferenceWeeks: 17 })
+    expect(await w.ok("GET", "/v1/roster/rules", w.p.owner)).toEqual({ severity: DEFAULT_SEVERITY, avgWeekReferenceWeeks: 17, draftWarnDays: 3 })
     expect(await w.code("PUT", "/v1/roster/rules", w.p.admin, { ...good, severity: { ...good.severity, not_a_rule: "warn" } }, 422)).toBe("invalid_rules")
     expect(await w.code("PUT", "/v1/roster/rules", w.p.admin, { ...good, severity: { ...good.severity, daily_rest: "panic" } }, 422)).toBe("invalid_rules")
     for (const weeks of [0, 53, -1, 1.5, 100]) expect(await w.code("PUT", "/v1/roster/rules", w.p.admin, { ...good, avgWeekReferenceWeeks: weeks }, 422), String(weeks)).toBe("invalid_avg_weeks")
     expect(await w.rows("select 1 from tenant_settings where key = 'roster.rules'")).toEqual([])
-    expect(await w.ok("PUT", "/v1/roster/rules", w.p.admin, good)).toEqual(good)
+    expect(await w.ok("PUT", "/v1/roster/rules", w.p.admin, { severity: good.severity, avgWeekReferenceWeeks: 26 })).toEqual(good)
     expect(await w.ok("GET", "/v1/roster/rules", w.staff2)).toEqual(good)
     const [a] = await w.rows("select actor_id, before, after, entity from audit_events where action = 'roster.rules_changed'")
     expect(a.actor_id).toBe(w.p.admin.userId)
     expect(a.entity).toBe("roster_rules")
-    expect(a.before).toEqual({ severity: DEFAULT_SEVERITY, avgWeekReferenceWeeks: 17 })
+    expect(a.before).toEqual({ severity: DEFAULT_SEVERITY, avgWeekReferenceWeeks: 17, draftWarnDays: 3 })
     expect(a.after).toEqual(good)
     await w.ok("PUT", "/v1/roster/rules", w.p.owner, good) // unchanged: no second audit line
     expect(await w.rows("select 1 from audit_events where action = 'roster.rules_changed'")).toHaveLength(1)
     // a rule left out falls back to its default
     // AD4: a rule left out keeps its STORED value (here daily_rest block, 26 weeks), never the default; the window may be left out as well
-    expect(await w.ok("PUT", "/v1/roster/rules", w.p.owner, { severity: { unavailable: "ignore" } })).toEqual({ severity: { ...good.severity, unavailable: "ignore" }, avgWeekReferenceWeeks: 26 })
+    expect(await w.ok("PUT", "/v1/roster/rules", w.p.owner, { severity: { unavailable: "ignore" } })).toEqual({ severity: { ...good.severity, unavailable: "ignore" }, avgWeekReferenceWeeks: 26, draftWarnDays: 3 })
     // the setting is per tenant
     expect(await ownerQuery("select 1 from tenant_settings where key = 'roster.rules' and tenant_id <> $1", [w.tenant.id])).toEqual([])
   })

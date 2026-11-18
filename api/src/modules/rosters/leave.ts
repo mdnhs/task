@@ -47,7 +47,7 @@ function mayDecideFor(ctx: RosterCtx, home: string | null): boolean {
 }
 
 /** The same cut as SQL on the member's home location (the leave list and the notification audience follow it). */
-function approverReach(ctx: RosterCtx): SQL {
+export function approverReach(ctx: RosterCtx): SQL {
   const home = memberships.homeLocationId
   if (ctx.access.scope === "all" && ctx.access.editPublished) {
     const ids = ctx.access.locationIds ?? []

@@ -5,4 +5,5 @@ export { rosterRead, rosterWrite, officeOnly, unrestrictedOffice, writeHistory, 
 export { shiftInstants, instantSql, normaliseRequires, qualificationKey } from "./locations"
 export { reachablePerson, ROSTERED_LOOKBACK_DAYS } from "./people"
 export { isExpired, todayOf } from "./qualifications"
-export { AUTO_REPEAT_JOB, AUTO_REPEAT_ACTOR, registerRosters, runAutoRepeatJob } from "./jobs"
+export { AUTO_REPEAT_JOB, AUTO_REPEAT_ACTOR, QUALIFICATION_EXPIRY_JOB, EXPIRY_ACTOR, registerRosters, runAutoRepeatJob, runQualificationExpiryJob } from "./jobs"
+export { countRosterAttention, countUnconfirmed, loadRosterAttention, ROSTER_ATTENTION_KINDS, type RosterAttentionKind } from "./read-model"

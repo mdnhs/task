@@ -6,6 +6,7 @@ import { can } from "@opsdesk/domain/permissions"
 import { AppError } from "../../core/errors"
 import { taskEvidence, teams } from "../../db/schema"
 import type { TenantTx } from "../../db/tenant-tx"
+import { countRosterAttention, countUnconfirmed, loadRosterAttention } from "../rosters"
 import { occurrencesBetween } from "../shifts"
 import { buildInboxQuery, currentItem, inboxRange, virtualRows, type InboxFilter } from "../shift-reports"
 import { assigneesOf, decodeCursor, encodeCursor, namesOf, wallOf } from "../tasks"
@@ -55,7 +56,7 @@ export async function loadReportAlerts(tx: TenantTx, s: RmScope, o: { person?: s
 
 // ---------------------------------------------------------------- attention (F17: derived only)
 
-const RANK = { overdue: 0, blocked: 1, evidence_review: 2, report_missing: 3, report_returned: 4 } as const
+const RANK = { overdue: 0, blocked: 1, evidence_review: 2, report_missing: 3, report_returned: 4, roster_leave: 5, roster_change_request: 6, roster_open_shift: 7, roster_draft_week: 8, qualification_expiring: 9, roster_unconfirmed: 10 } as const
 type Ranked = AttentionItemDto & { _rank: number; _key: string }
 
 function lateText(due: Date, now: Date): string {
@@ -87,7 +88,7 @@ export async function loadAttention(tx: TenantTx, s: RmScope): Promise<{ total: 
         kind === "overdue" ? upper(lateText(r.dueAt, s.now))
         : kind === "blocked" ? `Blocked${late ? `, ${lateText(r.dueAt, s.now)}` : ""}`
         : `Waiting for review${r.pending ? `, ${r.pending} evidence ${r.pending === 1 ? "item" : "items"} pending` : ""}`
-      items.push({ kind, ref: ref(r.refNo), taskId: r.id, reportId: null, reportKey: null, title: free(r.title), ownerId: owner, owner: "", dueAt: r.dueAt.toISOString(), reason, _rank: RANK[kind], _key: r.id })
+      items.push({ kind, ref: ref(r.refNo), taskId: r.id, reportId: null, reportKey: null, rosterRef: null, title: free(r.title), ownerId: owner, owner: "", dueAt: r.dueAt.toISOString(), reason, _rank: RANK[kind], _key: r.id })
     }
   }
   if (t) {
@@ -102,9 +103,18 @@ export async function loadAttention(tx: TenantTx, s: RmScope): Promise<{ total: 
   for (const a of alerts) {
     names.push(a.userId)
     items.push({
-      kind: a.kind, ref: null, taskId: null, reportId: a.reportId, reportKey: a.key, title: free(`${a.shiftName}, ${a.shiftDate}`), ownerId: a.userId, owner: "", dueAt: a.dueAt.toISOString(),
+      kind: a.kind, ref: null, taskId: null, reportId: a.reportId, reportKey: a.key, rosterRef: null, title: free(`${a.shiftName}, ${a.shiftDate}`), ownerId: a.userId, owner: "", dueAt: a.dueAt.toISOString(),
       reason: a.kind === "report_missing" ? "Shift report not submitted" : "Shift report returned for changes", _rank: RANK[a.kind], _key: a.key,
     })
+  }
+  const rctx = s.roster ? await s.roster() : null
+  if (rctx) {
+    const roster = await loadRosterAttention(tx, rctx) // B8 T14: scope-cut inside (a hidden site contributes nothing), derived on read
+    total += roster.total
+    for (const r of roster.items) {
+      if (r.ownerId) names.push(r.ownerId)
+      items.push({ kind: r.kind, ref: null, taskId: null, reportId: null, reportKey: null, rosterRef: r.ref, title: r.title, ownerId: r.ownerId, owner: "", dueAt: new Date(r.dueAt).toISOString(), reason: r.reason, _rank: RANK[r.kind], _key: r.key })
+    }
   }
   const nameOf = await namesOf(tx, names)
   for (const i of items) i.owner = i.ownerId ? nameOf(i.ownerId) : ""
@@ -117,7 +127,7 @@ function decodeAttentionCursor(raw: string): { rank: number; dueAt: string; key:
   const [rank, dueAt, ...rest] = Buffer.from(raw, "base64url").toString("utf8").split("|")
   const key = rest.join("|")
   const r = Number(rank)
-  if (!Number.isInteger(r) || r < 0 || r > 4 || !dueAt || Number.isNaN(Date.parse(dueAt)) || !key) throw new AppError(400, "invalid_cursor", "Bad Request")
+  if (!Number.isInteger(r) || r < 0 || r > 10 || !dueAt || Number.isNaN(Date.parse(dueAt)) || !key) throw new AppError(400, "invalid_cursor", "Bad Request")
   return { rank: r, dueAt, key }
 }
 /** One page of the sorted feed after the cursor. */
@@ -182,6 +192,8 @@ export async function loadDashboard(tx: TenantTx, s: RmScope): Promise<Dashboard
   if (s.attention) {
     const [c] = t ? await attentionCountsQuery(tx, t) : [{ overdue: 0, blocked: 0, review: 0 }]
     attentionCount = c.overdue + c.blocked + c.review + alerts.length
+    const rctx = s.roster ? await s.roster() : null
+    if (rctx) attentionCount += await countRosterAttention(tx, rctx)
   }
   const trend = by.map((d) => d.count)
   const counted = sum.notStarted + sum.inProgress + sum.blocked + sum.submitted + sum.changesRequested + sum.completed + sum.cancelled
@@ -282,6 +294,8 @@ export async function loadToday(tx: TenantTx, s: RmScope, mode: DayMode): Promis
   const review = reviewer ? (await attentionCountsQuery(tx, s.tctx!))[0].review : 0
   const alerts = await loadReportAlerts(tx, s, { person: s.me })
   const reports = alerts.length
+  const rosterCtx = s.roster ? await s.roster() : null
+  const roster = rosterCtx ? await countUnconfirmed(tx, rosterCtx) : 0
   const counts = todayCounts(tasks, nowWall, { evidence: review, reports })
   const order = dayOrder(tasks, nowWall, mode)
   const summary = daySummary(tasks, nowWall, mode)
@@ -303,6 +317,7 @@ export async function loadToday(tx: TenantTx, s: RmScope, mode: DayMode): Promis
     summary: { headline: summary.headline, lines: summary.lines.slice(0, 101), spoken: summary.spoken.length > 8000 ? summary.lines.slice(0, 101).map((l) => l.text).join(" ") : summary.spoken },
     ...(team ? { team } : {}),
     reports,
+    roster,
   }
 }
 
