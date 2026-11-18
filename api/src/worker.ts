@@ -10,6 +10,9 @@ import { registerSearchIndexers } from "./modules/search"
 import { DEADLINE_JOB, EXPORT_SWEEP_JOB, registerShiftReports } from "./modules/shift-reports"
 import { ARCHIVE_PURGE_JOB, RECURRENCE_JOB, registerTasks } from "./modules/tasks"
 import { registerWebhooks, SWEEP_JOB as WEBHOOK_SWEEP_JOB } from "./modules/webhooks-out"
+import { hostname } from "node:os"
+import { Redis } from "ioredis"
+import { startHeartbeat } from "./core/queue/heartbeat"
 import { parseEnv, type Env } from "./env"
 import { makeDeps, startInternalMetrics } from "./server"
 
@@ -38,9 +41,14 @@ export async function startWorkerProcess(env: Env = parseEnv(process.env)) {
   await queue.raw.upsertJobScheduler(ARCHIVE_PURGE_JOB, { every: 60 * 60_000 }, { name: ARCHIVE_PURGE_JOB, opts: { removeOnComplete: true, removeOnFail: 100 } }) // purge tasks archived 30+ days ago (T4.5); idempotent, safe with two runs
   await queue.raw.upsertJobScheduler(DEADLINE_JOB, { every: 5 * 60_000 }, { name: DEADLINE_JOB, opts: { removeOnComplete: true, removeOnFail: 100 } }) // shift-end prompt and missing-report alerts (T5.4); exactly once per (member, shift, day, kind) via the ledger, safe with two workers
   await queue.raw.upsertJobScheduler(EXPORT_SWEEP_JOB, { every: 10 * 60_000 }, { name: EXPORT_SWEEP_JOB, opts: { removeOnComplete: true, removeOnFail: 100 } }) // report exports (T5.5): re-enqueue lost exports, expire files after 7 days; safe with two workers
+  const beatRedis = new Redis(env.REDIS_URL, { enableOfflineQueue: false, maxRetriesPerRequest: 1, connectTimeout: 2000, retryStrategy: (n) => Math.min(n * 200, 2000) })
+  beatRedis.on("error", () => {}) // reconnects on its own; a failed beat just lets the key expire
+  const heartbeat = startHeartbeat(beatRedis, { host: hostname() }) // the compose healthcheck reads this (scripts/worker-healthcheck.mjs)
   deps.logger.info("worker started")
   return {
     async close() {
+      heartbeat.stop()
+      beatRedis.disconnect()
       await worker.close()
       await new Promise((r) => (metricsServer ? metricsServer.close(r) : r(undefined)))
       await queue.close?.()

@@ -1,0 +1,207 @@
+# OpsDesk production reference for Dokploy (Docker Compose application). FILES AND DOCS ONLY: nothing here deploys itself.
+# Read .claude/docs/deploy/dokploy.md first. Every value that differs per environment is a variable reference filled from Dokploy's
+# Environment tab (its secret store); the variable names are listed in deploy/.env.matrix.example and explained in .claude/docs/deploy/env-matrix.md.
+#
+# Managed OUTSIDE this file (NFR-02, EU region): production Postgres 16 (roles app_owner and app_user, see api/src/db/bootstrap/roles.sql) and the R2 bucket.
+# Platform secrets (Stripe, Resend, R2 keys) are NOT env here: the platform admin console stores them encrypted in the database.
+# Profiles: (none) web, api, worker, redis, clamav | ops: migrate (one-shot) | demo: seed (demo deployment only) | local: postgres and minio for a dry run on a laptop.
+#   docker compose -f deploy/docker-compose.prod.yml --env-file <your env file> config                  # validate
+#   docker compose -f deploy/docker-compose.prod.yml --profile ops run --rm migrate                     # migrations as app_owner, NEW image
+name: opsdesk
+
+x-logging: &logging
+  driver: json-file
+  options: { max-size: "10m", max-file: "5" }
+
+# Shared by api and worker (same image). No port is published anywhere: Traefik reaches web:3000 and api:8080 through the Dokploy domain settings only.
+x-api-env: &api-env
+  NODE_ENV: production
+  DATABASE_URL: ${DATABASE_URL:?set the app_user connection string}
+  DATABASE_OWNER_URL: ${DATABASE_OWNER_URL:?set the app_owner connection string}
+  REDIS_URL: redis://:${REDIS_PASSWORD:?set a hex password}@redis:6379
+  BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?set 32+ random characters}
+  SECRETS_KEY: ${SECRETS_KEY:?set base64 of 32 random bytes}
+  SECRETS_KEYS: ${SECRETS_KEYS:-}
+  SECRETS_KEY_ID: ${SECRETS_KEY_ID:-}
+  APP_URL: ${APP_URL:?set the public web origin, https}
+  DATA_REGION: ${DATA_REGION:?eu-west-1 or eu-central-1}
+  TRUST_PROXY_HOPS: ${TRUST_PROXY_HOPS:?proxies that append to x-forwarded-for, Cloudflare plus Traefik is 2}
+  CLAMD_HOST: clamav
+  CLAMD_PORT: "3310"
+  FILE_MAX_BYTES: ${FILE_MAX_BYTES:-}
+  TASK_EVIDENCE_MAX_BYTES: ${TASK_EVIDENCE_MAX_BYTES:-}
+  TASK_VIDEO_MAX_BYTES: ${TASK_VIDEO_MAX_BYTES:-}
+  TASK_VOICE_MAX_BYTES: ${TASK_VOICE_MAX_BYTES:-}
+  AUTH_RATE_LIMIT_PER_MIN: ${AUTH_RATE_LIMIT_PER_MIN:-}
+  TENANT_CREATE_MAX_PER_USER: ${TENANT_CREATE_MAX_PER_USER:-}
+  GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+  GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+  GOOGLE_INTEGRATION_CLIENT_ID: ${GOOGLE_INTEGRATION_CLIENT_ID:-}
+  GOOGLE_INTEGRATION_CLIENT_SECRET: ${GOOGLE_INTEGRATION_CLIENT_SECRET:-}
+  GOOGLE_INTEGRATION_REDIRECT_URI: ${GOOGLE_INTEGRATION_REDIRECT_URI:-}
+  MICROSOFT_CLIENT_ID: ${MICROSOFT_CLIENT_ID:-}
+  MICROSOFT_CLIENT_SECRET: ${MICROSOFT_CLIENT_SECRET:-}
+  LOG_LEVEL: ${LOG_LEVEL:-info}
+  # The metrics listener binds the container's private address and is never published or given a Dokploy domain (observability.md).
+  METRICS_HOST: 0.0.0.0
+
+services:
+  web:
+    build: { context: .., dockerfile: Dockerfile, target: run }
+    image: ${WEB_IMAGE:-opsdesk-web:local}
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      API_URL: http://api:8080
+      APP_ORIGIN: ${APP_URL:?set the public web origin, https}
+      ENABLE_MOCK_MODULES: ${ENABLE_MOCK_MODULES:-}
+    expose: ["3000"]
+    depends_on:
+      api: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/sign-in >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    logging: *logging
+
+  api:
+    build: { context: .., dockerfile: api/Dockerfile, target: run }
+    image: ${API_IMAGE:-opsdesk-api:local}
+    restart: unless-stopped
+    environment:
+      <<: *api-env
+      PORT: "8080"
+      METRICS_PORT: "9464"
+    expose: ["8080"]
+    depends_on:
+      redis: { condition: service_healthy }
+      clamav: { condition: service_healthy }
+    # Readiness (GET /readyz: database, migration version, Redis) is what the traffic switch waits for; the image's own HEALTHCHECK is the cheap liveness GET /healthz.
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/readyz >/dev/null || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
+    stop_grace_period: 30s
+    logging: *logging
+
+  worker:
+    image: ${API_IMAGE:-opsdesk-api:local}
+    restart: unless-stopped
+    command: ["../node_modules/.bin/tsx", "src/worker.ts"]
+    environment:
+      <<: *api-env
+      WORKER_METRICS_PORT: "9465"
+    depends_on:
+      redis: { condition: service_healthy }
+      clamav: { condition: service_healthy }
+    # No port to call: the worker writes a heartbeat key to Redis every 10 s (api/src/core/queue/heartbeat.ts), the check reads it.
+    healthcheck:
+      test: ["CMD", "node", "scripts/worker-healthcheck.mjs"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    stop_grace_period: 60s
+    logging: *logging
+
+  # One-shot: applies pending migrations as app_owner with the NEW image, before api and worker are rolled (.claude/docs/deploy/migrations.md).
+  migrate:
+    image: ${API_IMAGE:-opsdesk-api:local}
+    profiles: ["ops"]
+    restart: "no"
+    command: ["sh", "/opt/deploy/migrate.sh"]
+    environment:
+      DATABASE_OWNER_URL: ${DATABASE_OWNER_URL:?set the app_owner connection string}
+    volumes:
+      - ./scripts/migrate.sh:/opt/deploy/migrate.sh:ro
+
+  # DEMO DEPLOYMENT ONLY, never started by default and never on a client's database (.claude/docs/deploy/demo-seed.md). Its own target and image.
+  seed:
+    build: { context: .., dockerfile: api/Dockerfile, target: seed }
+    image: ${SEED_IMAGE:-opsdesk-seed:local}
+    profiles: ["demo"]
+    restart: "no"
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: ${DATABASE_URL:?set the app_user connection string}
+      DATABASE_OWNER_URL: ${DATABASE_OWNER_URL:?set the app_owner connection string}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?set 32+ random characters}
+      APP_URL: ${APP_URL:?set the public web origin, https}
+      ALLOW_DEMO_SEED: ${ALLOW_DEMO_SEED:-}
+      SEED_DEMO_PASSWORD: ${SEED_DEMO_PASSWORD:-}
+      SEED_EMAIL_DOMAIN: ${SEED_EMAIL_DOMAIN:-}
+      SEED_PLATFORM_TOTP_SECRET: ${SEED_PLATFORM_TOTP_SECRET:-}
+
+  redis:
+    image: redis:7
+    restart: unless-stopped
+    # BullMQ needs noeviction. The queue is rebuilt by the sweeps if it is lost; Redis holds no system of record (.claude/docs/deploy/backup-restore.md).
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory-policy", "noeviction", "--requirepass", "${REDIS_PASSWORD:?set a hex password}"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" --no-auth-warning ping | grep -q PONG"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?set a hex password}
+    logging: *logging
+
+  clamav:
+    image: clamav/clamav:stable
+    platform: linux/amd64
+    restart: unless-stopped
+    volumes:
+      - clamav-db:/var/lib/clamav
+    healthcheck:
+      test: ["CMD", "clamdcheck.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 20
+      start_period: 180s
+    logging: *logging
+
+  # Laptop dry run only (--profile local). Production uses managed Postgres 16 and Cloudflare R2.
+  postgres:
+    image: postgres:16
+    profiles: ["local"]
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${LOCAL_POSTGRES_PASSWORD:?set a throwaway password}
+      POSTGRES_DB: opsdesk
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d opsdesk"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  minio:
+    image: cgr.dev/chainguard/minio:latest
+    profiles: ["local"]
+    restart: unless-stopped
+    command: server /data
+    environment:
+      MINIO_ROOT_USER: ${LOCAL_MINIO_USER:?set a throwaway user}
+      MINIO_ROOT_PASSWORD: ${LOCAL_MINIO_PASSWORD:?set a throwaway password}
+      MINIO_API_CORS_ALLOW_ORIGIN: ${APP_URL:?set the public web origin, https}
+    volumes:
+      - miniodata:/data
+    healthcheck:
+      test: ["CMD", "/usr/bin/mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  redis-data: {}
+  clamav-db: {}
+  pgdata: {}
+  miniodata: {}

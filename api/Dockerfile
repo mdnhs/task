@@ -40,6 +40,10 @@ CMD ["../node_modules/.bin/tsx", "scripts/seed-demo.ts"]
 # The API (default target: keep this the LAST stage).
 FROM app AS run
 EXPOSE 8080
+# Liveness only (GET /healthz). Readiness (GET /readyz) is the compose healthcheck that Dokploy's traffic switch waits for; the worker service overrides this
+# with its Redis heartbeat check (deploy/docker-compose.prod.yml).
+HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
+  CMD wget -qO- http://127.0.0.1:8080/healthz >/dev/null || exit 1
 # The code is TypeScript with extensionless imports and @opsdesk/domain ships .ts source,
 # so it runs under tsx (a production dependency of api) with no separate compile step.
 # Default process: the HTTP API. The same image runs the background worker (BullMQ jobs + the 1 s events.relay job)

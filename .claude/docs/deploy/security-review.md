@@ -44,7 +44,7 @@ Run the proofs: `npm -w api test`, `npx vitest run`, `node scripts/check-secrets
 ## 5. Secrets
 
 - [x] Stored secrets (billing, mail and storage settings, integration tokens) are encrypted with AES-256-GCM under `SECRETS_KEY`; a keyring (`SECRETS_KEYS`, `SECRETS_KEY_ID`) allows rotation: `api/src/core/crypto/secret-box.ts`, `api/src/core/crypto/secret-box.test.ts`.
-- [x] Key rotation procedure: add the new key to the keyring and make it current, redeploy, re-encrypt (the console re-saves each stored secret), remove the old key only when nothing is under it. Written in `.claude/docs/deploy/runbook-go-live.md` (Secrets). The old key must also stay in the separate key backup until then (`.claude/docs/deploy/backup-restore.md`).
+- [x] Key rotation procedure: add the new key to the keyring and make it current, redeploy, re-enter and save each stored secret in the console (there is no automatic re-encryption), remove the old key only when nothing is under it. Written in `.claude/docs/deploy/runbook-go-live.md` (Secrets). The old key must also stay in the separate key backup until then (`.claude/docs/deploy/backup-restore.md`).
 - [x] Production boot refuses a weak, short or example `BETTER_AUTH_SECRET`, a missing `SECRETS_KEY`, the demo seed switches and one database role for both URLs: `api/src/env.ts`, `api/src/env.test.ts`.
 - [x] Nothing secret in logs or error text: exact deploy-secret values are masked in every logged string, error classes are logged without messages: `api/src/env.secrets.test.ts`, `api/src/core/observability/logger.test.ts`.
 - [x] Nothing secret in the browser bundle: `scripts/check-bundle.mjs` (CI `check` job).
