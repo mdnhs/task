@@ -119,6 +119,6 @@ export const NOT_SEEDED: Record<string, string> = {
   "assistant/*": "FE-only; stays on the mock",
   "platform/*": "platform plans, invoices and tenants are platform data, not demo-tenant data",
   "billing/invoices.json, billing/usage.json, billing/entitlements.json": "invoices come from the payment provider; usage is computed; entitlements are read by the API itself",
-  "dashboard/*, attention/*, search/*, support/*, audit/*, account/*, auth/*": "read models the API computes (dashboard, attention, search), or display data",
-  "settings/{branding,delivery-log,departments(sites),integrations,invites,notifications,privacy,roles-matrix}.json": "display data, provider state or per-user settings with no demo-tenant state to load",
+  "dashboard/*, attention/*, search/*, support/*, account/*, auth/*": "read models the API computes (dashboard, attention, search), or display data",
+  "settings/{branding,delivery-log,departments(sites),notifications}.json": "display data, provider state or per-user settings with no demo-tenant state to load",
 }
