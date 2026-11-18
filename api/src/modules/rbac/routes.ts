@@ -10,13 +10,14 @@ const Id = z.uuid()
 export const RoleDto = z.object({
   id: z.string(), key: z.string(), label: z.string(), description: z.string(), home: z.string(),
   access: z.record(z.string(), z.enum(["none", "read", "write"])), fieldRules: z.record(z.string(), z.array(z.string())),
+  rosterLevel: z.enum(["office", "supervisor"]).nullable(),
   isTemplate: z.boolean(), clonedFrom: z.string().nullable(),
 })
 const Clone = z.object({ label: z.string().trim().min(1).max(80).regex(/^[^\r\n]+$/) }).openapi({ example: { label: "Night lead" } })
 const Patch = z
-  .object({ label: z.string().trim().min(1).max(80).regex(/^[^\r\n]+$/).optional(), access: AccessPatch.optional(), fieldRules: FieldRules.optional() })
-  .refine((v) => v.label !== undefined || v.access !== undefined || v.fieldRules !== undefined)
-  .openapi({ example: { label: "Night lead", access: { payroll: "none" }, fieldRules: { member: ["payRate"] } } })
+  .object({ label: z.string().trim().min(1).max(80).regex(/^[^\r\n]+$/).optional(), access: AccessPatch.optional(), fieldRules: FieldRules.optional(), rosterLevel: z.enum(["office", "supervisor"]).nullable().optional() })
+  .refine((v) => v.label !== undefined || v.access !== undefined || v.fieldRules !== undefined || v.rosterLevel !== undefined)
+  .openapi({ example: { label: "Night lead", access: { payroll: "none" }, fieldRules: { member: ["payRate"] }, rosterLevel: "supervisor" } })
 const MemberPatch = z.object({ roleId: Id }).openapi({ example: { roleId: "00000000-0000-4000-8000-000000000000" } })
 
 const listRoute = createRoute({
@@ -26,12 +27,12 @@ const listRoute = createRoute({
 const cloneRoute = createRoute({
   method: "post", path: "/v1/roles/{id}/clone", middleware: [requireTenant, requirePermission("settings", "write")] as const,
   request: { params: z.object({ id: Id }), body: { content: { "application/json": { schema: Clone } }, required: true } },
-  responses: { 201: { description: "Editable copy of the role", content: { "application/json": { schema: RoleDto } } } },
+  responses: { 201: { description: "Editable copy of the role (access, field rules and roster level are copied; 403 role_escalation when the source has a roster level above the caller's own)", content: { "application/json": { schema: RoleDto } } } },
 })
 const patchRoute = createRoute({
   method: "patch", path: "/v1/roles/{id}", middleware: [requireTenant, requirePermission("settings", "write")] as const,
   request: { params: z.object({ id: Id }), body: { content: { "application/json": { schema: Patch } }, required: true } },
-  responses: { 200: { description: "Updated role", content: { "application/json": { schema: RoleDto } } } },
+  responses: { 200: { description: "Updated role. `rosterLevel` (office | supervisor | null) is the roster level of the role; a caller cannot grant a level above their own, nor re-level a role that outranks them (403 role_escalation)", content: { "application/json": { schema: RoleDto } } } },
 })
 const memberRoute = createRoute({
   method: "patch", path: "/v1/members/{userId}", middleware: [requireTenant, requirePermission("settings", "write")] as const,

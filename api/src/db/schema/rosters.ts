@@ -22,7 +22,7 @@ export const locations = pgTable(
     lat: doublePrecision("lat"),
     lng: doublePrecision("lng"),
     zoneRadiusM: integer("zone_radius_m"),
-    openingHours: jsonb("opening_hours").$type<Record<string, unknown>>().notNull().default({}),
+    openingHours: jsonb("opening_hours").$type<Record<string, string>>().notNull().default({}),
     contact: text("contact").notNull().default(""),
     swapApprovalDelegated: boolean("swap_approval_delegated").notNull().default(false),
     timeZone: text("time_zone"),

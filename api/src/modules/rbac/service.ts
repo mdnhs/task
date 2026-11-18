@@ -13,6 +13,22 @@ import { exceeds } from "./access"
 export type RoleRow = typeof roles.$inferSelect
 type Actor = { userId: string }
 
+export type RosterLevel = "office" | "supervisor"
+/** The column is a checked text ('office' | 'supervisor' | null); anything else reads as no level. */
+const asRosterLevel = (v: string | null): RosterLevel | null => (v === "office" || v === "supervisor" ? v : null)
+const LEVEL_RANK: Record<RosterLevel, number> = { supervisor: 1, office: 2 }
+const levelRank = (v: RosterLevel | null): number => (v ? LEVEL_RANK[v] : 0)
+
+/**
+ * Roster level escalation (R8-3, carry-in of the B8 review): a caller cannot hand out a roster level higher than their own (office > supervisor > none),
+ * through a clone or a PATCH. The caller's level is the `roster_level` of their role, read in the same tx (after lockActor).
+ */
+async function assertLevelNotAbove(tx: TenantTx, tenantId: string, actor: ResolvedRole, target: RosterLevel | null): Promise<void> {
+  if (levelRank(target) === 0) return
+  const [r] = await tx.select({ level: roles.rosterLevel }).from(roles).where(and(eq(roles.id, actor.id), eq(roles.tenantId, tenantId)))
+  if (levelRank(target) > levelRank(asRosterLevel(r?.level ?? null))) throw Forbidden("role_escalation")
+}
+
 export const toRoleDto = (r: RoleRow) => ({
   id: r.id,
   key: r.key,
@@ -21,11 +37,12 @@ export const toRoleDto = (r: RoleRow) => ({
   home: r.home,
   access: r.access as Record<string, Access>, // validated on every write (AccessPatch); the column is jsonb
   fieldRules: r.fieldRules,
+  rosterLevel: asRosterLevel(r.rosterLevel),
   isTemplate: r.isTemplate,
   clonedFrom: r.clonedFrom,
 })
 
-const snapshot = (r: Pick<RoleRow, "label" | "access" | "fieldRules">) => ({ label: r.label, access: r.access, fieldRules: r.fieldRules })
+const snapshot = (r: Pick<RoleRow, "label" | "access" | "fieldRules" | "rosterLevel">) => ({ label: r.label, access: r.access, fieldRules: r.fieldRules, rosterLevel: asRosterLevel(r.rosterLevel) })
 
 // Namespace for the two-key advisory lock, so RBAC cannot collide with the audit lock's single-key space.
 const RBAC_LOCK_NS = 0x72626163 // "rbac"
@@ -87,9 +104,10 @@ function humanActorOnly(actor: Actor): void {
 export async function cloneRole(tx: TenantTx, tenantId: string, actor: Actor, sourceId: string, label: string, now: Date): Promise<RoleRow> {
   humanActorOnly(actor)
   await lockRbac(tx, tenantId)
-  await lockActor(tx, tenantId, actor.userId, "settings", "write")
+  const me = await lockActor(tx, tenantId, actor.userId, "settings", "write")
   const src = await roleIn(tx, tenantId, sourceId)
   if (src.key === "owner") throw Conflict("owner_not_clonable")
+  await assertLevelNotAbove(tx, tenantId, me, asRosterLevel(src.rosterLevel)) // the clone carries the source's roster level
   const base = slug(label)
   const taken = new Set(
     (await tx.select({ key: roles.key }).from(roles).where(and(eq(roles.tenantId, tenantId), like(roles.key, `${base}%`)))).map((r) => r.key),
@@ -100,7 +118,7 @@ export async function cloneRole(tx: TenantTx, tenantId: string, actor: Actor, so
     .insert(roles)
     .values({
       tenantId, key, label, description: src.description, home: src.home,
-      access: { ...src.access }, fieldRules: structuredClone(src.fieldRules), isTemplate: false, clonedFrom: src.id,
+      access: { ...src.access }, fieldRules: structuredClone(src.fieldRules), rosterLevel: src.rosterLevel, isTemplate: false, clonedFrom: src.id,
     })
     .returning()
   await recordAudit(
@@ -113,7 +131,7 @@ export async function cloneRole(tx: TenantTx, tenantId: string, actor: Actor, so
 
 export async function updateRole(
   tx: TenantTx, tenantId: string, actor: Actor, id: string,
-  patch: { label?: string; access?: Record<string, string>; fieldRules?: Record<string, string[]> }, now: Date,
+  patch: { label?: string; access?: Record<string, string>; fieldRules?: Record<string, string[]>; rosterLevel?: RosterLevel | null }, now: Date,
 ): Promise<RoleRow> {
   humanActorOnly(actor)
   await lockRbac(tx, tenantId)
@@ -123,8 +141,12 @@ export async function updateRole(
   if (cur.isTemplate) throw Conflict("template_locked")
   assertNoEscalation(me, cur.access) // never touch (rename, re-scope, demote) a role that outranks you, whatever the patch
   if (patch.access) assertNoEscalation(me, patch.access) // only the modules being set; others are unchanged
+  if (patch.rosterLevel !== undefined) {
+    await assertLevelNotAbove(tx, tenantId, me, patch.rosterLevel) // never grant a level above your own
+    await assertLevelNotAbove(tx, tenantId, me, asRosterLevel(cur.rosterLevel)) // nor re-level (demote or clear) a role that outranks you
+  }
   const access = patch.access ? { ...cur.access, ...patch.access } : cur.access
-  const next = { label: patch.label ?? cur.label, access, fieldRules: patch.fieldRules ?? cur.fieldRules }
+  const next = { label: patch.label ?? cur.label, access, fieldRules: patch.fieldRules ?? cur.fieldRules, rosterLevel: patch.rosterLevel !== undefined ? patch.rosterLevel : cur.rosterLevel }
   const [row] = await tx.update(roles).set(next).where(eq(roles.id, id)).returning()
   await recordAudit(
     tx, tenantId,

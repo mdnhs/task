@@ -133,7 +133,8 @@ describe("grant path in requireTenant", () => {
     for (const r of gets) {
       const res = await w.asStaff("GET", r.url)
       if (res.status >= 500) failures.push(`${r.path} -> ${res.status}`)
-      if (res.status === 404 && (await code(res)) === "not_found") failures.push(`${r.path} -> 404 not_found under an active grant`)
+      // roster ids answer the one generic 404 by design (R8-4: a hidden, missing or foreign location look the same), so a made-up id is not_found even under a grant
+      if (res.status === 404 && (await code(res)) === "not_found" && !/^\/v1\/locations\/\{id\}/.test(r.path)) failures.push(`${r.path} -> 404 not_found under an active grant`)
       if (res.status === 403 && (await code(res)) === "support_forbidden_route") continue
       allowed++
     }

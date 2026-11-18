@@ -157,6 +157,18 @@ const SPECS: Record<string, Spec> = {
   "GET /v1/tasks/{id}/evidence/{evidenceId}/download": { actor: "owner", expect: "task_not_found" },
   "POST /v1/tasks/{id}/verify": { actor: "owner", expect: "task_not_found" },
   "POST /v1/tasks/{id}/reject": { actor: "owner", expect: "task_not_found" },
+  // B8 T5: locations, shift types, targets, supervisors (controls: GET/PATCH/archive/shift types 200 or 201, supervisors 422 invalid_supervisor for the example's unknown user, office limit 422 not_roster_office for the staff fixture).
+  // A site the caller cannot see, one that does not exist and another tenant's are the same plain 404 not_found (R8-4); a shift type shares that code so a hidden site shows no difference.
+  "GET /v1/locations/{id}": { actor: "owner", expect: "not_found" },
+  "PATCH /v1/locations/{id}": { actor: "owner", expect: "not_found" },
+  "POST /v1/locations/{id}/archive": { actor: "owner", expect: "not_found" },
+  "PUT /v1/locations/{id}/supervisors": { actor: "owner", expect: "not_found" },
+  "GET /v1/locations/{id}/shift-types": { actor: "owner", expect: "not_found" },
+  "POST /v1/locations/{id}/shift-types": { actor: "owner", expect: "not_found" },
+  "PATCH /v1/shift-types/{id}": { actor: "owner", expect: "not_found" },
+  "DELETE /v1/shift-types/{id}": { actor: "owner", expect: "not_found" },
+  "PUT /v1/shift-types/{id}/targets": { actor: "owner", expect: "not_found" },
+  "PUT /v1/roster/office-limits/{userId}": { actor: "owner", expect: "member_not_found" },
   "PATCH /v1/task-templates/{id}": { actor: "owner", expect: "template_not_found" },
   "DELETE /v1/task-templates/{id}": { actor: "owner", expect: "template_not_found" },
   // T5.1: shift patterns (control: PATCH 200, DELETE 204), assignments (control: PATCH 200 with an end date after the fixture's start, DELETE 204 for the future one),

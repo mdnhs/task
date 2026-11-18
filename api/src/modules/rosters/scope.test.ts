@@ -205,7 +205,7 @@ describe("guarded routes (HTTP)", () => {
     expect(hidden.status).toBe(404)
     expect(await body(randomUUID())).toEqual(hidden) // missing
     expect(await body(w.lb)).toEqual(hidden) // another tenant's
-    expect(await body("not-a-uuid")).toEqual(hidden)
+    for (const bad of ["not-a-uuid", "12345", "'; drop table locations; --", "%00", "0".repeat(64), "G".repeat(36), w.l3.toUpperCase().replace(/-/g, "")]) expect(await body(bad), bad).toEqual(hidden) // not a uuid: never reaches SQL, same body and headers
     expect(JSON.stringify(hidden.body)).not.toMatch(/Charlie|location|count/i)
     expect((await body(w.l1)).status).toBe(200)
     const sup = w.people["location-supervisor"]

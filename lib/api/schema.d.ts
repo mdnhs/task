@@ -553,6 +553,8 @@ export interface paths {
                             fieldRules: {
                                 [key: string]: string[];
                             };
+                            /** @enum {string|null} */
+                            rosterLevel: "office" | "supervisor" | null;
                             isTemplate: boolean;
                             clonedFrom: string | null;
                         }[];
@@ -594,7 +596,7 @@ export interface paths {
                 };
             };
             responses: {
-                /** @description Editable copy of the role */
+                /** @description Editable copy of the role (access, field rules and roster level are copied; 403 role_escalation when the source has a roster level above the caller's own) */
                 201: {
                     headers: {
                         [name: string]: unknown;
@@ -612,6 +614,8 @@ export interface paths {
                             fieldRules: {
                                 [key: string]: string[];
                             };
+                            /** @enum {string|null} */
+                            rosterLevel: "office" | "supervisor" | null;
                             isTemplate: boolean;
                             clonedFrom: string | null;
                         };
@@ -682,11 +686,13 @@ export interface paths {
                         fieldRules?: {
                             [key: string]: string[];
                         };
+                        /** @enum {string|null} */
+                        rosterLevel?: "office" | "supervisor" | null;
                     };
                 };
             };
             responses: {
-                /** @description Updated role */
+                /** @description Updated role. `rosterLevel` (office | supervisor | null) is the roster level of the role; a caller cannot grant a level above their own, nor re-level a role that outranks them (403 role_escalation) */
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -704,6 +710,8 @@ export interface paths {
                             fieldRules: {
                                 [key: string]: string[];
                             };
+                            /** @enum {string|null} */
+                            rosterLevel: "office" | "supervisor" | null;
                             isTemplate: boolean;
                             clonedFrom: string | null;
                         };
@@ -8696,6 +8704,627 @@ export interface paths {
                         "application/json": {
                             userId: string;
                             on: boolean | null;
+                        };
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/locations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    /** @description Also list archived locations (default false) */
+                    includeArchived?: "true" | "false";
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The locations the caller may see (a supervisor: only the granted ones; an office role with an except list: all but those; staff: none). Archived ones only with includeArchived=true */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            items: {
+                                /** Format: uuid */
+                                id: string;
+                                name: string;
+                                address: string;
+                                lat: number | null;
+                                lng: number | null;
+                                zoneRadiusM: number | null;
+                                openingHours: {
+                                    [key: string]: string;
+                                };
+                                contact: string;
+                                swapApprovalDelegated: boolean;
+                                timeZone: string | null;
+                                version: number;
+                                archived: boolean;
+                                supervisorIds: string[];
+                            }[];
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        name: string;
+                        address?: string;
+                        lat?: number | null;
+                        lng?: number | null;
+                        zoneRadiusM?: number | null;
+                        openingHours?: {
+                            [key: string]: string;
+                        };
+                        contact?: string;
+                        swapApprovalDelegated?: boolean;
+                        timeZone?: string | null;
+                    };
+                };
+            };
+            responses: {
+                /** @description The new location (office roster roles only: 403 forbidden). 409 location_name_taken; 422 invalid_location | invalid_coordinates | invalid_zone_radius (0..5000 m) | invalid_time_zone (not an IANA zone) */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** Format: uuid */
+                            id: string;
+                            name: string;
+                            address: string;
+                            lat: number | null;
+                            lng: number | null;
+                            zoneRadiusM: number | null;
+                            openingHours: {
+                                [key: string]: string;
+                            };
+                            contact: string;
+                            swapApprovalDelegated: boolean;
+                            timeZone: string | null;
+                            version: number;
+                            archived: boolean;
+                            supervisorIds: string[];
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/locations/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description One location with its active supervisor ids. 404 not_found for a location the caller may not see, one that does not exist, another tenant's and an id that is not a uuid (all the same answer) */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** Format: uuid */
+                            id: string;
+                            name: string;
+                            address: string;
+                            lat: number | null;
+                            lng: number | null;
+                            zoneRadiusM: number | null;
+                            openingHours: {
+                                [key: string]: string;
+                            };
+                            contact: string;
+                            swapApprovalDelegated: boolean;
+                            timeZone: string | null;
+                            version: number;
+                            archived: boolean;
+                            supervisorIds: string[];
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        version: number;
+                        name?: string;
+                        address?: string;
+                        lat?: number | null;
+                        lng?: number | null;
+                        zoneRadiusM?: number | null;
+                        openingHours?: {
+                            [key: string]: string;
+                        };
+                        contact?: string;
+                        swapApprovalDelegated?: boolean;
+                        timeZone?: string | null;
+                    };
+                };
+            };
+            responses: {
+                /** @description The updated location (office only). A changed time zone recomputes DRAFT shifts only. 404 not_found for a location the caller may not see, one that does not exist, another tenant's and an id that is not a uuid (all the same answer); 409 version_conflict | location_name_taken | location_archived; 422 as POST */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** Format: uuid */
+                            id: string;
+                            name: string;
+                            address: string;
+                            lat: number | null;
+                            lng: number | null;
+                            zoneRadiusM: number | null;
+                            openingHours: {
+                                [key: string]: string;
+                            };
+                            contact: string;
+                            swapApprovalDelegated: boolean;
+                            timeZone: string | null;
+                            version: number;
+                            archived: boolean;
+                            supervisorIds: string[];
+                        };
+                    };
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/v1/locations/{id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The location is archived, never deleted (office only; repeat is a 200). 404 not_found for a location the caller may not see, one that does not exist, another tenant's and an id that is not a uuid (all the same answer) */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** Format: uuid */
+                            id: string;
+                            name: string;
+                            address: string;
+                            lat: number | null;
+                            lng: number | null;
+                            zoneRadiusM: number | null;
+                            openingHours: {
+                                [key: string]: string;
+                            };
+                            contact: string;
+                            swapApprovalDelegated: boolean;
+                            timeZone: string | null;
+                            version: number;
+                            archived: boolean;
+                            supervisorIds: string[];
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/locations/{id}/supervisors": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        userIds: string[];
+                    };
+                };
+            };
+            responses: {
+                /** @description The supervisor set of the location, replaced (office only). An unchanged set writes nothing. 404 not_found for a location the caller may not see, one that does not exist, another tenant's and an id that is not a uuid (all the same answer); 409 location_archived; 422 invalid_supervisor (not an active member) */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** Format: uuid */
+                            locationId: string;
+                            userIds: string[];
+                        };
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/locations/{id}/shift-types": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    /** @description Also list archived types (default false); rostered shifts keep their type either way */
+                    includeArchived?: "true" | "false";
+                };
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The shift types of the location with their weekday targets. 404 not_found for a location the caller may not see, one that does not exist, another tenant's and an id that is not a uuid (all the same answer) */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            items: {
+                                /** Format: uuid */
+                                id: string;
+                                /** Format: uuid */
+                                locationId: string;
+                                name: string;
+                                start: string;
+                                end: string;
+                                unpaidBreakMin: number;
+                                role: string;
+                                requires: string[];
+                                targets: {
+                                    weekday: number;
+                                    count: number;
+                                }[];
+                                archived: boolean;
+                                version: number;
+                            }[];
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        name: string;
+                        start: string;
+                        end: string;
+                        unpaidBreakMin?: number;
+                        role: string;
+                        requires?: string[];
+                    };
+                };
+            };
+            responses: {
+                /** @description The new shift type (office only). end before start is overnight; start equal to end is refused. 404 not_found for a location the caller may not see, one that does not exist, another tenant's and an id that is not a uuid (all the same answer); 409 shift_type_name_taken | location_archived; 422 invalid_shift_type */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** Format: uuid */
+                            id: string;
+                            /** Format: uuid */
+                            locationId: string;
+                            name: string;
+                            start: string;
+                            end: string;
+                            unpaidBreakMin: number;
+                            role: string;
+                            requires: string[];
+                            targets: {
+                                weekday: number;
+                                count: number;
+                            }[];
+                            archived: boolean;
+                            version: number;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/shift-types/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The shift type is archived (never deleted, always succeeds, repeat included); shifts that use it keep reading it. 404 not_found for a location the caller may not see, one that does not exist, another tenant's and an id that is not a uuid (all the same answer) */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        version: number;
+                        name?: string;
+                        start?: string;
+                        end?: string;
+                        unpaidBreakMin?: number;
+                        role?: string;
+                        requires?: string[];
+                    };
+                };
+            };
+            responses: {
+                /** @description The updated shift type (office only; shifts already rostered keep their copy). 404 not_found for a location the caller may not see, one that does not exist, another tenant's and an id that is not a uuid (all the same answer); 409 version_conflict | shift_type_name_taken | shift_type_archived; 422 invalid_shift_type */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** Format: uuid */
+                            id: string;
+                            /** Format: uuid */
+                            locationId: string;
+                            name: string;
+                            start: string;
+                            end: string;
+                            unpaidBreakMin: number;
+                            role: string;
+                            requires: string[];
+                            targets: {
+                                weekday: number;
+                                count: number;
+                            }[];
+                            archived: boolean;
+                            version: number;
+                        };
+                    };
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/v1/shift-types/{id}/targets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        targets: {
+                            weekday: number;
+                            count: number;
+                        }[];
+                    };
+                };
+            };
+            responses: {
+                /** @description The staffing target per weekday (0 = Sunday ... 6, count 0..99), replacing the whole set (office only). 404 not_found for a location the caller may not see, one that does not exist, another tenant's and an id that is not a uuid (all the same answer); 409 shift_type_archived; 422 invalid_targets */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** Format: uuid */
+                            id: string;
+                            /** Format: uuid */
+                            locationId: string;
+                            name: string;
+                            start: string;
+                            end: string;
+                            unpaidBreakMin: number;
+                            role: string;
+                            requires: string[];
+                            targets: {
+                                weekday: number;
+                                count: number;
+                            }[];
+                            archived: boolean;
+                            version: number;
+                        };
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/roster/office-limits/{userId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    userId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        except: string[];
+                    };
+                };
+            };
+            responses: {
+                /** @description The sites a Roster Manager does NOT manage (an office role with no limit of its own only: 403 forbidden). 404 member_not_found; 422 not_roster_office (not an active member with office level and roster write) | invalid_location */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            userId: string;
+                            except: string[];
                         };
                     };
                 };

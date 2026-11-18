@@ -349,3 +349,69 @@ describe("redactFields", () => {
     expect(redactFields(roleWith({}), "constructor", { a: 1 })).toEqual({ a: 1 })
   })
 })
+
+describe("roster level on custom roles (R8-3, B8 carry-in)", () => {
+  test("cloneRole copies roster_level; a clone of roster-manager is an office role that really manages rosters", async () => {
+    const w = await world()
+    const rm = await w.roleId("roster-manager")
+    const r = await w.req("POST", `/v1/roles/${rm}/clone`, w.owner, { label: "Rota lead" })
+    expect(r.status).toBe(201)
+    const dto = (await r.json()) as Json
+    expect(dto.rosterLevel).toBe("office")
+    expect((await ownerTenantQuery(w.tenant.id, "select roster_level from roles where id = $1", [dto.id]))[0].roster_level).toBe("office")
+    expect(((await (await w.req("POST", `/v1/roles/${await w.roleId("location-supervisor")}/clone`, w.owner, { label: "Site lead" })).json()) as Json).rosterLevel).toBe("supervisor")
+    expect(((await (await w.req("POST", `/v1/roles/${await w.roleId("manager")}/clone`, w.owner, { label: "Plain" })).json()) as Json).rosterLevel).toBeNull()
+    // the clone is usable: a member of it is office level in the roster API
+    await ownerTenantQuery(w.tenant.id, "select 1")
+    const m = await makeMember(w.deps, w.tenant.id, dto.key)
+    const cookie = (await signIn(w.app, m.email, m.password)).cookie
+    expect((await call(w.app, "GET", "/v1/locations", { cookie, tenant: "acme" })).status).toBe(200)
+    expect((await call(w.app, "POST", "/v1/locations", { cookie, tenant: "acme", body: { name: "By clone" } })).status).toBe(201)
+  })
+
+  test("PATCH accepts rosterLevel (set, change, clear) and audits it; an unknown level is 400", async () => {
+    const w = await world()
+    const clone = (await (await w.req("POST", `/v1/roles/${await w.roleId("manager")}/clone`, w.owner, { label: "Custom" })).json()) as Json
+    for (const level of ["supervisor", "office", null]) {
+      const r = await w.req("PATCH", `/v1/roles/${clone.id}`, w.owner, { rosterLevel: level })
+      expect(r.status, String(level)).toBe(200)
+      expect(((await r.json()) as Json).rosterLevel).toBe(level)
+    }
+    const a = await w.lastAudit()
+    expect(a).toMatchObject({ action: "role.updated", before: { rosterLevel: "office" }, after: { rosterLevel: null } })
+    expect((await w.req("PATCH", `/v1/roles/${clone.id}`, w.owner, { rosterLevel: "boss" })).status).toBe(400)
+    expect((await w.req("PATCH", `/v1/roles/${clone.id}`, w.owner, {})).status).toBe(400)
+    // a patch without rosterLevel leaves it alone
+    await w.req("PATCH", `/v1/roles/${clone.id}`, w.owner, { rosterLevel: "supervisor" })
+    expect(((await (await w.req("PATCH", `/v1/roles/${clone.id}`, w.owner, { label: "Renamed" })).json()) as Json).rosterLevel).toBe("supervisor")
+  })
+
+  test("a caller cannot grant a roster level above their own: no level, supervisor and office callers (clone and PATCH)", async () => {
+    const w = await world()
+    const custom = (await (await w.req("POST", `/v1/roles/${await w.roleId("manager")}/clone`, w.owner, { label: "Custom" })).json()) as Json
+    const target = (await (await w.req("POST", `/v1/roles/${await w.roleId("manager")}/clone`, w.owner, { label: "Target" })).json()) as Json
+    // `nolevel` is admin's access (settings, audit, roster write) with NO roster level; its level is raised below
+    await ownerTenantQuery(w.tenant.id, "insert into roles (tenant_id, key, label, home, access) select tenant_id, 'nolevel', 'No level', home, access from roles where key='admin'")
+    const limited = await w.who("nolevel")
+    for (const level of ["supervisor", "office"]) {
+      const r = await w.req("PATCH", `/v1/roles/${custom.id}`, limited, { rosterLevel: level })
+      expect(r.status, `none -> ${level}`).toBe(403)
+      expect(((await r.json()) as Json).code).toBe("role_escalation")
+    }
+    expect((await w.req("PATCH", `/v1/roles/${custom.id}`, limited, { label: "Still ok" })).status).toBe(200) // other edits are unaffected
+    expect((await w.req("PATCH", `/v1/roles/${custom.id}`, limited, { rosterLevel: null })).status).toBe(200) // clearing a level that is not above theirs
+    // a supervisor-level settings writer
+    await ownerTenantQuery(w.tenant.id, "update roles set roster_level = 'supervisor' where key = 'nolevel'")
+    expect((await w.req("PATCH", `/v1/roles/${custom.id}`, limited, { rosterLevel: "supervisor" })).status).toBe(200)
+    expect(((await (await w.req("PATCH", `/v1/roles/${custom.id}`, limited, { rosterLevel: "office" })).json()) as Json).code).toBe("role_escalation")
+    // ... who also cannot re-level (clear) a role that outranks them, nor clone one
+    await w.req("PATCH", `/v1/roles/${target.id}`, w.owner, { rosterLevel: "office" })
+    expect(((await (await w.req("PATCH", `/v1/roles/${target.id}`, limited, { rosterLevel: null })).json()) as Json).code).toBe("role_escalation")
+    const c = await w.req("POST", `/v1/roles/${target.id}/clone`, limited, { label: "Office copy" })
+    expect(c.status).toBe(403)
+    expect(((await c.json()) as Json).code).toBe("role_escalation")
+    expect((await w.req("POST", `/v1/roles/${await w.roleId("location-supervisor")}/clone`, limited, { label: "Sup copy" })).status).toBe(201) // at their own level
+    // office callers may grant either level
+    for (const level of ["office", "supervisor", null]) expect((await w.req("PATCH", `/v1/roles/${custom.id}`, w.admin, { rosterLevel: level })).status).toBe(200)
+  })
+})
