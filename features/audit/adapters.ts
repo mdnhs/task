@@ -1,11 +1,13 @@
-// Audit log mapping and queries (B6 T6.5). The API has `entity`, `from`, `to` and `limit` (max 1000, newest first): those go in the query. The actor, action and text
-// filters work on the loaded page. Dates are the tenant's calendar days, turned into instants in the tenant's zone.
+// Audit log mapping and queries (B6 T6.5, B7 T9). The API filters by `entity`, `actorId`, `action`, `from` and `to` and pages newest first with a cursor (100 a page): those go in the query.
+// Only the text search works on the loaded rows (and "System", which has no actor id). Dates are the tenant's calendar days, turned into instants in the tenant's zone.
 import type { ApiClient } from "@/lib/api/client"
 import { dayBoundsInTz, wallInTz } from "@/lib/tz"
 import { actionInfo } from "./actions-catalogue"
+import { SYSTEM_ACTOR } from "./filters"
 import type { AuditEvent, AuditFilters } from "./types"
 
-export const AUDIT_LIMIT = 1000
+/** The API's page size (its maximum). */
+export const AUDIT_LIMIT = 100
 
 type Rec = Record<string, unknown>
 const bad = (k: string, want: string): never => {
@@ -39,28 +41,37 @@ export function toAuditEvent(dto: unknown, tz: string, nameOf: (userId: string) 
   }
 }
 
-export type AuditQuery = { entity?: string; from?: string; to?: string; limit: number }
+export type AuditQuery = { entity?: string; actorId?: string; action?: string; from?: string; to?: string; limit: number; cursor?: string }
 
-/** The query the API understands. A bad or empty day is left out. */
-export function auditQuery(f: AuditFilters, tz: string): AuditQuery {
-  const q: AuditQuery = { limit: AUDIT_LIMIT }
-  if (f.recordType !== "all" && f.recordType) q.entity = f.recordType
-  if (f.from) q.from = dayBoundsInTz(f.from, tz).from
-  if (f.to) q.to = dayBoundsInTz(f.to, tz).to
-  // key order is part of the contract with the tests: entity, from, to, limit
-  return { ...(q.entity ? { entity: q.entity } : {}), ...(q.from ? { from: q.from } : {}), ...(q.to ? { to: q.to } : {}), limit: q.limit }
+/** The query the API understands. A bad or empty day is left out; "all" and "system" (no actor id) are not API filters. */
+export function auditQuery(f: AuditFilters, tz: string, cursor?: string): AuditQuery {
+  const entity = f.recordType !== "all" && f.recordType ? f.recordType : undefined
+  const actorId = f.actor !== "all" && f.actor !== SYSTEM_ACTOR && f.actor ? f.actor : undefined
+  const action = f.action !== "all" && f.action ? f.action : undefined
+  const from = f.from ? dayBoundsInTz(f.from, tz).from : undefined
+  const to = f.to ? dayBoundsInTz(f.to, tz).to : undefined
+  // key order is part of the contract with the tests: entity, actorId, action, from, to, limit, cursor
+  return {
+    ...(entity ? { entity } : {}), ...(actorId ? { actorId } : {}), ...(action ? { action } : {}), ...(from ? { from } : {}), ...(to ? { to } : {}),
+    limit: AUDIT_LIMIT, ...(cursor ? { cursor } : {}),
+  }
 }
 
-export async function loadAudit(api: Pick<ApiClient, "get">, f: AuditFilters, tz: string, nameOf: (userId: string) => string): Promise<AuditEvent[]> {
-  const rows = await api.get("/v1/audit", { query: auditQuery(f, tz) })
-  return rows.map((r) => toAuditEvent(r, tz, nameOf))
+export type AuditPage = { events: AuditEvent[]; nextCursor: string | null }
+
+/** One page of the log for these filters (newest first); pass the previous page's `nextCursor` for the next, older one. */
+export async function loadAudit(api: Pick<ApiClient, "get">, f: AuditFilters, tz: string, nameOf: (userId: string) => string, cursor?: string): Promise<AuditPage> {
+  const page = await api.get("/v1/audit", { query: auditQuery(f, tz, cursor) })
+  return { events: page.items.map((r) => toAuditEvent(r, tz, nameOf)), nextCursor: page.nextCursor }
 }
 
-/** The CSV is the API's own download (streamed through the BFF with the session cookie; the API audits `audit.exported`). Only the filters the API accepts go in. */
+/** The CSV is the API's own download (streamed through the BFF with the session cookie; the API audits `audit.exported`). Every filter the API accepts goes in (not the text search). */
 export function exportUrl(f: AuditFilters, tz: string): string {
   const q = auditQuery(f, tz)
   const p = new URLSearchParams({ format: "csv" })
   if (q.entity) p.set("entity", q.entity)
+  if (q.actorId) p.set("actorId", q.actorId)
+  if (q.action) p.set("action", q.action)
   if (q.from) p.set("from", q.from)
   if (q.to) p.set("to", q.to)
   return `/v1/audit/export?${p.toString()}`

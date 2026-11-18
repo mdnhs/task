@@ -16,3 +16,4 @@
   .au-meta-row td{display:block;text-align:left}
   .au-meta-row td::before{content:none}
 }
+.au-more{display:flex;justify-content:center;margin-top:16px}

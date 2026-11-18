@@ -1,4 +1,4 @@
-import { AppError } from "../../core/errors"
+import { AppError } from "./errors"
 
 /** Opaque keyset cursor (base64url of `<ISO instant>|<uuid>`), the same shape as billing's. Anything else is 400 invalid_cursor. */
 export const encodeCursor = (at: Date, id: string): string => Buffer.from(`${at.toISOString()}|${id}`, "utf8").toString("base64url")

@@ -1,5 +1,5 @@
 export { recordAudit, type AuditInput } from "./record"
 export { verifyChain } from "./verify"
-export { listAudit, auditToCsv, streamAuditCsv, type AuditFilter, type AuditRow } from "./query"
+export { listAudit, listAuditPage, checkAuditFilter, auditToCsv, streamAuditCsv, type AuditFilter, type AuditRow } from "./query"
 export { canonicalJson } from "./canonical"
 export { auditRoutes } from "./routes"

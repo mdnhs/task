@@ -34,28 +34,38 @@ describe("T6.5 audit: entries map through the adapter", () => {
   })
 })
 
-describe("T6.5 audit: filters go through the query, the rest filter the loaded page", () => {
-  test("auditQuery turns the tenant's calendar days into instants (DST: 25 Oct 2026 in Dublin is 25 hours long) and passes the record type", () => {
+describe("B7 audit: filters go through the API query (actor, action, record type, dates), the text search filters the loaded rows", () => {
+  test("auditQuery turns the tenant's calendar days into instants (DST: 25 Oct 2026 in Dublin is 25 hours long) and passes record type, actor and action", () => {
     const q = auditQuery({ ...EMPTY_FILTERS, recordType: "invite", from: "2026-10-25", to: "2026-10-25" }, "Europe/Dublin")
-    expect(q).toEqual({ entity: "invite", from: "2026-10-24T23:00:00.000Z", to: "2026-10-25T23:59:59.999Z", limit: 1000 })
-    expect(auditQuery(EMPTY_FILTERS, "UTC")).toEqual({ limit: 1000 })
+    expect(q).toEqual({ entity: "invite", from: "2026-10-24T23:00:00.000Z", to: "2026-10-25T23:59:59.999Z", limit: 100 })
+    expect(auditQuery(EMPTY_FILTERS, "UTC")).toEqual({ limit: 100 })
+    expect(auditQuery({ ...EMPTY_FILTERS, actor: "u1", action: "role.updated" }, "UTC")).toEqual({ actorId: "u1", action: "role.updated", limit: 100 })
+    expect(auditQuery({ ...EMPTY_FILTERS, actor: "system" }, "UTC")).toEqual({ limit: 100 }) // system entries have no actor id: filtered on the loaded rows
+    expect(auditQuery(EMPTY_FILTERS, "UTC", "CUR")).toEqual({ limit: 100, cursor: "CUR" })
   })
-  test("loadAudit reads GET /v1/audit with that query and maps every row", async () => {
-    const { client, calls } = fakeApi({ "GET /v1/audit": [DTO] })
-    const rows = await loadAudit(client, { ...EMPTY_FILTERS, recordType: "invite" }, "UTC", (id) => id)
-    expect(calls[0]).toMatchObject({ method: "get", path: "/v1/audit", query: { entity: "invite", limit: 1000 } })
-    expect(rows).toHaveLength(1)
+  test("loadAudit reads GET /v1/audit with that query and maps every row; the cursor of the page comes back", async () => {
+    const { client, calls } = fakeApi({ "GET /v1/audit": { items: [DTO], nextCursor: "NEXT" } })
+    const page = await loadAudit(client, { ...EMPTY_FILTERS, recordType: "invite", actor: "u1" }, "UTC", (id) => id)
+    expect(calls[0]).toMatchObject({ method: "get", path: "/v1/audit", query: { entity: "invite", actorId: "u1", limit: 100 } })
+    expect(page.events).toHaveLength(1)
+    expect(page.nextCursor).toBe("NEXT")
+    const more = await loadAudit(client, EMPTY_FILTERS, "UTC", (id) => id, "NEXT")
+    expect(calls[1]).toMatchObject({ query: { cursor: "NEXT", limit: 100 } })
+    expect(more.events).toHaveLength(1)
   })
-  test("actor, action, record type, date and text filters still work on events", () => {
+  test("actor (id, or system), action, record type, date and text filters still work on loaded events", () => {
     const a = toAuditEvent(DTO, "UTC", () => "Ada Byrne")
     const b = toAuditEvent({ ...DTO, seq: 41, actorId: "u2", action: "device.retired", entity: "device", at: "2026-11-10T09:00:00.000Z" }, "UTC", () => "Grace Mensah")
-    expect(filterEvents([a, b], { ...EMPTY_FILTERS, actor: "Ada Byrne" })).toEqual([a])
+    const sys = toAuditEvent({ ...DTO, seq: 40, actorId: null }, "UTC", (id) => id)
+    expect(filterEvents([a, b, sys], { ...EMPTY_FILTERS, actor: "u1" })).toEqual([a])
+    expect(filterEvents([a, b, sys], { ...EMPTY_FILTERS, actor: "system" })).toEqual([sys])
     expect(filterEvents([a, b], { ...EMPTY_FILTERS, action: "device.retired" })).toEqual([b])
     expect(filterEvents([a, b], { ...EMPTY_FILTERS, from: "2026-11-15" })).toEqual([a])
     expect(filterEvents([a, b], { ...EMPTY_FILTERS, q: "retired" })).toEqual([b])
   })
-  test("the CSV export is the API's download (BFF route) with only the filters it accepts", () => {
+  test("the CSV export is the API's download (BFF route) with every filter the API accepts", () => {
     expect(exportUrl({ ...EMPTY_FILTERS, recordType: "invite", from: "2026-11-01", to: "2026-11-30" }, "UTC")).toBe("/v1/audit/export?format=csv&entity=invite&from=2026-11-01T00%3A00%3A00.000Z&to=2026-11-30T23%3A59%3A59.999Z")
+    expect(exportUrl({ ...EMPTY_FILTERS, actor: "u1", action: "role.updated" }, "UTC")).toBe("/v1/audit/export?format=csv&actorId=u1&action=role.updated")
     expect(exportUrl(EMPTY_FILTERS, "UTC")).toBe("/v1/audit/export?format=csv")
   })
 })
@@ -99,11 +109,11 @@ describe("T6.5 fix: audit labels", () => {
     expect(nameFrom({ u1: "Ada Byrne" })("u1")).toBe("Ada Byrne")
     expect(nameFrom({})("usr_8Kq2mZ4tW1xyz")).toBe("Unknown member")
   })
-  test("the export says it uses type and dates only, and the truncation notice says the other filters apply to loaded rows", () => {
+  test("the export says it uses every filter but the search, and a longer log offers Load older", () => {
     const src = readFileSync(path.resolve(__dirname, "components/audit-view.tsx"), "utf8")
     expect(src).toMatch(/Export CSV/)
-    expect(src).toMatch(/type and dates/i)
-    expect(src).toMatch(/apply to the loaded rows/i)
+    expect(src).toMatch(/same filters, not the search/i)
+    expect(src).toMatch(/Load older/)
     expect(src).not.toMatch(/\bids\[|\?\? id\b/)
   })
 })

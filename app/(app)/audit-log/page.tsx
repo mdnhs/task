@@ -9,15 +9,15 @@ export default async function Page() {
   const session = await requireMfaOk()
   if (!can(session.role, "audit")) return <AccessRestricted moduleLabel="Audit Log" />
   const org = await getOrg()
-  let events
+  let first
   let names
   try {
     names = await actorNames()
-    events = await getAuditEvents(org.timezone, names)
+    first = await getAuditEvents(org.timezone, names)
   } catch (e) {
     const gate = apiFailureView(e, "Audit Log")
     if (gate) return gate
     throw e
   }
-  return <AuditView events={events} today={org.today} tzLabel={org.tzLabel} timezone={org.timezone} names={names} />
+  return <AuditView events={first.events} nextCursor={first.nextCursor} today={org.today} tzLabel={org.tzLabel} timezone={org.timezone} names={names} />
 }

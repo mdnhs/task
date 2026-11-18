@@ -10566,9 +10566,19 @@ export interface paths {
             parameters: {
                 query?: {
                     entity?: string;
+                    /** @description Only this member's entries (the opaque member id, as `actorId` on a row). An unknown id is an empty page */
+                    actorId?: string;
+                    /** @description Exact action, for example `role.updated`. Not with actionPrefix (400 invalid_filter) */
+                    action?: string;
+                    /** @description Actions starting with this text, literally (`task.` for every task action). Not with action (400 invalid_filter) */
+                    actionPrefix?: string;
+                    /** @description Entries at or after this instant */
                     from?: string;
+                    /** @description Entries at or before this instant; before `from` is 400 invalid_range */
                     to?: string;
                     limit?: number;
+                    /** @description The `nextCursor` of the previous page. Anything else is 400 invalid_cursor (also another tenant's cursor) */
+                    cursor?: string;
                 };
                 header?: never;
                 path?: never;
@@ -10576,23 +10586,30 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description Audit entries, newest first */
+                /** @description One page of audit entries in chain order, newest (highest seq) first, filtered by actor, action (exact or prefix), entity and time range. 400 invalid_filter (action with actionPrefix) | invalid_range (to before from) | invalid_cursor; limit 1 to 100, default 50. A read: the chain is never touched */
                 200: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
                         "application/json": {
-                            seq: number;
-                            at: string;
-                            actorId: string | null;
-                            action: string;
-                            entity: string;
-                            entityId: string;
-                            before?: unknown;
-                            after?: unknown;
-                            hash: string;
-                        }[];
+                            items: {
+                                seq: number;
+                                at: string;
+                                actorId: string | null;
+                                action: string;
+                                entity: string;
+                                entityId: string;
+                                before?: unknown;
+                                after?: unknown;
+                                hash: string;
+                            }[];
+                            /**
+                             * @description Pass as `cursor` for the next (older) page; null on the last page
+                             * @example MjAyNi0xMS0wMVQwMDowNTowMC4wMDBafDAxOTNiNmQ0LTAwMDAtNzAwMC04MDAwLTAwMDAwMDAwMDAwMQ
+                             */
+                            nextCursor: string | null;
+                        };
                     };
                 };
             };
@@ -10616,7 +10633,15 @@ export interface paths {
             parameters: {
                 query: {
                     entity?: string;
+                    /** @description Only this member's entries (the opaque member id, as `actorId` on a row). An unknown id is an empty page */
+                    actorId?: string;
+                    /** @description Exact action, for example `role.updated`. Not with actionPrefix (400 invalid_filter) */
+                    action?: string;
+                    /** @description Actions starting with this text, literally (`task.` for every task action). Not with action (400 invalid_filter) */
+                    actionPrefix?: string;
+                    /** @description Entries at or after this instant */
                     from?: string;
+                    /** @description Entries at or before this instant; before `from` is 400 invalid_range */
                     to?: string;
                     format: "csv";
                 };
@@ -10626,7 +10651,7 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description Every matching entry as CSV (streamed) */
+                /** @description Every matching entry as CSV (streamed), same filters as the list (not paged). 400 invalid_filter | invalid_range */
                 200: {
                     headers: {
                         [name: string]: unknown;

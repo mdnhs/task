@@ -4,7 +4,7 @@ import { formatChange, type RawChange } from "@opsdesk/domain/task-history"
 import type { FieldChange } from "@opsdesk/domain/task-model"
 import { projectMilestones, projects, taskHistory, tasks, teams, user } from "../../db/schema"
 import type { TenantTx } from "../../db/tenant-tx"
-import { decodeCursor, encodeCursor } from "./cursor"
+import { decodeCursor, encodeCursor } from "../../core/cursor"
 import { taskScopeWhere, type TaskCtx } from "./scope"
 import { wallOf } from "./time"
 

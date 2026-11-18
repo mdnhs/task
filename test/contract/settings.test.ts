@@ -133,7 +133,7 @@ describe("T6.5 contract (real API): settings responses parse and map through the
     expect((await o.api.get("/v1/me")).user.name).toBe("Owner Renamed")
 
     // audit: every change above is in the log, with actions the web knows
-    const rows = (await o.api.get("/v1/audit", { query: { limit: 1000 } })).map((r) => toAuditEvent(r, "Europe/Dublin", (id) => id))
+    const rows = (await o.api.get("/v1/audit", { query: { limit: 100 } })).items.map((r) => toAuditEvent(r, "Europe/Dublin", (id) => id))
     expect(rows.length).toBeGreaterThan(10)
     const actions = new Set(rows.map((r) => r.action))
     for (const a of ["tenant.settings_updated", "team.created", "invite.created", "invite.revoked", "device.registered", "device.retired", "device.bound", "device_policy.set", "settings.mfa_policy.updated", "member.role_changed", "role.updated"]) expect(actions.has(a), a).toBe(true)

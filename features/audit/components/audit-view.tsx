@@ -1,6 +1,6 @@
 "use client"
 
-import { Fragment, useMemo, useState } from "react"
+import { Fragment, useMemo, useRef, useState } from "react"
 
 import { DataPagination, PagedBody } from "@/components/data-pagination"
 import { DatePicker } from "@/components/date-picker"
@@ -13,23 +13,26 @@ import { When } from "@/components/when"
 import { apiBrowser } from "@/lib/api/browser"
 import { userMessage } from "@/lib/api/problem"
 import { paginate } from "@/lib/paginate"
-import { actionInfo } from "../actions-catalogue"
-import { AUDIT_LIMIT, exportUrl, loadAudit, nameFrom } from "../adapters"
-import { AUDIT_PAGE_SIZE, EMPTY_FILTERS, filterEvents } from "../filters"
+import { AUDIT_ACTIONS, actionInfo } from "../actions-catalogue"
+import { exportUrl, loadAudit, nameFrom } from "../adapters"
+import { AUDIT_PAGE_SIZE, EMPTY_FILTERS, SYSTEM_ACTOR, filterEvents } from "../filters"
 import type { AuditEvent, AuditFilters } from "../types"
 
 const uniq = (xs: string[]) => [...new Set(xs)].sort((a, b) => a.localeCompare(b))
 
-// The log is the API's newest 1,000 entries. Record type and dates are the API's own query (a change re-reads it); actor, action and text filter the loaded page.
-// The CSV is the API's download (streamed through the BFF, audited by the API), never built here.
+// The log is the API's pages of 100, newest first. Actor, action, record type and dates are the API's own query (a change re-reads page one); "Load older" follows its cursor; only the text
+// search and "System" filter the loaded rows. The CSV is the API's download (streamed through the BFF, audited by the API) with the same filters, never built here.
 export function AuditView({
   events: seed,
+  nextCursor: seedCursor,
   today,
   tzLabel,
   timezone,
   names,
 }: {
   events: AuditEvent[]
+  /** The API's cursor for the next, older page (null when the first page is all there is). */
+  nextCursor: string | null
   today: string
   tzLabel: string
   timezone: string
@@ -37,36 +40,47 @@ export function AuditView({
   names: Record<string, string>
 }) {
   const [events, setEvents] = useState(seed)
+  const [cursor, setCursor] = useState(seedCursor)
   const [filters, setFilters] = useState<AuditFilters>(EMPTY_FILTERS)
   const [page, setPage] = useState(1)
   const [open, setOpen] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const latest = useRef(0) // only the newest request may answer: a slow one cannot overwrite a newer filter
+  const [seenTypes, setSeenTypes] = useState(() => uniq(seed.map((e) => e.recordType)))
+  const read = (next: AuditFilters, after?: string) => {
+    const ticket = ++latest.current
+    setBusy(true)
+    setError(null)
+    loadAudit(apiBrowser, next, timezone, nameFrom(names), after)
+      .then((p) => {
+        if (ticket !== latest.current) return
+        setEvents((cur) => (after ? [...cur, ...p.events] : p.events))
+        setCursor(p.nextCursor)
+        setSeenTypes((cur) => uniq([...cur, ...p.events.map((e) => e.recordType)]))
+      })
+      .catch((e: unknown) => ticket === latest.current && setError(userMessage(e).text))
+      .finally(() => ticket === latest.current && setBusy(false))
+  }
   const set = <K extends keyof AuditFilters>(k: K, v: AuditFilters[K]) => {
     const next = { ...filters, [k]: v }
     setFilters(next)
     setPage(1)
     setOpen(null)
-    // record type and dates are the API's filters: re-read the log for them
-    if (k === "recordType" || k === "from" || k === "to") {
-      setBusy(true)
-      setError(null)
-      loadAudit(apiBrowser, next, timezone, nameFrom(names))
-        .then(setEvents)
-        .catch((e: unknown) => setError(userMessage(e).text))
-        .finally(() => setBusy(false))
-    }
+    // everything but the text search is the API's filter: re-read page one for it
+    if (k !== "q") read(next)
   }
 
-  const actors = useMemo(() => [{ value: "all", label: "All actors" }, ...uniq(events.map((e) => e.actor)).map((a) => ({ value: a, label: a }))], [events])
-  const actions = useMemo(
-    () => [
-      { value: "all", label: "All actions" },
-      ...uniq(events.map((e) => e.action)).map((a) => ({ value: a, label: actionInfo(a).label })),
-    ],
-    [events],
+  // the options do not depend on the rows on screen (a filter must not remove its own alternatives): people the caller can see, the catalogue's actions, the record types seen so far
+  const actors = useMemo(
+    () => [{ value: "all", label: "All actors" }, ...Object.entries(names).sort((a, b) => a[1].localeCompare(b[1])).map(([id, n]) => ({ value: id, label: n })), { value: SYSTEM_ACTOR, label: "System" }],
+    [names],
   )
-  const types = useMemo(() => [{ value: "all", label: "All records" }, ...uniq(events.map((e) => e.recordType)).map((t) => ({ value: t, label: t }))], [events])
+  const actions = useMemo(
+    () => [{ value: "all", label: "All actions" }, ...Object.entries(AUDIT_ACTIONS).map(([a, i]) => ({ value: a, label: i.label })).sort((a, b) => a.label.localeCompare(b.label))],
+    [],
+  )
+  const types = useMemo(() => [{ value: "all", label: "All records" }, ...seenTypes.map((t) => ({ value: t, label: t }))], [seenTypes])
 
   const rows = useMemo(() => filterEvents(events, filters), [events, filters])
   const pg = paginate(rows, page, AUDIT_PAGE_SIZE)
@@ -78,7 +92,7 @@ export function AuditView({
         title="Audit Log"
         subtitle="Who did what, when and from where"
         actions={
-          <a className="btn btn-outline" href={exportUrl(filters, timezone)} download title="The export uses the record type and dates only, not the actor, action or search filters">
+          <a className="btn btn-outline" href={exportUrl(filters, timezone)} download title="The export uses every filter except the search">
             Export CSV
           </a>
         }
@@ -87,7 +101,7 @@ export function AuditView({
         <p className="au-note">
           <Icon name="lock" />
           <span>
-            Audit records can&apos;t be edited or deleted. {flagged} sensitive actions are flagged. Export CSV uses the record type and dates (type and dates only).{events.length >= AUDIT_LIMIT ? ` Showing the latest ${AUDIT_LIMIT.toLocaleString("en")}: narrow the dates or export the CSV for the rest. The actor, action and search filters apply to the loaded rows only.` : ""}
+            Audit records can&apos;t be edited or deleted. {flagged} sensitive actions are flagged. Export CSV uses the same filters, not the search.{cursor ? ` Showing the latest ${events.length.toLocaleString("en")}: load older entries or export the CSV for all.` : ""}
           </span>
         </p>
         <FilterBar>
@@ -162,6 +176,11 @@ export function AuditView({
               </table>
             </div>
             <DataPagination {...pg} label="Audit log pages" onPageChange={(p) => { setPage(p); setOpen(null) }} />
+            {cursor && (
+              <div className="au-more">
+                <button type="button" className="btn btn-outline" disabled={busy} onClick={() => read(filters, cursor)}>Load older</button>
+              </div>
+            )}
           </>
         )}
       </div>
