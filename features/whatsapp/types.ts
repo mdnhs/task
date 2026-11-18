@@ -15,15 +15,20 @@ export type WaConnection = {
   today: { sent: number; delivered: number; failed: number }
 }
 
-export type WaDelivery = "instant" | "digest"
-/** One notification kind the product has. `scope` says who gets it. `locked` = always on and always instant (security). */
-export type WaKind = { id: string; label: string; hint: string; scope: string; enabled: boolean; delivery: WaDelivery; locked: boolean }
+/** How the owner sends one kind: email only, WhatsApp only, both always on (no dedupe), or WhatsApp first with email when it is not delivered. */
+export type WaVia = "email" | "whatsapp" | "both" | "whatsapp_then_email"
+/** One notification kind the product has. `scope` says who gets it. `via` is the owner's choice (`default` = the tenant-wide default). `locked` = fixed (security). */
+export type WaKind = { id: string; label: string; hint: string; scope: string; via: WaVia | "default"; locked: boolean }
+
+/** The plan's WhatsApp allowance. `limit` null = unlimited. */
+export type WaPlan = { name: string; whatsapp: boolean; limit: number | null; used: number }
 
 export type WaPersonStatus = "no_number" | "pending" | "verified" | "opted_out"
 export type WaScopeKind = "own" | "team" | "department" | "all"
 export type WaPerson = {
   id: string
   name: string
+  email: string
   role: string
   scope: { kind: WaScopeKind; label: string }
   status: WaPersonStatus
@@ -49,7 +54,10 @@ export type WaSelf = { phase: WaSelfPhase; country: string; national: string | n
 /** Everything the screens need; the store holds it and the interactions change it locally. */
 export type WaState = {
   connection: WaConnection
+  /** The tenant-wide default for kinds set to `default`. */
+  defaultVia: WaVia
   kinds: WaKind[]
+  plan: WaPlan
   people: WaPerson[]
   messages: WaMessage[]
   templates: WaTemplate[]

@@ -43,7 +43,7 @@ export default async function Page({ params }: { params: Promise<{ tab: string }
 
   // MOCK (no backend yet): the WhatsApp section of the notification tab, demo deployments only.
   const wa = mockEnabled() ? await getWhatsApp().catch(() => null) : null
-  const waSection = !mockEnabled() ? null : wa ? <WhatsAppAccountSection initial={wa} scope={session.tenant.id} /> : <WhatsAppError title="Could not load WhatsApp settings" />
+  const waSection = !mockEnabled() ? null : wa ? <WhatsAppAccountSection initial={wa} scope={session.tenant.id} email={user.email} /> : <WhatsAppError title="Could not load WhatsApp settings" />
 
   const panels: Record<AccountTabId, React.ReactNode> = {
     profile: <ProfilePanel data={profile} name={user.name} email={user.email} initials={user.initials} role={role} tzLabel={org.tzLabel} department={department} />,

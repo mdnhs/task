@@ -63,12 +63,12 @@ export function WhatsAppCard({ initial, scope, today, tzLabel, canWrite }: { ini
         <b>Last event:</b> {c.lastEvent}
         {c.lastEventAt && <> · <When iso={c.lastEventAt} today={today} tzLabel={tzLabel} /></>}
       </p>
-      <p className="set-int-policy">{WA_HINT}</p>
+      <p className="set-int-policy">{s.plan.whatsapp ? WA_HINT : <>WhatsApp is not in your plan. <Link href="/settings/billing" className="wa-plan-link">Upgrade to turn it on</Link>.</>}</p>
       <div className="set-int-foot">
         {active ? (
           <Link href={WA_MANAGE_HREF} className="btn btn-primary">Manage</Link>
         ) : canWrite ? (
-          <button type="button" className="btn btn-primary" disabled={c.status === "connecting"} onClick={() => setOpen(true)}>
+          <button type="button" className="btn btn-primary" disabled={c.status === "connecting" || !s.plan.whatsapp} onClick={() => setOpen(true)}>
             {c.status === "connecting" ? <><Icon name="spinner" className="wa-spin" />Connecting</> : "Turn on"}
           </button>
         ) : null}
@@ -116,13 +116,14 @@ function ConnectDialog({ connection: c, today, onClose }: { connection: WaState[
         <div className="od-form-foot">
           {c.status === "active" ? (
             <>
-              <DialogClose render={<button type="button" className="btn btn-outline" />}>Done</DialogClose>
+              <DialogClose autoFocus render={<button type="button" className="btn btn-outline" />}>Done</DialogClose>
               <Link href={WA_MANAGE_HREF} className="btn btn-primary">Manage</Link>
             </>
           ) : (
             <>
               <button type="button" className="btn btn-outline" onClick={() => { if (c.status === "connecting") stopConnect(today); onClose() }}>Cancel</button>
-              <button type="button" className="btn btn-primary" disabled={c.status === "connecting"} onClick={() => startConnect(today)}>
+              {/* aria-disabled, not disabled: the button keeps focus while connecting, so the dialog's focus never drops to the page */}
+              <button type="button" className="btn btn-primary" aria-disabled={c.status === "connecting" || undefined} onClick={() => c.status !== "connecting" && startConnect(today)}>
                 {c.status === "connecting" ? <><Icon name="spinner" className="wa-spin" />Connecting</> : "Turn on"}
               </button>
             </>

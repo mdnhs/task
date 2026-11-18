@@ -13,12 +13,12 @@ import { PageHead } from "@/components/page-head"
 import { StatusPill } from "@/components/status-pill"
 import { When } from "@/components/when"
 import { WA_DESCRIPTION } from "../constants"
-import { peopleCounts } from "../logic"
+import { kindsOnWhatsApp, peopleCounts } from "../logic"
 import { stopConnect, waStore } from "../store"
 import type { WaState } from "../types"
 import { KindsTable } from "./kinds-table"
 import { MessageLog } from "./message-log"
-import { PeopleList } from "./people-list"
+import { PeopleList, useEffectivePeople } from "./people-list"
 import { TemplatesList } from "./templates-list"
 import { WA_STATUS } from "./integration-card"
 
@@ -33,12 +33,12 @@ export function WhatsAppManageView({ initial, scope, today, tzLabel, canWrite }:
   const dir = useSlideDir(VIEWS.indexOf(view))
   const c = s.connection
   const active = c.status === "active"
-  const counts = peopleCounts(s.people)
-  const enabled = s.kinds.filter((k) => k.enabled).length
+  const counts = peopleCounts(useEffectivePeople(s.people, scope))
+  const enabled = kindsOnWhatsApp(s.kinds, s.defaultVia)
   const approved = s.templates.filter((t) => t.status === "approved").length
 
   const heads: Record<View, { title: string; sub: string }> = {
-    kinds: { title: "What gets sent", sub: `${enabled} of ${s.kinds.length} kinds on. Each person only hears about items in their scope.` },
+    kinds: { title: "What gets sent", sub: `${enabled} of ${s.kinds.length} kinds go out on WhatsApp. Each person only hears about items in their scope.` },
     people: { title: "People", sub: `${counts.verified} of ${counts.all} can receive WhatsApp messages` },
     log: { title: "Message log", sub: "Recent messages: who, which template, what happened" },
     templates: { title: "Templates", sub: `${approved} of ${s.templates.length} approved` },
@@ -99,8 +99,8 @@ export function WhatsAppManageView({ initial, scope, today, tzLabel, canWrite }:
                 <div className="sub">{head.sub}</div>
               </div>
             </div>
-            {view === "kinds" && <KindsTable kinds={s.kinds} canWrite={canWrite} />}
-            {view === "people" && <PeopleList people={s.people} today={today} tzLabel={tzLabel} />}
+            {view === "kinds" && <KindsTable kinds={s.kinds} defaultVia={s.defaultVia} plan={s.plan} canWrite={canWrite} />}
+            {view === "people" && <PeopleList people={s.people} countries={s.countries} canWrite={canWrite} today={today} tzLabel={tzLabel} scope={scope} />}
             {view === "log" && <MessageLog messages={s.messages} today={today} tzLabel={tzLabel} />}
             {view === "templates" && <TemplatesList templates={s.templates} />}
           </section>

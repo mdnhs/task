@@ -15,11 +15,18 @@ import { StatusPill } from "@/components/status-pill"
 import { When } from "@/components/when"
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
+import { PhoneField } from "@/components/phone-field"
+import { WA_STAGE_HINT, WaNumberDialog } from "@/components/wa-number-dialog"
 import { useApiAction } from "@/hooks/use-api-action"
 import { useDept } from "@/hooks/use-dept"
 import { apiBrowser } from "@/lib/api/browser"
 import { daysBetween } from "@/lib/dates"
 import { paginate } from "@/lib/paginate"
+import { PHONE_DEFAULT_COUNTRY, nationalDigits, validE164 } from "@/lib/phone"
+import type { PhoneCountry, PhoneValue } from "@/lib/phone"
+import { stageNumber, stagedStore } from "@/lib/wa-staged"
+import { WA_PERSON_STATUS, effectiveStatus } from "@/lib/wa-status"
+import type { WaPersonStatus } from "@/lib/wa-status"
 import { makeSettingsClient } from "../client"
 import { inviteDaysOf, needsRoleConfirm } from "../adapters"
 import { INVITES_PAGE_SIZE, USERS_PAGE_SIZE } from "../constants"
@@ -45,11 +52,13 @@ type Props = {
   meId: string
   /** MOCK (J2): per-email status and last active, only on a demo deployment. Local to this tab, never sent to the API. */
   mockActivity?: Record<string, { status: "active" | "deactivated"; lastActive: string }>
+  /** MOCK (demo flag only): the staged WhatsApp number column and the optional number of the invite form. `status` = the WhatsApp status per lower-case email. Local state, never sent to the API. */
+  whatsapp?: { countries: PhoneCountry[]; status: Record<string, WaPersonStatus>; scope: string }
 }
 
 // Users and invites (GET /v1/people, GET/POST/DELETE /v1/invites, PATCH /v1/members/{id}). A role change or invite the API refuses (403 role_escalation, 422
 // role_not_invitable, 409 seat_limit...) is one toast with the mapped copy and the screen reverts to the server's record. There is no deactivate route, so none is offered.
-export function UsersPanel({ users, invites, roles, today, tzLabel, seatLimit, seatsUsed, planName, canWrite, meId, mockActivity }: Props) {
+export function UsersPanel({ users, invites, roles, today, tzLabel, seatLimit, seatsUsed, planName, canWrite, meId, mockActivity, whatsapp }: Props) {
   const run = useApiAction()
   const client = makeSettingsClient(apiBrowser, { go: (u) => window.location.assign(u) })
   const dept = useDept()
@@ -62,6 +71,9 @@ export function UsersPanel({ users, invites, roles, today, tzLabel, seatLimit, s
   const [confirmRole, setConfirmRole] = useState<{ u: SettingsUser; next: string } | null>(null)
   // MOCK (demo only): deactivated state kept in this tab; the real API has no such route.
   const [off, setOff] = useState<Set<string>>(new Set())
+  const [staged] = stagedStore.useStore({}, whatsapp?.scope ?? "")
+  const [waEdit, setWaEdit] = useState<SettingsUser | null>(null)
+  const waStatus = (u: SettingsUser): WaPersonStatus => effectiveStatus(whatsapp?.status[u.email.toLowerCase()] ?? "no_number", staged[u.email.toLowerCase()])
   const inviteDays = inviteDaysOf(invites)
 
   const roleLabel = (key: string) => roles.find((r) => r.id === key)?.label ?? key
@@ -126,7 +138,7 @@ export function UsersPanel({ users, invites, roles, today, tzLabel, seatLimit, s
           <div className="table-wrap">
             <table className="rtable set-table">
               <thead>
-                <tr><th>User</th><th>Role</th><th>Department</th>{mockActivity && <><th>Status <span className="tm">Demo</span></th><th>Last active <span className="tm">Demo</span></th>{canWrite && <th>Actions <span className="tm">Demo</span></th>}</>}</tr>
+                <tr><th>User</th><th>Role</th><th>Department</th>{whatsapp && <th>WhatsApp <span className="tm">Demo</span></th>}{mockActivity &&<><th>Status <span className="tm">Demo</span></th><th>Last active <span className="tm">Demo</span></th>{canWrite && <th>Actions <span className="tm">Demo</span></th>}</>}</tr>
               </thead>
               <tbody>
                 {paged.rows.map((u) => (
@@ -145,6 +157,14 @@ export function UsersPanel({ users, invites, roles, today, tzLabel, seatLimit, s
                       )}
                     </td>
                     <td data-label="Department">{u.dept ? <span className="dep-tag">{u.dept}</span> : <span className="tm">All departments</span>}</td>
+                    {whatsapp && (
+                      <td data-label="WhatsApp">
+                        <span className="wa-user-cell">
+                          <StatusPill status={WA_PERSON_STATUS[waStatus(u)]} tick={false} />
+                          {canWrite && <button type="button" className="btn btn-outline set-sm" onClick={() => setWaEdit(u)} aria-label={`Edit WhatsApp number of ${u.name}`}>Edit</button>}
+                        </span>
+                      </td>
+                    )}
                     {mockActivity && (() => {
                       const m = mockActivity[u.email.toLowerCase()]
                       const deactivated = off.has(u.id) || m?.status === "deactivated"
@@ -229,7 +249,10 @@ export function UsersPanel({ users, invites, roles, today, tzLabel, seatLimit, s
         destructive
         onConfirm={() => confirmRole && void changeRole(confirmRole.u, confirmRole.next)}
       />
-      {inviting > 0 && <InviteDialog key={inviting} roles={roles} inviteDays={inviteDays} onClose={() => setInviting(0)} onInvite={invite} />}
+      {inviting > 0 && <InviteDialog key={inviting} roles={roles} inviteDays={inviteDays} wa={whatsapp?.countries} onClose={() => setInviting(0)} onInvite={invite} />}
+      {whatsapp && waEdit && (
+        <WaNumberDialog key={waEdit.id} name={waEdit.name} email={waEdit.email} countries={whatsapp.countries} current={staged[waEdit.email.toLowerCase()] ?? null} status={waStatus(waEdit)} onClose={() => setWaEdit(null)} />
+      )}
       <ConfirmDialog
         open={!!confirmInvite}
         onOpenChange={(o) => !o && setConfirmInvite(null)}
@@ -248,10 +271,12 @@ export function UsersPanel({ users, invites, roles, today, tzLabel, seatLimit, s
 }
 
 // Invite dialog (FR-SAAS-05): email and role. The API only offers the roles an invite may carry (an owner role is refused, 422 role_not_invitable).
-function InviteDialog({ roles, inviteDays, onClose, onInvite }: { roles: MatrixRole[]; inviteDays: number | null; onClose(): void; onInvite(v: { email: string; role: string }): Promise<boolean> }) {
+function InviteDialog({ roles, inviteDays, wa, onClose, onInvite }: { roles: MatrixRole[]; inviteDays: number | null; wa?: PhoneCountry[]; onClose(): void; onInvite(v: { email: string; role: string }): Promise<boolean> }) {
   const [email, setEmail] = useState("")
   const [role, setRole] = useState("")
-  const [errors, setErrors] = useState<{ email?: string; role?: string }>({})
+  const [errors, setErrors] = useState<{ email?: string; role?: string; phone?: string }>({})
+  // MOCK (demo flag only): the optional WhatsApp number is only staged locally (Pending confirmation); the invite itself goes to the API without it.
+  const [phone, setPhone] = useState<PhoneValue>({ country: PHONE_DEFAULT_COUNTRY, national: "" })
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
@@ -265,7 +290,16 @@ function InviteDialog({ roles, inviteDays, onClose, onInvite }: { roles: MatrixR
       setErrors(next)
       return
     }
-    if (await onInvite({ email: parsed.data.email, role: parsed.data.role })) onClose()
+    const dial = wa?.find((c) => c.code === phone.country)?.dial ?? "353"
+    const typed = nationalDigits(phone.national) !== ""
+    if (wa && typed && !validE164(dial, phone.national)) {
+      setErrors({ phone: "Enter a valid number, for example 87 123 4567." })
+      return
+    }
+    if (await onInvite({ email: parsed.data.email, role: parsed.data.role })) {
+      if (wa && typed) stageNumber(parsed.data.email, { country: phone.country, national: nationalDigits(phone.national) })
+      onClose()
+    }
   }
 
   return (
@@ -282,6 +316,9 @@ function InviteDialog({ roles, inviteDays, onClose, onInvite }: { roles: MatrixR
           <Field label="Role" htmlFor="inv-role" error={errors.role} required>
             <FilterSelect label="Role" value={role} onChange={(v) => { setRole(v); setErrors((x) => ({ ...x, role: undefined })) }} options={[{ value: "", label: "Choose a role" }, ...roles.filter((r) => r.id !== "owner").map((r) => ({ value: r.id, label: r.label }))]} />
           </Field>
+          {wa && (
+            <PhoneField id="inv-wa" countries={wa} value={phone} onChange={(v) => { setPhone(v); setErrors((x) => ({ ...x, phone: undefined })) }} error={errors.phone} hint={`Optional. ${WA_STAGE_HINT}`} />
+          )}
           <div className="od-form-foot">
             <DialogClose render={<button type="button" className="btn btn-outline" />}>Cancel</DialogClose>
             <button type="submit" className="btn btn-primary">Send invite</button>

@@ -66,7 +66,9 @@ export default async function Page({ params, searchParams }: { params: Promise<{
         ])
         if (!users || !roles) return null
         const mockActivity = mockEnabled() ? await getMockUserActivity() : undefined // MOCK (J2): deactivate and last active, demo deployments only
-        return <UsersPanel meId={session.user.id} mockActivity={mockActivity} users={users} invites={invites ?? []} roles={roles.roles} today={org.today} tzLabel={org.tzLabel} seatLimit={seats.limit} seatsUsed={seats.used} planName={seats.planName} canWrite={write} />
+        const waUsers = mockEnabled() ? await getWhatsApp().catch(() => null) : null // MOCK: staged WhatsApp numbers, demo deployments only
+        const whatsapp = waUsers ? { countries: waUsers.countries, status: Object.fromEntries(waUsers.people.map((p) => [p.email.toLowerCase(), p.status])), scope: tenant.id } : undefined
+        return <UsersPanel meId={session.user.id} mockActivity={mockActivity} whatsapp={whatsapp} users={users} invites={invites ?? []} roles={roles.roles} today={org.today} tzLabel={org.tzLabel} seatLimit={seats.limit} seatsUsed={seats.used} planName={seats.planName} canWrite={write} />
       }
       case "roles": {
         const [matrix, policy] = await Promise.all([readable(() => loadMatrix(api)), readable(() => loadMfaPolicy(api))])

@@ -7,7 +7,7 @@ import { SettingsSkeleton } from "./skeletons"
 import type { SettingsCounts } from "./skeletons"
 
 // loading.tsx gets no params, so the skeleton reads the target tab from the pathname (falls back to Organisation).
-export function SettingsLoading({ counts, canWrite, billing, extras }: { counts: SettingsCounts; canWrite: boolean; billing?: React.ReactNode; extras?: { integrations?: React.ReactNode } }) {
+export function SettingsLoading({ counts, canWrite, billing, extras }: { counts: SettingsCounts; canWrite: boolean; billing?: React.ReactNode; extras?: { integrations?: React.ReactNode; usersWhatsApp?: boolean } }) {
   const last = usePathname().split("/").filter(Boolean).pop() ?? ""
   return <SettingsSkeleton tab={isTab(last) ? last : "organisation"} counts={counts} canWrite={canWrite} billing={billing} extras={extras} />
 }

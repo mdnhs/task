@@ -23,7 +23,7 @@ export default async function Loading() {
     <SettingsLoading
       counts={counts}
       canWrite={canWrite(session, "settings")}
-      extras={mockEnabled() ? { integrations: <WhatsAppCardSkeleton canWrite={canWrite(session, "settings")} /> } : undefined} // the mock WhatsApp card (demo flag only)
+      extras={mockEnabled() ? { integrations: <WhatsAppCardSkeleton canWrite={canWrite(session, "settings")} />, usersWhatsApp: true } : undefined} // the mock WhatsApp card (demo flag only)
       billing={<BillingSkeleton plans={plans.length} invoices={0} subscribed={false} canManage={manage} currentIndex={Math.max(0, plans.indexOf(plan))} modules={planModules(entitlements, plan.id)} planName={plan.name} />}
     />
   )

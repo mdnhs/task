@@ -1,6 +1,6 @@
 import { createStore } from "@/lib/store"
 import { CONNECT_MS, nextConnection } from "./logic"
-import type { WaChannelPrefs, WaSelf, WaState } from "./types"
+import type { WaChannelPrefs, WaKind, WaSelf, WaState, WaVia } from "./types"
 
 // Client-only, in memory: survives client navigation (Settings -> Account), resets on reload. Nothing is sent anywhere.
 export const waStore = createStore<WaState>()
@@ -18,8 +18,8 @@ export function stopConnect(at: string) {
   waStore.set((s) => ({ ...s, connection: nextConnection(s.connection, "off", at) }))
 }
 
-export const setKind = (id: string, patch: Partial<Pick<WaState["kinds"][number], "enabled" | "delivery">>) =>
-  waStore.set((s) => ({ ...s, kinds: s.kinds.map((k) => (k.id === id && !k.locked ? { ...k, ...patch } : k)) }))
+export const setKindVia = (id: string, via: WaKind["via"]) => waStore.set((s) => ({ ...s, kinds: s.kinds.map((k) => (k.id === id && !k.locked ? { ...k, via } : k)) }))
+export const setDefaultVia = (defaultVia: WaVia) => waStore.set((s) => ({ ...s, defaultVia }))
 export const setSelf = (patch: Partial<WaSelf>) => waStore.set((s) => ({ ...s, self: { ...s.self, ...patch } }))
 export const setSelfChannel = (kind: string, patch: Partial<WaChannelPrefs>) =>
   waStore.set((s) => ({ ...s, self: { ...s.self, channels: { ...s.self.channels, [kind]: { ...s.self.channels[kind], ...patch } } } }))

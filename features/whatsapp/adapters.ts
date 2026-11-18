@@ -1,5 +1,5 @@
 // Maps the (mock, later real) API payloads to the screen types. It throws on a shape it does not know, so a wrong response is an error state, never a half-drawn page.
-import type { WaConnection, WaCountry, WaKind, WaMessage, WaPerson, WaSelf, WaState, WaTemplate } from "./types"
+import type { WaConnection, WaCountry, WaKind, WaMessage, WaPerson, WaPlan, WaSelf, WaState, WaTemplate, WaVia } from "./types"
 
 type Rec = Record<string, unknown>
 const bad = (k: string, want: string): never => {
@@ -26,21 +26,28 @@ export function toConnection(dto: unknown): WaConnection {
   }
 }
 
+const VIAS = ["email", "whatsapp", "both", "whatsapp_then_email"] as const
+export const toDefaultVia = (dto: unknown): WaVia => oneOf(rec(dto, "kinds").defaultVia, "defaultVia", VIAS)
 export const toKinds = (dto: unknown): WaKind[] =>
   arr(rec(dto, "kinds").kinds, "kinds").map((x, i) => {
     const r = rec(x, `kinds[${i}]`)
     return {
       id: str(r.id, "kind.id"), label: str(r.label, "kind.label"), hint: str(r.hint, "kind.hint"), scope: str(r.scope, "kind.scope"),
-      enabled: bool(r.enabled, "kind.enabled"), delivery: oneOf(r.delivery, "kind.delivery", ["instant", "digest"]), locked: bool(r.locked, "kind.locked"),
+      via: oneOf(r.via, "kind.via", [...VIAS, "default"] as const), locked: bool(r.locked, "kind.locked"),
     }
   })
+
+export function toPlan(dto: unknown): WaPlan {
+  const r = rec(dto, "plan")
+  return { name: str(r.name, "plan.name"), whatsapp: bool(r.whatsapp, "plan.whatsapp"), limit: r.limit === null ? null : num(r.limit, "plan.limit"), used: num(r.used, "plan.used") }
+}
 
 export const toPeople = (dto: unknown): WaPerson[] =>
   arr(rec(dto, "people").people, "people").map((x, i) => {
     const r = rec(x, `people[${i}]`)
     const s = rec(r.scope, "person.scope")
     return {
-      id: str(r.id, "person.id"), name: str(r.name, "person.name"), role: str(r.role, "person.role"),
+      id: str(r.id, "person.id"), name: str(r.name, "person.name"), email: str(r.email, "person.email"), role: str(r.role, "person.role"),
       scope: { kind: oneOf(s.kind, "scope.kind", ["own", "team", "department", "all"]), label: str(s.label, "scope.label") },
       status: oneOf(r.status, "person.status", ["no_number", "pending", "verified", "opted_out"]),
       // Never more than 3 digits, whatever the payload carries.
@@ -83,8 +90,8 @@ export function toSelf(dto: unknown): WaSelf {
   return { phase: oneOf(r.phase, "self.phase", ["none", "verified", "opted_out"]), country: str(r.country, "self.country"), national: strOrNull(r.national, "self.national"), channels }
 }
 
-export type WaRaw = { connection: unknown; kinds: unknown; people: unknown; messages: unknown; templates: unknown; countries: unknown; self: unknown }
+export type WaRaw = { connection: unknown; kinds: unknown; plan: unknown; people: unknown; messages: unknown; templates: unknown; countries: unknown; self: unknown }
 export const toState = (raw: WaRaw): WaState => ({
-  connection: toConnection(raw.connection), kinds: toKinds(raw.kinds), people: toPeople(raw.people), messages: toMessages(raw.messages),
+  connection: toConnection(raw.connection), defaultVia: toDefaultVia(raw.kinds), kinds: toKinds(raw.kinds), plan: toPlan(raw.plan), people: toPeople(raw.people), messages: toMessages(raw.messages),
   templates: toTemplates(raw.templates), countries: toCountries(raw.countries), self: toSelf(raw.self),
 })
