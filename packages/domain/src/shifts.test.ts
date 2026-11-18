@@ -91,17 +91,54 @@ describe("date helpers", () => {
   })
 })
 
+const pad2 = (n: number) => String(n).padStart(2, "0")
+
 describe("time zones", () => {
   it("round-trips wall time", () => {
     expect(epochToWall(wallToEpoch("2026-10-20T09:00", TZ), TZ)).toBe("2026-10-20T09:00")
     expect(wallToEpoch("2026-10-20T09:00", TZ)).toBe(Date.UTC(2026, 9, 20, 8, 0)) // IST (Irish summer time)
     expect(wallToEpoch("2026-12-20T09:00", TZ)).toBe(Date.UTC(2026, 11, 20, 9, 0)) // GMT (Irish winter time)
   })
-  it("spring-forward gap moves forward", () => {
+  // R8-1 replaced the old "shift a gap by its length" rule (01:30 -> 02:30) with the transition instant (01:30 -> 02:00).
+  it("gap: 01:30 on 29 Mar 2026 in Europe/Dublin resolves to the transition instant 01:00Z (wall 02:00)", () => {
     // 29 Mar 2026: 01:00 GMT -> 02:00 IST, so 01:30 does not exist
-    expect(epochToWall(wallToEpoch("2026-03-29T01:30", TZ), TZ)).toBe("2026-03-29T02:30")
+    expect(wallToEpoch("2026-03-29T01:30", TZ)).toBe(Date.UTC(2026, 2, 29, 1, 0))
+    expect(epochToWall(wallToEpoch("2026-03-29T01:30", TZ), TZ)).toBe("2026-03-29T02:00")
+    expect(wallToEpoch("2026-03-29T01:00", TZ)).toBe(Date.UTC(2026, 2, 29, 1, 0))
+    expect(wallToEpoch("2026-03-29T01:59:59", TZ)).toBe(Date.UTC(2026, 2, 29, 1, 0))
   })
-  it("fall-back ambiguity takes the earlier instant", () => {
+  it("gap: a 30-minute-gap zone (Australia/Lord_Howe, 5 Oct 2025) resolves to the first valid minute after the gap", () => {
+    // 02:00 +10:30 -> 02:30 +11:00 at 2025-10-04T15:30Z; 02:15 does not exist
+    expect(wallToEpoch("2025-10-05T02:15", "Australia/Lord_Howe")).toBe(Date.UTC(2025, 9, 4, 15, 30))
+    expect(epochToWall(wallToEpoch("2025-10-05T02:15", "Australia/Lord_Howe"), "Australia/Lord_Howe")).toBe("2025-10-05T02:30")
+    expect(wallToEpoch("2025-10-05T02:30", "Australia/Lord_Howe")).toBe(Date.UTC(2025, 9, 4, 15, 30))
+  })
+  it("gap and fold in America/New_York and Australia/Lord_Howe 2026 (autumn: 01:45 +11:00 first)", () => {
+    expect(wallToEpoch("2026-03-08T02:30", "America/New_York")).toBe(Date.UTC(2026, 2, 8, 7, 0))
+    expect(wallToEpoch("2026-11-01T01:30", "America/New_York")).toBe(Date.UTC(2026, 10, 1, 5, 30))
+    expect(wallToEpoch("2026-10-04T02:15", "Australia/Lord_Howe")).toBe(Date.UTC(2026, 9, 3, 15, 30))
+    expect(wallToEpoch("2026-04-05T01:45", "Australia/Lord_Howe")).toBe(Date.UTC(2026, 3, 4, 14, 45))
+  })
+  it("a wall time on the first minute after the gap is unchanged", () => {
+    expect(wallToEpoch("2026-03-29T02:00", TZ)).toBe(Date.UTC(2026, 2, 29, 1, 0))
+    expect(wallToEpoch("2026-03-29T02:01", TZ)).toBe(Date.UTC(2026, 2, 29, 1, 1))
+  })
+  it("a sweep of every minute around both Dublin and New_York changes is monotonic and lands on the wall time or its transition", () => {
+    for (const [tz, from, to] of [[TZ, "2026-03-28", "2026-03-30"], [TZ, "2026-10-24", "2026-10-26"], ["America/New_York", "2026-03-07", "2026-03-09"], ["America/New_York", "2026-10-31", "2026-11-02"]] as const) {
+      let prev = -Infinity
+      for (let m = 0; m < 48 * 60; m++) {
+        const day = addDays(from, Math.floor(m / 1440))
+        const wall = `${day}T${pad2(Math.floor((m % 1440) / 60))}:${pad2(m % 60)}`
+        const ms = wallToEpoch(wall, tz)
+        expect(ms).toBeGreaterThanOrEqual(prev)
+        prev = ms
+        const back = epochToWall(ms, tz)
+        if (back !== wall) expect(epochToWall(ms - 60_000, tz) < wall && back > wall).toBe(true) // a gap minute: the transition, the first minute after it
+      }
+      expect(to > from).toBe(true)
+    }
+  })
+  it("fold: 01:30 on 25 Oct 2026 takes the first occurrence (00:30Z)", () => {
     // 25 Oct 2026: 02:00 IST -> 01:00 GMT, 01:30 happens twice
     expect(wallToEpoch("2026-10-25T01:30", TZ)).toBe(Date.UTC(2026, 9, 25, 0, 30))
   })
@@ -109,6 +146,7 @@ describe("time zones", () => {
     expect(addMinutes("2026-10-25T00:30", 120, TZ)).toBe("2026-10-25T01:30") // 00:30 IST + 2h = 01:30 GMT
     expect(minutesBetween("2026-10-24T22:00", "2026-10-25T07:00", TZ)).toBe(600)
     expect(minutesBetween("2026-03-28T22:00", "2026-03-29T07:00", TZ)).toBe(480)
+    expect(minutesBetween("2026-03-28T22:00", "2026-03-29T06:00", TZ)).toBe(420) // real minutes across the spring gap
   })
   it("works far from the tenant zone", () => {
     expect(epochToWall(wallToEpoch("2026-11-01T01:30", "America/New_York"), "America/New_York")).toBe("2026-11-01T01:30")
@@ -389,12 +427,12 @@ describe("occurrenceInstants and dueInstant across both DST changes (Europe/Dubl
     expect(iso(dueInstant(o.endAt, 60))).toBe("2026-10-25T01:30:00.000Z")
     expect(o.minutes).toBe(450)
   })
-  it("a start inside the spring-forward gap moves forward (01:30-09:30 on Sun 28 Mar 2027: starts 01:30Z = wall 02:30, 420 min)", () => {
+  it("occurrenceInstants: a 01:30-09:30 pattern on 28 Mar 2027 starts at 01:00Z (R8-1 transition rule, was 01:30Z), so it is 450 min not 420", () => {
     const p: ShiftPattern = { ...nightly, start: "01:30", end: "09:30" }
     const o = occurrenceInstants(p, "2027-03-28", TZ)
-    expect(iso(o.startAt)).toBe("2027-03-28T01:30:00.000Z")
+    expect(iso(o.startAt)).toBe("2027-03-28T01:00:00.000Z")
     expect(iso(o.endAt)).toBe("2027-03-28T08:30:00.000Z")
-    expect(o.minutes).toBe(420)
+    expect(o.minutes).toBe(450)
   })
   it("a pattern in Pacific/Auckland keeps its own start date; shiftsOn, shiftKey and occurrence agree (F2)", () => {
     const akl: ShiftPattern = { id: "akl", name: "Early", team: "Security", start: "06:00", end: "14:00", days: [1], timeZone: "Pacific/Auckland" }

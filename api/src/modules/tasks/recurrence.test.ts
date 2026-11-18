@@ -101,15 +101,15 @@ describe("recurrence job", () => {
     expect(String((err as Error).message)).toContain("tasks_series_occ_uq")
   }, 60_000)
 
-  test("spring-forward: due 01:30 on 2027-03-28 becomes 02:30 local (01:30Z), one instance", async () => {
+  test("spring-forward: due 01:30 on 2027-03-28 resolves to the transition, 02:00 local (01:00Z, R8-1), one instance", async () => {
     const w = await world()
     const s = await series(w, { freq: "daily" }, { start: "2027-03-27T01:00:00", due: "2027-03-27T01:30:00" })
     await tick(w, "2027-03-27T22:00:00Z", "2027-03-28T04:00:00Z", 2)
     const rows = await instances(w, s.id)
     expect(rows.map((r) => r.d)).toEqual(["2027-03-28"])
-    expect(iso(rows[0].due)).toBe("2027-03-28T01:30:00.000Z")
+    expect(iso(rows[0].due)).toBe("2027-03-28T01:00:00.000Z")
     const dto = await w.json(await w.req("GET", `/v1/tasks?ref=TSK-${rows[0].ref_no}`, w.ops))
-    expect(dto.items[0].due).toBe("2027-03-28T02:30:00")
+    expect(dto.items[0].due).toBe("2027-03-28T02:00:00")
     await rec(w, "2027-03-29T05:00:00Z") // the series' time of day is 01:30 local, so the day after is 01:30 BST = 00:30Z
     expect(iso((await instances(w, s.id))[1].due)).toBe("2027-03-29T00:30:00.000Z")
   }, 60_000)

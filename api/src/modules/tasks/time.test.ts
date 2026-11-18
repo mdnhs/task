@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest"
 import { AppError } from "../../core/errors"
+import { wallToEpoch } from "@opsdesk/domain/shifts"
 import { instantOfWall, wallOf } from "./time"
 
 const utc = (wall: string, tz: string) => instantOfWall(wall, tz).toISOString()
@@ -54,6 +55,24 @@ describe("instantOfWall: DST gaps and folds (ruling S9)", () => {
         expect(e).toBeInstanceOf(AppError)
         expect((e as AppError).status).toBe(422)
       }
+    }
+  })
+})
+
+// R8-1: one implementation. instantOfWall is a validator around the domain wallToEpoch; they agree for every minute of the change days.
+describe("instantOfWall and wallToEpoch agree (R8-1)", () => {
+  test.each([
+    ["Europe/Dublin", "2026-03-28", "2026-03-30"],
+    ["Europe/Dublin", "2026-10-24", "2026-10-26"],
+    ["America/New_York", "2026-03-07", "2026-03-09"],
+    ["America/New_York", "2026-10-31", "2026-11-02"],
+    ["Australia/Lord_Howe", "2026-10-03", "2026-10-05"],
+    ["Australia/Lord_Howe", "2026-04-04", "2026-04-06"],
+  ])("%s %s..%s, every minute", (tz, from, to) => {
+    const end = Date.parse(`${to}T00:00:00Z`)
+    for (let t = Date.parse(`${from}T00:00:00Z`); t < end; t += 60_000) {
+      const wall = new Date(t).toISOString().slice(0, 19)
+      expect(instantOfWall(wall, tz).getTime(), `${tz} ${wall}`).toBe(wallToEpoch(wall, tz))
     }
   })
 })

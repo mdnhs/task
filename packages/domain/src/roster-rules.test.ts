@@ -55,6 +55,13 @@ describe("daily_rest", () => {
     const b = shift("2026-03-29", "09:00", "17:00")
     expect(rules([b], ctx([a, b]))).toContain("daily_rest")
   })
+  it("R8-1: a start inside the 28 Mar 2027 gap (01:30) counts from the transition 01:00Z: a 14:05 end leaves 10h55 real rest and fails (the old rule read 11h25)", () => {
+    const a = shift("2027-03-27", "08:00", "14:05")
+    const b = shift("2027-03-28", "01:30", "09:30")
+    expect(rules([b], ctx([a, b]))).toContain("daily_rest")
+    const ok = shift("2027-03-27", "08:00", "14:00") // 11h00 exactly to 01:00Z
+    expect(rules([b], ctx([ok, b]))).not.toContain("daily_rest")
+  })
   it("a hidden-site neighbour gives a generic message and no ids", () => {
     const a = shift("2026-11-02", "08:00", "16:00", { locationId: "b" })
     const b = shift("2026-11-03", "02:00", "10:00")

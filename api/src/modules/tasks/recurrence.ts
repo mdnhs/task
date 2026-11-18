@@ -32,7 +32,7 @@ import { wallOf } from "./time"
 //      and then finds nothing to do (no ref number is taken for a date that already exists);
 //   3. the per-series cursor `repeat_cursor` (the last local date handled) moves to today in the same transaction.
 // The key is the DATE, never the due instant, so the repeated 01:30 of the October clock change cannot create a second instance, and the due
-// time is wallToEpoch(date + the series' local time of day), which takes the EARLIER instant of an ambiguous time and moves a gap time forward.
+// time is wallToEpoch(date + the series' local time of day), which takes the EARLIER instant of an ambiguous time and resolves a gap time to the transition instant (R8-1).
 //
 // `per_shift` (F15, D11): the same machinery, the same unique key and cursor, but the dates are the SHIFT START dates of the series' pattern that its
 // PRIMARY assignee is assigned to (a pattern-local date, F2), "today" is today in the pattern's own zone (the instance exists from the shift's

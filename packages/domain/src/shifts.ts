@@ -9,7 +9,7 @@
 // - Lengths, "is it now in the shift" and "report due" use real elapsed time (epoch ms via Intl), so a night shift on a
 //   DST change night is 7 or 9 real hours, and "60 minutes after shift end" is 60 real minutes.
 // - Day stepping (addDays, weekdayOf) uses UTC day numbers on date strings, like features/tasks/recurrence.ts: no DST, no browser zone.
-// - DST edge cases: a wall time that does not exist (spring-forward gap) moves forward by the gap (01:30 → 02:30);
+// - DST edge cases: a wall time that does not exist (spring-forward gap) resolves to the transition instant, the first valid minute after the gap (01:30 → 02:00, R8-1);
 //   an ambiguous wall time (fall-back hour) resolves to the EARLIER of its two instants.
 
 export type Weekday = 0 | 1 | 2 | 3 | 4 | 5 | 6 // 0 = Sunday ... 6 = Saturday
@@ -143,14 +143,28 @@ function wallUtc(wall: string): number {
   return Date.UTC(y, mo - 1, d, h, mi, s)
 }
 
-/** Epoch ms of a wall-clock string in `tz`. Gap times move forward; ambiguous times take the earlier instant (see header). */
+/**
+ * Epoch ms of a wall-clock string in `tz` (ruling R8-1, the one DST rule for rosters, shifts, deadlines and tasks). A wall time that happens
+ * twice (fall back) takes the FIRST occurrence. One that does not exist (spring forward) resolves to the first valid minute after the gap,
+ * the transition instant itself: 01:30 in Dublin's 01:00-02:00 gap is 02:00 (01:00Z), in a 30 minute gap 02:15 is 02:30.
+ */
 export function wallToEpoch(wall: string, tz: string): number {
   const naive = wallUtc(wall)
   const before = offsetAt(naive - DAY_MS, tz)
   const after = offsetAt(naive + DAY_MS, tz)
   const fits = [naive - before, naive - after].filter((t) => offsetAt(t, tz) === naive - t)
   if (fits.length) return Math.min(...fits)
-  return naive - before // gap: read with the pre-transition offset, which lands after the gap
+  // A gap: the pre-transition offset lands inside the new offset. Find the minute the offset changes, within a day before.
+  const ms = naive - before
+  const post = offsetAt(ms, tz)
+  let lo = Math.floor(ms / MIN_MS) - 24 * 60 // old offset
+  let hi = Math.floor(ms / MIN_MS) // new offset
+  while (hi - lo > 1) {
+    const mid = Math.floor((lo + hi) / 2)
+    if (offsetAt(mid * MIN_MS, tz) === post) hi = mid
+    else lo = mid
+  }
+  return hi * MIN_MS
 }
 
 /** "YYYY-MM-DDTHH:MM" wall clock in `tz` for an instant. */
@@ -203,7 +217,7 @@ export function shiftWindow(pattern: ShiftPattern, date: string, tenantTz: strin
 
 /**
  * UTC instants (epoch ms) of the occurrence of `pattern` that starts on `date` in the pattern's zone (F3). The one place that reads the
- * pattern's wall times: start/end go through `wallToEpoch` (a gap time moves forward, an ambiguous time takes the EARLIER instant), and
+ * pattern's wall times: start/end go through `wallToEpoch` (a gap time resolves to the transition instant, an ambiguous time takes the EARLIER instant), and
  * `minutes` is the real elapsed time (a 22:00-06:00 night is 540 min on 24 Oct 2026 and 420 min on 27 Mar 2027 in Europe/Dublin).
  * Store the instants; never re-derive them from a wall string (a time in the repeated hour does not identify one instant).
  */
