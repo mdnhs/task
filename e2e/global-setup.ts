@@ -12,8 +12,10 @@ export default async function globalSetup(_config: FullConfig): Promise<void> {
   void _config
   execFileSync("npx", ["tsx", "scripts/seed-demo.ts", "--reset"], { cwd: new URL("../api/", import.meta.url).pathname, env: { ...process.env, ...apiEnv }, stdio: "pipe" })
   mkdirSync(AUTH_DIR, { recursive: true })
+  let n = 0
   for (const persona of Object.keys(PERSONAS) as Persona[]) {
-    const ctx = await request.newContext({ baseURL: WEB_ORIGIN, extraHTTPHeaders: { origin: WEB_ORIGIN } })
+    // Each persona comes from its own (documentation-range) address, as it would behind the proxy, so a rate limit on sign-in (on in production) never sees one busy client.
+    const ctx = await request.newContext({ baseURL: WEB_ORIGIN, extraHTTPHeaders: { origin: WEB_ORIGIN, "x-forwarded-for": `198.51.100.${++n}` } })
     const res = await ctx.post("/api/auth/sign-in/email", { data: { email: PERSONAS[persona], password: DEMO_PASSWORD } })
     if (!res.ok()) throw new Error(`sign-in as ${persona} failed: ${res.status()}`)
     if ((await res.json()).twoFactorRedirect) {

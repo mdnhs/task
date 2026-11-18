@@ -39,8 +39,9 @@ export default defineConfig({
       timeout: 30_000,
     },
     {
-      // The production build, like the deployment (E2E_DEV=1 for the dev server while writing specs).
-      command: process.env.E2E_DEV ? "npx next dev -p 3100" : "npm run build && npx next start -p 3100",
+      // The dev server: the e2e runs over plain http, where the API names its device cookie `od-device-*`; a production web (next start) would only forward the https-only `__Host-` name.
+      // (The second start covers Next's one-off "upgrade recommendation" stop on a fresh machine: it exits and the retry continues.)
+      command: "npx next dev -p 3100 || npx next dev -p 3100",
       url: `${WEB_ORIGIN}/sign-in`,
       env: { ...(webEnv as unknown as Record<string, string>), NEXT_TELEMETRY_DISABLED: "1" },
       reuseExistingServer: !process.env.CI,

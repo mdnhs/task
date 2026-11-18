@@ -35,7 +35,7 @@ export type Persona = keyof typeof PERSONAS
 export const S3 = { endpoint: "http://localhost:59000", bucket: "opsdesk-e2e", key: "e2eminio", secret: "e2eminio-secret" }
 
 export const apiEnv = {
-  NODE_ENV: "development",
+  NODE_ENV: "development", // http on localhost: the device cookie is `od-device-*` (see playwright.config.ts)
   PORT: String(API_PORT),
   DATABASE_URL: USER_URL,
   DATABASE_OWNER_URL: OWNER_URL,

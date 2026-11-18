@@ -19,6 +19,8 @@ test("CR-06 on a bound Android phone Drive is blocked and the rest works", async
   await signInThroughUi(page, PERSONAS.leo, DEMO_PASSWORD)
   const bound = await page.context().request.post(`/v1/devices/${device.id}/bind`, { data: { code }, headers: { origin: new URL(page.url()).origin } })
   expect(bound.status()).toBe(200)
+  await page.goto("/account/security")
+  await expect(page.getByRole("region", { name: "This device" })).toContainText(`E2E Leo phone ${stamp}`) // the browser is now that Android device
 
   // Drive is blocked: the button is off and says why, and an attempt to add a Drive item through the API is refused with the policy message.
   await page.goto(`/tasks/${driveTask.ref}`)

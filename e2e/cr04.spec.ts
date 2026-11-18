@@ -9,6 +9,7 @@ test("CR-04 a manager adds, reassigns, reschedules and removes a task; the bell 
 
   // --- add ---
   await page.goto("/tasks/new")
+  await expect(page.locator("#nt-title")).toHaveCount(1) // the loading skeleton (the real form, masked) has gone
   await page.locator("#nt-title").fill(title)
   await page.locator("#nt-desc").fill("Check the east stairwell lights.")
   await pickDate(page, "#nt-due", due)
