@@ -85,7 +85,7 @@ const apiEnv = () => ({
   DATABASE_URL: USER_URL,
   DATABASE_OWNER_URL: OWNER_URL,
   REDIS_URL: `redis://localhost:${REDIS_PORT}`,
-  BETTER_AUTH_SECRET: "local-run-auth-secret-0123456789abcdefghij",
+  BETTER_AUTH_SECRET: "local-run-auth-secret-0123456789abcdefghij", // check-secrets:allow throwaway local-demo value, never used outside dev:all
   APP_URL: WEB,
   DATA_REGION: "eu-west-1",
   SECRETS_KEY: Buffer.alloc(32, 7).toString("base64"),
