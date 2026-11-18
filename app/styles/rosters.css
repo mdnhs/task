@@ -120,14 +120,13 @@
 
 /* Shift cards on the day columns: the same card as the recruitment kanban (.rec-card): --card surface, --r-md, 12px padding, name 14/700, then the detail lines.
    Drag affordance (grab cursor, grip, ghost, lifted card) comes from the shared drag.css; only editable cards carry it. */
-.ros-card{position:relative;gap:2px;padding:12px;border-radius:var(--r-md);background:var(--card);color:var(--ink);list-style:none}
-.ros-card[data-edit]{padding:0}
-.ros-card[data-edit] .ros-shift-btn{padding:12px}
-.ros-card[data-edit] .ros-who{padding-right:18px}
-.ros-card .ros-who{font-size:14px;font-weight:700;line-height:20px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;transition:color var(--dur-fast) var(--ease)}
-.ros-card .ros-time{font-size:12.5px;line-height:18px}
-.ros-card .ros-role{font-size:12px;line-height:17px}
-.ros-card .ros-req-btn{margin-top:4px}
+.ros-scard{position:relative;gap:2px;padding:12px;border-radius:var(--r-md);background:var(--card);color:var(--ink);list-style:none}
+.ros-scard[data-edit]{padding:0}
+.ros-scard[data-edit] .ros-shift-btn{padding:12px}
+.ros-scard .ros-who{font-size:14px;font-weight:700;line-height:20px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;transition:color var(--dur-fast) var(--ease)}
+.ros-scard .ros-time{font-size:12.5px;line-height:18px}
+.ros-scard .ros-role{font-size:12px;line-height:17px}
+.ros-scard .ros-req-btn{margin-top:4px}
 /* Day column = kanban column: while a card is held every valid day is tinted, the hovered one lights up like a hovered .rec-col. */
 .ros-day{transition:background var(--dur-fast) var(--ease)}
 .ros-day[data-target]{background:color-mix(in srgb,var(--brand-soft) 40%,var(--mute-bg))}
@@ -290,3 +289,20 @@
 /* A card that arrives after first paint (added or moved here) fades in once; reduced motion drops it. */
 .ros-shift[data-new]{animation:od-enter var(--dur) var(--ease) both}
 @media (prefers-reduced-motion:reduce){.ros-shift[data-new]{animation:none}}
+
+/* Narrow boards (seven columns in less than ~1400px): tighter day and card padding, the time may wrap so a card never overflows its column. */
+@media (max-width:1400px){
+  .ros-board:not([data-view="day"]) .ros-day{padding:8px}
+  .ros-scard{padding:8px}
+  .ros-scard[data-edit]{padding:0}
+  .ros-scard[data-edit] .ros-shift-btn{padding:8px}
+  .ros-scard .ros-time{white-space:normal}
+  .dnd-grip{right:4px;bottom:8px;top:auto}
+}
+@media (max-width:640px){
+  .ros-board .ros-day{padding:12px}
+  .ros-scard{padding:12px}
+  .ros-scard[data-edit]{padding:0}
+  .ros-scard[data-edit] .ros-shift-btn{padding:12px}
+  .dnd-grip{right:8px;bottom:12px;top:auto}
+}

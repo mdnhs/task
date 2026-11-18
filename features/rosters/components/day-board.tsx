@@ -64,7 +64,7 @@ type LineProps = { s: ViewShift; place?: boolean; fresh?: boolean; card?: boolea
 
 /** One shift. `card` = a card on a day column (the same card as the recruitment kanban: lib/drag-card.tsx + drag.css); the person grid uses plain lines. */
 export function ShiftLine({ s, place, fresh, card, onEdit, onRequest }: LineProps) {
-  const cls = card ? "ros-shift ros-card" : "ros-shift"
+  const cls = card ? "ros-shift ros-scard" : "ros-shift"
   if (!onEdit && onRequest) {
     return (
       <li className={cls} data-open={s.open || undefined} data-new={fresh || undefined}>
@@ -90,7 +90,7 @@ function DragShift({ s, place, fresh, card, onEdit }: { s: ViewShift; place?: bo
   return (
     <li
       ref={setNodeRef}
-      className={`${card ? "ros-shift ros-card" : "ros-shift"} dnd-card`}
+      className={`${card ? "ros-shift ros-scard" : "ros-shift"} dnd-card`}
       data-edit=""
       data-dragging={isDragging ? "" : undefined}
       data-open={s.open || undefined} data-new={fresh || undefined}
@@ -188,15 +188,16 @@ export function DayBoard({ block, today, view, firstWeekday, editor }: { block: 
   }
   return (
     <DndContext
+      id={`ros-${block.locationId}`}
       sensors={sensors}
       collisionDetection={rectIntersection}
       accessibility={{ announcements }}
-      onDragStart={({ active, activatorEvent }: DragStartEvent) => { setDragId(String(active.id)); setOrigin(originOf(activatorEvent, ".ros-card")) }}
+      onDragStart={({ active, activatorEvent }: DragStartEvent) => { setDragId(String(active.id)); setOrigin(originOf(activatorEvent, ".ros-scard")) }}
       onDragCancel={() => setDragId(null)}
       onDragEnd={end}
     >
       {board}
-      <DragLayer show={!!held} reduce={reduce} className="ros-shift ros-card" origin={origin}>
+      <DragLayer show={!!held} reduce={reduce} className="ros-shift ros-scard" origin={origin}>
         {held && <Lines s={held} />}
       </DragLayer>
     </DndContext>

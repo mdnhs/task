@@ -14,14 +14,14 @@ const css = (f: string) => readFileSync(new URL(`../../../app/styles/${f}`, impo
 describe("roster shift card", () => {
   it("editable card shares the kanban drag style and shows the grip", () => {
     const m = html(createElement(ShiftLine, { s, card: true, onEdit: () => {} }))
-    expect(m).toContain("ros-card")
+    expect(m).toContain("ros-scard")
     expect(m).toContain("dnd-card")
     expect(m).toContain("dnd-grip")
     expect(m).toContain('aria-roledescription="draggable"')
   })
   it("read-only and request-only cards are not draggable", () => {
     for (const m of [html(createElement(ShiftLine, { s, card: true })), html(createElement(ShiftLine, { s, card: true, onRequest: () => {} }))]) {
-      expect(m).toContain("ros-card")
+      expect(m).toContain("ros-scard")
       expect(m).not.toContain("dnd-card")
       expect(m).not.toContain("dnd-grip")
       expect(m).not.toContain("draggable")
@@ -29,7 +29,7 @@ describe("roster shift card", () => {
   })
   it("uses the kanban card tokens and the shared drag css (grab cursor only on .dnd-card)", () => {
     const ros = css("rosters.css")
-    expect(ros).toMatch(/\.ros-card\{[^}]*padding:12px;border-radius:var\(--r-md\);background:var\(--card\)/)
+    expect(ros).toMatch(/\.ros-scard\{[^}]*padding:12px;border-radius:var\(--r-md\);background:var\(--card\)/)
     expect(css("recruitment.css")).toMatch(/\.rec-card\{[^}]*padding:12px;border-radius:var\(--r-md\);background:var\(--card\)/)
     expect(css("drag.css")).toContain(".dnd-card{cursor:grab")
     expect(ros).not.toContain("cursor:grab")
