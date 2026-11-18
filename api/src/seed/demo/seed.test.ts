@@ -371,6 +371,25 @@ describe("B7 T13 --reset: no orphans", () => {
     expect(fake.deleted).not.toContain(other)
   }, 300_000)
 
+  test("a files row whose key is outside the demo tenant's prefixes is never deleted from storage", async () => {
+    await seedDemo(testDb(), await demoOptions({ anchor: ANCHOR }))
+    const [t] = await ownerQuery("select id from tenants where slug = 'northgate'")
+    const tid = String(t.id)
+    const fid = "44444444-4444-4444-8444-444444444444"
+    const foreign = "t/99999999-9999-4999-8999-999999999999/victim"
+    // files_key_check pins the key shape, so a foreign key can only exist if the constraint is lifted: do that for this test and restore it after
+    await ownerQuery("alter table files drop constraint files_key_check")
+    try {
+      await ownerTenantQuery(tid, "insert into files (id, tenant_id, key, name, mime, size_bytes, status, created_at) values ($1, $2, $3, 'x.pdf', 'application/pdf', 10, 'clean', now())", [fid, tid, foreign])
+      const fake = fakeObjects([foreign])
+      await deleteDemoTenants(ownerDb(), { storage: fake.storage })
+      expect(fake.deleted).not.toContain(foreign)
+      expect([...fake.objects]).toEqual([foreign])
+    } finally {
+      await ownerQuery(`alter table files add constraint files_key_check check ("key" = 't/' || "tenant_id"::text || '/' || "id"::text)`)
+    }
+  }, 300_000)
+
   test("a storage failure does not undo the reset: the database is clean and the failure is counted for the report", async () => {
     await seedDemo(testDb(), await demoOptions({ anchor: ANCHOR }))
     const [t] = await ownerQuery("select id from tenants where slug = 'northgate'")

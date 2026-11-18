@@ -65,12 +65,16 @@ export async function deleteDemoTenants(owner: Db, o: { storage?: Pick<Storage, 
   const catalogue = await tenantTableNames(owner)
   const keys: string[] = []
   let objectsLeft = 0
+  let skipped = 0
   for (const { id } of rows) {
     await owner.transaction(async (tx) => {
       await tx.execute(sql`select set_config('app.tenant_id', ${id}, true)`)
       const files = (await tx.execute(sql`select id, key, purpose, status, object_removed_at is not null as removed from files where tenant_id = ${id}`)).rows as { id: string; key: string; purpose: string | null; status: string; removed: boolean }[]
       for (const f of files) {
-        keys.push(f.key, `u/${id}/${f.id}`)
+        // Only keys inside this demo tenant's own prefixes are ever deleted from storage; a row holding anything else is skipped and counted.
+        if (f.key.startsWith(`t/${id}/`)) keys.push(f.key)
+        else skipped++
+        keys.push(`u/${id}/${f.id}`)
         if (f.purpose !== "task_evidence" && f.status !== "deleted" && !f.removed) objectsLeft++
       }
       await tx.execute(sql`delete from audit_events where tenant_id = ${id}`) // no foreign key to tenants, so the cascade would leave the chain behind
@@ -91,5 +95,6 @@ export async function deleteDemoTenants(owner: Db, o: { storage?: Pick<Storage, 
     }
     objectsLeft = 0
   }
+  if (skipped > 0) console.warn(`reset: skipped ${skipped} file keys outside the demo tenants' own prefixes (not deleted from storage)`)
   return { tenants: rows.length, objectsRemoved, objectFailures, objectsLeft: o.storage ? objectFailures : objectsLeft }
 }

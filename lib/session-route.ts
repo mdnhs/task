@@ -2,7 +2,7 @@
 // session or a stale od-tenant it redirects here (app/api/session/*), where a route handler can. A redirect is always a GET, so:
 //  - expired stays a GET (it only clears, and only when the API says the session is dead: a cross-site link cannot sign anybody out);
 //  - tenant WRITES a cookie, so the write is a POST (same-origin form or JSON, Origin checked like the BFF); its GET never mutates anything: it answers a
-//    tiny page whose form posts itself, which is how a redirect target reaches the POST. A cross-site link can therefore no longer set od-tenant.
+//    tiny page whose form posts itself, which is how a redirect target reaches the POST. The form is our own page, so the POST's Origin check passes even after a foreign link: the protection is that the cookie is only ever set to a membership the API verified for THIS user (nobody can choose a tenant; the worst a link can do is a nuisance switch among the user's own companies).
 // Both only ever make the cookies MATCH what the API confirms:
 //  - expired: clears the Better Auth cookies and od-tenant, but ONLY when the API itself says the session is dead (a valid session is never cleared, so a
 //    cross-site link cannot sign anybody out), then /sign-in?reason=expired. The sign-in page never redirects back, so there is no loop.
