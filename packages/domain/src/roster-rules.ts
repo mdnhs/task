@@ -5,6 +5,11 @@ import type { WorkforceMember } from "./contracts"
 // Roster rule checks (FR-RS-44, D9). Pure. All times are real elapsed time via `wallToEpoch`, so a clock change counts correctly.
 
 export type RuleId = "double_booking" | "approved_leave" | "unavailable" | "daily_rest" | "weekly_rest" | "avg_48h" | "expired_licence" | "left"
+/** Every rule, in the order a settings screen lists them. */
+export const RULE_IDS = ["double_booking", "approved_leave", "unavailable", "daily_rest", "weekly_rest", "avg_48h", "expired_licence", "left"] as const satisfies readonly RuleId[]
+
+/** What the tenant decided for a rule: `block` stops publishing, `warn` only tells, `ignore` switches the rule off (nothing is reported). */
+export type RuleSeverity = "block" | "warn" | "ignore"
 export type RuleViolation = { rule: RuleId; shiftId: string; personId: string; severity: "block" | "warn"; message: string; otherShiftIds: string[] }
 export type LeaveRequest = { id: string; personId: string; from: string; to: string; kind: string; status: "requested" | "approved" | "rejected"; decidedBy: string | null; decidedAt: string | null }
 /** The person is NOT available in this window. */
@@ -15,9 +20,11 @@ export type RuleContext = {
   leave: LeaveRequest[]
   availability: Availability[]
   templates: ShiftTemplate[]
-  severity: Record<RuleId, "block" | "warn">
+  severity: Record<RuleId, RuleSeverity>
   avgWeekReferenceWeeks: number
   tz: string
+  /** IANA zone per location id (a site's own zone); a location not listed uses `tz`. Spans and paid hours are real time in the shift's own zone. */
+  zones?: Record<string, string>
   /** Locations the caller may see; null means all. A clash elsewhere is reported without naming the site or time. */
   visibleLocationIds: string[] | null
 }
@@ -36,6 +43,8 @@ export function blocking(v: RuleViolation[]): RuleViolation[] {
   return v.filter((x) => x.severity === "block")
 }
 
+const zoneOf = (ctx: Pick<RuleContext, "tz" | "zones">, s: Pick<RosterShift, "locationId">): string => ctx.zones?.[s.locationId] ?? ctx.tz
+
 function span(s: RosterShift, tz: string): Span {
   return { s, start: wallToEpoch(`${s.date}T${s.start}`, tz), end: wallToEpoch(shiftEnd(s, tz), tz) }
 }
@@ -44,13 +53,14 @@ const hm = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5))
 const label = (s: RosterShift) => `${s.date} ${s.start}-${s.end}`
 
 export function checkShifts(target: RosterShift[], ctx: RuleContext): RuleViolation[] {
-  const { tz } = ctx
   const out: RuleViolation[] = []
+  // A caller who does not see every location gets no hour totals, leave dates or availability windows: those add up or describe time at sites they cannot see.
+  const masked = ctx.visibleLocationIds !== null
   const byPerson = new Map<string, Span[]>()
   for (const s of ctx.shifts) {
     if (!s.personId) continue
     const list = byPerson.get(s.personId) ?? []
-    list.push(span(s, tz))
+    list.push(span(s, zoneOf(ctx, s)))
     byPerson.set(s.personId, list)
   }
   for (const list of byPerson.values()) list.sort((a, b) => a.start - b.start)
@@ -64,9 +74,11 @@ export function checkShifts(target: RosterShift[], ctx: RuleContext): RuleViolat
     const m = members.get(pid)
     const name = m?.name ?? pid
     const mine = byPerson.get(pid) ?? []
-    const me = span(s, tz)
-    const add = (rule: RuleId, message: string, others: string[] = []) =>
-      out.push({ rule, shiftId: s.id, personId: pid, severity: ctx.severity[rule], message, otherShiftIds: others })
+    const me = span(s, zoneOf(ctx, s))
+    const add = (rule: RuleId, message: string, others: string[] = []) => {
+      const severity = ctx.severity[rule]
+      if (severity !== "ignore") out.push({ rule, shiftId: s.id, personId: pid, severity, message, otherShiftIds: others })
+    }
     const others = mine.filter((o) => o.s.id !== s.id)
 
     // double booking: any overlap with the same person's other shifts
@@ -117,14 +129,15 @@ export function checkShifts(target: RosterShift[], ctx: RuleContext): RuleViolat
       const ws = weekStart(s.date)
       const from = addDays(ws, -(weeks - 1) * 7)
       const to = addDays(ws, 7)
-      const minutes = mine.filter((o) => o.s.date >= from && o.s.date < to).reduce((n, o) => n + shiftMinutes(o.s, tz), 0)
+      const minutes = mine.filter((o) => o.s.date >= from && o.s.date < to).reduce((n, o) => n + shiftMinutes(o.s, zoneOf(ctx, o.s)), 0)
       const avg = minutes / 60 / weeks
-      if (avg > MAX_AVG_H) add("avg_48h", `${name} averages ${avg.toFixed(1)}h a week over ${weeks} weeks (limit ${MAX_AVG_H}h)`)
+      // The hours add up shifts at every site, so a caller who does not see every location gets the finding without the total, the window and the limit.
+      if (avg > MAX_AVG_H) add("avg_48h", masked ? `${name} averages more than the weekly hours limit` : `${name} averages ${avg.toFixed(1)}h a week over ${weeks} weeks (limit ${MAX_AVG_H}h)`)
     }
 
     // approved leave covers the shift date
     const leave = ctx.leave.find((l) => l.personId === pid && l.status === "approved" && l.from <= s.date && s.date <= l.to)
-    if (leave) add("approved_leave", `${name} is on approved leave (${leave.from} to ${leave.to}) on ${s.date}`)
+    if (leave) add("approved_leave", masked ? `${name} has approved leave on that day` : `${name} is on approved leave (${leave.from} to ${leave.to}) on ${s.date}`)
 
     // unavailable: windows on the start weekday against the shift's part of that day, and for a shift crossing midnight the next
     // weekday against [00:00, end]
@@ -137,7 +150,7 @@ export function checkShifts(target: RosterShift[], ctx: RuleContext): RuleViolat
       const hit = ctx.availability.find(
         (v) => v.personId === pid && ((v.weekday === wd && a < hm(v.to) && hm(v.from) < b) || (crosses && v.weekday === next && hm(v.from) < hm(s.end))),
       )
-      if (hit) add("unavailable", `${name} is unavailable ${hit.from}-${hit.to} on a ${hit.weekday === wd ? s.date : "day after " + s.date}, shift ${s.start}-${s.end}`)
+      if (hit) add("unavailable", masked ? `${name} is unavailable at that time` : `${name} is unavailable ${hit.from}-${hit.to} on a ${hit.weekday === wd ? s.date : "day after " + s.date}, shift ${s.start}-${s.end}`)
     }
 
     // licence: any required type expired before the shift date (expiring that day still passes)

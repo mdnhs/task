@@ -130,3 +130,29 @@ export type AvailabilityDto = z.infer<typeof AvailabilityOut>
 export const AvailabilityBody = z
   .object({ windows: z.array(z.object({ weekday: z.number(), from: z.string().max(10), to: z.string().max(10) })).max(500) })
   .openapi({ example: { windows: [{ weekday: 1, from: "09:00", to: "12:00" }, { weekday: 5, from: "22:00", to: "06:00" }] } })
+
+// ------------------------------------------------------------------ rule engine (FR-RS-44)
+
+const WEEK_ID = "5d8b2f4a-1c3e-4a7b-8f60-9e2d1c0b3a44"
+const severityEx = { double_booking: "block", approved_leave: "block", unavailable: "warn", daily_rest: "warn", weekly_rest: "warn", avg_48h: "warn", expired_licence: "warn", left: "warn" }
+export const RulesOut = z
+  .object({ severity: z.record(z.string(), z.enum(["block", "warn", "ignore"])), avgWeekReferenceWeeks: z.number().int() })
+  .openapi({ example: { severity: severityEx, avgWeekReferenceWeeks: 17 } })
+export type RulesDto = z.infer<typeof RulesOut>
+// Loose on purpose: the service answers 422 invalid_rules / invalid_avg_weeks with a specific code instead of the generic 400.
+export const RulesBody = z
+  .object({ severity: z.record(z.string().max(40), z.string().max(20)), avgWeekReferenceWeeks: z.number() })
+  .openapi({ example: { severity: { ...severityEx, daily_rest: "block" }, avgWeekReferenceWeeks: 26 } })
+const ViolationOut = z.object({
+  rule: z.enum(["double_booking", "approved_leave", "unavailable", "daily_rest", "weekly_rest", "avg_48h", "expired_licence", "left"]), shiftId: z.string(), personId: z.string(),
+  severity: z.enum(["block", "warn"]), message: z.string(), otherShiftIds: z.array(z.string()),
+})
+export const CheckOut = z
+  .object({ weekId: z.uuid(), violations: z.array(ViolationOut), blocking: z.number().int() })
+  .openapi({
+    example: {
+      weekId: WEEK_ID,
+      violations: [{ rule: "daily_rest", shiftId: LEAVE_ID, personId: UID, severity: "warn", message: "Aoife Byrne has only 10h00 rest between 2026-11-02 08:00-16:00 and 2026-11-03 02:00-10:00", otherShiftIds: [STID] }],
+      blocking: 0,
+    },
+  })

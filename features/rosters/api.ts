@@ -1,6 +1,6 @@
 import { getData } from "@/lib/data"
 import { canSeeLocation, seesAllLocations, type LocationGrant, type RosterAccess } from "@/lib/roster-access"
-import { checkShifts, type Availability, type LeaveRequest, type RuleContext, type RuleId, type RuleViolation } from "@/lib/roster-rules"
+import { checkShifts, type Availability, type LeaveRequest, type RuleContext, type RuleId, type RuleSeverity, type RuleViolation } from "@/lib/roster-rules"
 import type { WeekTemplate } from "@/lib/roster-repeat"
 import { getWorkforce, type WorkforceMember } from "@/lib/workforce"
 import type { HistoryEntry, Location, RosterShift, RosterWeek, ShiftTemplate, StaffingTarget } from "@/lib/rosters"
@@ -127,7 +127,7 @@ export async function getLocationAdminData(access: RosterAccess): Promise<Locati
  */
 export async function getRosterRules(access: RosterAccess): Promise<RosterRules> {
   const [rules, { leave }, { availability }, { shifts }] = await Promise.all([
-    getData<{ avgWeekReferenceWeeks: number; severity: Record<RuleId, "block" | "warn"> }>("rosters/rules.json"),
+    getData<{ avgWeekReferenceWeeks: number; severity: Record<RuleId, RuleSeverity> }>("rosters/rules.json"),
     getData<{ leave: LeaveRequest[] }>("rosters/leave.json"),
     getData<{ availability: Availability[] }>("rosters/availability.json"),
     getData<{ shifts: RosterShift[] }>("rosters/shifts.json"),
@@ -146,7 +146,7 @@ export function isTied(access: RosterAccess, m: WorkforceMember, shifts: RosterS
 }
 
 export type WeekData = {
-  rules: { avgWeekReferenceWeeks: number; severity: Record<RuleId, "block" | "warn"> }
+  rules: { avgWeekReferenceWeeks: number; severity: Record<RuleId, RuleSeverity> }
   leave: LeaveRequest[]
   availability: Availability[]
   shifts: RosterShift[]
@@ -205,7 +205,7 @@ export function weekCheck(access: RosterAccess, weekId: string, posted: unknown,
     all = [...d.shifts.filter((s) => !ids.has(s.id) && !(s.weekId === weekId && canSeeLocation(access, s.locationId))), ...mine]
   } else if (!week) return []
   const target = all.filter((s) => s.weekId === weekId && s.personId && canSeeLocation(access, s.locationId))
-  const ctx: RuleContext = { shifts: all, members: d.members, leave: d.leave, availability: d.availability, templates: d.templates, severity: d.rules.severity, avgWeekReferenceWeeks: d.rules.avgWeekReferenceWeeks, tz, visibleLocationIds: access.locationIds }
+  const ctx: RuleContext = { shifts: all, members: d.members, leave: d.leave, availability: d.availability, templates: d.templates, severity: d.rules.severity, avgWeekReferenceWeeks: d.rules.avgWeekReferenceWeeks, tz, visibleLocationIds: seesAllLocations(access, d.allLocationIds) ? null : access.locationIds }
   const names = new Map(d.members.map((m) => [m.id, m.name]))
   const full = seesAllLocations(access, d.allLocationIds)
   return checkShifts(target, ctx).map((v) => (!full && (v.rule === "avg_48h" || v.rule === "approved_leave" || v.rule === "unavailable") ? generic(v, names.get(v.personId) ?? "Staff member", false) : v))
@@ -359,7 +359,7 @@ export async function getMyExchange(personId: string, today: string): Promise<My
 }
 
 export type AssignData = {
-  rules: { avgWeekReferenceWeeks: number; severity: Record<RuleId, "block" | "warn"> }
+  rules: { avgWeekReferenceWeeks: number; severity: Record<RuleId, RuleSeverity> }
   leave: LeaveRequest[]
   availability: Availability[]
   shifts: RosterShift[]
@@ -404,7 +404,7 @@ export function assignmentCheck(access: RosterAccess, assign: { shiftId: string;
     if (why) forced.push({ rule: m.leftOn !== null && s.date >= m.leftOn ? "left" : "expired_licence", shiftId: s.id, personId: m.id, severity: "block", message: why, otherShiftIds: [] })
   }
   const after = d.shifts.map((s) => (by.has(s.id) ? { ...s, personId: by.get(s.id)! } : s))
-  const ctx: RuleContext = { shifts: after, members: d.members, leave: d.leave, availability: d.availability, templates: d.templates, severity: d.rules.severity, avgWeekReferenceWeeks: d.rules.avgWeekReferenceWeeks, tz, visibleLocationIds: access.locationIds }
+  const ctx: RuleContext = { shifts: after, members: d.members, leave: d.leave, availability: d.availability, templates: d.templates, severity: d.rules.severity, avgWeekReferenceWeeks: d.rules.avgWeekReferenceWeeks, tz, visibleLocationIds: seesAllLocations(access, d.allLocationIds) ? null : access.locationIds }
   const found = checkShifts(after.filter((s) => by.has(s.id)), ctx)
     .map((v) => (v.rule === "left" || v.rule === "expired_licence" ? { ...v, severity: "block" as const } : v))
     .map((v) => (seesAllLocations(access, d.allLocationIds) ? v : generic(v, members.get(v.personId)?.name ?? "Staff member")))

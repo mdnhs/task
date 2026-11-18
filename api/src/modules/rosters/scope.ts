@@ -39,7 +39,7 @@ export async function lockRoster(tx: TenantTx, tenantId: string): Promise<void> 
  * Everything a roster operation needs to know about the caller. `me` is whose data the caller sees (the creator for an API key), `actorId` is who DID it.
  * `access` is the domain `rosterAccess` result for this person (scope, visible locations, edit flags): the single source of every cut below.
  */
-export type RosterCtx = { tenantId: string; tz: string; me: string; actorId: string; role: ResolvedRole; access: RosterAccess; now: Date }
+export type RosterCtx = { tenantId: string; tz: string; me: string; actorId: string; role: ResolvedRole; access: RosterAccess; now: Date; /** Every location of the tenant (archived included), whatever the caller may see: the rule engine needs it to tell "sees everything" from "sees some". */ allLocationIds: string[] }
 
 /**
  * The caller's roster context. A mutation passes `need: "write"`: it MUST already hold the roster lock (a programming error otherwise, thrown as a plain
@@ -62,7 +62,7 @@ export async function loadRosterCtx(c: Context<AppEnv>, tx: TenantTx, need: "rea
   const except = (await tx.select({ locationId: rosterOfficeLimits.locationId }).from(rosterOfficeLimits).where(and(eq(rosterOfficeLimits.tenantId, tenant.id), eq(rosterOfficeLimits.userId, me)))).map((l) => l.locationId)
   const access = rosterAccess({ ...role, rosterLevel: level }, me, grants, [{ personId: me, except }], all)
   if (access.scope === "none") throw Forbidden("forbidden")
-  return { tenantId: tenant.id, tz: tenant.timezone, me, actorId, role, access, now: c.get("deps").clock.now() }
+  return { tenantId: tenant.id, tz: tenant.timezone, me, actorId, role, access, now: c.get("deps").clock.now(), allLocationIds: all }
 }
 
 /** R8-4: a location the caller may not see is a 404, identical to one that does not exist (no existence oracle, no counts, never 403). */

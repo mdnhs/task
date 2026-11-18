@@ -207,3 +207,85 @@ describe("date rules", () => {
     expect(checkShifts([s], ctx([s]))).toEqual([])
   })
 })
+
+describe("clock changes (R8-1: wallToEpoch is the one DST rule)", () => {
+  it("spring forward: 23:30 to 10:30 across Sun 29 Mar 2026 reads 11h on the wall but is 10h real, so daily_rest warns", () => {
+    const a = shift("2026-03-28", "15:30", "23:30")
+    const b = shift("2026-03-29", "10:30", "18:30")
+    const v = checkShifts([b], ctx([a, b])).find((x) => x.rule === "daily_rest")!
+    expect(v).toBeTruthy()
+    expect(v.message).toContain("10h00 rest")
+    expect(v.otherShiftIds).toEqual([a.id])
+  })
+  it("fall back: 00:30 to 11:30 across Sun 25 Oct 2026 reads 11h but is 12h real, so there is no warning; 10:30 is 11h real and passes, 09:30 is 10h and fails", () => {
+    const a = shift("2026-10-24", "16:30", "00:30")
+    expect(rules([shift("2026-10-25", "11:30", "19:30")], ctx([a, shift("2026-10-25", "11:30", "19:30")]))).not.toContain("daily_rest")
+    const ok = shift("2026-10-25", "10:30", "18:30")
+    expect(rules([ok], ctx([a, ok]))).not.toContain("daily_rest")
+    const bad = shift("2026-10-25", "09:30", "17:30")
+    expect(checkShifts([bad], ctx([a, bad])).find((x) => x.rule === "daily_rest")!.message).toContain("10h00 rest")
+  })
+  it("a 22:00-06:00 night on Sat 24 Oct 2026 is 9 real hours towards the 48h average, one on Sat 28 Mar 2026 is 7", () => {
+    const week = (nightDate: string, others: string[]) => [...others.map((d) => shift(d, "08:00", "16:00")), shift(nightDate, "22:00", "06:00")]
+    // five 8h days plus the night in the same ISO week, averaged over one week: 40 + 9 = 49h (fails), 40 + 7 = 47h (passes)
+    const fall = week("2026-10-24", ["2026-10-19", "2026-10-20", "2026-10-21", "2026-10-22", "2026-10-23"])
+    const spring = week("2026-03-28", ["2026-03-23", "2026-03-24", "2026-03-25", "2026-03-26", "2026-03-27"])
+    expect(rules([fall[5]], ctx(fall, { avgWeekReferenceWeeks: 1 }))).toContain("avg_48h")
+    expect(rules([spring[5]], ctx(spring, { avgWeekReferenceWeeks: 1 }))).not.toContain("avg_48h")
+    const hit = checkShifts([fall[5]], ctx(fall, { avgWeekReferenceWeeks: 1 })).find((x) => x.rule === "avg_48h")!
+    expect(hit.message).toContain("49.0h")
+  })
+  it("two shifts of different zones clash in real time (zones per location); without the zone the clash is missed", () => {
+    const a = shift("2026-11-02", "08:00", "12:00") // Dublin 08:00-12:00 = 08:00Z-12:00Z
+    const b = shift("2026-11-02", "04:00", "08:00", { locationId: "b" }) // New York 04:00-08:00 EST = 09:00Z-13:00Z
+    expect(rules([a], ctx([a, b], { zones: { a: TZ, b: "America/New_York" } }))).toContain("double_booking")
+    expect(rules([a], ctx([a, b]))).not.toContain("double_booking")
+  })
+})
+
+describe("severity from the tenant setting", () => {
+  it("ignore drops the violation; block and warn are reported as set", () => {
+    const a = shift("2026-11-02", "18:00", "02:00")
+    const b = shift("2026-11-02", "20:00", "03:30")
+    const sev = (o: Partial<Record<RuleId, "block" | "warn" | "ignore">>) => ({ ...SEV, ...o })
+    expect(rules([b], ctx([a, b], { severity: sev({ double_booking: "ignore" }) }))).not.toContain("double_booking")
+    expect(checkShifts([b], ctx([a, b], { severity: sev({ double_booking: "warn" }) })).find((x) => x.rule === "double_booking")!.severity).toBe("warn")
+    expect(checkShifts([b], ctx([a, b], { severity: sev({ daily_rest: "block" }) })).filter((x) => x.rule === "daily_rest").every((x) => x.severity === "block")).toBe(true)
+  })
+})
+
+describe("avg_48h and a caller who does not see every location", () => {
+  const over = () => {
+    const out: RosterShift[] = []
+    for (let w = 0; w < 17; w++) for (let d = 0; d < 6; d++) out.push(shift(new Date(Date.UTC(2026, 6, 13) + (w * 7 + d) * 86400000).toISOString().slice(0, 10), "08:00", "16:00", { locationId: d === 5 ? "b" : "a" }))
+    out.push(shift("2026-11-08", "08:00", "09:00"))
+    return out
+  }
+  it("carries the hour total for a caller who sees every location and none for one who does not", () => {
+    const s = over()
+    const full = checkShifts([s[s.length - 1]], ctx(s, { visibleLocationIds: null })).find((x) => x.rule === "avg_48h")!
+    expect(full.message).toMatch(/\d+\.\dh a week/)
+    const cut = checkShifts([s[s.length - 1]], ctx(s, { visibleLocationIds: ["a"] })).find((x) => x.rule === "avg_48h")!
+    expect(cut.message).not.toMatch(/\d/) // no number at all: not the total, the window or the limit
+    expect(cut.message).toContain("Aoife Byrne")
+    expect(cut.otherShiftIds).toEqual([])
+  })
+  it("a hidden site's hours still count towards the average", () => {
+    const s = over()
+    expect(rules([s[s.length - 1]], ctx(s, { visibleLocationIds: ["a"] }))).toContain("avg_48h")
+  })
+})
+
+describe("leave and availability wording for a caller who does not see every location", () => {
+  const s = shift("2026-11-02", "08:00", "16:00")
+  const leave = [{ id: "l", personId: "p1", from: "2026-11-01", to: "2026-11-03", kind: "Annual", status: "approved" as const, decidedBy: null, decidedAt: null }]
+  const away = [{ personId: "p1", weekday: 1 as const, from: "12:00", to: "18:00" }]
+  it("a full caller gets the dates and the window, a cut caller only that it applies", () => {
+    const text = (c: RuleContext, rule: RuleId) => checkShifts([s], c).find((x) => x.rule === rule)!.message
+    expect(text(ctx([s], { leave }), "approved_leave")).toContain("2026-11-01")
+    expect(text(ctx([s], { leave, visibleLocationIds: ["a"] }), "approved_leave")).toBe("Aoife Byrne has approved leave on that day")
+    expect(text(ctx([s], { availability: away }), "unavailable")).toContain("12:00-18:00")
+    expect(text(ctx([s], { availability: away, visibleLocationIds: ["a"] }), "unavailable")).toBe("Aoife Byrne is unavailable at that time")
+  })
+})
+

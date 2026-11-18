@@ -9757,6 +9757,130 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/roster/rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The tenant's rule severities (block | warn | ignore per rule) and the averaging window in weeks. Anyone with roster read; defaults until an admin changes them. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            severity: {
+                                [key: string]: "block" | "warn" | "ignore";
+                            };
+                            avgWeekReferenceWeeks: number;
+                        };
+                    };
+                };
+            };
+        };
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        severity: {
+                            [key: string]: string;
+                        };
+                        avgWeekReferenceWeeks: number;
+                    };
+                };
+            };
+            responses: {
+                /** @description The settings after the change (admin or owner: 403 forbidden otherwise; audit roster.rules_changed; an unchanged set writes nothing). A rule left out gets its default. 422 invalid_rules (unknown rule id or severity) | invalid_avg_weeks (1..52). */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            severity: {
+                                [key: string]: "block" | "warn" | "ignore";
+                            };
+                            avgWeekReferenceWeeks: number;
+                        };
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/roster/weeks/{id}/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description A dry run: the rule violations on the people's shifts of that week, with the tenant's severities. A clash with a shift at a site the caller cannot see reads "Already rostered elsewhere" (no site, time or shift id) and leave, availability and hour totals carry no detail. Writes nothing. 404 not_found for a week of a site the caller may not see, a missing or another tenant's week and an id that is not a uuid. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** Format: uuid */
+                            weekId: string;
+                            violations: {
+                                /** @enum {string} */
+                                rule: "double_booking" | "approved_leave" | "unavailable" | "daily_rest" | "weekly_rest" | "avg_48h" | "expired_licence" | "left";
+                                shiftId: string;
+                                personId: string;
+                                /** @enum {string} */
+                                severity: "block" | "warn";
+                                message: string;
+                                otherShiftIds: string[];
+                            }[];
+                            blocking: number;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/members/{userId}/deactivate": {
         parameters: {
             query?: never;

@@ -6,6 +6,8 @@ import {
 } from "./dto"
 import { archiveLocation, archiveShiftType, createLocation, createShiftType, getLocation, listLocations, listShiftTypes, patchLocation, patchShiftType, setOfficeLimit, setSupervisors, setTargets } from "./locations"
 import { AvailabilityBody, AvailabilityOut, CreateLeaveBody, DecideLeaveBody, LeaveListOut, LeaveQuery, LeaveSchema } from "./dto"
+import { CheckOut, RulesBody, RulesOut } from "./dto"
+import { checkWeek, putRules, readRules } from "./rules"
 import { cancelLeave, createLeave, decideLeave, getAvailability, listLeave, putAvailability } from "./leave"
 import { setHomeLocation } from "./people"
 import { getQualifications, setQualifications } from "./qualifications"
@@ -106,6 +108,19 @@ const availPutR = createRoute({
   responses: { 200: json(AvailabilityOut, "The caller's whole set, replaced atomically. A window with `to` before `from` crosses midnight and is stored as two rows; to 00:00 means 24:00. 422 invalid_availability (weekday 0..6, HH:MM, from not equal to to, at most 50 rows).") },
 })
 
+const rulesGetR = createRoute({
+  method: "get", path: "/v1/roster/rules", middleware: guard("read"),
+  responses: { 200: json(RulesOut, "The tenant's rule severities (block | warn | ignore per rule) and the averaging window in weeks. Anyone with roster read; defaults until an admin changes them.") },
+})
+const rulesPutR = createRoute({
+  method: "put", path: "/v1/roster/rules", middleware: guard("write"), request: { body: body(RulesBody) },
+  responses: { 200: json(RulesOut, "The settings after the change (admin or owner: 403 forbidden otherwise; audit roster.rules_changed; an unchanged set writes nothing). A rule left out gets its default. 422 invalid_rules (unknown rule id or severity) | invalid_avg_weeks (1..52).") },
+})
+const checkR = createRoute({
+  method: "post", path: "/v1/roster/weeks/{id}/check", middleware: guard("write"), request: { params: RosterIdParam },
+  responses: { 200: json(CheckOut, "A dry run: the rule violations on the people's shifts of that week, with the tenant's severities. A clash with a shift at a site the caller cannot see reads \"Already rostered elsewhere\" (no site, time or shift id) and leave, availability and hour totals carry no detail. Writes nothing. 404 not_found for a week of a site the caller may not see, a missing or another tenant's week and an id that is not a uuid.") },
+})
+
 export const rosterRoutes = newRouter()
   .openapi(listR, async (c) => c.json(await rosterRead(c, (tx, ctx) => listLocations(tx, ctx, { includeArchived: c.req.valid("query").includeArchived === "true" })), 200))
   .openapi(createR, async (c) => c.json(await rosterWrite(c, (tx, ctx) => createLocation(tx, ctx, c.req.valid("json"))), 201))
@@ -131,3 +146,14 @@ export const rosterRoutes = newRouter()
   .openapi(leaveDecideR, async (c) => c.json(await rosterWrite(c, (tx, ctx, env) => decideLeave(tx, ctx, env, c.req.valid("param").id, c.req.valid("json"))), 200))
   .openapi(availGetR, async (c) => c.json(await rosterRead(c, (tx, ctx) => getAvailability(tx, ctx)), 200))
   .openapi(availPutR, async (c) => c.json(await rosterWrite(c, (tx, ctx) => putAvailability(tx, ctx, c.req.valid("json").windows), "self"), 200))
+  .openapi(rulesGetR, async (c) => c.json(await rosterRead(c, (tx, ctx) => readRules(tx, ctx.tenantId)), 200))
+  .openapi(rulesPutR, async (c) => c.json(await rosterWrite(c, (tx, ctx) => putRules(tx, ctx, c.req.valid("json"))), 200))
+  .openapi(checkR, async (c) =>
+    c.json(
+      await rosterRead(c, async (tx, ctx) => {
+        const violations = await checkWeek(tx, ctx, c.req.valid("param").id)
+        return { weekId: c.req.valid("param").id, violations, blocking: violations.filter((v) => v.severity === "block").length }
+      }),
+      200,
+    ),
+  )

@@ -50,11 +50,11 @@ export type OrganisationPatch = Partial<Pick<OrganisationDto, "name" | "timezone
 const ORG_KEYS = ["name", "timezone", "currency", "locale", "reportDeadline", "reportDueAfterMinutes"] as const
 export const isDueAfterMinutes = (v: unknown): v is number => typeof v === "number" && Number.isInteger(v) && v >= 0 && v <= 1440
 
-async function readSetting(tx: TenantTx, tenantId: string, key: string): Promise<unknown> {
+export async function readSetting(tx: TenantTx, tenantId: string, key: string): Promise<unknown> {
   const [r] = await tx.select({ value: tenantSettings.value }).from(tenantSettings).where(and(eq(tenantSettings.tenantId, tenantId), eq(tenantSettings.key, key)))
   return r?.value
 }
-async function writeSetting(tx: TenantTx, tenantId: string, key: string, value: unknown): Promise<void> {
+export async function writeSetting(tx: TenantTx, tenantId: string, key: string, value: unknown): Promise<void> {
   await tx.insert(tenantSettings).values({ tenantId, key, value }).onConflictDoUpdate({ target: [tenantSettings.tenantId, tenantSettings.key], set: { value } })
 }
 

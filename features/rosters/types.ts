@@ -1,7 +1,7 @@
 import type { LocationGrant, RosterAccess } from "@/lib/roster-access"
 import type { WorkforceMember } from "@/lib/workforce"
 import type { WeekTemplate } from "@/lib/roster-repeat"
-import type { Availability, LeaveRequest, RuleId, RuleViolation } from "@/lib/roster-rules"
+import type { Availability, LeaveRequest, RuleId, RuleSeverity, RuleViolation } from "@/lib/roster-rules"
 import type { HistoryEntry, Location, RosterShift, RosterWeek, ShiftTemplate, StaffingTarget } from "@/lib/rosters"
 
 export type {
@@ -84,7 +84,7 @@ export type RosterQuery = { location?: string; week?: string; view?: string; gro
  * query, the store scope, the signed-in person and the current time. The client rebuilds the view from the stores, so edits show at once.
  */
 /** Rule settings plus the leave and availability of the people on the caller's shifts. */
-export type RosterRules = { avgWeekReferenceWeeks: number; severity: Record<RuleId, "block" | "warn">; leave: LeaveRequest[]; availability: Availability[] }
+export type RosterRules = { avgWeekReferenceWeeks: number; severity: Record<RuleId, RuleSeverity>; leave: LeaveRequest[]; availability: Availability[] }
 
 export type RosterEdit = {
   roster: RosterData

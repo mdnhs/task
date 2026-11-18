@@ -178,6 +178,8 @@ const SPECS: Record<string, Spec> = {
   // B8 T7: leave (controls: the owner's own request: cancel 200, decide 403 self_decision). Another tenant's, a missing and a hidden leave are one 404 leave_not_found.
   "POST /v1/leave/{id}/cancel": { actor: "owner", expect: "leave_not_found" },
   "POST /v1/leave/{id}/decide": { actor: "owner", expect: "leave_not_found" },
+  // B8 T8: the check of a roster week (control: 200 with no violations). A week of another tenant or a site the caller cannot see, a missing one and a non-uuid id are one plain 404 not_found.
+  "POST /v1/roster/weeks/{id}/check": { actor: "owner", expect: "not_found" },
   "PATCH /v1/task-templates/{id}": { actor: "owner", expect: "template_not_found" },
   "DELETE /v1/task-templates/{id}": { actor: "owner", expect: "template_not_found" },
   // T5.1: shift patterns (control: PATCH 200, DELETE 204), assignments (control: PATCH 200 with an end date after the fixture's start, DELETE 204 for the future one),
