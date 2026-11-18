@@ -1,11 +1,11 @@
 "use client"
 
 import { useState } from "react"
-import { X } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog"
 import type { TasksClosedDay } from "../types"
+import { Icon } from "@/components/icon"
 
 type Day = TasksClosedDay
 
@@ -29,7 +29,7 @@ export function DayDetailsDialog({ day: current, onClose }: { day: Day | null; o
                 </DialogDescription>
               </div>
               <DialogClose render={<Button variant="ghost" size="icon" className="ai-close" aria-label="Close" />}>
-                <X />
+                <Icon name="close" size={24} />
               </DialogClose>
             </div>
 

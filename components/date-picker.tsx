@@ -1,13 +1,13 @@
 "use client"
 
 import { useId, useState } from "react"
-import { CalendarIcon } from "lucide-react"
 
 import { useField } from "@/components/field"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { TimePicker } from "@/components/time-picker"
 import { formatDate } from "@/lib/dates"
+import { Icon } from "@/components/icon"
 
 // Date picker: a Calendar in a Popover. Values are plain strings, never Date objects or UTC conversions:
 // "YYYY-MM-DD", or "YYYY-MM-DDTHH:mm" with `withTime` (adds a TimePicker beside the trigger).
@@ -90,7 +90,7 @@ export function DatePicker({
             />
           }
         >
-          <CalendarIcon aria-hidden="true" />
+          <Icon name="calendar" size={24} />
           <span className={day ? undefined : "od-datepick-ph"}>{day ? formatDate(`${day}T00:00:00`) : placeholder}</span>
         </PopoverTrigger>
         <PopoverContent id={popId} className="od-pop" align="start" sideOffset={6}>

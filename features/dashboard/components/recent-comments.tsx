@@ -1,6 +1,6 @@
 import Link from "next/link"
 
-import { Icon } from "@/components/icons"
+import { Icon } from "@/components/icon"
 import { When } from "@/components/when"
 import type { StaffCommentsData } from "../types"
 

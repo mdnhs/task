@@ -3,7 +3,8 @@
 .dnd-card:active{cursor:grabbing}
 .dnd-card[data-dragging]{opacity:.4}
 .dnd-lifted{cursor:grabbing;box-shadow:0 14px 34px rgba(0,0,0,.22),0 3px 8px rgba(0,0,0,.12);pointer-events:none}
-/* Drag handle: six dots, drawn in CSS so the icon set can change; shown on editable cards only. */
-.dnd-grip{position:absolute;top:10px;right:8px;width:8px;height:14px;color:var(--ink-3);opacity:.55;pointer-events:none;transition:opacity var(--dur-fast) var(--ease),color var(--dur-fast) var(--ease);background:radial-gradient(circle,currentColor 1.1px,transparent 1.5px) 0 0/4px 5px}
+/* Drag handle (<span class="dnd-grip"><Icon name="grip" /></span>): shown on editable cards only; the icon is the only icon use in the drag pieces. */
+.dnd-grip{position:absolute;top:10px;right:8px;width:14px;height:14px;display:grid;place-items:center;color:var(--ink-3);opacity:.7;pointer-events:none;transition:opacity var(--dur-fast) var(--ease),color var(--dur-fast) var(--ease)}
+.dnd-grip svg{width:14px;height:14px}
 .dnd-card:hover .dnd-grip,.dnd-card:focus-within .dnd-grip{opacity:1;color:var(--ink-2)}
 @media (prefers-reduced-motion:reduce){.dnd-grip{transition:none}}

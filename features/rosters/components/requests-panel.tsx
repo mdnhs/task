@@ -3,11 +3,11 @@
 import { AnimatePresence, motion } from "motion/react"
 import { listItem } from "@/lib/motion"
 import { useState } from "react"
-import { Check, X } from "lucide-react"
 
 import { Input } from "@/components/ui/input"
 import { formatDate } from "@/lib/dates"
 import type { ChangeRequest, RosterShift } from "../types"
+import { Icon } from "@/components/icon"
 
 const FIELD: Record<string, string> = { start: "Start", end: "End", date: "Day", personId: "Person", templateId: "Shift" }
 
@@ -43,8 +43,8 @@ export function RequestsPanel({ requests, shiftOf, nameOf, onDecide }: {
               </div>
               <Input className="ros-req-note" aria-label="Note" placeholder="Note (optional)" value={notes[r.id] ?? ""} onChange={(e) => setNotes((n) => ({ ...n, [r.id]: e.target.value }))} />
               <div className="ros-req-act">
-                <button type="button" className="btn btn-outline" onClick={() => onDecide(r.id, false, notes[r.id] ?? null)}><X aria-hidden="true" />Reject</button>
-                <button type="button" className="btn btn-primary" disabled={!s} onClick={() => onDecide(r.id, true, notes[r.id] ?? null)}><Check aria-hidden="true" />Approve</button>
+                <button type="button" className="btn btn-outline" onClick={() => onDecide(r.id, false, notes[r.id] ?? null)}><Icon name="close" size={24} />Reject</button>
+                <button type="button" className="btn btn-primary" disabled={!s} onClick={() => onDecide(r.id, true, notes[r.id] ?? null)}><Icon name="check" size={24} />Approve</button>
               </div>
             </motion.li>
           )

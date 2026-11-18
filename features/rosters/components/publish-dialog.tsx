@@ -2,12 +2,12 @@
 
 import { ActionButton } from "@/components/action-button"
 import { useState } from "react"
-import { AlertTriangle, TriangleAlert } from "lucide-react"
 
 import { Field } from "@/components/field"
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { blocking, type RuleViolation } from "@/lib/roster-rules"
+import { Icon } from "@/components/icon"
 
 export type PersonViolations = { personId: string; name: string; items: RuleViolation[] }
 
@@ -68,7 +68,7 @@ export function PublishDialog({ title, violations, nameOf, canOverride, checking
                 const hard = p.items.some((i) => i.severity === "block")
                 return (
                   <li key={p.personId} className="ros-viol-row" data-kind={hard ? "block" : "warn"}>
-                    {hard ? <TriangleAlert aria-hidden="true" /> : <AlertTriangle aria-hidden="true" />}
+                    {hard ? <Icon name="warning" size={24} /> : <Icon name="warning" size={24} />}
                     <span>
                       <b>{p.name}</b> {p.items[0].message}
                       {p.items.length > 1 && <span className="ros-viol-more num"> +{p.items.length - 1} more</span>}

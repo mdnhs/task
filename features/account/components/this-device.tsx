@@ -5,7 +5,7 @@ import { toast } from "sonner"
 
 import { Field } from "@/components/field"
 import { FilterSelect } from "@/components/filter-bar"
-import { Icon } from "@/components/icons"
+import { Icon } from "@/components/icon"
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { useApiAction } from "@/hooks/use-api-action"

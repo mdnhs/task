@@ -2,7 +2,6 @@
 
 import { ActionButton } from "@/components/action-button"
 import { useState } from "react"
-import { Save } from "lucide-react"
 
 import { Field } from "@/components/field"
 import { FilterSelect } from "@/components/filter-bar"
@@ -10,6 +9,7 @@ import { Dialog, DialogClose, DialogContent, DialogDescription, DialogHeader, Di
 import { Input } from "@/components/ui/input"
 import { formatDate } from "@/lib/dates"
 import type { WeekTemplate } from "@/lib/roster-repeat"
+import { Icon } from "@/components/icon"
 
 const WEEKS_AHEAD = 8
 
@@ -37,7 +37,7 @@ export function TemplatesPanel({ templates, locationName, canSave, onSave, onApp
           <Field label="Save the shown week as" htmlFor="wt-name" error={error || undefined}>
             <Input id="wt-name" placeholder="e.g. Standard week" value={name} onChange={(e) => { setName(e.target.value); setError("") }} />
           </Field>
-          <button type="submit" className="btn btn-outline"><Save aria-hidden="true" />Save template</button>
+          <button type="submit" className="btn btn-outline"><Icon name="save" size={24} />Save template</button>
         </form>
       )}
       {templates.length > 0 && (

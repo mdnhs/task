@@ -1,4 +1,4 @@
-import { Icon } from "./icons"
+import { Icon } from "./icon"
 
 /**
  * A Google Drive link that follows the device policy (FR-M1-50..52, CR-02, CR-06).

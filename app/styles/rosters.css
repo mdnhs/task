@@ -123,7 +123,7 @@
 .ros-card{position:relative;gap:2px;padding:12px;border-radius:var(--r-md);background:var(--card);color:var(--ink);list-style:none}
 .ros-card[data-edit]{padding:0}
 .ros-card[data-edit] .ros-shift-btn{padding:12px}
-.ros-card[data-edit] .ros-who{padding-right:14px}
+.ros-card[data-edit] .ros-who{padding-right:18px}
 .ros-card .ros-who{font-size:14px;font-weight:700;line-height:20px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;transition:color var(--dur-fast) var(--ease)}
 .ros-card .ros-time{font-size:12.5px;line-height:18px}
 .ros-card .ros-role{font-size:12px;line-height:17px}

@@ -1,11 +1,10 @@
 "use client"
 
 import { useRef, useState } from "react"
-import { X } from "lucide-react"
 import { motion } from "motion/react"
 import { DUR, EASE } from "@/lib/motion"
 import { useField } from "@/components/field"
-import { Icon } from "@/components/icons"
+import { Icon } from "@/components/icon"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { StretchIndicator } from "@/components/stretch-indicator"
 
@@ -65,7 +64,7 @@ export function FilterSearch({ value, onChange, placeholder }: { value: string; 
       >
         <motion.span className="ofs-flip" initial={false} animate={{ rotateY: open ? 180 : 0, scale: open ? INSET : 1 }} transition={flip}>
           <span className="ofs-face"><Icon name="search" /></span>
-          <span className="ofs-face ofs-face-back"><X aria-hidden="true" /></span>
+          <span className="ofs-face ofs-face-back"><Icon name="close" size={24} /></span>
         </motion.span>
       </motion.button>
     </div>

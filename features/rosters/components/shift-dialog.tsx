@@ -2,7 +2,6 @@
 
 import { ActionButton } from "@/components/action-button"
 import { useState } from "react"
-import { CalendarClock, Trash2, Users } from "lucide-react"
 
 import { Field } from "@/components/field"
 import { FilterSelect } from "@/components/filter-bar"
@@ -13,6 +12,7 @@ import { Input } from "@/components/ui/input"
 import type { WorkforceMember } from "@/lib/workforce"
 import { eligible, prunePeople, validateShiftForm, type ShiftErrors } from "../editing"
 import type { RosterShift, ShiftTemplate } from "../types"
+import { Icon } from "@/components/icon"
 
 export type ShiftSave = { date: string; templateId: string; role: string; start: string; end: string; unpaidBreakMin: number; people: string[] }
 
@@ -89,7 +89,7 @@ export function ShiftDialog({ shift, date, templates, members, dates, onSave, on
         <form className="od-form" onSubmit={submit} noValidate>
           <div className="od-form-cols">
             <div className="od-form-col">
-              <FormSection icon={Users} title="Who and when">
+              <FormSection icon="users" title="Who and when">
                 <Field label="Shift" htmlFor="sd-tpl" error={errors.templateId} required>
                   <FilterSelect
                     label="Shift"
@@ -118,7 +118,7 @@ export function ShiftDialog({ shift, date, templates, members, dates, onSave, on
               </FormSection>
             </div>
             <div className="od-form-col">
-              <FormSection icon={CalendarClock} title="Times">
+              <FormSection icon="calendar-clock" title="Times">
                 <div className="od-row2">
                   <Field label="Start" htmlFor="sd-start" error={errors.start} required>
                     <TimePicker label="Start" value={start} onChange={(v) => { setStart(v); clear("start") }} />
@@ -136,7 +136,7 @@ export function ShiftDialog({ shift, date, templates, members, dates, onSave, on
           <div className="od-form-foot">
             {shift && onRemove && (
               <button type="button" className="btn btn-outline ros-remove" onClick={onRemove}>
-                <Trash2 aria-hidden="true" />
+                <Icon name="trash" size={24} />
                 Remove shift
               </button>
             )}

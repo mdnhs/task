@@ -1,7 +1,6 @@
 "use client"
 
 import { useMemo, useState, type ReactNode } from "react"
-import { ChevronLeft, ChevronRight } from "lucide-react"
 
 import { useSlideDir } from "@/components/data-pagination"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -9,6 +8,7 @@ import { formatDate, formatTime } from "@/lib/dates"
 import type { LeaveRequest } from "@/lib/roster-rules"
 import type { RosterShift } from "@/lib/rosters"
 import { leaveOn, monthGrid, monthLabel, shiftMonth, shiftsByDay } from "../calendar"
+import { Icon } from "@/components/icon"
 
 const DOW = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 /** Shift chips shown in a month cell before "+n more" (the day's full list is under the grid). */
@@ -56,13 +56,13 @@ export function MyCalendar({
     <section className="mc" aria-label="My calendar">
       <div className="mc-nav">
         <button type="button" className="mc-btn" aria-label="Previous month" onClick={() => go(-1)}>
-          <ChevronLeft aria-hidden="true" />
+          <Icon name="chevron-left" size={24} />
         </button>
         <button type="button" className="mc-btn mc-today" onClick={() => { setAnchor(day0); setPicked(day0) }}>
           Today
         </button>
         <button type="button" className="mc-btn" aria-label="Next month" onClick={() => go(1)}>
-          <ChevronRight aria-hidden="true" />
+          <Icon name="chevron-right" size={24} />
         </button>
         <h2 className="mc-title" aria-live="polite">{monthLabel(anchor)}</h2>
         <span className="mc-count">{inMonth === 0 ? "No shifts this month" : `${inMonth} shift${inMonth > 1 ? "s" : ""} this month`}</span>

@@ -4,7 +4,7 @@ import Link from "next/link"
 
 import { CountUp } from "@/components/count-up"
 import { EmptyState } from "@/components/empty-state"
-import { Icon } from "@/components/icons"
+import { Icon, type IconName } from "@/components/icon"
 import { PageHead } from "@/components/page-head"
 import { When } from "@/components/when"
 import type { AttentionItem, AttentionKind } from "../attention"
@@ -17,7 +17,7 @@ import { MrrChart } from "./mrr-chart"
 // this component only renders it. `skeleton` swaps the charts for plain blocks, for the SkMask loading state.
 
 const TONE_CLASS: Record<DeltaTone, string> = { good: "up", bad: "down", flat: "pf-flat" }
-const KIND: Record<AttentionKind, { icon: string; tone: string; label: string }> = {
+const KIND: Record<AttentionKind, { icon: IconName; tone: string; label: string }> = {
   past_due: { icon: "wallet", tone: "red", label: "Payment past due" },
   trial_ending: { icon: "clock", tone: "blue", label: "Trial ending" },
   limit: { icon: "layers", tone: "amber", label: "Near plan limit" },

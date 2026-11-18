@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import { toast } from "sonner"
 
-import { Icon } from "@/components/icons"
+import { Icon } from "@/components/icon"
 import { copyText } from "@/lib/clipboard"
 import { ACTION } from "@/lib/motion"
 

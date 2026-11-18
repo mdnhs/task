@@ -2,7 +2,6 @@
 
 import { useState } from "react"
 import Link from "next/link"
-import { Bookmark, CalendarClock, FileText, ShieldCheck, SlidersHorizontal, Users } from "lucide-react"
 import { toast } from "sonner"
 import { z } from "zod"
 
@@ -24,6 +23,7 @@ import { useTaskWrites } from "../use-task-writes"
 import type { EvidenceRule, Person, Project, TaskTemplate } from "../types"
 import { EvidenceRuleField } from "./evidence-rule-field"
 import { NO_REPEAT, RepeatField, draftToRule, type PatternChoice, type RepeatDraft } from "./repeat-field"
+import { Icon } from "@/components/icon"
 
 // FR-TASK-01 fields. Dates are ISO local wall-clock strings, like the rest of the mock data.
 const schema = z
@@ -205,11 +205,11 @@ export function NewTaskForm({
         <div className="od-form-cols">
           <div className="od-form-col">
             <FormSection
-              icon={FileText}
+              icon="report"
               title="Task"
               action={canManageTemplates && !saving && (
                 <button type="button" className="fs-act" onClick={() => setSaving(true)}>
-                  <Bookmark aria-hidden="true" />
+                  <Icon name="bookmark" size={24} />
                   Save as template
                 </button>
               )}
@@ -223,7 +223,7 @@ export function NewTaskForm({
                     </button>
                     {tpls.map((t) => (
                       <button key={t.id} type="button" className="rp-day nt-tpl-chip" aria-pressed={tplId === t.id} onClick={() => pickTemplate(t.id)}>
-                        <Bookmark aria-hidden="true" />
+                        <Icon name="bookmark" size={24} />
                         {t.name}
                       </button>
                     ))}
@@ -256,7 +256,7 @@ export function NewTaskForm({
                 <VoiceRecorder id="nt-voice" value={voice} onChange={setVoice} hint="Up to 2 min · the assignee plays it on the task" />
               </div>
             </FormSection>
-            <FormSection icon={CalendarClock} title="Schedule">
+            <FormSection icon="calendar-clock" title="Schedule">
               <div className="od-row3">
                 <Field label="Start date" htmlFor="nt-start" error={err("start")} required>
                   <DatePicker label="Start date" value={form.start} today={today} placeholder="Pick a start date" onChange={(v) => { set("start", v); clear("start") }} />
@@ -272,7 +272,7 @@ export function NewTaskForm({
             </FormSection>
           </div>
           <div className="od-form-col">
-            <FormSection icon={Users} title="People">
+            <FormSection icon="users" title="People">
               <div className="od-row2">
                 <Field label="Department" htmlFor="nt-dept" error={err("dept")} required>
                   <FilterSelect label="Department" value={form.dept} options={departments.map((d) => ({ value: d.name, label: d.name }))} onChange={(v) => { set("dept", v); clear("dept") }} />
@@ -295,7 +295,7 @@ export function NewTaskForm({
               </div>
             </FormSection>
             <FormSection
-              icon={SlidersHorizontal}
+              icon="sliders"
               title="More"
               action={<FoldToggle open={moreOpen} onToggle={() => setShowMore((v) => !v)} controls="nt-more" label="Client, labels, estimate" />}
             >
@@ -325,7 +325,7 @@ export function NewTaskForm({
                 )}
               </FormFold>
             </FormSection>
-            <FormSection icon={ShieldCheck} title="Proof of completion" className="nt-ev">
+            <FormSection icon="shield" title="Proof of completion" className="nt-ev">
               <EvidenceRuleField id="nt-ev" value={form.evidenceRule} onChange={(r) => { set("evidenceRule", r); clear("evidenceRule") }} people={people} error={err("evidenceRule")} />
             </FormSection>
           </div>

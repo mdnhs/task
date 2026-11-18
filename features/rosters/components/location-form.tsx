@@ -4,7 +4,6 @@ import { ActionButton } from "@/components/action-button"
 import { useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { BadgeCheck, CalendarClock, Plus, Repeat, Target, Trash2, UserCog, Radar, MapPin } from "lucide-react"
 import { toast } from "sonner"
 
 import { Field } from "@/components/field"
@@ -17,6 +16,7 @@ import type { Weekday } from "@/lib/shifts"
 import { assignableMembers, canDeleteTemplate, setSupervisors, supervisorHistory, validateLocation, type LocationErrors, type LocationForm } from "../admin"
 import { grantsStore, historyStore, locationsStore, shiftsStore, targetsStore, templatesStore } from "../store"
 import type { Location, LocationAdminData, ShiftTemplate, StaffingTarget } from "../types"
+import { Icon } from "@/components/icon"
 
 const DAYS: { day: Weekday; label: string }[] = [{ day: 1, label: "Mon" }, { day: 2, label: "Tue" }, { day: 3, label: "Wed" }, { day: 4, label: "Thu" }, { day: 5, label: "Fri" }, { day: 6, label: "Sat" }, { day: 0, label: "Sun" }]
 
@@ -118,7 +118,7 @@ function LocationFormBody({ data, location, scopeKey, me, today }: { data: Locat
     <form className="od-form nt-form" onSubmit={submit} noValidate>
       <div className="od-form-cols">
         <div className="od-form-col">
-          <FormSection icon={MapPin} title="Details">
+          <FormSection icon="pin" title="Details">
             <Field label="Name" htmlFor="lf-name" error={errors.name} required>
               <Input id="lf-name" value={form.name} onChange={(e) => set("name", e.target.value)} />
             </Field>
@@ -134,7 +134,7 @@ function LocationFormBody({ data, location, scopeKey, me, today }: { data: Locat
               </Field>
             </div>
           </FormSection>
-          <FormSection icon={Radar} title="Clock-in zone">
+          <FormSection icon="radar" title="Clock-in zone">
             <div className="od-row3">
               <Field label="Latitude" htmlFor="lf-lat" error={errors.lat} required>
                 <Input id="lf-lat" inputMode="decimal" placeholder="e.g. 53.3343" value={form.lat} onChange={(e) => set("lat", e.target.value)} />
@@ -147,7 +147,7 @@ function LocationFormBody({ data, location, scopeKey, me, today }: { data: Locat
               </Field>
             </div>
           </FormSection>
-          <FormSection icon={CalendarClock} title="Shift templates" action={<button type="button" className="fs-act" onClick={addTpl}><Plus aria-hidden="true" />Add template</button>}>
+          <FormSection icon="calendar-clock" title="Shift templates" action={<button type="button" className="fs-act" onClick={addTpl}><Icon name="plus" size={24} />Add template</button>}>
             {tpls.length === 0 && <p className="rl-empty">No templates yet.</p>}
             {tpls.map((t, i) => {
               const inUse = savedIds.has(t.id) && !canDeleteTemplate(t.id, shifts)
@@ -175,7 +175,7 @@ function LocationFormBody({ data, location, scopeKey, me, today }: { data: Locat
                   <div className="rl-tpl-foot">
                     {inUse ? <span className="rl-note">In use by shifts</span> : <span />}
                     <button type="button" className="fs-act bad" disabled={inUse} title={inUse ? "A template used by shifts can't be deleted" : undefined} onClick={() => setTpls((p) => p.filter((x) => x.id !== t.id))}>
-                      <Trash2 aria-hidden="true" />
+                      <Icon name="trash" size={24} />
                       Delete
                     </button>
                   </div>
@@ -186,7 +186,7 @@ function LocationFormBody({ data, location, scopeKey, me, today }: { data: Locat
           </FormSection>
         </div>
         <div className="od-form-col">
-          <FormSection icon={Target} title="Staffing targets">
+          <FormSection icon="target" title="Staffing targets">
             {tpls.length === 0 && <p className="rl-empty">Add a template to set targets.</p>}
             {tpls.map((t, i) => (
               <div key={t.id} className="rl-targets" role="group" aria-label={`Targets for ${t.name || `template ${i + 1}`}`}>
@@ -202,7 +202,7 @@ function LocationFormBody({ data, location, scopeKey, me, today }: { data: Locat
               </div>
             ))}
           </FormSection>
-          <FormSection icon={BadgeCheck} title="Required skills" note="Optional">
+          <FormSection icon="verified" title="Required skills" note="Optional">
             {tpls.map((t, i) => (
               <div key={t.id} className="od-field" role="group" aria-label={`Skills for ${t.name || `template ${i + 1}`}`}>
                 <span className="fs-label">{t.name || `Template ${i + 1}`}</span>
@@ -221,12 +221,12 @@ function LocationFormBody({ data, location, scopeKey, me, today }: { data: Locat
               <button type="button" className="btn btn-outline" onClick={addSkill}>Add</button>
             </div>
           </FormSection>
-          <FormSection icon={UserCog} title="Supervisors">
+          <FormSection icon="user-cog" title="Supervisors">
             <Field label="Location supervisors" htmlFor="lf-sups">
               <PeoplePicker people={supPeople} value={sups} onChange={setSups} label="Supervisors" />
             </Field>
           </FormSection>
-          <FormSection icon={Repeat} title="Swap approval">
+          <FormSection icon="repeat" title="Swap approval">
             <div className="od-field">
               <FilterSeg<"office" | "supervisor">
                 label="Swap approval"

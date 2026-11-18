@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react"
-import { ArrowRightLeft, CalendarDays, CalendarPlus, Check, CheckCheck, HandHelping, ListChecks } from "lucide-react"
 import { toast } from "sonner"
 
 import { FilterSeg } from "@/components/filter-bar"
@@ -25,6 +24,7 @@ import { LeaveForm } from "./leave-form"
 import { LeavePanel } from "./leave-panel"
 import { MyCalendar } from "./my-calendar"
 import { SwapDialog } from "./swap-dialog"
+import { Icon } from "@/components/icon"
 
 // My roster (FR-RS-23, 33, 40, 41): the signed-in person's published shifts across every location, a "Seen" confirm, an .ics export,
 // their not-available windows and leave requests. Leave decisions (D8) show only for roles that can decide. Edits live in stores until reload.
@@ -125,7 +125,7 @@ export function MyRosterView({ data, queue, exchange, me, tz, today, scopeKey }:
               <StatusPill status={{ tone: "ok", label: "Confirmed" }} tick={false} />
             ) : (
               <button type="button" className="btn btn-outline mr-btn" onClick={() => setConfirmed((p) => ({ ...p, [s.id]: { at: today, sig: shiftSig(s) } }))}>
-                <Check aria-hidden="true" />
+                <Icon name="check" size={24} />
                 Seen
               </button>
             )}
@@ -134,12 +134,12 @@ export function MyRosterView({ data, queue, exchange, me, tz, today, scopeKey }:
             <StatusPill status={{ tone: "warn", label: "Swap asked" }} tick={false} />
           ) : (
             <button type="button" className="btn btn-outline mr-btn" aria-label={`Swap ${formatDate(s.date)}`} onClick={() => { close?.(); setSwapping({ id: s.id, n: (swapping?.n ?? 0) + 1 }) }}>
-              <ArrowRightLeft aria-hidden="true" />
+              <Icon name="swap" size={24} />
               Swap
             </button>
           ))}
           <button type="button" className="mr-ics" aria-label={`Add ${formatDate(s.date)} to calendar`} onClick={() => download([s], `shift-${s.date}`)}>
-            <CalendarPlus aria-hidden="true" />
+            <Icon name="calendar-plus" size={24} />
           </button>
         </div>
       </li>
@@ -159,7 +159,7 @@ export function MyRosterView({ data, queue, exchange, me, tz, today, scopeKey }:
             title={upcoming.length === 0 ? "No upcoming shifts to add" : undefined}
             onClick={() => download(upcoming, "my-roster")}
           >
-            <CalendarPlus aria-hidden="true" />
+            <Icon name="calendar-plus" size={24} />
             Add to calendar
           </button>
         }
@@ -182,7 +182,7 @@ export function MyRosterView({ data, queue, exchange, me, tz, today, scopeKey }:
           <b className="num"><CountUp value={String(unseen.length)} /></b>
           {unseen.length > 0 ? (
             <button type="button" className="btn btn-outline mr-btn" onClick={confirmAll}>
-              <CheckCheck aria-hidden="true" />
+              <Icon name="check-all" size={24} />
               Mark all as seen
             </button>
           ) : (
@@ -194,7 +194,7 @@ export function MyRosterView({ data, queue, exchange, me, tz, today, scopeKey }:
           <b className="num"><CountUp value={String(open.length)} /></b>
           {open.length > 0 ? (
             <button type="button" className="btn btn-outline mr-btn" onClick={() => setTab("shifts")}>
-              <HandHelping aria-hidden="true" />
+              <Icon name="hand" size={24} />
               See them
             </button>
           ) : (
@@ -217,13 +217,13 @@ export function MyRosterView({ data, queue, exchange, me, tz, today, scopeKey }:
       <div className="card nt-card">
         <div className="od-form nt-form od-slide" key={tab} data-slide={tabDir}>
           {tab === "calendar" && (
-            <FormSection icon={CalendarDays} title="Calendar" note="Pick a day to see its shifts">
+            <FormSection icon="calendar" title="Calendar" note="Pick a day to see its shifts">
               <MyCalendar shifts={shifts} leave={myLeave} today={today} places={places} renderShift={row} />
             </FormSection>
           )}
           {tab === "shifts" && (
             <>
-              <FormSection icon={ListChecks} title="Upcoming shifts" note={upcoming.length ? `${upcoming.length}` : undefined}>
+              <FormSection icon="list-checks" title="Upcoming shifts" note={upcoming.length ? `${upcoming.length}` : undefined}>
                 {upcoming.length === 0 ? <p className="rl-empty">No published shifts coming up.</p> : <ul className="mr-list">{upcoming.map((s) => row(s))}</ul>}
                 {earlier.length > 0 && (
                   <details className="ev-earlier">
@@ -232,7 +232,7 @@ export function MyRosterView({ data, queue, exchange, me, tz, today, scopeKey }:
                   </details>
                 )}
               </FormSection>
-              <FormSection icon={HandHelping} title="Open shifts you can take" note={open.length ? `${open.length}` : undefined}>
+              <FormSection icon="hand" title="Open shifts you can take" note={open.length ? `${open.length}` : undefined}>
                 {open.length === 0 ? (
                   <p className="rl-empty">No open shifts right now.</p>
                 ) : (
@@ -255,7 +255,7 @@ export function MyRosterView({ data, queue, exchange, me, tz, today, scopeKey }:
                                 <StatusPill status={{ tone: "warn", label: "Offered" }} tick={false} />
                               ) : (
                                 <button type="button" className="btn btn-primary mr-btn" aria-label={`Claim ${formatDate(s.date)}`} onClick={() => claim(s)}>
-                                  <HandHelping aria-hidden="true" />
+                                  <Icon name="hand" size={24} />
                                   Claim
                                 </button>
                               )}

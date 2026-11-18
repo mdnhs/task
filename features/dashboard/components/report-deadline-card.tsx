@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { AnimatePresence, motion } from "motion/react"
 
-import { Icon } from "@/components/icons"
+import { Icon } from "@/components/icon"
 import { StatusPill } from "@/components/status-pill"
 import { useDept } from "@/hooks/use-dept"
 import { layoutTransition, listItem } from "@/lib/motion"

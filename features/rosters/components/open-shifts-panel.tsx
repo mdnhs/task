@@ -3,10 +3,10 @@
 import { AnimatePresence, motion } from "motion/react"
 import { listItem } from "@/lib/motion"
 import Link from "next/link"
-import { ArrowRightLeft, Check, HandHelping, X } from "lucide-react"
 
 import { formatDate } from "@/lib/dates"
 import type { Claim, RosterShift, SwapRequest } from "../types"
+import { Icon } from "@/components/icon"
 
 // Open shifts of the shown range with who offered to take them, and swap requests waiting (FR-RS-38/42/43, D6). `canDecide` is approverFor for the
 // shift's week and location, so a supervisor sees the buttons only where they may decide. Each open shift is also a derived gap in Staff & Rosters
@@ -40,7 +40,7 @@ export function OpenShiftsPanel({ gapsLink, open, claims, swaps, shiftOf, nameOf
           return (
             <motion.li key={s.id} className="ros-os" data-id={s.id} {...listItem}>
               <div className="ros-req-main">
-                <span className="ros-who"><HandHelping aria-hidden="true" className="ros-os-i" />{when(s)} · {s.role}</span>
+                <span className="ros-who"><Icon name="hand" className="ros-os-i" size={24} />{when(s)} · {s.role}</span>
                 <span className="ros-role">{placeOf(s.locationId)}{mine.length === 0 ? " · nobody has offered yet" : ""}</span>
               </div>
               {mine.map((c) => (
@@ -48,8 +48,8 @@ export function OpenShiftsPanel({ gapsLink, open, claims, swaps, shiftOf, nameOf
                   <span className="ros-who">{nameOf(c.personId)}</span>
                   {canDecide(s.id) ? (
                     <span className="ros-req-act">
-                      <button type="button" className="btn btn-outline" aria-label={`Reject ${nameOf(c.personId)}`} onClick={() => onClaim(c, false)}><X aria-hidden="true" />Reject</button>
-                      <button type="button" className="btn btn-primary" aria-label={`Approve ${nameOf(c.personId)}`} onClick={() => onClaim(c, true)}><Check aria-hidden="true" />Approve</button>
+                      <button type="button" className="btn btn-outline" aria-label={`Reject ${nameOf(c.personId)}`} onClick={() => onClaim(c, false)}><Icon name="close" size={24} />Reject</button>
+                      <button type="button" className="btn btn-primary" aria-label={`Approve ${nameOf(c.personId)}`} onClick={() => onClaim(c, true)}><Icon name="check" size={24} />Approve</button>
                     </span>
                   ) : (
                     <span className="ros-role">A higher-level user approves</span>
@@ -65,14 +65,14 @@ export function OpenShiftsPanel({ gapsLink, open, claims, swaps, shiftOf, nameOf
           return (
             <motion.li key={r.id} className="ros-os" data-id={r.id} {...listItem}>
               <div className="ros-req-main">
-                <span className="ros-who"><ArrowRightLeft aria-hidden="true" className="ros-os-i" />{nameOf(r.fromPersonId)} to {nameOf(r.toPersonId)}</span>
+                <span className="ros-who"><Icon name="swap" className="ros-os-i" size={24} />{nameOf(r.fromPersonId)} to {nameOf(r.toPersonId)}</span>
                 <span className="ros-time num">{when(s)}{t ? ` for ${when(t)}` : ""}</span>
                 <span className="ros-role">{placeOf(s.locationId)}</span>
               </div>
               {canDecide(s.id) ? (
                 <span className="ros-req-act">
-                  <button type="button" className="btn btn-outline" aria-label={`Reject swap, ${nameOf(r.fromPersonId)}`} onClick={() => onSwap(r, false)}><X aria-hidden="true" />Reject</button>
-                  <button type="button" className="btn btn-primary" aria-label={`Approve swap, ${nameOf(r.fromPersonId)}`} onClick={() => onSwap(r, true)}><Check aria-hidden="true" />Approve</button>
+                  <button type="button" className="btn btn-outline" aria-label={`Reject swap, ${nameOf(r.fromPersonId)}`} onClick={() => onSwap(r, false)}><Icon name="close" size={24} />Reject</button>
+                  <button type="button" className="btn btn-primary" aria-label={`Approve swap, ${nameOf(r.fromPersonId)}`} onClick={() => onSwap(r, true)}><Icon name="check" size={24} />Approve</button>
                 </span>
               ) : (
                 <span className="ros-role">A higher-level user approves</span>

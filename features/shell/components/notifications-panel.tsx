@@ -2,11 +2,10 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { AlarmClock, BellRing, CalendarClock, CreditCard, FileCheck2, Files, Hourglass, KeyRound, ListChecks, Repeat2, RotateCcw, ShieldCheck, UserPlus, Users, type LucideIcon } from "lucide-react"
 import { AnimatePresence, motion, useReducedMotion } from "motion/react"
 
 import { FilterSeg } from "@/components/filter-bar"
-import { Icon } from "@/components/icons"
+import { Icon, type IconName } from "@/components/icon"
 import { RollNumber } from "@/components/roll-number"
 import { Button } from "@/components/ui/button"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
@@ -19,27 +18,27 @@ import { platformFeed } from "../platform-feed"
 import type { Notification, NotificationType } from "../types"
 import { NotificationsListSkeleton } from "./skeletons"
 
-const ICONS: Record<NotificationType, LucideIcon> = {
-  assigned: ListChecks,
-  reassigned: Repeat2,
-  deadline: CalendarClock,
-  evidence: FileCheck2,
-  "report-returned": RotateCcw,
-  "manager-action": BellRing,
-  reminder: AlarmClock,
-  payment: CreditCard,
-  access: KeyRound,
-  trial: Hourglass,
+const ICONS: Record<NotificationType, IconName> = {
+  assigned: "list-checks",
+  reassigned: "repeat",
+  deadline: "calendar-clock",
+  evidence: "file-check",
+  "report-returned": "reset",
+  "manager-action": "bell-ring",
+  reminder: "alarm",
+  payment: "card",
+  access: "key",
+  trial: "hourglass",
   // The API's notification kinds (B6 T6.4).
-  task: ListChecks,
-  report: FileCheck2,
-  billing: CreditCard,
-  security: KeyRound,
-  invite: UserPlus,
-  member: Users,
-  file: Files,
-  dsr: ShieldCheck,
-  system: BellRing,
+  task: "list-checks",
+  report: "file-check",
+  billing: "card",
+  security: "key",
+  invite: "userplus",
+  member: "users",
+  file: "files",
+  dsr: "shield",
+  system: "bell-ring",
 }
 
 type Tab = "all" | "unread"
@@ -154,8 +153,7 @@ function BellView({ list: source, loading, onRead, onReadAll, today, tzLabel }: 
           {!loading && shown.length === 0 && <p className="od-menu-sub-hint">You are all caught up.</p>}
           <AnimatePresence initial={false}>
           {shown.map((n) => {
-            const Ico = ICONS[n.type]
-            return (
+                        return (
               <motion.div key={n.id} layout="position" {...listItem} transition={layoutTransition}>
               <Link
                 href={n.href}
@@ -166,7 +164,7 @@ function BellView({ list: source, loading, onRead, onReadAll, today, tzLabel }: 
                 }}
               >
                 <span className="od-notif-ico">
-                  <Ico size={16} aria-hidden="true" />
+                  <Icon name={ICONS[n.type]} size={16} />
                 </span>
                 <span className="od-notif-body">
                   <span className="od-notif-title">{!n.read && <span className="sr-only">Unread: </span>}{n.title}</span>

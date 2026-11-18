@@ -1,6 +1,6 @@
 import Link from "next/link"
 
-import { Icon } from "@/components/icons"
+import { Icon } from "@/components/icon"
 import { PageHead } from "@/components/page-head"
 import type { LiveMetrics } from "../adapters"
 import { minorMoney } from "../format"

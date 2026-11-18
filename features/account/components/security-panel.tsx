@@ -3,13 +3,12 @@
 import { useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { AlertDialog as AlertDialogPrimitive } from "@base-ui/react/alert-dialog"
-import { Monitor } from "lucide-react"
 import { toast } from "sonner"
 
 import { ConfirmDialog } from "@/components/confirm-dialog"
 import { DataPagination } from "@/components/data-pagination"
 import { Field } from "@/components/field"
-import { Icon } from "@/components/icons"
+import { Icon } from "@/components/icon"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { SecretInput } from "@/components/secret-input"
 import { Switch } from "@/components/ui/switch"
@@ -150,7 +149,7 @@ export function SecurityPanel({
         <ul className="set-list">
           {sessions.map((s) => (
             <li key={s.id} className="acc-sess">
-              <span className="acc-sess-ico">{s.kind === "phone" ? <Icon name="phone" /> : <Monitor className="ico" strokeWidth={1.8} aria-hidden="true" />}</span>
+              <span className="acc-sess-ico">{s.kind === "phone" ? <Icon name="phone" /> : <Icon name="monitor" strokeWidth={1.8} />}</span>
               <div className="acc-sess-main">
                 <span className="acc-sess-top">
                   <b>{s.device}</b>

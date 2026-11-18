@@ -1,7 +1,7 @@
-import { Icon } from "@/components/icons"
+import { Icon, type IconName } from "@/components/icon"
 
-// `icon` is a sprite name from components/icons.tsx (e.g. "task", "folder").
-export function EmptyState({ icon, title, text, action }: { icon: string; title: string; text?: string; action?: React.ReactNode }) {
+// `icon` is an icon name from components/icon.tsx (e.g. "task", "folder").
+export function EmptyState({ icon, title, text, action }: { icon: IconName; title: string; text?: string; action?: React.ReactNode }) {
   return (
     <div className="od-empty">
       <span className="od-empty-ico" aria-hidden="true">

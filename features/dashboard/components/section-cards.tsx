@@ -3,7 +3,7 @@
 import Link from "next/link"
 
 import { CountUp } from "@/components/count-up"
-import { Icon } from "@/components/icons"
+import { Icon } from "@/components/icon"
 import { useDept } from "@/hooks/use-dept"
 import type { SummaryData } from "../types"
 import { Sparkline } from "./sparkline"

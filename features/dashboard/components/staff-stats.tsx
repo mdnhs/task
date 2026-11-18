@@ -1,7 +1,7 @@
 import Link from "next/link"
 
 import { CountUp } from "@/components/count-up"
-import { Icon } from "@/components/icons"
+import { Icon } from "@/components/icon"
 import type { StaffMyTasksData } from "../types"
 
 // The four figures are the API's (GET /v1/dashboard/staff): the list below is a page of the open tasks, so counting its rows would not equal them.
