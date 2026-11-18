@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Agent worktrees and the dev:all runner checkout are other copies of the repo, not part of this tree.
+    ".claude/worktrees/**",
+    ".local-run/**",
   ]),
 ]);
 

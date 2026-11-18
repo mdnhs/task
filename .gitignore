@@ -49,3 +49,4 @@ playwright-report/
 
 # npm run dev:all logs
 /.local-run/
+/.claude/worktrees/
