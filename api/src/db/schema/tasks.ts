@@ -142,9 +142,12 @@ export const taskHistory = pgTable(
     changes: jsonb("changes").$type<{ field: string; from: unknown; to: unknown }[]>().notNull().default(sql`'[]'::jsonb`),
     notified: text("notified").array().notNull().default(sql`'{}'::text[]`),
     updateId: text("update_id"),
+    /** The other task whose change caused this line (a knock-on move, an archive batch). The text stays neutral; the reader renders the ref only for a caller who can see that task (B7 R1). `ON DELETE SET NULL (cause_task_id)` is written by hand in the migration. */
+    causeTaskId: uuid("cause_task_id"),
   },
   (t) => [
     foreignKey({ columns: [t.tenantId, t.taskId], foreignColumns: [tasks.tenantId, tasks.id], name: "task_history_task_fk" }).onDelete("cascade"),
+    foreignKey({ columns: [t.tenantId, t.causeTaskId], foreignColumns: [tasks.tenantId, tasks.id], name: "task_history_cause_fk" }),
     unique("task_history_update_uq").on(t.tenantId, t.taskId, t.updateId),
     index("task_history_task_idx").on(t.tenantId, t.taskId, t.at.desc(), t.id.desc()),
     tenantPolicy(),

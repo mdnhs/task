@@ -1307,7 +1307,7 @@ describe("projects, milestones, dependencies, knock-on and date proposals (T4.3)
       expect((h.changes as Json[]).map((x) => x.field)).toEqual(["start", "due"].filter((f) => (id === a.id ? f === "due" : true)))
     }
     expect((await w.q("select text from task_history where task_id = $1 and kind = 'rescheduled'", [a.id]))[0].text).toBe("Rescheduled: Supplier is late")
-    expect((await w.q("select text from task_history where task_id = $1 and kind = 'rescheduled'", [b.id]))[0].text).toBe(`Moved because ${a.ref} was rescheduled`)
+    expect((await w.q("select text from task_history where task_id = $1 and kind = 'rescheduled'", [b.id]))[0].text).toBe("Moved because another task was rescheduled")
     const n = await w.q("select user_id, title from notifications where kind = 'task' and title = 'Task rescheduled' and user_id = $1", [w.staff.userId])
     expect(n.length).toBe(3) // one for each of the three tasks moved
     const ev = await w.q("select payload from domain_events where type = 'task.updated'")
@@ -1333,6 +1333,68 @@ describe("projects, milestones, dependencies, knock-on and date proposals (T4.3)
     const stale = await resched(w, a.id, { version: 7, start: "2026-11-20T09:00:00", due: "2026-11-22T17:00:00", knockOn: { apply: false } })
     expect(await code(stale)).toBe("version_conflict")
     expect(await code(await resched(w, a.id, { version: 1, start: "2026-11-22T09:00:00", due: "2026-11-21T09:00:00", knockOn: { apply: false } }))).toBe("invalid_dates")
+  })
+
+  describe("knock-on history redaction (B7 R1, ruling S2)", () => {
+    const histOf = async (w: W, id: string, as: Who) => w.json(await w.req("GET", `/v1/tasks/${id}/history`, as))
+    const textsOf = (h: Json) => (h.items as Json[]).map((i) => i.text as string)
+    /** A <- B <- C; A belongs to staff2, B and C to staff, so staff can see B and C but not A. Applies a knock-on from A. */
+    async function moved(w: W) {
+      const { a, b, c } = await chain(w, [w.staff2, w.staff, w.staff])
+      const p = await preview(w, a.id, "2026-11-20T09:00:00", "2026-11-22T17:00:00")
+      const r = await resched(w, a.id, { version: 1, start: "2026-11-20T09:00:00", due: "2026-11-22T17:00:00", knockOn: { apply: true, previewHash: p.previewHash } })
+      expect(r.status, await r.clone().text()).toBe(200)
+      return { a, b, c }
+    }
+
+    test("knock-on history text shows the cause ref to a caller who can see the root task", async () => {
+      const w = await world()
+      const { a, b } = await moved(w)
+      expect(textsOf(await histOf(w, b.id, w.ops))).toContain(`Moved because ${a.ref} was rescheduled`)
+    })
+
+    test("knock-on history hides the root ref from an employee who cannot see the root task (neutral text, no TSK- of the root anywhere in the JSON body)", async () => {
+      const w = await world()
+      const { a, b } = await moved(w)
+      const res = await w.req("GET", `/v1/tasks/${b.id}/history`, w.staff)
+      const raw = await res.text()
+      expect(raw).not.toContain(a.ref)
+      expect(textsOf(JSON.parse(raw))).toContain("Moved because a task you cannot see was rescheduled")
+      expect(JSON.stringify(await w.json(await w.req("GET", `/v1/tasks/${b.id}`, w.staff)))).not.toContain(a.ref) // the detail timeline too
+    })
+
+    test("knock-on history does not change hiddenDependencies for the redacted cause", async () => {
+      const w = await world()
+      const { a, b } = await moved(w)
+      const items = (await histOf(w, b.id, w.staff)).items as Json[]
+      const row = items.find((i) => i.kind === "rescheduled")!
+      expect(row.hiddenDependencies).toBe(0)
+      expect(JSON.stringify(items)).not.toContain(a.ref)
+    })
+
+    test("legacy row text \"Moved because TSK-n was rescheduled\" is neutral for an out-of-scope caller after migration 0040 (backfill resolves cause_task_id)", async () => {
+      const w = await world()
+      const { a, b } = await moved(w)
+      const legacy = `Moved because ${a.ref} was rescheduled`
+      await w.q("update task_history set cause_task_id = null, text = $2 where task_id = $1 and kind = 'rescheduled'", [b.id, legacy])
+      const sqlText = (await import("node:fs")).readFileSync(new URL("../../db/migrations/0040_history_cause.sql", import.meta.url), "utf8")
+      for (const st of sqlText.split("--> statement-breakpoint").filter((x) => /^\s*UPDATE/i.test(x))) await w.q(st)
+      const [row] = await w.q("select cause_task_id, text from task_history where task_id = $1 and kind = 'rescheduled'", [b.id])
+      expect(row.cause_task_id).toBe(a.id)
+      expect(row.text).not.toContain(a.ref)
+      expect(textsOf(await histOf(w, b.id, w.staff))).toContain("Moved because a task you cannot see was rescheduled")
+      expect(textsOf(await histOf(w, b.id, w.ops))).toContain(`Moved because ${a.ref} was rescheduled`)
+    })
+
+    test("notification body, event payload and search hit for the moved task contain no root ref", async () => {
+      const w = await world()
+      const { a, b } = await moved(w)
+      const n = await w.q("select title, body, link from notifications where user_id = $1", [w.staff.userId])
+      expect(JSON.stringify(n)).not.toContain(a.ref)
+      expect(JSON.stringify(await w.q("select payload from domain_events"))).not.toContain(a.ref)
+      const hits = await w.json(await w.req("GET", `/v1/search?q=${encodeURIComponent(b.title)}`, w.staff))
+      expect(JSON.stringify(hits)).not.toContain(a.ref)
+    })
   })
 
   test("a dependant outside a team manager's scope is flagged outOfScope; apply → 409 knock_on_out_of_scope; apply:false moves only the task", async () => {

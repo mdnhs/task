@@ -110,7 +110,7 @@ export async function archiveTask(tx: TenantTx, env: TaskEnv, ctx: TaskCtx, id: 
   // Removing a task is a change like any other: its assignees and creator are told (AC-M1-04), never the manager who did it. The open subtasks go with it quietly.
   const recipients = changeRecipients(ctx, row, assignees)
   for (const m of members) {
-    await writeHistory(tx, ctx, m.id, { kind: "archived", text: m.id === row.id ? "Archived" : `Archived with ${ref(row.refNo)}`, ...(m.id === row.id ? { notified: recipients } : {}) })
+    await writeHistory(tx, ctx, m.id, { kind: "archived", ...(m.id === row.id ? { text: "Archived", notified: recipients } : { text: "Archived with another task", causeTaskId: row.id }) })
     await removeDocument(tx, ctx.tenantId, "task", m.id) // gone from search at once, not when the relay catches up
   }
   const [next] = await tx.select().from(tasks).where(and(eq(tasks.id, row.id), eq(tasks.tenantId, ctx.tenantId)))
@@ -154,7 +154,7 @@ export async function restoreTask(tx: TenantTx, _env: Env, ctx: TaskCtx, id: str
     .set({ archivedAt: null, archivedBy: null, archiveBatchId: null, version: sql`${tasks.version} + 1`, updatedAt: ctx.now })
     .where(and(eq(tasks.tenantId, ctx.tenantId), inArray(tasks.id, members.map((m) => m.id))))
   for (const m of members) {
-    await writeHistory(tx, ctx, m.id, { kind: "restored", text: m.id === row.id ? "Restored" : `Restored with ${ref(row.refNo)}` })
+    await writeHistory(tx, ctx, m.id, { kind: "restored", ...(m.id === row.id ? { text: "Restored" } : { text: "Restored with another task", causeTaskId: row.id }) })
     await indexTask(tx, ctx.tenantId, m.id, ctx.now) // back in search at once, with its role-tagged audience (ruling E4)
   }
   const [next] = await tx.select().from(tasks).where(and(eq(tasks.id, row.id), eq(tasks.tenantId, ctx.tenantId)))
@@ -191,7 +191,7 @@ export async function purgeArchivedTask(tx: TenantTx, enqueue: Enqueue, who: Who
   const kids = await tx.select({ id: tasks.id }).from(tasks).where(and(eq(tasks.tenantId, tenantId), eq(tasks.parentId, row.id))).orderBy(asc(tasks.id)) // locked with the task by purgeSet
   if (kids.length > 0) {
     await tx.update(tasks).set({ parentId: null, version: sql`${tasks.version} + 1`, updatedAt: now }).where(and(eq(tasks.tenantId, tenantId), inArray(tasks.id, kids.map((k) => k.id))))
-    for (const k of kids) await writeHistory(tx, who, k.id, { kind: "detached", text: `${ref(row.refNo)} was removed; this is now a task of its own` })
+    for (const k of kids) await writeHistory(tx, who, k.id, { kind: "detached", text: "The parent task was removed; this is now a task of its own" })
   }
   await tx.update(tasks).set({ seriesId: null, occurrenceDate: null, version: sql`${tasks.version} + 1`, updatedAt: now }).where(and(eq(tasks.tenantId, tenantId), eq(tasks.seriesId, row.id)))
 

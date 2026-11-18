@@ -236,7 +236,7 @@ async function rescheduleLocked(
     const changes = diffFields({ start: r.startAt.toISOString(), due: r.dueAt.toISOString() }, { start: s.toISOString(), due: d.toISOString() })
     const [moved] = await tx.update(tasks).set({ startAt: s, dueAt: d, proposal: null, version: r.version + 1, updatedAt: ctx.now }).where(and(eq(tasks.id, r.id), eq(tasks.tenantId, ctx.tenantId))).returning()
     const recipients = changeRecipients(ctx, r, p.people.get(r.id) ?? [])
-    const historyId = await writeHistory(tx, ctx, r.id, { kind: "rescheduled", text: `Moved because ${ref(root.refNo)} was rescheduled`, changes, notified: recipients })
+    const historyId = await writeHistory(tx, ctx, r.id, { kind: "rescheduled", text: "Moved because another task was rescheduled", causeTaskId: root.id, changes, notified: recipients })
     await notifyTask(tx, env, ctx, moved, recipients, "Task rescheduled")
     events.push({ taskId: r.id, historyId, fields: changes.map((c) => c.field) })
   }

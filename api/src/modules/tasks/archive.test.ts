@@ -173,6 +173,10 @@ describe("archive and restore", () => {
     expect(by.get(s1.id)!.archived_by).toBe(w.ops.userId)
     expect(by.get(s1.id)!.version).toBe(2) // every archived row bumps its version
     expect((await w.q("select count(*)::int n from task_history where kind = 'archived'"))[0].n).toBe(4) // parent, s1, s2, s4
+    // B7 R1: the batch line stores the parent structurally; no other task's ref sits in the persisted text
+    const lines = await w.q<{ task_id: string; text: string; cause_task_id: string | null }>("select task_id, text, cause_task_id from task_history where kind = 'archived'")
+    expect(lines.find((l) => l.task_id === p.id)!.cause_task_id).toBeNull()
+    for (const l of lines.filter((x) => [s1.id, s2.id].includes(x.task_id))) expect([l.text, l.cause_task_id]).toEqual(["Archived with another task", p.id])
     expect((await restore(w, s1.id)).status).toBe(200) // restoring a member brings the whole batch back
     const live = await w.q<{ id: string }>("select id from tasks where archived_at is null")
     expect(live.map((x) => x.id).sort()).toEqual([p.id, s1.id, s2.id, s3.id].sort())

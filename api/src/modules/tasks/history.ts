@@ -8,7 +8,7 @@ import { decodeCursor, encodeCursor } from "./cursor"
 import { taskScopeWhere, type TaskCtx } from "./scope"
 import { wallOf } from "./time"
 
-export type HistoryInput = { kind: string; text?: string | null; changes?: RawChange[]; notified?: string[]; updateId?: string | null }
+export type HistoryInput = { kind: string; text?: string | null; changes?: RawChange[]; notified?: string[]; updateId?: string | null; causeTaskId?: string | null }
 export type HistoryDto = { id: string; at: string; atUtc: string; actorId: string | null; by: string; kind: string; text: string; changes: FieldChange[]; notified: string[]; hiddenNotified: number; hiddenDependencies: number; updateId?: string }
 type HistoryRow = typeof taskHistory.$inferSelect
 
@@ -16,9 +16,16 @@ type HistoryRow = typeof taskHistory.$inferSelect
 export async function writeHistory(tx: TenantTx, ctx: Pick<TaskCtx, "tenantId" | "actorId" | "now">, taskId: string, h: HistoryInput): Promise<string> {
   const [row] = await tx
     .insert(taskHistory)
-    .values({ tenantId: ctx.tenantId, taskId, at: ctx.now, actorId: ctx.actorId, kind: h.kind, text: h.text == null ? null : withholdDriveText(h.text), changes: h.changes ?? [], notified: h.notified ?? [], updateId: h.updateId ?? null })
+    .values({ tenantId: ctx.tenantId, taskId, at: ctx.now, actorId: ctx.actorId, kind: h.kind, text: h.text == null ? null : withholdDriveText(h.text), changes: h.changes ?? [], notified: h.notified ?? [], updateId: h.updateId ?? null, causeTaskId: h.causeTaskId ?? null })
     .returning({ id: taskHistory.id })
   return row.id
+}
+
+/** Lines that name another task (ruling S2): the stored text is neutral; a reader who can see the cause task gets its ref, anyone else a neutral line. */
+const CAUSE_TEXT: Record<string, (ref: string) => string> = {
+  rescheduled: (r) => `Moved because ${r} was rescheduled`,
+  archived: (r) => `Archived with ${r}`,
+  restored: (r) => `Restored with ${r}`,
 }
 
 const FORMER = "Former member"
@@ -73,6 +80,17 @@ export async function historyDtos(tx: TenantTx, ctx: Pick<TaskCtx, "tenantId" | 
   const seeable = refNos.length
     ? new Set((await tx.select({ refNo: tasks.refNo }).from(tasks).where(and(eq(tasks.tenantId, ctx.tenantId), inArray(tasks.refNo, refNos), taskScopeWhere(ctx.scope, ctx.reports)))).map((t) => `TSK-${t.refNo}`))
     : new Set<string>()
+  // Knock-on / archive-batch lines: one batched lookup of the cause tasks the caller can see (the same scope rule as the dependency refs above).
+  const causeIds = [...new Set(rows.filter((r) => r.causeTaskId && CAUSE_TEXT[r.kind]).map((r) => r.causeTaskId!))]
+  const causeRef = new Map(
+    causeIds.length
+      ? (await tx.select({ id: tasks.id, refNo: tasks.refNo }).from(tasks).where(and(eq(tasks.tenantId, ctx.tenantId), inArray(tasks.id, causeIds), taskScopeWhere(ctx.scope, ctx.reports)))).map((t) => [t.id, `TSK-${t.refNo}`] as const)
+      : [],
+  )
+  const textOf = (r: HistoryRow): string => {
+    const render = r.causeTaskId ? CAUSE_TEXT[r.kind] : undefined
+    return render ? render(causeRef.get(r.causeTaskId!) ?? "a task you cannot see") : (r.text ?? "")
+  }
   const depVisible = (x: unknown) => seeable.has(String(x))
   const fmt = {
     tz: ctx.tz, nameOf, teamName: (id: string) => teamNames.get(id) ?? "Former team",
@@ -94,7 +112,7 @@ export async function historyDtos(tx: TenantTx, ctx: Pick<TaskCtx, "tenantId" | 
       actorId: r.actorId,
       by: r.actorId ? nameOf(r.actorId) : FORMER,
       kind: r.kind,
-      text: free(r.text ?? ""),
+      text: free(textOf(r)),
       changes: changes.map((c) => formatChange(c, fmt)).map((c) => ({ ...c, from: free(c.from), to: free(c.to) })),
       notified: r.notified.filter((n) => personVisible(ctx, n)),
       hiddenNotified: r.notified.filter((n) => !personVisible(ctx, n)).length, // out-of-scope people: a count only (as hidden dependencies), never their ids
