@@ -44,6 +44,7 @@ Hex values listed in the per-feature briefs are superseded by the CSS variables 
 
 ## Must read before any new UI
 - `architecture.md`: feature-based folder structure (`features/<feature>/`), import rules, how to add a feature.
+- `00-design-system/icons.md`: the one icon set (Hugeicons) behind `components/icon.tsx`: rules and the old-name to new-name table.
 - `00-design-system/ui-rules.md`: how to skin shadcn components with OpsDesk tokens (popover/dropdown mistake) and where mock data lives (`public/data`).
 - `requirements/SRS.md`: the main spec since 28 Oct 2026, "AI Business OS" by the BA, v1.3 (modules M0–M9 plus M1A Rostering, M1B Time & Attendance, M1C Payroll; six phases; CR-01..11; FR-Mx-nn, FR-RS, FR-TA, FR-PY IDs). Appendix A (engineering) has build status, old-to-new ID mapping and the Phase 1 front-end plan.
 - `requirements/SRS-v1.2-built.md`: the old OpsDesk SRS v1.2, kept as the record of what was built (route map §5.3, traceability Appendix A, mock status Appendix B). Old IDs in code comments refer to it.
