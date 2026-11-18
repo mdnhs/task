@@ -37,23 +37,50 @@ export const readModelTtl = (support: boolean): number => (support ? 0 : READ_MO
 export type ReadModelCache = {
   /** The cached value (a copy) while it is younger than `ttlMs` of `now` (deps.clock) and the tenant's stamp has not moved, else `load()`. A `ttlMs` of 0 never reads or stores. */
   cached<T>(key: string, ttlMs: number, load: () => Promise<T>, now: Date): Promise<T>
-  /** Drops this instance's entries of the tenant at once, invalidates the loads in flight, then bumps the shared stamp so other instances drop theirs. Never rejects (a Redis failure leaves them to the TTL). */
+  /** Drops this instance's entries of the tenant at once, invalidates the loads in flight, then bumps the shared stamp (not awaited) so other instances drop theirs. Never rejects (a Redis failure leaves them to the TTL). */
   bust(tenantId: string): Promise<void>
   /** Test and diagnostics: the keys held now. Never values. */
   keys(): string[]
   reset(): void
 }
 
-/** One cache instance (one per process). Without a `stamp` it is the single-instance cache of F18. */
-export function makeReadModelCache(stamp?: CacheStamp): ReadModelCache {
+/** A stamp call that takes longer than this counts as failed (a hung, not refused, Redis). */
+export const STAMP_TIMEOUT_MS = 100
+/** After a failed or timed-out stamp call Redis is not asked again for this long (then one call probes it): a hung Redis costs one 100 ms wait per window, not one per request. */
+export const STAMP_BREAKER_MS = 5000
+
+const withTimeout = <T>(p: Promise<T>): Promise<T> =>
+  new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error("stamp timeout")), STAMP_TIMEOUT_MS)
+    timer.unref?.()
+    p.then(
+      (v) => (clearTimeout(timer), resolve(v)),
+      (e) => (clearTimeout(timer), reject(e)),
+    )
+  })
+
+/**
+ * One cache instance (one per process). Without a `stamp` it is the single-instance cache of F18. With one, a tiny circuit breaker (on `clock`, i.e. deps.clock) protects every
+ * request from a slow Redis, and a bust never waits for it. A Redis flush or restart resets the stamps to 0: an entry stored under the same small number within its 30 s
+ * could then match again, which is no worse than the TTL fallback this cache already accepts.
+ */
+export function makeReadModelCache(stamp?: CacheStamp, o: { clock?: { now(): Date }; onError?: (err: unknown) => void } = {}): ReadModelCache {
+  if (stamp && !o.clock) throw new Error("makeReadModelCache: a stamp needs a clock (deps.clock)")
+  const clock = o.clock ?? { now: () => new Date(0) } // only read when there is a stamp
+  let skipUntil = 0
+  const trip = (err: unknown) => {
+    skipUntil = clock.now().getTime() + STAMP_BREAKER_MS
+    o.onError?.(err)
+  }
   const store = new Map<string, Entry>() // insertion order = recency (a hit re-inserts)
   const generation = new Map<string, number>() // per tenant: bumped by every local bust, so a load that started before a bust is not stored
   const readStamp = async (tenant: string): Promise<number | null> => {
-    if (!stamp) return null
+    if (!stamp || clock.now().getTime() < skipUntil) return null
     try {
-      return await stamp.get(tenant)
-    } catch {
-      return null // Redis down: the 30 s TTL is the only bound, never an error
+      return await withTimeout(stamp.get(tenant))
+    } catch (err) {
+      trip(err)
+      return null // Redis down or hung: the 30 s TTL is the only bound, never an error
     }
   }
   return {
@@ -80,7 +107,9 @@ export function makeReadModelCache(stamp?: CacheStamp): ReadModelCache {
       generation.set(tenantId, (generation.get(tenantId) ?? 0) + 1)
       const prefix = `rm:${tenantId}:`
       for (const k of store.keys()) if (k.startsWith(prefix)) store.delete(k)
-      return stamp ? stamp.incr(tenantId).catch(() => {}) : Promise.resolve()
+      // The shared stamp is bumped without waiting (the request must not pay for Redis); a failure trips the breaker and other instances fall back to the TTL.
+      if (stamp && clock.now().getTime() >= skipUntil) withTimeout(stamp.incr(tenantId)).catch(trip)
+      return Promise.resolve()
     },
     keys: () => [...store.keys()],
     reset() {

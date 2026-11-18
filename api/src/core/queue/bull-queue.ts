@@ -10,7 +10,11 @@ import { runJob, type Queue } from "./queue"
 export const QUEUE_NAME = "opsdesk"
 
 /** Worker connection: blocks and retries forever (BullMQ requires maxRetriesPerRequest null). */
-const connect = (url: string) => new Redis(url, { maxRetriesPerRequest: null })
+const connect = (url: string) => {
+  const r = new Redis(url, { maxRetriesPerRequest: null })
+  r.on("error", () => {}) // reconnects on its own; an unhandled `error` would end the worker process
+  return r
+}
 
 /**
  * Producer connection (HTTP requests): commands fail at once while Redis is down (no offline queue) and a command is
@@ -99,6 +103,7 @@ export function startWorker(deps: Deps, redisUrl: string, name: string = QUEUE_N
       }
     }), { connection })
   worker.on("failed", (job, err) => logJobFailure(deps.logger, job, err))
+  worker.on("error", (err) => deps.logger.error(errorInfo(err), "worker error")) // BullMQ emits connection and internal errors here; with no listener they would be thrown
   return {
     close: async () => {
       await worker.close()

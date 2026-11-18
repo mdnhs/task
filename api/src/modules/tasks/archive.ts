@@ -300,33 +300,33 @@ export async function runArchivePurge(_data: unknown, deps: Deps): Promise<void>
   const rows = await deps.db.select({ id: tenants.id }).from(tenants).where(eq(tenants.status, "active")) // `tenants` has no RLS
   const sweep = startSweep(deps, ARCHIVE_PURGE_JOB)
   try {
-  for (const { id: tenantId } of rows) {
-    try {
-      sweep.tenant()
-      const now = deps.clock.now()
-      const ent = await tenantEntitlements(deps.db, tenantId, now)
-      if (!ent.allowed.includes("M1") || ent.billingState === "blocked") continue
-      await requeueObjects(deps, tenantId)
-      const cutoff = new Date(now.getTime() - ARCHIVE_DAYS * DAY_MS)
-      let after: { at: Date; id: string } | null = null
-      for (let batch = 0; batch < MAX_BATCHES; batch++) {
-        const page: { id: string; at: Date | null }[] = await withTenant(deps.db, tenantId, (tx) => expiredPageQuery(tx, tenantId, cutoff, after, PURGE_BATCH))
-        for (const t of page) {
-          try {
-            await purgeIfExpired(deps, tenantId, t.id, cutoff)
-          } catch (err) {
-            deps.logger.error({ tenantId, taskId: t.id, errCode: safeCode(err) }, "task purge failed; it stays archived")
+    for (const { id: tenantId } of rows) {
+      try {
+        sweep.tenant()
+        const now = deps.clock.now()
+        const ent = await tenantEntitlements(deps.db, tenantId, now)
+        if (!ent.allowed.includes("M1") || ent.billingState === "blocked") continue
+        await requeueObjects(deps, tenantId)
+        const cutoff = new Date(now.getTime() - ARCHIVE_DAYS * DAY_MS)
+        let after: { at: Date; id: string } | null = null
+        for (let batch = 0; batch < MAX_BATCHES; batch++) {
+          const page: { id: string; at: Date | null }[] = await withTenant(deps.db, tenantId, (tx) => expiredPageQuery(tx, tenantId, cutoff, after, PURGE_BATCH))
+          for (const t of page) {
+            try {
+              await purgeIfExpired(deps, tenantId, t.id, cutoff)
+            } catch (err) {
+              deps.logger.error({ tenantId, taskId: t.id, errCode: safeCode(err) }, "task purge failed; it stays archived")
+            }
           }
+          if (page.length > 0) await deps.readModelCache.bust(tenantId) // purged tasks leave the read models of every API instance
+          if (page.length < PURGE_BATCH) break
+          const last = page[page.length - 1]
+          after = { at: last.at!, id: last.id }
         }
-        if (page.length > 0) await deps.readModelCache.bust(tenantId) // purged tasks leave the read models of every API instance
-        if (page.length < PURGE_BATCH) break
-        const last = page[page.length - 1]
-        after = { at: last.at!, id: last.id }
+      } catch (err) {
+        deps.logger.error({ tenantId, errCode: safeCode(err) }, "task retention failed for a tenant")
       }
-    } catch (err) {
-      deps.logger.error({ tenantId, errCode: safeCode(err) }, "task retention failed for a tenant")
     }
-  }
   } finally {
     sweep.done()
   }

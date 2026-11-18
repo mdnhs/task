@@ -6,12 +6,13 @@ export const STAMP_TTL_SEC = 3600
 
 /**
  * Redis version stamp for the read-model cache (B7 S11): `rm:v:<tenantId>` holds a bare integer (never tenant data). One key per tenant, always with a TTL.
- * Commands fail at once while Redis is down or connecting (no offline queue) and give up after 300 ms, so a read or a write never waits on it; the cache then rides on its TTL.
+ * A Redis flush or restart resets every stamp to 0; an entry stored under the same small number within its 30 s could match again, which is no worse than the TTL fallback.
+ * Commands fail at once while Redis is down or connecting (no offline queue) and give up after 100 ms, so a read or a write never waits on it; the cache then rides on its TTL.
  */
 export function makeRedisCacheStamp(redisUrl: string): CacheStamp & { close(): Promise<void> } {
-  const redis = new Redis(redisUrl, { enableOfflineQueue: false, commandTimeout: 300, maxRetriesPerRequest: 1, connectTimeout: 2000, retryStrategy: (n) => Math.min(n * 200, 2000) })
+  const redis = new Redis(redisUrl, { enableOfflineQueue: false, commandTimeout: 100, maxRetriesPerRequest: 1, connectTimeout: 2000, retryStrategy: (n) => Math.min(n * 200, 2000) })
   redis.on("error", () => {})
-  /** Right after start-up the first connection is still being made: wait for it (at most the command timeout), once. Reconnecting or closed fails at once. */
+  /** Right after start-up the first connection is still being made: wait for it (at most 100 ms), once. Reconnecting or closed fails at once. */
   const ready = async (): Promise<void> => {
     if (redis.status === "ready" || (redis.status !== "connecting" && redis.status !== "connect" && redis.status !== "wait")) return
     await new Promise<void>((resolve) => {
@@ -20,7 +21,7 @@ export function makeRedisCacheStamp(redisUrl: string): CacheStamp & { close(): P
         redis.off("ready", done)
         resolve()
       }
-      const timer = setTimeout(done, 300)
+      const timer = setTimeout(done, 100)
       redis.once("ready", done)
     })
   }

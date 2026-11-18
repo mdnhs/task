@@ -9,13 +9,17 @@ import { check, sleep } from "k6"
 import { Counter, Trend } from "k6/metrics"
 import { SharedArray } from "k6/data"
 
-const LOCAL = /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?(\/|$)/
+// k6 has no URL global, so the authority is matched strictly: scheme, then EXACTLY localhost / 127.0.0.1 / [::1], an optional port, and only then a path, query or fragment
+// (no `@`, so `http://localhost@evil.com` and `http://localhost.evil.com` do not pass).
+const LOCAL = /^https?:\/\/(?:localhost|127\.0\.0\.1|\[::1\])(?::\d{1,5})?(?:[/?#][^@\s]*)?$/
+const isLocal = (u) => LOCAL.test(u)
+
 export const BASE_URL = (__ENV.BASE_URL || "http://localhost:3100").replace(/\/$/, "")
 export const TARGET = __ENV.TARGET || "bff"
 export const ORIGIN = (__ENV.ORIGIN || "http://localhost:3100").replace(/\/$/, "")
 export const METRICS_URL = __ENV.METRICS_URL || ""
 for (const u of [BASE_URL, METRICS_URL]) {
-  if (u && !LOCAL.test(u)) throw new Error("refused: the load test only runs against localhost")
+  if (u && !isLocal(u)) throw new Error("refused: the load test only runs against localhost")
 }
 if (TARGET !== "bff" && TARGET !== "api") throw new Error("TARGET must be bff or api")
 

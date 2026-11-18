@@ -18,10 +18,10 @@ import { DRIVE, REQUIRED, world, type Json, type W, type Who } from "../shift-re
 import { createApp } from "../../app"
 import { bustAfterJob } from "../../core/queue/bull-queue"
 import { runArchivePurge } from "../tasks"
-import { fakeCacheStamp } from "../../../test/fakes"
+import { fakeCacheStamp, fakeClock } from "../../../test/fakes"
 import { Redis } from "ioredis"
 import { makeRedisCacheStamp, STAMP_TTL_SEC } from "./stamp"
-import { cacheKeys, cached, bustReadModels, makeReadModelCache, readModelTtl, READ_MODEL_MAX, READ_MODEL_TTL_MS, resetReadModelCache } from "./cache"
+import { cacheKeys, cached, bustReadModels, makeReadModelCache, STAMP_BREAKER_MS, STAMP_TIMEOUT_MS, readModelTtl, READ_MODEL_MAX, READ_MODEL_TTL_MS, resetReadModelCache } from "./cache"
 import { dayBounds, localDay, lastDays } from "./days"
 import { attentionQuery, awaitingReportsQuery, dashboardSummaryQuery, openReportsQuery, pendingEvidenceQuery, teamTasksQuery, tasksClosedQuery, awaitingReviewQuery } from "./queries"
 import { SUPPORT_DENIED_ROUTES } from "../../core/middleware/support"
@@ -861,6 +861,7 @@ describe("route walker and the API surface", () => {
 
 // B7 Task 16 (ruling S11): the multi-instance cache. Two cache instances over one stamp store stand for two API processes over one Redis.
 describe("read-model cache: Redis version stamp (S11)", () => {
+  const w0 = () => fakeClock(new Date("2026-10-26T12:00:00.000Z"))
   const now = new Date("2026-10-26T12:00:00.000Z")
   const as = (w: W, cache: ReturnType<typeof makeReadModelCache>) => createApp({ ...w.deps, readModelCache: cache })
   const read = async (w: W, app: ReturnType<typeof createApp>, who: Who) => {
@@ -874,8 +875,8 @@ describe("read-model cache: Redis version stamp (S11)", () => {
   test("a write through instance A is visible to a read on instance B immediately; without the stamp B would serve the old number for the TTL", async () => {
     const w = await world({ now: NOW })
     const stamp = fakeCacheStamp()
-    const a = as(w, makeReadModelCache(stamp))
-    const b = as(w, makeReadModelCache(stamp))
+    const a = as(w, makeReadModelCache(stamp, { clock: w0() }))
+    const b = as(w, makeReadModelCache(stamp, { clock: w0() }))
     expect(await read(w, b, w.ops)).toBe(0)
     expect((await create(w, a, "From A")).status).toBe(201)
     expect(await read(w, b, w.ops)).toBe(1) // B's entry was cached; A's bust moved the stamp
@@ -890,8 +891,8 @@ describe("read-model cache: Redis version stamp (S11)", () => {
   test("a worker job write invalidates the cache of that tenant (and only for the jobs that change read-model data)", async () => {
     const w = await world({ now: NOW })
     const stamp = fakeCacheStamp()
-    const api = makeReadModelCache(stamp)
-    const worker = makeReadModelCache(stamp)
+    const api = makeReadModelCache(stamp, { clock: w0() })
+    const worker = makeReadModelCache(stamp, { clock: w0() })
     const a = as(w, api)
     expect(await read(w, a, w.ops)).toBe(0)
     await w.q(
@@ -913,7 +914,7 @@ describe("read-model cache: Redis version stamp (S11)", () => {
 
   test("Redis down: reads fall back to the 30 s TTL and never throw; a bust still drops this instance", async () => {
     const stamp = fakeCacheStamp()
-    const cache = makeReadModelCache(stamp)
+    const cache = makeReadModelCache(stamp, { clock: w0() })
     let n = 0
     const load = async () => ++n
     const k = "rm:t1:m:all:drive0:d"
@@ -931,7 +932,7 @@ describe("read-model cache: Redis version stamp (S11)", () => {
 
   test("a bust for tenant A does not evict tenant B", async () => {
     const stamp = fakeCacheStamp()
-    const cache = makeReadModelCache(stamp)
+    const cache = makeReadModelCache(stamp, { clock: w0() })
     let n = 0
     const load = async () => ++n
     await cache.cached("rm:ta:m:all:drive0:d", 30_000, load, now)
@@ -941,6 +942,41 @@ describe("read-model cache: Redis version stamp (S11)", () => {
     expect(await cache.cached("rm:tb:m:all:drive0:d", 30_000, load, now)).toBe(2) // still a hit: B's stamp did not move
     expect(await cache.cached("rm:ta:m:all:drive0:d", 30_000, load, now)).toBe(3)
     expect([...stamp.values.keys()]).toEqual(["ta"])
+  })
+
+  test("a HUNG Redis: one 100 ms wait trips a 5 s breaker (reads stay fast), a write never waits, the breaker closes after the window and a bump from another instance is seen again", async () => {
+    const stamp = fakeCacheStamp()
+    const hang: { on: boolean; calls: number } = { on: false, calls: 0 }
+    const slow = {
+      get: (t: string) => (hang.on ? (hang.calls++, new Promise<number>(() => {})) : stamp.get(t)),
+      incr: (t: string) => (hang.on ? (hang.calls++, new Promise<void>(() => {})) : stamp.incr(t)),
+    }
+    const clock = fakeClock(new Date(now))
+    const mine = makeReadModelCache(slow, { clock })
+    const other = makeReadModelCache(stamp, { clock })
+    let n = 0
+    const load = async () => ++n
+    const k = "rm:t1:m:all:drive0:d"
+    expect(await mine.cached(k, 600_000, load, now)).toBe(1)
+    hang.on = true
+    const t0 = performance.now()
+    expect(await mine.cached(k, 600_000, load, now)).toBe(1) // first read after the hang: waits out the timeout, then serves the entry on the TTL
+    expect(performance.now() - t0).toBeGreaterThanOrEqual(STAMP_TIMEOUT_MS - 20)
+    const calls = hang.calls
+    const t1 = performance.now()
+    for (let i = 0; i < 50; i++) expect(await mine.cached(k, 600_000, load, now)).toBe(1)
+    const t2 = performance.now()
+    await mine.bust("t1") // returns at once, local entries gone
+    expect(performance.now() - t2).toBeLessThan(20)
+    expect(performance.now() - t1).toBeLessThan(STAMP_TIMEOUT_MS) // breaker open: no Redis call, no wait
+    expect(hang.calls).toBe(calls)
+    expect(mine.keys()).toEqual([])
+    clock.advance({ minutes: (STAMP_BREAKER_MS + 1000) / 60_000 }) // the window ends
+    hang.on = false
+    expect(await mine.cached(k, 600_000, load, now)).toBe(2) // probes Redis: healthy again, loads and stores under the stamp
+    expect(await mine.cached(k, 600_000, load, now)).toBe(2)
+    await other.bust("t1") // another instance writes
+    expect(await mine.cached(k, 600_000, load, now)).toBe(3) // seen
   })
 
   test("the real Redis stamp: one integer key per tenant with a TTL, no tenant data; an unreachable Redis rejects fast", async () => {
@@ -967,7 +1003,7 @@ describe("read-model cache: Redis version stamp (S11)", () => {
     await expect(dead.incr("t")).rejects.toThrow()
     expect(Date.now() - t0).toBeLessThan(2000)
     await dead.close()
-    const cache = makeReadModelCache(dead)
+    const cache = makeReadModelCache(dead, { clock: w0() })
     expect(await cache.cached("rm:t:m:all:drive0:d", 30_000, async () => "ok", now)).toBe("ok") // fail-open
     await expect(cache.bust("t")).resolves.toBeUndefined()
   })

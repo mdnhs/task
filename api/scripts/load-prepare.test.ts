@@ -74,7 +74,11 @@ describe("load-prepare", () => {
     expect(await refusal(opts({ urls: { app: "postgres://u:p@localhost:5432/x", owner: undefined } }))).toBe("not_local")
     expect(await refusal(opts({ users: 5 }))).toBe("bad_size")
     expect(await refusal(opts({ password: "short" }))).toBe("password_required")
-    expect(isLocalUrl("postgres://u:p@localhost.evil.com:5432/x")).toBe(false)
+    for (const bad of [
+      "postgres://u:p@localhost.evil.com:5432/x", "postgres://u:p@evil.com:5432/x?host=localhost", "postgres://u:p@localhost:5432/x?host=db.example.com", "postgres://u:p@localhost/x?hostaddr=10.0.0.5",
+      "postgres://localhost@evil.com/x", "postgres://u:p@localhost,evil.com:5432/x", "postgres:///x?host=/var/run/postgresql", "not a url", "", "postgres://u:p@127.0.0.1.evil.com/x",
+    ]) expect(isLocalUrl(bad), bad).toBe(false)
+    for (const good of ["postgres://u:p@localhost:5432/x", "postgres://u:p@127.0.0.1:55432/x", "postgres://u:p@[::1]:5432/x?sslmode=disable"]) expect(isLocalUrl(good), good).toBe(true)
     expect(await noLoadRows()).toBe(0)
   })
 

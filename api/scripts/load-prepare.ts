@@ -46,8 +46,17 @@ export type LoadUser = { email: string; role: "owner" | "ops" | "employee"; cook
 /** What k6 reads (load/k6/lib.js). Cookies are session credentials of throwaway users on a local database; the file is gitignored and never printed. */
 export type UsersFile = { tenant: string; patternId: string; today: string; users: LoadUser[] }
 
-const LOCAL = /@(localhost|127\.0\.0\.1|\[::1\])[:/]/
-export const isLocalUrl = (u: string | undefined): boolean => typeof u === "string" && LOCAL.test(u)
+const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]"])
+/** The URL's own host (parsed, not pattern-matched) is local, and no `host`/`hostaddr` query parameter can send the connection elsewhere (node-postgres lets the query override the host). */
+export function isLocalUrl(u: string | undefined): boolean {
+  if (typeof u !== "string") return false
+  try {
+    const x = new URL(u)
+    return LOCAL_HOSTS.has(x.hostname) && !x.searchParams.has("host") && !x.searchParams.has("hostaddr")
+  } catch {
+    return false
+  }
+}
 
 /** The shape k6 reads. Pure, so the test can check it without a database. */
 export function buildUsersFile(o: { tenant: string; patternId: string; today: string; users: LoadUser[] }): UsersFile {

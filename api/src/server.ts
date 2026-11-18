@@ -23,14 +23,14 @@ import { errorInfo } from "./core/safe-error"
 import { parseEnv, type Env } from "./env"
 
 export function makeDeps(env: Env, o: { service?: "api" | "worker" } = {}): Deps {
-  const db = makeDb(env.DATABASE_URL)
-  const clock = { now: () => new Date() }
   const logger = makeLogger({ level: env.LOG_LEVEL, service: o.service ?? "api" })
+  const db = makeDb(env.DATABASE_URL, { logger })
+  const clock = { now: () => new Date() }
   const metrics = makeMetrics()
   const errorReporter = makeLogErrorReporter(logger) // a Sentry / OpenTelemetry adapter replaces this line at go-live (ErrorReporter, ruling S10)
   const mailer = makeMailer({ env, db, logger })
   const rateLimiter = makeRedisRateLimiter(env.REDIS_URL)
-  return { env, db, auth: buildAuth({ env, db, clock, mailer, logger, rateLimiter }), rateLimiter, clock, mailer, logger, queue: makeBullQueue(env.REDIS_URL), push: makeLoggingPush(logger), storage: makeStorage({ env, db }), scanner: clamdFromEnv(env) ?? unconfiguredScanner(), oauth: makeOAuthClient(env), billing: makeBilling({ env, db }), net: makeNet(), metrics, errorReporter, readModelCache: makeReadModelCache(makeRedisCacheStamp(env.REDIS_URL)) }
+  return { env, db, auth: buildAuth({ env, db, clock, mailer, logger, rateLimiter }), rateLimiter, clock, mailer, logger, queue: makeBullQueue(env.REDIS_URL), push: makeLoggingPush(logger), storage: makeStorage({ env, db }), scanner: clamdFromEnv(env) ?? unconfiguredScanner(), oauth: makeOAuthClient(env), billing: makeBilling({ env, db }), net: makeNet(), metrics, errorReporter, readModelCache: makeReadModelCache(makeRedisCacheStamp(env.REDIS_URL), { clock, onError: (e) => logger.debug(errorInfo(e), "read-model stamp unavailable") }) }
 }
 
 /** The internal metrics listener (ruling S10); a no-op when `port` is unset. The pool gauge is read at scrape time. */

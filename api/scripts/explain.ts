@@ -2,7 +2,9 @@
 //   E2E_PG_ADMIN_URL=postgres://postgres:...@localhost:55432/opsdesk_e2e [E2E_PG_CONTAINER=opsdesk-e2e-postgres-1] [BASE_URL=http://localhost:3101] npm -w api exec -- tsx scripts/explain.ts
 // It switches `auto_explain` on for the app role (EXPLAIN ANALYZE, BUFFERS of every statement, nested ones included) and waits 12 s, so the API's pool (idle timeout 10 s) opens fresh connections that load it. It calls each scenario endpoint once as the right persona
 // (a warm-up call first), reads the plans back from the container log, switches auto_explain off again, and prints a Markdown table: per endpoint the statements, the
-// slowest and the most expensive plan node, and every Seq Scan that read more than 1 000 rows. Nothing is written to any tenant table.
+// slowest and the most expensive plan node, and every Seq Scan that read more than 1 000 rows.
+// It is NOT read-only: the "report open" and "report draft save" steps create (or update) one shift-report row (the first employee of the users file, shift date today - 60) in the load tenant, and
+// the API writes its usual audit/history rows for them. Use it on the throwaway load database only. auto_explain is switched off again at the end and on SIGINT/SIGTERM.
 import { spawnSync } from "node:child_process"
 import { readFileSync } from "node:fs"
 import { fileURLToPath } from "node:url"
@@ -75,6 +77,9 @@ async function main(): Promise<void> {
       await admin.query(on ? `alter role app_user set ${k} = '${v}'` : `alter role app_user reset ${k}`)
     }
   }
+  const off = () => void set(false).catch(() => undefined).finally(() => process.exit(130))
+  process.once("SIGINT", off)
+  process.once("SIGTERM", off)
   const rows: { name: string; stmts: number; slow?: Plan; costly?: Plan; seq: string[] }[] = []
   try {
     await set(true)

@@ -159,40 +159,40 @@ export async function runRecurrence(_data: unknown, deps: Deps): Promise<void> {
   const rows = await deps.db.select({ id: tenants.id, tz: tenants.timezone }).from(tenants).where(eq(tenants.status, "active")) // `tenants` has no RLS
   const sweep = startSweep(deps, RECURRENCE_JOB)
   try {
-  for (const { id: tenantId, tz } of rows) {
-    try {
-      sweep.tenant()
-      const now = deps.clock.now()
-      const ent = await tenantEntitlements(deps.db, tenantId, now)
-      if (!ent.allowed.includes("M1") || ent.billingState === "blocked") continue
-      const today = wallOf(now, tz).slice(0, 10)
-      const live = await withTenant(deps.db, tenantId, (tx) => liveSeriesQuery(tx, tenantId))
-      const shiftIds = [...new Set(live.flatMap((s) => (s.repeat?.freq === "per_shift" && s.repeat.patternId && UUID.test(s.repeat.patternId) ? [s.repeat.patternId] : [])))]
-      const patterns = new Map<string, PatternRow>(
-        shiftIds.length ? (await withTenant(deps.db, tenantId, (tx) => tx.select().from(shiftPatterns).where(and(eq(shiftPatterns.tenantId, tenantId), inArray(shiftPatterns.id, shiftIds))))).map((p) => [p.id, p]) : [],
-      )
-      for (const s of live) {
-        try {
-          const rule = s.repeat!
-          let seriesToday = today
-          if (rule.freq === "per_shift") {
-            const p = patterns.get(rule.patternId ?? "")
-            if (!p || p.archivedAt) continue // an archived (or missing) pattern has no occurrences (F14)
-            seriesToday = wallOf(now, patternZone(p, tz)).slice(0, 10) // "today" is the pattern's own date
+    for (const { id: tenantId, tz } of rows) {
+      try {
+        sweep.tenant()
+        const now = deps.clock.now()
+        const ent = await tenantEntitlements(deps.db, tenantId, now)
+        if (!ent.allowed.includes("M1") || ent.billingState === "blocked") continue
+        const today = wallOf(now, tz).slice(0, 10)
+        const live = await withTenant(deps.db, tenantId, (tx) => liveSeriesQuery(tx, tenantId))
+        const shiftIds = [...new Set(live.flatMap((s) => (s.repeat?.freq === "per_shift" && s.repeat.patternId && UUID.test(s.repeat.patternId) ? [s.repeat.patternId] : [])))]
+        const patterns = new Map<string, PatternRow>(
+          shiftIds.length ? (await withTenant(deps.db, tenantId, (tx) => tx.select().from(shiftPatterns).where(and(eq(shiftPatterns.tenantId, tenantId), inArray(shiftPatterns.id, shiftIds))))).map((p) => [p.id, p]) : [],
+        )
+        for (const s of live) {
+          try {
+            const rule = s.repeat!
+            let seriesToday = today
+            if (rule.freq === "per_shift") {
+              const p = patterns.get(rule.patternId ?? "")
+              if (!p || p.archivedAt) continue // an archived (or missing) pattern has no occurrences (F14)
+              seriesToday = wallOf(now, patternZone(p, tz)).slice(0, 10) // "today" is the pattern's own date
+            }
+            if (s.cursor && s.cursor >= seriesToday) continue // already handled today: no lock, no write
+            // per_shift: the dates need the assignments, so the unlocked pre-read cannot know; the counter is taken (once a day per series) and the locked re-read plans
+            const needsRefs = rule.freq === "per_shift" || planOccurrences(rule, s.cursor, wallOf(s.dueAt, tz).slice(0, 10), seriesToday).dates.length > 0
+            await materialiseSeries(deps, { tenantId, tz, now, today: seriesToday, seriesId: s.id, projectId: s.projectId, needsRefs })
+          } catch (err) {
+            deps.logger.error({ tenantId, seriesId: s.id, errCode: safeCode(err) }, "recurrence failed for a series")
           }
-          if (s.cursor && s.cursor >= seriesToday) continue // already handled today: no lock, no write
-          // per_shift: the dates need the assignments, so the unlocked pre-read cannot know; the counter is taken (once a day per series) and the locked re-read plans
-          const needsRefs = rule.freq === "per_shift" || planOccurrences(rule, s.cursor, wallOf(s.dueAt, tz).slice(0, 10), seriesToday).dates.length > 0
-          await materialiseSeries(deps, { tenantId, tz, now, today: seriesToday, seriesId: s.id, projectId: s.projectId, needsRefs })
-        } catch (err) {
-          deps.logger.error({ tenantId, seriesId: s.id, errCode: safeCode(err) }, "recurrence failed for a series")
         }
+        if (live.length > 0) await deps.readModelCache.bust(tenantId) // instances may have been created: every API instance drops this tenant's read models
+      } catch (err) {
+        deps.logger.error({ tenantId, errCode: safeCode(err) }, "recurrence failed for a tenant")
       }
-      if (live.length > 0) await deps.readModelCache.bust(tenantId) // instances may have been created: every API instance drops this tenant's read models
-    } catch (err) {
-      deps.logger.error({ tenantId, errCode: safeCode(err) }, "recurrence failed for a tenant")
     }
-  }
   } finally {
     sweep.done()
   }
