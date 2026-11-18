@@ -13,7 +13,7 @@ Migrations are numbered SQL files in `api/src/db/migrations/` (drizzle; 43 at th
 
 ## One-time bootstrap (a new database)
 
-1. Create the database in the EU region (Postgres 16).
+1. Create the database in the EU region (Postgres 16). `DATABASE_OWNER_URL` exists only for the `migrate` job below: the api and worker containers are never given it (the API refuses to run in production if it shares a role with `DATABASE_URL`, when both are present).
 2. As a superuser, run `api/src/db/bootstrap/roles.sql` once (it is idempotent): it creates `app_owner` and `app_user` (NOLOGIN, NOBYPASSRLS), grants `CREATE` on the database to `app_owner`, and revokes `CREATE` on `public` from everyone else. Managed providers often forbid some of these statements for the admin user: if one is refused, run the equivalent through the provider's role UI and keep the attributes (NOSUPERUSER, NOBYPASSRLS).
 3. Give both roles a password and `LOGIN`: `ALTER ROLE app_owner LOGIN PASSWORD '...'; ALTER ROLE app_user LOGIN PASSWORD '...';` Use two different passwords; they go into `DATABASE_OWNER_URL` and `DATABASE_URL` (the API refuses to boot in production if both URLs use the same role).
 4. Enable `pg_trgm` if the provider requires it (rule 6).
@@ -26,7 +26,7 @@ Migrations are numbered SQL files in `api/src/db/migrations/` (drizzle; 43 at th
 
 1. **Backup first.** Confirm the managed backup is current and, for a release with a migration, take a logical dump and manifest ([backup-restore.md](backup-restore.md)). Note the current image tags (they are the rollback target).
 2. **Staging first.** Run the same release on staging (same compose, separate database) with data resembling production. A migration that touches a tenant table is run against a database with more than one tenant.
-3. **Run `migrate` with the NEW image**, as `app_owner`:
+3. **Run `migrate` with the NEW image**, as `app_owner` (the one-shot `migrate` service of the compose file is the only container with `DATABASE_OWNER_URL`; if your Dokploy setup cannot run a compose profile, run the same command once from a Dokploy Schedule/Job on the api image with only `DATABASE_OWNER_URL` set: `sh /opt/deploy/migrate.sh` or `../node_modules/.bin/tsx scripts/migrate.ts` in `/app/api`):
    `docker compose -f deploy/docker-compose.prod.yml --profile ops run --rm migrate` (in Dokploy: run the `migrate` service once, or a Schedule/Job with the same command). Expected last line: `migrate: ok (applied N -> M)`. It reads only `DATABASE_OWNER_URL` and prints no connection string.
 4. **Roll api and worker** with the new image (api first, wait for `/readyz`, then worker), then **web last**.
 5. **Verify**: `GET /readyz` ok on every instance, `readyz/details` on the internal port shows `migrations.applied == expected`, the smoke test passes, the worker heartbeat is healthy.

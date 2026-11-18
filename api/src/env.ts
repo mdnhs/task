@@ -19,6 +19,8 @@ function weakSecret(v: string): boolean {
   if (SECRET_DENY.some((d) => lower.includes(d))) return true
   return new Set(v).size < 12 // a repeated pattern ("x" * 32, "abcabc...") has few distinct characters; 32 random base64 characters have about 25
 }
+/** A key whose decoded bytes show fewer than 12 distinct values is a placeholder (all zeros, a repeated byte or short pattern), not 32 random bytes. */
+const weakKey = (b64: string): boolean => new Set(Buffer.from(b64, "base64")).size < 12
 /** The role name in a postgres URL ("" when absent or unparsable, so two unnamed URLs also count as the same role). */
 function dbUser(url: string): string {
   try { return decodeURIComponent(new URL(url).username) } catch { return "" }
@@ -28,7 +30,9 @@ const schema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   PORT: z.preprocess((v) => (v === "" ? Number.NaN : v), z.coerce.number().int().min(1).max(65535)).default(8787),
   DATABASE_URL: z.string().min(1),
-  DATABASE_OWNER_URL: z.string().min(1),
+  // The DDL-capable app_owner connection. The API and the worker never use it at runtime (only the migrate job and the demo seed do), so it is optional here and
+  // production api and worker containers are not given it. Validated like any URL-ish value when present.
+  DATABASE_OWNER_URL: optional,
   REDIS_URL: z.string().min(1),
   BETTER_AUTH_SECRET: z.string().min(32),
   APP_URL: z.string().min(1),
@@ -105,6 +109,14 @@ const schema = z.object({
   if (e.METRICS_PORT !== undefined && e.METRICS_PORT === e.PORT) {
     ctx.addIssue({ code: "custom", path: ["METRICS_PORT"], message: "must differ from PORT: metrics are never served on the public port" })
   }
+  if (e.NODE_ENV === "production" && e.SECRETS_KEY && weakKey(e.SECRETS_KEY)) {
+    ctx.addIssue({ code: "custom", path: ["SECRETS_KEY"], message: "must be 32 random bytes in production (a placeholder or low-variety key is refused)" })
+  }
+  if (e.NODE_ENV === "production" && e.SECRETS_KEYS) {
+    try {
+      if (Object.values(parseKeyMap(e.SECRETS_KEYS)).some(weakKey)) ctx.addIssue({ code: "custom", path: ["SECRETS_KEYS"], message: "every key must be 32 random bytes in production (a placeholder or low-variety key is refused)" })
+    } catch { /* already reported above */ }
+  }
   if (e.NODE_ENV === "production" && !e.SECRETS_KEY && !e.SECRETS_KEYS) {
     ctx.addIssue({ code: "custom", path: ["SECRETS_KEY"], message: "required in production (or SECRETS_KEYS)" })
   }
@@ -115,7 +127,7 @@ const schema = z.object({
     const refuse = (path: string, message: string) => ctx.addIssue({ code: "custom", path: [path], message })
     if (weakSecret(e.BETTER_AUTH_SECRET)) refuse("BETTER_AUTH_SECRET", "must be a long random value in production (an example, placeholder or low-variety string is refused)")
     if (!/^https:\/\/[^/\s]+/i.test(e.APP_URL)) refuse("APP_URL", "must be an https origin in production")
-    if (dbUser(e.DATABASE_URL) === dbUser(e.DATABASE_OWNER_URL)) refuse("DATABASE_OWNER_URL", "must use a different database role than DATABASE_URL (app_owner vs app_user)")
+    if (e.DATABASE_OWNER_URL && dbUser(e.DATABASE_URL) === dbUser(e.DATABASE_OWNER_URL)) refuse("DATABASE_OWNER_URL", "must use a different database role than DATABASE_URL (app_owner vs app_user)")
     if ((e.TRUST_PROXY_HOPS ?? 1) === 0 && e.ALLOW_NO_PROXY !== "1") refuse("TRUST_PROXY_HOPS", "0 ignores x-forwarded-for; set the proxy count, or ALLOW_NO_PROXY=1 when no proxy is in front")
     if (e.ALLOW_DEMO_SEED) refuse("ALLOW_DEMO_SEED", "must not be set in production")
     if (e.SEED_DEMO_PASSWORD) refuse("SEED_DEMO_PASSWORD", "must not be set in production")

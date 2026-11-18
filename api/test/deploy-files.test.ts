@@ -56,6 +56,17 @@ describe("deploy/docker-compose.prod.yml", () => {
     expect(m.volumes?.[0]).toMatch(/^\.\/scripts\/migrate\.sh:/)
   })
 
+  test("api and worker are not given DATABASE_OWNER_URL (DDL-capable); only migrate and the demo seed are", () => {
+    for (const n of ["api", "worker", "web"]) expect(Object.keys(compose.services[n].environment ?? {}), n).not.toContain("DATABASE_OWNER_URL")
+    expect(Object.keys(compose.services.migrate.environment ?? {})).toContain("DATABASE_OWNER_URL")
+  })
+
+  test("ALLOW_NO_PROXY is passed through (empty by default) and the api healthcheck is liveness (/healthz), never /readyz", () => {
+    expect(String(compose.services.api.environment?.ALLOW_NO_PROXY)).toContain("ALLOW_NO_PROXY:-")
+    expect(JSON.stringify(compose.services.api.healthcheck?.test)).toContain("/healthz")
+    expect(JSON.stringify(compose.services.api.healthcheck?.test)).not.toContain("/readyz")
+  })
+
   test("files the compose file points at exist", () => {
     for (const rel of ["deploy/scripts/migrate.sh", "deploy/scripts/restore-drill.sh", "api/scripts/worker-healthcheck.mjs", "api/scripts/migrate.ts", "api/scripts/restore-verify.ts", "api/src/worker.ts", "api/src/server.ts", "api/src/db/bootstrap/roles.sql"]) {
       expect(existsSync(resolve(ROOT, rel)), rel).toBe(true)

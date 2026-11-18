@@ -10,6 +10,7 @@ import { withTenant } from "../../db/tenant-tx"
 import { clearModuleOverride } from "../entitlements"
 import { registerFiles } from "../files"
 import { registerNotifications } from "../notifications"
+import { perfBound } from "../../../test/timing"
 import { registerSearchIndexers } from "../search"
 import { applyTaskUpdate, registerTasks, type TaskCtx } from "."
 import { expiredPageQuery, lockTaskSet } from "./archive"
@@ -1008,7 +1009,7 @@ describe("query plans at 10k tasks (EXPLAIN)", () => {
     const t0 = Date.now()
     expect((await w.req("GET", "/v1/tasks/board", w.owner)).status).toBe(200)
     expect((await w.req("GET", "/v1/tasks/archive", w.owner)).status).toBe(200)
-    expect(Date.now() - t0).toBeLessThan(5000)
+    expect(Date.now() - t0).toBeLessThan(perfBound(5000))
   }, 120_000)
 })
 

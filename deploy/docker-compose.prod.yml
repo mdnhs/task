@@ -13,11 +13,10 @@ x-logging: &logging
   driver: json-file
   options: { max-size: "10m", max-file: "5" }
 
-# Shared by api and worker (same image). No port is published anywhere: Traefik reaches web:3000 and api:8080 through the Dokploy domain settings only.
+# Shared by api and worker (same image). The DDL-capable DATABASE_OWNER_URL is deliberately NOT here: only `migrate` (and the demo `seed`) get it. No port is published anywhere: Traefik reaches web:3000 and api:8080 through the Dokploy domain settings only.
 x-api-env: &api-env
   NODE_ENV: production
   DATABASE_URL: ${DATABASE_URL:?set the app_user connection string}
-  DATABASE_OWNER_URL: ${DATABASE_OWNER_URL:?set the app_owner connection string}
   REDIS_URL: redis://:${REDIS_PASSWORD:?set a hex password}@redis:6379
   BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?set 32+ random characters}
   SECRETS_KEY: ${SECRETS_KEY:?set base64 of 32 random bytes}
@@ -26,6 +25,7 @@ x-api-env: &api-env
   APP_URL: ${APP_URL:?set the public web origin, https}
   DATA_REGION: ${DATA_REGION:?eu-west-1 or eu-central-1}
   TRUST_PROXY_HOPS: ${TRUST_PROXY_HOPS:?proxies that append to x-forwarded-for, Cloudflare plus Traefik is 2}
+  ALLOW_NO_PROXY: ${ALLOW_NO_PROXY:-}
   CLAMD_HOST: clamav
   CLAMD_PORT: "3310"
   FILE_MAX_BYTES: ${FILE_MAX_BYTES:-}
@@ -78,9 +78,10 @@ services:
     depends_on:
       redis: { condition: service_healthy }
       clamav: { condition: service_healthy }
-    # Readiness (GET /readyz: database, migration version, Redis) is what the traffic switch waits for; the image's own HEALTHCHECK is the cheap liveness GET /healthz.
+    # Container health is LIVENESS (GET /healthz): a Redis or database blip must not mark the container unhealthy and cascade into restarts. Readiness (GET /readyz, and
+    # /readyz/details on the internal metrics port) is the deploy gate in .claude/docs/deploy/runbook-go-live.md, not a container healthcheck.
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/readyz >/dev/null || exit 1"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/healthz >/dev/null || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 3

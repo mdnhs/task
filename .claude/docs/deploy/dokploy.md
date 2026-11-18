@@ -14,7 +14,7 @@ api, worker -> managed Postgres 16 (EU), redis:6379, clamav:3310, R2 bucket (EU)
 | Service | Image and target | Port (internal only) | Healthcheck | Notes |
 |---|---|---|---|---|
 | `web` | `Dockerfile` (repo root), target `run` | 3000 | `GET /sign-in` | Server-only env `API_URL`, `APP_ORIGIN`. Never `NEXT_PUBLIC_*`. |
-| `api` | `api/Dockerfile`, target `run` (the last stage, what a plain build gives) | 8080, metrics 9464 | compose: `GET /readyz` (database, migration version, Redis); image: `GET /healthz` | Runs under `tsx`, no compile step. |
+| `api` | `api/Dockerfile`, target `run` (the last stage, what a plain build gives) | 8080, metrics 9464 | compose and image: `GET /healthz` (liveness only, so a Redis or database blip never restarts the container); the deploy gate is `GET /readyz` (database, migration version, Redis) and `/readyz/details` on the internal port, checked by the runbook | Runs under `tsx`, no compile step. |
 | `worker` | same image as `api`, command `../node_modules/.bin/tsx src/worker.ts` | metrics 9465 | Redis heartbeat key `worker:heartbeat:<container id>` (`api/scripts/worker-healthcheck.mjs`) | Scans, notifications, exports, the 1 s event relay, recurrence and deadline jobs. Run one or two; the jobs are idempotent. |
 | `migrate` | same image as `api`, profile `ops` | none | none (one-shot) | `deploy/scripts/migrate.sh`, runs as `app_owner`. See [migrations.md](migrations.md). |
 | `seed` | `api/Dockerfile`, target `seed`, profile `demo` | none | none (one-shot) | Demo deployment only, never started by default, never on a client's database. See [demo-seed.md](demo-seed.md). |

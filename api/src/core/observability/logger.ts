@@ -82,6 +82,15 @@ export const secretValuesOf = (env: Record<string, unknown>): string[] => {
       try { for (const k of Object.values(JSON.parse(v) as Record<string, unknown>)) if (typeof k === "string" && k.length >= 8) out.push(k) } catch { /* not JSON: the whole string is already listed */ }
     }
   }
+  // The passwords inside connection strings (the whole URL never reaches a log, but its password can appear alone in a message or a driver text).
+  for (const n of ["DATABASE_URL", "DATABASE_OWNER_URL", "REDIS_URL"]) {
+    const v = env[n]
+    if (typeof v !== "string") continue
+    try {
+      const pw = new URL(v).password
+      if (pw.length >= 8) { out.push(pw); try { out.push(decodeURIComponent(pw)) } catch { /* keep the raw form */ } }
+    } catch { /* not a URL */ }
+  }
   return out
 }
 
@@ -107,9 +116,11 @@ export function makeLogger(o: { level?: string; service?: string; destination?: 
       redact: { paths: LOG_REDACT_PATHS, censor: CENSOR },
       formatters: { log: clean, bindings: (b) => clean(b) },
       ...(values.length ? { hooks: { logMethod(args, method) { method.apply(this, args.map((a) => (typeof a === "string" ? maskIn(a, values) : a)) as Parameters<typeof method>) } } } : {}),
-      serializers: { err: (e: unknown) => errorInfo(e) },
+      // the log formatter has already turned an Error into { name, code }; only a raw Error (not yet formatted) is converted here, so the field is never reduced to "NonError"
+      serializers: { err: (e: unknown) => (e instanceof Error ? errorInfo(e) : e) },
     },
-    o.destination,
+    // The last net: the finished JSON line is masked too, which covers values bound by logger.child({...}) and anything a formatter did not see.
+    values.length ? { write: (line: string) => void (o.destination ?? process.stdout).write(values.reduce((acc, x) => acc.split(x).join(CENSOR), line)) } : o.destination,
   )
 }
 

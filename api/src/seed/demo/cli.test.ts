@@ -8,6 +8,7 @@ import { ownerDb, ownerQuery } from "../../../test/db"
 import { SEED_LOCK_KEY } from "./guards"
 import { makeTenant } from "../../../test/factories"
 import { countAll, DEMO_PASSWORD } from "../../../test/seed-support"
+import { perfBound } from "../../../test/timing"
 
 const run = promisify(execFile)
 const API = resolve(dirname(fileURLToPath(import.meta.url)), "../../..")
@@ -84,7 +85,7 @@ describe("scripts/seed-demo.ts", () => {
       const started = Date.now()
       const out = await seed({ ...OPT_IN, SEED_LOCK_TIMEOUT_MS: "500" }, ["--anchor", "latest-report"])
       expect([out.code, out.stderr.trim().split("\n").pop()]).toEqual([1, "refused: lock_timeout"])
-      expect(Date.now() - started).toBeLessThan(60_000)
+      expect(Date.now() - started).toBeLessThan(perfBound(60_000))
     } finally {
       await holder.query("select pg_advisory_unlock($1)", [SEED_LOCK_KEY])
       holder.release()

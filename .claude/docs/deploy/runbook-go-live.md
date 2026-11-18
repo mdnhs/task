@@ -8,6 +8,8 @@ Staging is the same compose file with a **separate database, Redis and bucket**,
 
 - [ ] Hosting: Dokploy on a host in the EU; Postgres 16 and the R2 bucket created in the EU (`DATA_REGION` matches); Cloudflare in front of Traefik.
 - [ ] Database bootstrap done: `roles.sql` run once as a superuser, two role passwords set, `pg_trgm` available ([migrations.md](migrations.md) bootstrap).
+- [ ] `DATABASE_OWNER_URL` is set **only** on the `migrate` job, not on api, worker or web (the API starts without it).
+- [ ] **Decide before the first client's deploy (owner: the user):** show the FE-only mock modules (Orders & Stock, client files, rosters, recruitment, payroll, assistant, manager-attention, platform plans/invoices) by setting `ENABLE_MOCK_MODULES=1`, or keep them hidden (default, unset).
 - [ ] Environment filled in Dokploy from `deploy/.env.matrix.example`; every value in the secret store, none in Git. The API refuses to boot in production with a weak `BETTER_AUTH_SECRET`, a non-https `APP_URL`, one database role for both URLs, a missing `SECRETS_KEY` or `CLAMD_HOST`, `TRUST_PROXY_HOPS=0` without `ALLOW_NO_PROXY=1`, or the demo seed switches.
 - [ ] `TRUST_PROXY_HOPS` equals the number of proxies that append (Cloudflare plus Traefik is 2); Traefik trusts Cloudflare's ranges; the two-network check and the forged-header check pass ([dokploy.md](dokploy.md) Edge).
 - [ ] Domains: web host to `web:3000`; `/webhooks` on the same host to `api:8080`; nothing for ports 9464 or 9465; `curl -sI https://<host>/metrics` is not metrics.
@@ -16,7 +18,7 @@ Staging is the same compose file with a **separate database, Redis and bucket**,
 - [ ] clamd `StreamMaxLength` at or above `FILE_MAX_BYTES` (and `TASK_VIDEO_MAX_BYTES` if video evidence is on).
 - [ ] Backups: daily plus WAL PITR on, retention 30 days, encrypted, second EU copy ([backup-restore.md](backup-restore.md)). `SECRETS_KEY`, `SECRETS_KEYS` ids and `BETTER_AUTH_SECRET` backed up separately from the data.
 - [ ] `migrate` run with the release image as `app_owner`; last line `migrate: ok`.
-- [ ] api `/readyz` ok; `readyz/details` (internal) shows migrations applied equal to expected; worker heartbeat healthy; web `/sign-in` ok.
+- [ ] The deploy gate (container health is only `/healthz`): api `/readyz` ok; `readyz/details` (internal) shows migrations applied equal to expected; worker heartbeat healthy; web `/sign-in` ok.
 - [ ] First platform operator created (`npm -w api run platform:owner`) and 2FA enrolled.
 - [ ] Console: mail (Resend), storage (R2) and billing (Stripe) settings entered by the platform admin, each with its **test** button. Stripe webhook endpoint added at Stripe pointing at `https://<web-host>/webhooks/billing/stripe`; the signing secret entered in the console.
 

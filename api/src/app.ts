@@ -90,7 +90,7 @@ export function createApp(deps: Deps) {
   app.get("/healthz", (c) => c.json({ status: "ok" }))
   app.get("/readyz", async (c) => {
     const r = await readiness(deps)
-    return c.json({ status: r.status }, r.status === "ready" ? 200 : 503) // the internet gets ok / not ok; the details are on the internal metrics port
+    return c.json({ status: r.status }, r.status === "ready" ? 200 : 503) // ok / not ok only; the details are on the internal metrics port. /readyz is not routed to the internet (only the web and /webhooks/* are): it is the deploy gate and a private health probe
   })
 
   app.route("/", authRoutes)

@@ -54,6 +54,25 @@ describe("secret scan (B7 Task 18)", () => {
     expect(run(tree({ "a.ts": `const apiSecret = "${"a".repeat(40)}"\nconst token = "short"\nconst hash = "${planted.entropy}"\n` })).status).toBe(0)
   })
 
+  test("check-secrets flags a hex secret (openssl rand -hex 32) on a secret-like name", () => {
+    const hex = "9f3a1c7e5b2d48a06c1e9d7b3f5a2c80e4b6d1a79c3f58e2b0d4a6c8e1f37b95"
+    expect(run(tree({ "deploy/.env.production": `REDIS_PASSWORD=${hex}\n` })).status).toBe(1)
+    expect(run(tree({ "a.ts": `const cfg = { jwt_secret = "${hex}" }\n` })).status).toBe(1)
+    expect(run(tree({ "a.ts": `const checksum = "${hex}"\n` })).status).toBe(0) // a hash on a non-secret name
+    expect(run(tree({ "a.ts": `const apiSecret = "${"ab".repeat(32)}"\n` })).status).toBe(0) // low variety
+  })
+
+  test("check-secrets flags credentials inside a URL, not placeholders or local fixtures", () => {
+    const url = (pw: string, host = "db.prod.internal") => "postgres://" + "app_user:" + pw + "@" + host + ":5432/opsdesk"
+    const r = run(tree({ "deploy/env.txt": `DATABASE_URL=${url("Zk7mQ2vL9xR4tB8w")}\n` }))
+    expect(r.status).toBe(1)
+    expect(r.stdout + r.stderr).not.toContain("Zk7mQ2vL9xR4tB8w")
+    for (const ok of [url("${DB_PASSWORD}"), url("<password>"), url("CHANGE_ME"), url("***"), url("e2e_user_pw", "localhost"), url("realpassword99", "127.0.0.1"), url("pw12345678", "db.example.com"), "redis://:${REDIS_PASSWORD}@redis:6379"]) {
+      expect(run(tree({ "docs/a.md": `use ${ok}\n` })).status, ok).toBe(0)
+    }
+    expect(run(tree({ "a.ts": "// check-secrets:allow fixture\n" + url("Zk7mQ2vL9xR4tB8w") + " // check-secrets:allow fixture" })).status).toBe(0)
+  })
+
   test("test files, *.example files, lockfiles and lines marked check-secrets:allow are skipped", () => {
     expect(run(tree({ "src/billing.test.ts": `const k = "${planted.stripeLive}"`, "api/.env.example": `KEY=${planted.stripeLive}`, "package-lock.json": `"integrity": "${planted.entropy}", "secret": "${planted.entropy}"`, "a.ts": `const k = "${planted.stripeLive}" // check-secrets:allow fixture\n` })).status).toBe(0)
   })

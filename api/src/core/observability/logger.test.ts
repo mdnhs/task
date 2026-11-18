@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest"
-import { LOG_REDACT_PATHS, makeLogger, scrub } from "./logger"
+import { LOG_REDACT_PATHS, makeLogger, scrub, secretValuesOf } from "./logger"
 
 const capture = () => {
   const lines: string[] = []
@@ -112,5 +112,35 @@ describe("log redaction", () => {
     logger.info({ blob: "x".repeat(50_000) + "TAILSECRET" }, "m")
     expect((last().blob as string).length).toBeLessThanOrEqual(2000)
     expect(JSON.stringify(last())).not.toContain("TAILSECRET")
+  })
+})
+
+describe("secret values and error fields (B7 fix wave)", () => {
+  const cap = (values: string[]) => {
+    const lines: string[] = []
+    return { lines, logger: makeLogger({ level: "debug", destination: { write: (s: string) => void lines.push(s) }, secretValues: values }) }
+  }
+
+  test("secretValuesOf includes the passwords parsed from DATABASE_URL, DATABASE_OWNER_URL and REDIS_URL", () => {
+    const v = secretValuesOf({ DATABASE_URL: "postgres://app_user:Pw%2Fuser9876@db/x", DATABASE_OWNER_URL: "postgres://app_owner:OwnerPw12345@db/x", REDIS_URL: "redis://:RedisPw123456@r:6379", BETTER_AUTH_SECRET: "auth-secret-0123456789" })
+    for (const x of ["Pw/user9876", "Pw%2Fuser9876", "OwnerPw12345", "RedisPw123456", "auth-secret-0123456789"]) expect(v, x).toContain(x)
+    expect(secretValuesOf({ DATABASE_URL: "postgres://app_user@db/x", REDIS_URL: "not a url" })).toEqual([])
+  })
+
+  test("a value bound by logger.child({...}) is masked, and so is a connection password in free text", () => {
+    const { logger, lines } = cap(secretValuesOf({ REDIS_URL: "redis://:RedisPw123456@r:6379" }))
+    logger.child({ note: "dial redis://:RedisPw123456@r:6379", other: "RedisPw123456" }).info({ a: 1 }, "hello RedisPw123456")
+    expect(lines.join("")).not.toContain("RedisPw123456")
+    expect(lines.length).toBeGreaterThan(0)
+  })
+
+  test("an { err } field is logged as its class name and code, not as NonError", () => {
+    const { logger, lines } = cap([])
+    logger.error({ err: Object.assign(new TypeError("Failed query with a@b.ie"), { code: "23505" }) }, "failed")
+    const o = JSON.parse(lines[0])
+    expect(o.err).toEqual({ name: "TypeError", code: "23505" })
+    expect(lines[0]).not.toContain("a@b.ie")
+    logger.error({ err: "plain string" }, "x")
+    expect(JSON.parse(lines[1]).err).toBe("plain string")
   })
 })

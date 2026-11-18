@@ -25,3 +25,9 @@ export async function retryTimingOnce<T>(fn: () => Promise<T>): Promise<T> {
     return fn()
   }
 }
+
+/**
+ * A wall-clock ceiling for a speed assertion. The default is 3x the contract so a loaded laptop or shared runner does not fail a correct run; the same tests
+ * keep the strict value when PERF_STRICT=1 (a dedicated, quiet perf run). The 250-user NFR-08 numbers are proven by the k6 run on staging, not by these.
+ */
+export const perfBound = (ms: number): number => (process.env.PERF_STRICT === "1" ? ms : ms * 3)

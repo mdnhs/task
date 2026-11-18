@@ -4,8 +4,9 @@ import { parseEnv } from "./env"
 const base = { DATABASE_URL: "postgres://app_user@db/x", DATABASE_OWNER_URL: "postgres://app_owner@db/x", REDIS_URL: "redis://r",
   BETTER_AUTH_SECRET: "x".repeat(32), APP_URL: "http://localhost:3000", DATA_REGION: "eu-west-1" }
 // What production must look like (B7 Task 18): a strong secret, an https origin, two different database roles, the clamd host and the stored-secret key.
+const spread = (n: number) => Buffer.from(Array.from({ length: 32 }, (_, i) => (i * 37 + n) % 251)).toString("base64") // 32 bytes with many distinct values
 const STRONG = "k9Qv3Zr8Lm2Xw7Bn4Tc6Yh1Jd5Gf0Sa-Pe"
-const prodOk = { ...base, NODE_ENV: "production", APP_URL: "https://app.example.com", BETTER_AUTH_SECRET: STRONG, CLAMD_HOST: "clamd", SECRETS_KEY: Buffer.alloc(32, 1).toString("base64") }
+const prodOk = { ...base, NODE_ENV: "production", APP_URL: "https://app.example.com", BETTER_AUTH_SECRET: STRONG, CLAMD_HOST: "clamd", SECRETS_KEY: spread(1) }
 
 const prodFiles = { CLAMD_HOST: "clamd" }
 
@@ -37,7 +38,7 @@ test("parseEnv accepts PORT 1..65535 and rejects everything else", () => {
     expect(() => parseEnv({ ...base, PORT: bad }), `PORT=${bad}`).toThrow(/PORT/)
   }
 })
-const key32 = Buffer.alloc(32, 7).toString("base64")
+const key32 = spread(7)
 test("SECRETS_KEY must be base64 of exactly 32 bytes, and is required in production", () => {
   expect(parseEnv({ ...base, SECRETS_KEY: key32 }).SECRETS_KEY).toBe(key32)
   expect(() => parseEnv({ ...base, SECRETS_KEY: Buffer.alloc(16).toString("base64") })).toThrow(/SECRETS_KEY/)
@@ -53,7 +54,7 @@ test("RESEND_API_KEY and MAIL_FROM: empty string is unset", () => {
   expect(parseEnv({ ...base, RESEND_API_KEY: "re_x", MAIL_FROM: "a@x.ie" }).MAIL_FROM).toBe("a@x.ie")
 })
 test("SECRETS_KEYS keyring: every key 32 bytes, SECRETS_KEY_ID must exist, satisfies production", () => {
-  const k = (n: number) => Buffer.alloc(n, 3).toString("base64")
+  const k = (n: number) => (n === 32 ? spread(3) : Buffer.alloc(n, 3).toString("base64"))
   const keys = JSON.stringify({ k1: k(32), k2: k(32) })
   expect(parseEnv({ ...base, SECRETS_KEYS: keys, SECRETS_KEY_ID: "k2" }).SECRETS_KEY_ID).toBe("k2")
   expect(parseEnv({ ...prodOk, SECRETS_KEY: undefined, SECRETS_KEYS: keys, SECRETS_KEY_ID: "k1" }).NODE_ENV).toBe("production")
@@ -141,6 +142,12 @@ describe("production refuses insecure settings (B7 Task 18)", () => {
     expect(parseEnv({ ...prodOk, DATABASE_URL: "postgres://app_user:pw@db/x", DATABASE_OWNER_URL: "postgres://app_owner:pw@db/x" }).NODE_ENV).toBe("production")
     expect(parseEnv({ ...base, DATABASE_URL: "postgres://pg@db/x", DATABASE_OWNER_URL: "postgres://pg@db/x" }).NODE_ENV).toBe("development") // local dev may use one role
   })
+  test("DATABASE_OWNER_URL is optional: the API and worker start without it, and a present one is still checked against the app role", () => {
+    const noOwner = { ...prodOk, DATABASE_OWNER_URL: undefined }
+    expect(parseEnv(noOwner).DATABASE_OWNER_URL).toBeUndefined()
+    expect(parseEnv({ ...noOwner, DATABASE_OWNER_URL: "" }).DATABASE_OWNER_URL).toBeUndefined()
+    expect(() => parseEnv({ ...prodOk, DATABASE_OWNER_URL: prodOk.DATABASE_URL })).toThrow(/DATABASE_OWNER_URL/)
+  })
   test("production env refuses TRUST_PROXY_HOPS=0 without ALLOW_NO_PROXY", () => {
     expect(() => parseEnv({ ...prodOk, TRUST_PROXY_HOPS: "0" })).toThrow(/TRUST_PROXY_HOPS/)
     expect(parseEnv({ ...prodOk, TRUST_PROXY_HOPS: "0", ALLOW_NO_PROXY: "1" }).TRUST_PROXY_HOPS).toBe(0)
@@ -157,6 +164,22 @@ describe("production refuses insecure settings (B7 Task 18)", () => {
   test("production env refuses a missing SECRETS_KEY and CLAMD_HOST", () => {
     expect(() => parseEnv({ ...prodOk, SECRETS_KEY: undefined })).toThrow(/SECRETS_KEY/)
     expect(() => parseEnv({ ...prodOk, CLAMD_HOST: undefined })).toThrow(/CLAMD_HOST/)
+  })
+  test("production refuses a weak SECRETS_KEY and any weak SECRETS_KEYS entry (fewer than 12 distinct byte values)", () => {
+    const weak = [Buffer.alloc(32, 0), Buffer.alloc(32, 0xff), Buffer.alloc(32, 65), Buffer.from("abcdefghijabcdefghijabcdefghijab"), Buffer.from(Array.from({ length: 32 }, (_, i) => i % 11))]
+    for (const b of weak) {
+      const v = b.toString("base64")
+      expect(() => parseEnv({ ...prodOk, SECRETS_KEY: v }), v).toThrow(/SECRETS_KEY/)
+      expect(() => parseEnv({ ...prodOk, SECRETS_KEY: ` ${v} ` }), "whitespace").toThrow(/SECRETS_KEY/)
+      expect(() => parseEnv({ ...prodOk, SECRETS_KEY: undefined, SECRETS_KEYS: JSON.stringify({ k1: spread(2), k2: v }), SECRETS_KEY_ID: "k1" }), "keyring").toThrow(/SECRETS_KEYS/)
+    }
+    expect(() => parseEnv({ ...prodOk, SECRETS_KEY: "A".repeat(43) + "=" }), "case variant of the zero key (still low variety)").toThrow(/SECRETS_KEY/)
+    expect(() => parseEnv({ ...prodOk, SECRETS_KEY: "a".repeat(43) + "=" })).toThrow(/SECRETS_KEY/)
+    expect(parseEnv({ ...prodOk, SECRETS_KEY: spread(5) }).NODE_ENV).toBe("production")
+    expect(parseEnv({ ...prodOk, SECRETS_KEY: undefined, SECRETS_KEYS: JSON.stringify({ k1: spread(2), k2: spread(9) }), SECRETS_KEY_ID: "k1" }).NODE_ENV).toBe("production")
+    // development and test keep accepting a weak key (fixtures)
+    expect(parseEnv({ ...base, SECRETS_KEY: Buffer.alloc(32, 7).toString("base64") }).NODE_ENV).toBe("development")
+    expect(parseEnv({ ...base, NODE_ENV: "test", SECRETS_KEYS: JSON.stringify({ k1: Buffer.alloc(32, 3).toString("base64") }), SECRETS_KEY_ID: "k1" }).NODE_ENV).toBe("test")
   })
   test("the refusal message names the variable and never prints its value", () => {
     let msg = ""

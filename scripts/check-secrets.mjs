@@ -2,7 +2,7 @@
 // Fails when a secret was committed (B7 Task 18). No service, no dependency:
 //   node scripts/check-secrets.mjs [dir]        default: the repo root (git-tracked and untracked-but-not-ignored files; a plain walk when there is no .git)
 // Findings: known token prefixes (Stripe sk_/rk_ live and test keys, whsec_, the API's odk_ keys, GitHub, AWS, Slack, Google, Resend), private key blocks, and a
-// high-entropy value (32+ characters) assigned to a secret-like name (secret, token, password, api key, private key, credential).
+// high-entropy or hex value (32+ characters) assigned to a secret-like name (secret, token, password, api key, private key, credential), and credentials inside a URL (scheme://user:password@host).
 // Skipped: *.test.* and *.spec.* files, *.example files, lockfiles, binaries, node_modules, .git, .next, and any line carrying `check-secrets:allow <why>`.
 // It prints the pattern name, the file and the line number, never the match: a leaked secret must not land in CI logs.
 // Exit codes: 0 clean, 1 found, 2 the directory does not exist.
@@ -33,6 +33,12 @@ const PREFIXES = [
   ["private key block", /-----BEGIN (?:[A-Z]+ )?PRIVATE KEY-----/],
 ]
 const ASSIGN = /([A-Za-z0-9_.-]*(?:secret|token|passw(?:or)?d|api[_-]?key|private[_-]?key|access[_-]?key|credential)[A-Za-z0-9_.-]*)["']?\s*[:=]\s*["'`]?([A-Za-z0-9+/=_-]{32,})/i
+
+// scheme://user:password@host. A password that is a placeholder, a variable reference, or on a local or example host is not a finding.
+const URL_CRED = /\b[a-z][a-z0-9+.-]*:\/\/([^\s:/@"'`]+):([^\s@"'`/]{6,})@([^\s/:"'`?#]+)/gi
+const PLACEHOLDER_PW = /(\$|<|>|\{|\*|change_?me|example|placeholder|password|passwd|secret|xxxx|your[-_]|dummy|selftest|e2e|test)/i
+const LOCAL_HOST = /^(localhost|127\.0\.0\.1|\[?::1\]?|[^.]*\.invalid|[^.]*\.local|(.*\.)?example\.(com|org|net|ie)|.*\.test)$/i
+const isHex = (v) => /^[0-9a-f]{32,}$/i.test(v) && new Set(v.toLowerCase()).size > 12
 
 function entropy(s) {
   const n = new Map()
@@ -78,7 +84,8 @@ for (const file of listFiles()) {
     if (line.includes("check-secrets:allow")) return
     for (const [name, re] of PREFIXES) if (re.test(line)) findings.push(`${name} in ${rel}:${i + 1}`)
     const m = ASSIGN.exec(line)
-    if (m && new Set(m[2]).size >= 12 && entropy(m[2]) >= 4) findings.push(`high-entropy value for "${m[1].slice(0, 40)}" in ${rel}:${i + 1}`)
+    if (m && ((new Set(m[2]).size >= 12 && entropy(m[2]) >= 4) || isHex(m[2]))) findings.push(`high-entropy value for "${m[1].slice(0, 40)}" in ${rel}:${i + 1}`)
+    for (const u of line.matchAll(URL_CRED)) if (!PLACEHOLDER_PW.test(u[2]) && !LOCAL_HOST.test(u[3])) findings.push(`credentials in a URL in ${rel}:${i + 1}`)
   })
 }
 
