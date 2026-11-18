@@ -5,7 +5,7 @@ import { renderToStaticMarkup } from "react-dom/server"
 import { describe, expect, test, vi } from "vitest"
 import { ApiError, userMessage } from "@/lib/api/problem"
 import { toTask } from "./adapters"
-import { EMPTY_FILTERS, listQuery } from "./filters"
+import { EMPTY_FILTERS, boardQuery, departmentFilter, listQuery } from "./filters"
 import { canOpenEvidence, evidencePath, openEvidence } from "./client"
 import { dto } from "@/test/support/task-dto"
 
@@ -95,7 +95,22 @@ describe("N3 -> B7 T10: the department filter is the API's (teamId), Load more k
     expect(src).toMatch(/\{ \.\.\.listQuery\(filters, teamId\), limit: TASKS_PAGE_SIZE, cursor \}/)
     expect(src).toMatch(/listQuery\(filters, teamId\), limit: TASKS_PAGE_SIZE \}/)
     expect(src).not.toMatch(/t\.dept === dept/)
-    expect(read("features/tasks/components/task-board.tsx")).toMatch(/loaded so far/)
+  })
+  test("the department becomes a team id; a name no team has is 'unknown' (shows nothing), never everything", () => {
+    const deps = [{ id: "t1", name: "Kitchen" }, { id: "t2", name: "Front of house" }]
+    expect(departmentFilter("all", deps)).toEqual({ unknown: false })
+    expect(departmentFilter("Kitchen", deps)).toEqual({ teamId: "t1", unknown: false })
+    expect(departmentFilter("Garden", deps)).toEqual({ unknown: true })
+    expect(departmentFilter("Kitchen", [])).toEqual({ unknown: true })
+  })
+  test("the board sends the same teamId as the list, and a column's Load more keeps it", () => {
+    const f = { project: "all", assignee: "u1", q: " x " }
+    expect(boardQuery(f, "t1")).toEqual({ assignee: "u1", q: "x", teamId: "t1" })
+    expect(boardQuery({ project: "all", assignee: "all", q: "" })).toEqual({})
+    const src = read("features/tasks/components/task-board.tsx")
+    expect(src).toMatch(/\.\.\.boardQuery\(f, teamId\) \}/)
+    expect(src).not.toMatch(/t\.dept === dept|loaded so far/)
+    expect(read("app/(app)/tasks/board/page.tsx")).toMatch(/departments=\{departments\}/)
   })
 })
 

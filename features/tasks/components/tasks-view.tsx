@@ -13,7 +13,7 @@ import { userMessage } from "@/lib/api/problem"
 import { toast } from "sonner"
 import { toTask } from "../adapters"
 import { newTaskHref } from "../new-task"
-import { EMPTY_FILTERS, TASKS_PAGE_SIZE, listQuery } from "../filters"
+import { EMPTY_FILTERS, TASKS_PAGE_SIZE, departmentFilter, listQuery } from "../filters"
 import { useUrlFilters } from "../use-url-filters"
 import { STATUS, STATUS_ORDER } from "../types"
 import type { Person, Project, Task, TasksFilters } from "../types"
@@ -76,7 +76,7 @@ export function TasksView({
 }) {
   const dept = useDept()
   const { filters, set, reset, pending } = useUrlFilters<TasksFilters>(initialFilters, EMPTY_FILTERS)
-  const teamId = dept === "all" ? undefined : departments.find((d) => d.name === dept)?.id
+  const { teamId, unknown: unknownDept } = departmentFilter(dept, departments)
   // Pages after the first come from the API with the cursor; a new server page (filters changed) starts over.
   const [more, setMore] = useState<{ base: Task[]; rows: Task[]; cursor: string | null }>({ base: tasks, rows: [], cursor: nextCursor })
   // A department is the API's filter too (teamId): its own first page replaces the server's, and Load more keeps it.
@@ -98,8 +98,8 @@ export function TasksView({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- filterKey stands for filters (a fresh object each render)
   }, [teamId, tasks, filterKey])
   const fresh = more.base === tasks
-  const loaded = useMemo(() => (scopedNow ? scopedNow.rows : waitingTeam ? [] : fresh ? [...tasks, ...more.rows] : tasks), [scopedNow, waitingTeam, fresh, tasks, more.rows])
-  const cursor = scopedNow ? scopedNow.cursor : waitingTeam ? null : fresh ? more.cursor : nextCursor
+  const loaded = useMemo(() => (unknownDept ? [] : scopedNow ? scopedNow.rows : waitingTeam ? [] : fresh ? [...tasks, ...more.rows] : tasks), [unknownDept, scopedNow, waitingTeam, fresh, tasks, more.rows])
+  const cursor = unknownDept ? null : scopedNow ? scopedNow.cursor : waitingTeam ? null : fresh ? more.cursor : nextCursor
   const peopleById = useMemo(() => new Map(people.map((p) => [p.id, p])), [people])
   const rows = loaded
 
@@ -154,7 +154,9 @@ export function TasksView({
           <FilterSeg label="Due" value={filters.due} options={DUE} onChange={(v) => set("due", v)} />
           <FilterSearch value={filters.q} onChange={(v) => set("q", v)} placeholder="Search tasks" />
         </FilterBar>
-        {rows.length > 0 ? (
+        {waitingTeam ? (
+          <p className="td-muted tasks-more" role="status">Loading…</p>
+        ) : rows.length > 0 ? (
           <>
             <TaskTable tasks={rows} page={1} people={peopleById} today={today} nowAt={nowAt} tzLabel={tzLabel} />
             {cursor && (

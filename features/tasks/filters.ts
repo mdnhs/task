@@ -74,3 +74,18 @@ export const listQuery = (f: TasksFilters, teamId?: string) => ({
   ...(f.q.trim() ? { q: f.q.trim() } : {}),
 })
 
+
+/** The shell's department (a name) as the API's team: `teamId` is the filter, `unknown` a name no team has (the list shows nothing, never everything). */
+export function departmentFilter(dept: string, departments: { id: string; name: string }[]): { teamId?: string; unknown: boolean } {
+  if (dept === "all") return { unknown: false }
+  const teamId = departments.find((d) => d.name === dept)?.id
+  return teamId ? { teamId, unknown: false } : { unknown: true }
+}
+
+/** The board's query for its filters (`all` means none) and the department's team id; a column page adds `column` and `cursor`. */
+export const boardQuery = (f: { project: string; assignee: string; q: string }, teamId?: string) => ({
+  ...(f.project !== "all" ? { project: f.project } : {}),
+  ...(f.assignee !== "all" ? { assignee: f.assignee } : {}),
+  ...(f.q.trim() ? { q: f.q.trim() } : {}),
+  ...(teamId ? { teamId } : {}),
+})

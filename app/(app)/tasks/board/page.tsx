@@ -1,4 +1,4 @@
-import { TaskBoard, loadBoard, loadProjects, taskScreenData, viewerOf } from "@/features/tasks"
+import { TaskBoard, loadBoard, loadDepartmentTeams, loadProjects, taskScreenData, viewerOf } from "@/features/tasks"
 import { AccessRestricted } from "@/features/shell"
 import { getOrg } from "@/lib/org"
 import { can } from "@/lib/permissions"
@@ -11,7 +11,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<Rec
   const sp = await searchParams
   const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) ?? ""
   const [{ api, people }, org] = await Promise.all([taskScreenData(), getOrg()])
-  const projects = await loadProjects(api)
+  const [projects, departments] = await Promise.all([loadProjects(api), loadDepartmentTeams(api)])
   const project = projects.some((p) => p.id === one(sp.project)) ? one(sp.project) : "all"
   const assignee = people.some((p) => p.id === one(sp.assignee)) ? one(sp.assignee) : "all"
   const q = one(sp.q).slice(0, 100)
@@ -22,6 +22,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<Rec
     <TaskBoard
       key={`${project}|${assignee}|${q}`}
       columns={columns}
+      departments={departments}
       people={people}
       projects={projects}
       today={org.today}

@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { AnimatePresence, motion } from "motion/react"
 import { toast } from "sonner"
@@ -22,6 +22,7 @@ import { changeStatus, completeTask, nowIso } from "../mutations"
 import { assigneesOf, checklistProgress } from "../planning"
 import { isLateAt } from "../time"
 import { useTaskWrites } from "../use-task-writes"
+import { boardQuery, departmentFilter } from "../filters"
 import { useUrlFilters } from "../use-url-filters"
 import { STATUS } from "../types"
 import type { Person, Project, Task, TaskStatus } from "../types"
@@ -47,6 +48,8 @@ export type BoardProps = {
   actor: "assignee" | "reviewer"
   me: string
   initialFilters?: BoardFilterValues
+  /** Department teams: the shell's department (a name) becomes the API's `teamId`. */
+  departments?: { id: string; name: string }[]
 }
 
 export function BoardFilters({ q, project, assignee, set, people, projects, staff, children }: {
@@ -126,11 +129,30 @@ function BoardCard({ t, people, today, nowAt, tzLabel, moves, onMove, onDragStar
 
 /** Kanban board (FR-M1-05): drag a card to another status column, or use "Move to" (keyboard and touch). Each column is the API's page (cursor), the move is a versioned write. */
 export function TaskBoard(props: BoardProps) {
-  const { people, projects, today, nowAt, tzLabel, staff, canEdit, actor, me, columns } = props
+  const { people, projects, today, nowAt, tzLabel, staff, canEdit, actor, me, departments = [] } = props
   const dept = useDept()
   const { filters: f, set, pending } = useUrlFilters<BoardFilterValues>(props.initialFilters ?? NO_BOARD_FILTERS, NO_BOARD_FILTERS)
   // "Load more" pages of a column come from the API with that column's cursor; a new server answer starts over (the server wins). The extra cards are part of the list the
   // optimistic overlay sits on, so a move of a card loaded by "Load more" shows at once too.
+  // A department is the API's filter (teamId): its own board replaces the server's, and Load more keeps it.
+  const { teamId, unknown: unknownDept } = departmentFilter(dept, departments)
+  const [scoped, setScoped] = useState<{ teamId: string; base: BoardColumn[]; columns: BoardColumn[] } | null>(null)
+  const filterKey = JSON.stringify(f)
+  useEffect(() => {
+    if (!teamId) return
+    let live = true
+    apiBrowser
+      .get("/v1/tasks/board", { query: boardQuery(f, teamId) as never })
+      .then((b) => live && setScoped({ teamId, base: props.columns, columns: b.columns.map((c) => ({ status: c.status as TaskStatus, count: c.count, tasks: c.items.map(toCard), nextCursor: c.nextCursor })) }))
+      .catch((e) => live && toast.error(userMessage(e).text))
+    return () => {
+      live = false
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- filterKey stands for f (a fresh object each render)
+  }, [teamId, props.columns, filterKey])
+  const scopedNow = teamId && scoped?.teamId === teamId && scoped.base === props.columns ? scoped : null
+  const waitingTeam = !!teamId && !scopedNow
+  const columns = useMemo(() => (unknownDept || waitingTeam ? [] : scopedNow ? scopedNow.columns : props.columns), [unknownDept, waitingTeam, scopedNow, props.columns])
   const [more, setMore] = useState<{ base: BoardColumn[]; add: Partial<Record<TaskStatus, { tasks: Task[]; cursor: string | null }>> }>({ base: columns, add: {} })
   const extra = useMemo(() => (more.base === columns ? more.add : {}), [more, columns])
   const server = useMemo(() => [...columns.flatMap((c) => c.tasks), ...Object.values(extra).flatMap((x) => x?.tasks ?? [])], [columns, extra])
@@ -139,7 +161,6 @@ export function TaskBoard(props: BoardProps) {
   const [dragRef, setDragRef] = useState<string | null>(null)
   const [over, setOver] = useState<TaskStatus | null>(null)
   const now = nowIso(today)
-  const shown = (t: Task) => dept === "all" || t.dept === dept // the department switcher is the shell's; the API has no department filter
   const all = tasks
   const total = columns.reduce((n, c) => n + c.count, 0)
 
@@ -161,7 +182,7 @@ export function TaskBoard(props: BoardProps) {
   }
   async function loadMore(col: TaskStatus, cursor: string) {
     try {
-      const q = { column: col, cursor, ...(f.project !== "all" ? { project: f.project } : {}), ...(f.assignee !== "all" ? { assignee: f.assignee } : {}), ...(f.q.trim() ? { q: f.q.trim() } : {}) }
+      const q = { column: col, cursor, ...boardQuery(f, teamId) }
       const b = await apiBrowser.get("/v1/tasks/board", { query: q as never })
       const c = b.columns[0]
       if (!c) return
@@ -171,31 +192,23 @@ export function TaskBoard(props: BoardProps) {
     }
   }
 
-  const visible = all.filter(shown)
-  const nextCol = BOARD_COLUMNS.map((c) => ({ status: c, cursor: (extra[c] ? extra[c]!.cursor : columns.find((x) => x.status === c)?.nextCursor) ?? null })).find((x) => x.cursor !== null) as { status: TaskStatus; cursor: string } | undefined
+  const visible = all
   return (
     <>
       <PageHead title="Tasks" subtitle={`${total} tasks on the board`} />
       <TaskViewTabs active="board" />
-      <div className="card tasks-card" aria-busy={pending || undefined}>
+      <div className="card tasks-card" aria-busy={pending || waitingTeam || undefined}>
         <BoardFilters {...f} set={set} people={people} projects={projects} staff={staff} />
-        {visible.length === 0 ? (
-          <>
-            <EmptyState icon="task" title="No tasks match" text="Try a different search or clear the filters." />
-            {nextCol && (
-              // The department switcher narrows only the cards loaded so far: a column may hold matches on its next page.
-              <div className="tasks-more">
-                <p className="td-muted">Only the cards loaded so far were checked.</p>
-                <button type="button" className="btn btn-outline" onClick={() => void loadMore(nextCol.status, nextCol.cursor)}>Load more</button>
-              </div>
-            )}
-          </>
+        {waitingTeam ? (
+          <p className="td-muted tasks-more" role="status">Loading…</p>
+        ) : visible.length === 0 ? (
+          <EmptyState icon="task" title="No tasks match" text="Try a different search or clear the filters." />
         ) : (
           <div className="kb-scroll">
             <div className="kb-cols">
               {BOARD_COLUMNS.map((col) => {
                 const apiCol = columns.find((c) => c.status === col)
-                const list = all.filter((t) => t.status === col && shown(t))
+                const list = all.filter((t) => t.status === col)
                 // The count is the API's; a predicted move shifts it by what the overlay changed in this column.
                 const was = new Set(server.filter((t) => t.status === col).map((t) => t.id))
                 const is = new Set(tasks.filter((t) => t.status === col).map((t) => t.id))

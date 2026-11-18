@@ -2355,6 +2355,26 @@ describe("b4 fix wave (I1, I4, M8)", () => {
     expect(done.items).toEqual([])
   })
 
+  test("B7 W1: the board filters cards AND column counts by teamId like the list; a foreign team is empty, a non-uuid is 400", async () => {
+    const w = await world()
+    const dept = await w.json(await w.req("POST", "/v1/teams", w.owner, { name: "Cleaning", kind: "department" }))
+    expect((await w.req("PUT", `/v1/teams/${dept.id}/members`, w.owner, { userIds: [w.staff.userId] })).status).toBe(200)
+    await w.mk(w.ops, { title: "In 1", primary: w.staff.userId })
+    await w.mk(w.ops, { title: "In 2", primary: w.staff2.userId, teamId: dept.id })
+    await w.mk(w.ops, { title: "Out", primary: w.staff2.userId })
+    const board = async (qs: string, as: Who = w.ops) => w.json(await w.req("GET", `/v1/tasks/board?${qs}`, as))
+    const open = (b: Json) => (b.columns as Json[]).find((c) => c.status === "not_started")!
+    const b = await board(`teamId=${dept.id}`)
+    expect((open(b).items as Json[]).map((i) => i.title).sort()).toEqual(["In 1", "In 2"])
+    expect(open(b).count).toBe(2)
+    expect(open(await board("")).count).toBe(3)
+    const foreign = await board("teamId=6f1c0d52-8d3a-4b7e-9c41-2a5b7e90d3f8")
+    expect(open(foreign).items).toEqual([])
+    expect(open(foreign).count).toBe(0)
+    expect((await w.req("GET", "/v1/tasks/board?teamId=nope", w.ops)).status).toBe(400)
+    expect(open(await board(`teamId=${dept.id}`, w.staff)).count).toBe(1) // staff: only their own, inside scope
+  })
+
   test("B7 T10: a task blocking 120 others returns 50 blocks and hiddenBlocks 70, ordered by due then id", async () => {
     const w = await world()
     const root = await w.mk(w.ops, { title: "Root" })

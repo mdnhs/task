@@ -93,7 +93,7 @@ export async function boardView(tx: TenantTx, ctx: TaskCtx, q: BoardInput): Prom
   if (q.cursor && !q.column) throw new AppError(400, "invalid_cursor", "Bad Request") // a cursor belongs to one column
   const after = q.cursor ? decodeCursor(q.cursor) : undefined
   const limit = q.limit
-  const filters: Filters = { due: q.due, priority: q.priority, assignee: q.assignee, project: q.project, repeat: q.repeat, q: q.q, ref: q.ref, label: q.label }
+  const filters: Filters = { due: q.due, priority: q.priority, assignee: q.assignee, project: q.project, repeat: q.repeat, q: q.q, ref: q.ref, label: q.label, teamId: q.teamId }
   const counts = new Map((await boardCountsQuery(tx, ctx, filters)).map((r) => [r.status, r.n]))
   const statuses: z.infer<typeof Status>[] = q.column ? [q.column] : STATUS_ORDER
   const pages = new Map<string, TaskRow[]>()
