@@ -14,8 +14,11 @@ export type ObjectHead = { size: number; contentType: string; etag: string }
 export type Storage = {
   /** Presigned PUT valid for `expiresSec`: exact key, exact Content-Type and Content-Length signed into the URL. */
   presignPut(key: string, o: { mime: string; sizeBytes: number; expiresSec: number }): Promise<PresignedPut>
-  /** Presigned GET valid for `expiresSec`, forcing a download (`attachment`) with the stored mime. */
-  presignGet(key: string, o: { name: string; mime: string; expiresSec: number }): Promise<string>
+  /**
+   * Presigned GET valid for `expiresSec` with the STORED mime. Always `attachment`, except `inline: true` is honoured for
+   * image/png|jpeg|webp|gif and application/pdf only (never svg or html: they run script in the bucket origin).
+   */
+  presignGet(key: string, o: { name: string; mime: string; expiresSec: number; inline?: boolean }): Promise<string>
   /**
    * Server-side copy `from` -> `to`, keeping content type. With `ifMatchEtag` it fails with `PreconditionFailedError`
    * when the source changed since that ETag was read.

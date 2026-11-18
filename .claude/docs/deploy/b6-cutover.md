@@ -67,3 +67,9 @@ Separate environment, separate database from the first client's.
 - CI: `contract` (web clients against the real API) and `e2e` (Playwright, CR-01 to CR-06 on the real stack) jobs in `.github/workflows/ci.yml`.
 - Locally: `npm run e2e:stack` (Postgres, Redis, MinIO, ClamAV on ports 55432, 56379, 59000, 53310; demo data and fake credentials only), `npm run test:e2e`, and `SMOKE_PASSWORD=... npm run smoke` against a web on a demo database (`SMOKE_MOCK=1` when it runs with `ENABLE_MOCK_MODULES=1`).
 - After go-live: sign in as each role once; Settings → Devices shows the registered PCs; a test report submits and reaches the inbox; a proof-required task refuses Complete without evidence.
+
+## Download hardening (B7 Task 4)
+
+- Every API response carries `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`, `Cross-Origin-Resource-Policy: same-site`, `Content-Security-Policy: default-src 'none'; frame-ancestors 'none'`, and authenticated JSON carries `Cache-Control: no-store` (`api/src/core/middleware/secure-headers.ts`). No new env.
+- File downloads are 302 redirects to a presigned bucket URL. The API signs `response-content-type` (the stored mime) and `response-content-disposition: attachment` for every file; `inline` is only possible for image/png, jpeg, webp, gif and application/pdf, never svg or html.
+- A presigned bucket URL cannot carry `nosniff` (S3 and R2 limit). Mandatory at deploy: a Cloudflare Transform Rule (response header modification) on the bucket domain that sets `X-Content-Type-Options: nosniff` (and `Content-Security-Policy: default-src 'none'; sandbox`). The full runbook is Task 19.

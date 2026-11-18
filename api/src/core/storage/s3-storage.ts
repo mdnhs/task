@@ -10,6 +10,9 @@ export type StorageConfigSource = { get(): Promise<S3Config | null> }
 
 const TTL_MS = 60_000
 
+/** The only types a browser may render inline from a download link (no script-bearing document: never svg or html). Everything else is `attachment`. */
+export const INLINE_MIMES: ReadonlySet<string> = new Set(["image/png", "image/jpeg", "image/webp", "image/gif", "application/pdf"])
+
 /** RFC 5987 `ext-value` encoding for Content-Disposition filename*: percent-encode everything but attr-chars. */
 export function rfc5987(name: string): string {
   return encodeURIComponent(name).replace(/['()*]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`)
@@ -62,9 +65,10 @@ export function makeS3Storage(source: StorageConfigSource, o: { now?: () => numb
     },
     async presignGet(Key, p) {
       const { cfg, client } = await current()
+      const kind = p.inline && INLINE_MIMES.has(p.mime.trim().toLowerCase()) ? "inline" : "attachment"
       return getSignedUrl(
         client,
-        new GetObjectCommand({ Bucket: cfg.bucket, Key, ResponseContentType: p.mime, ResponseContentDisposition: `attachment; filename*=UTF-8''${rfc5987(p.name)}` }),
+        new GetObjectCommand({ Bucket: cfg.bucket, Key, ResponseContentType: p.mime, ResponseContentDisposition: `${kind}; filename*=UTF-8''${rfc5987(p.name)}` }),
         { expiresIn: p.expiresSec },
       )
     },

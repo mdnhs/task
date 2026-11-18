@@ -64,3 +64,22 @@ test("M6c: Postgres 40P01 (deadlock) and 40001 (serialisation failure), read fro
   expect(other.status).toBe(500)
   expect(await other.text()).not.toContain("secret detail")
 })
+
+test("every API response carries x-content-type-options nosniff, the security headers and a request id", async () => {
+  const { app } = testApp()
+  app.get("/v1/_boom2", () => { throw new Error("x") })
+  app.get("/v1/_json", (c) => c.json({ a: 1 }))
+  app.get("/v1/_dl", (c) => c.body("a,b", 200, { "content-type": "text/csv", "content-disposition": 'attachment; filename="x.csv"', "cache-control": "no-store" }))
+  app.get("/v1/_redir", (c) => c.redirect("https://files.example/x", 302))
+  for (const path of ["/healthz", "/v1/nope", "/v1/_boom2", "/v1/_json", "/v1/_dl", "/v1/_redir", "/v1/openapi.json"]) {
+    const r = await call(app, "GET", path)
+    expect(r.headers.get("x-content-type-options"), path).toBe("nosniff")
+    expect(r.headers.get("x-request-id"), path).toBeTruthy()
+    expect(r.headers.get("referrer-policy"), path).toBe("no-referrer")
+    expect(r.headers.get("cross-origin-resource-policy"), path).toBe("same-site")
+    expect(r.headers.get("content-security-policy"), path).toBe("default-src 'none'; frame-ancestors 'none'")
+  }
+  expect((await call(app, "GET", "/v1/_json")).headers.get("cache-control")).toBe("no-store")
+  expect((await call(app, "GET", "/v1/_boom2")).headers.get("cache-control")).toBe("no-store")
+  expect((await call(app, "GET", "/v1/_dl")).headers.get("content-disposition")).toContain("attachment")
+})
