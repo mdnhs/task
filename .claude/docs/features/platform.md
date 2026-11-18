@@ -9,6 +9,32 @@ Code: `features/platform/**` (pure logic next to its `*.test.ts`, views in `comp
 the ⌘K index action in `app/actions/platform-search.ts`. Only the session role with `platform: true` gets in; everyone
 else sees "Access restricted" without the console's nav, alerts or search.
 
+## API coverage (B6 T6.8)
+
+Page-by-route table from the generated `paths` (`lib/api/schema.d.ts`). **Backed** pages run on the platform staff API; **unbacked** pages keep their
+mock seed (`public/data/platform/*`) and are shown only with `ENABLE_MOCK_MODULES=1` (ruling I16); without it they show the unavailable state and their nav entry is hidden.
+The operator is the signed-in user (`/v1/me.platformRole`), not `platform/staff.json`; the `od-staff-role` override is gone.
+
+| Console page | Status | Routes it uses |
+| --- | --- | --- |
+| Overview KPIs and MRR | backed | `GET /v1/platform/metrics` (MRR counts `active` only; `past_due` is its own count, C11), `GET /v1/platform/tenants` |
+| Overview plan mix, recent activity, MRR history chart | unbacked, mock | needs the subscription event log; no route |
+| Tenants list and saved views | backed | `GET /v1/platform/tenants?q&status&plan&page&pageSize` (metadata only) |
+| Tenant 360: overview, modules, support, audit tabs | backed | `GET /v1/platform/tenants/{tenantId}` (aggregates only), `PUT .../modules`, `POST .../support-grants`, `GET /v1/platform/audit?targetTenantId` |
+| Suspend, reactivate | backed | `POST .../suspend`, `POST .../reactivate` (reason 1-500; 409 `already_suspended`, `not_suspended`) |
+| Extend trial | backed | `POST .../extend-trial` (days 1-30, reason) |
+| Module overrides | backed | `PUT .../modules` with the full overrides array |
+| Support access | backed | `POST /v1/platform/tenants/{tenantId}/support-grants`, `DELETE /v1/platform/support-grants/{id}` (no list route: grants show on the tenant's `/settings/support-access`) |
+| Data requests | backed (read) | `GET /v1/platform/data-requests` (no subject identity; no resolve route) |
+| Audit log and export | backed | `GET /v1/platform/audit`, `GET /v1/platform/audit/export` (CSV, through the BFF) |
+| Team (staff) | backed | `GET/POST /v1/platform/staff`, `PATCH /v1/platform/staff/{userId}` |
+| Settings: email, storage, billing | backed | `GET/PUT /v1/platform/settings/{email,storage,billing}` (+ `/test` for email and storage); secrets are never returned, only the last 4 |
+| Plans (list, new, edit, archive) | **unbacked, mock** | no route |
+| Invoice ledger and dunning | **unbacked, mock** | no route |
+| Usage series (360 Usage tab, overview usage sparks) | **unbacked, mock** | no route |
+| Tenant notes, change plan, schedule deletion, credit | **unbacked, mock** | no route |
+| Subscription event log behind the MRR history chart | **unbacked, mock** | `/v1/platform/metrics` has no series |
+
 ## Routes
 
 | Route | Page | Gate (staff action) |
