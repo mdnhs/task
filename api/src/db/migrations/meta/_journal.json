@@ -302,6 +302,13 @@
       "when": 1794990806181,
       "tag": "0042_schema_migration_count",
       "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1795005503794,
+      "tag": "0043_roster_locations",
+      "breakpoints": true
     }
   ]
 }

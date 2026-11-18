@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm"
-import { boolean, index, integer, jsonb, pgPolicy, pgTable, primaryKey, text, timestamp, unique, uuid } from "drizzle-orm/pg-core"
+import { boolean, check, index, integer, jsonb, pgPolicy, pgTable, primaryKey, text, timestamp, unique, uuid } from "drizzle-orm/pg-core"
 import type { MfaPolicy } from "@opsdesk/domain/mfa"
 import { user } from "./auth"
 
@@ -44,9 +44,12 @@ export const roles = pgTable(
     fieldRules: jsonb("field_rules").$type<Record<string, string[]>>().notNull().default({}),
     isTemplate: boolean("is_template").notNull().default(false),
     clonedFrom: uuid("cloned_from"),
+    // Roster scope (R8-3): office = manages rosters across locations, supervisor = only the locations granted to them, null = no roster rank.
+    rosterLevel: text("roster_level"),
   },
   (t) => [
     unique("roles_tenant_key").on(t.tenantId, t.key),
+    check("roles_roster_level_check", sql`${t.rosterLevel} is null or ${t.rosterLevel} in ('office','supervisor')`),
     tenantPolicy(),
     pgPolicy("own_membership_role_read", {
       as: "permissive",
