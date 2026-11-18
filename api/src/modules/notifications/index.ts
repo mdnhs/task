@@ -1,5 +1,5 @@
 export { notificationRoutes } from "./routes"
-export { notify, withTenantAfterCommit, sendNotification, SUBJECT_TOKEN, SWEEP_JOB as NOTIFICATION_SWEEP_JOB, type Enqueue, type NotifyInput } from "./service"
+export { notify, notifyMany, withTenantAfterCommit, sendNotification, SUBJECT_TOKEN, SWEEP_JOB as NOTIFICATION_SWEEP_JOB, type Enqueue, type NotifyInput } from "./service"
 export { registerNotifications } from "./subscribers"
 export { quietWindow } from "./quiet-hours"
 export type { NotificationKind } from "./prefs"

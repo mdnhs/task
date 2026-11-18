@@ -10197,11 +10197,12 @@ export interface paths {
                             unpaidBreakMin?: number;
                         }[];
                         reason?: string;
+                        overrideRuleIds?: string[];
                     };
                 };
             };
             responses: {
-                /** @description Assigns several people at once, all or nothing (null = an open shift; start, end, break and role default from the shift type and may differ per entry; an end at or before the start runs into the next day). Rule warnings (and, for an office role with a reason, overridden blocks) come back in violations. 404 not_found for a week or shift of a site the caller may not see, a missing or another tenant's one and an id that is not a uuid (all the same answer); 403 roster_locked (a supervisor on a published week); 409 shift_exists | week_published | location_archived; 422 invalid_shift | invalid_shift_type | ineligible (left, qualification missing or expired) | rule_blocked | reason_required */
+                /** @description Assigns several people at once, all or nothing (null = an open shift; start, end, break and role default from the shift type and may differ per entry; an end at or before the start runs into the next day). Rule warnings (and, for an office role with a reason, overridden blocks) come back in violations. 404 not_found for a week or shift of a site the caller may not see, a missing or another tenant's one and an id that is not a uuid (all the same answer); 403 roster_locked (a supervisor on a published week); 409 shift_exists | shift_conflict (the database refused the pair) | location_archived; 422 invalid_shift | invalid_shift_type | ineligible (left, qualification missing or expired; generic ineligible for a person of a site the caller cannot see) | rule_blocked (on a PUBLISHED week an office role must also name the overridden rules in overrideRuleIds, 422 invalid_override for an unknown id) | reason_required (office on a published week) */
                 201: {
                     headers: {
                         [name: string]: unknown;
@@ -10275,7 +10276,7 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description The shift is removed; history keeps it whole. 404 not_found for a week or shift of a site the caller may not see, a missing or another tenant's one and an id that is not a uuid (all the same answer); 403 roster_locked; 409 version_conflict | week_published; 422 reason_required */
+                /** @description The shift is removed; history keeps it whole. 404 not_found for a week or shift of a site the caller may not see, a missing or another tenant's one and an id that is not a uuid (all the same answer); 403 roster_locked (a supervisor on a published week); 409 version_conflict (a stale ?version=); 422 reason_required (office on a published week) */
                 204: {
                     headers: {
                         [name: string]: unknown;
@@ -10303,11 +10304,12 @@ export interface paths {
                             [key: string]: unknown;
                         };
                         reason?: string;
+                        overrideRuleIds?: string[];
                     };
                 };
             };
             responses: {
-                /** @description Moves, retimes, reassigns or retypes one shift inside its week (patch keys: date, start, end, unpaidBreakMin, userId, shiftTypeId, role). 404 not_found for a week or shift of a site the caller may not see, a missing or another tenant's one and an id that is not a uuid (all the same answer); 403 roster_locked; 409 version_conflict | shift_exists | week_published; 422 cannot_move_week | invalid_patch | invalid_shift | ineligible | rule_blocked | reason_required */
+                /** @description Moves, retimes, reassigns or retypes one shift inside its week (patch keys: date, start, end, unpaidBreakMin, userId, shiftTypeId, role). 404 not_found for a week or shift of a site the caller may not see, a missing or another tenant's one and an id that is not a uuid (all the same answer); 403 roster_locked (a supervisor on a published week); 409 version_conflict | shift_exists | shift_conflict | location_archived; 422 cannot_move_week | invalid_patch | invalid_shift | ineligible | rule_blocked (overrideRuleIds on a published week, as for add) | invalid_override | reason_required */
                 200: {
                     headers: {
                         [name: string]: unknown;

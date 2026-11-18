@@ -263,11 +263,11 @@ describe("office edit of a published week (R8-8, R8-17, FR-RS-37)", () => {
     expect(await notices(w)).toHaveLength(0)
   })
 
-  test("an office edit of a published week passes the same rule gate: a block it causes is recorded as an override because the reason is already required", async () => {
+  test("an office edit of a published week passes the same rule gate: a block it causes needs the named overrideRuleIds besides the reason (AE3)", async () => {
     const w = await sites()
     const { mon } = await published(w)
     const early = await w.type(w.a, "Early", { start: "06:00", end: "14:00" })
-    const r = await w.addOk(w.p.owner, w.wa, [{ date: MON, userIds: [mon[0].userId], shiftTypeId: early }], { reason: "Extra early cover" })
+    const r = await w.addOk(w.p.owner, w.wa, [{ date: MON, userIds: [mon[0].userId], shiftTypeId: early }], { reason: "Extra early cover", overrideRuleIds: ["double_booking"] })
     expect(r.violations.some((v: Json) => v.rule === "double_booking" && v.severity === "block")).toBe(true)
     const [h] = await w.rows("select reason, after from roster_history where shift_id = $1", [r.shifts[0].id])
     expect(h.reason).toBe("Extra early cover")

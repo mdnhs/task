@@ -11,7 +11,7 @@ import { AppError, Forbidden, NotFound } from "../../core/errors"
 import { leaveRequests, locations, memberships, publicHolidays, rosterAvailability, rosterShifts, rosterWeeks, shiftTypes, user } from "../../db/schema"
 import type { TenantTx } from "../../db/tenant-tx"
 import { ifMatchHolds, readSetting, writeSetting } from "../settings"
-import { assertLocation, type RosterCtx } from "./scope"
+import { assertLocation, canSeePerson, type RosterCtx } from "./scope"
 import { auditRoster, isUuid } from "./write"
 
 // The server rule engine (FR-RS-44, D9). The rules themselves are the pure `checkShifts` of packages/domain (the web mock runs the same code): this file loads the
@@ -77,7 +77,7 @@ export async function putRules(tx: TenantTx, ctx: RosterCtx, input: { severity: 
 }
 
 /** What the engine runs on, plus the tenant's public holidays in the window (an information line for repeat, never a violation). */
-export type LoadedRuleContext = RuleContext & { holidays: { date: string; name: string }[] }
+export type LoadedRuleContext = RuleContext & { holidays: { date: string; name: string }[]; /** People the caller may not know anything about (a cross-site loan): named "Member" and reported generically. */ opaque: Set<string> }
 
 type LoadOpts = {
   /** The weeks being checked: their people are the people whose other shifts (at every site) are loaded. */
@@ -143,6 +143,7 @@ export async function loadRuleContext(tx: TenantTx, ctx: RosterCtx, opts: LoadOp
   const persons = [...new Set([...rows.map((r) => r.userId!), ...people])]
 
   let members: WorkforceMember[] = []
+  const opaque = new Set<string>()
   let leave: LeaveRequest[] = []
   let availability: Availability[] = []
   if (persons.length > 0) {
@@ -155,8 +156,10 @@ export async function loadRuleContext(tx: TenantTx, ctx: RosterCtx, opts: LoadOp
       .innerJoin(user, eq(user.id, memberships.userId))
       .where(and(eq(memberships.tenantId, tenantId), inArray(memberships.userId, persons)))
       .orderBy(asc(memberships.userId))
+    const masked = !seesAllLocations(ctx.access, ctx.allLocationIds)
+    for (const r of m) if (masked && !canSeePerson(ctx, r.userId, r.home)) opaque.add(r.userId)
     members = m.map((r) => ({
-      id: r.userId, name: r.erasedAt ? "Erased user" : r.name, role: "", dept: "", homeLocationId: r.home, qualifications: r.quals,
+      id: r.userId, name: opaque.has(r.userId) ? "Member" : r.erasedAt ? "Erased user" : r.name, role: "", dept: "", homeLocationId: r.home, qualifications: r.quals,
       leftOn: r.deactivatedAt ? epochToWall(r.deactivatedAt.getTime(), ctx.tz).slice(0, 10) : null,
     }))
     const l = await tx
@@ -181,7 +184,7 @@ export async function loadRuleContext(tx: TenantTx, ctx: RosterCtx, opts: LoadOp
   return {
     shifts, members, leave, availability, templates: [...templates.values()], severity: rules.severity, avgWeekReferenceWeeks: rules.avgWeekReferenceWeeks, tz: ctx.tz, zones,
     visibleLocationIds: seesAllLocations(ctx.access, ctx.allLocationIds) ? null : (ctx.access.locationIds ?? []),
-    holidays,
+    holidays, opaque,
   }
 }
 
@@ -222,5 +225,27 @@ export async function checkWeek(tx: TenantTx, ctx: RosterCtx, weekId: string, ex
   }
   const all = [...shifts, ...proposed]
   const target = all.filter((s) => s.weekId === weekId && s.personId).sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : a.start < b.start ? -1 : a.start > b.start ? 1 : a.id < b.id ? -1 : 1))
-  return checkShifts(target, { ...c, shifts: all, templates, zones: { ...c.zones, [week.locationId]: week.zone ?? ctx.tz } })
+  return genericFor(c.opaque, checkShifts(target, { ...c, shifts: all, templates, zones: { ...c.zones, [week.locationId]: week.zone ?? ctx.tz } }))
+}
+
+const HIDDEN_LINE = "Already rostered elsewhere"
+/** What says something private about a person: their leave, availability, qualifications, departure and shifts elsewhere. For a person the caller cannot see (a cross-site loan) all of it is ONE generic line per shift. */
+const PRIVATE_RULES: readonly string[] = ["approved_leave", "unavailable", "expired_licence", "left", "elsewhere"]
+function genericFor(opaque: Set<string>, found: RuleViolation[]): RuleViolation[] {
+  if (opaque.size === 0) return found
+  const out: RuleViolation[] = []
+  const at = new Map<string, number>()
+  for (const v of found) {
+    if (!opaque.has(v.personId) || !PRIVATE_RULES.includes(v.rule)) {
+      out.push(v)
+      continue
+    }
+    const key = `${v.shiftId}|${v.personId}`
+    const i = at.get(key)
+    if (i === undefined) {
+      at.set(key, out.length)
+      out.push({ rule: "elsewhere", shiftId: v.shiftId, personId: v.personId, severity: v.severity, message: HIDDEN_LINE, otherShiftIds: [] })
+    } else if (v.severity === "block") out[i] = { ...out[i], severity: "block" }
+  }
+  return out
 }

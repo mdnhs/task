@@ -75,3 +75,11 @@ export function cleanReason(reason: string | undefined): string | null {
   if (r.length > 500 || CONTROL.test(r.replace(/[\r\n\t]/g, " "))) throw new AppError(422, "invalid_reason", "Unprocessable Entity")
   return r === "" ? null : r
 }
+
+const OVERRIDABLE = ["double_booking", "approved_leave", "unavailable", "daily_rest", "weekly_rest", "avg_48h", "expired_licence", "left", "elsewhere"]
+/** `overrideRuleIds` of a publish or a published-week edit: known rule ids only (422 invalid_override), at most one of each. */
+export function checkOverrideIds(ids: string[] | undefined): string[] | undefined {
+  if (ids === undefined) return undefined
+  if (ids.length > OVERRIDABLE.length || ids.some((r) => !OVERRIDABLE.includes(r))) throw new AppError(422, "invalid_override", "Unprocessable Entity")
+  return ids
+}

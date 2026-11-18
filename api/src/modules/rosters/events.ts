@@ -1,5 +1,7 @@
+import { and, eq, inArray } from "drizzle-orm"
+import { memberships } from "../../db/schema"
 import type { TenantTx } from "../../db/tenant-tx"
-import { notify } from "../notifications"
+import { notifyMany } from "../notifications"
 import type { RosterCtx } from "./scope"
 import type { RosterEnv } from "./write"
 
@@ -20,11 +22,15 @@ const NOTICE = {
 } as const
 
 /**
- * One notification per person (R8-17): however many shifts a person has in the week or in the mutation, they hear once. An open shift (null) notifies nobody.
- * Goes through the shared notify engine, so in-app, email and push follow each person's own preferences and quiet hours.
+ * One notification per ACTIVE person (R8-17): however many shifts a person has in the week or in the mutation, they hear once; a deactivated member (whose shift stays, flagged `left`) hears
+ * nothing on any channel; an open shift (null) notifies nobody. Goes through the shared notify engine in one batch (O(1) lookups), so in-app, email and push follow each person's
+ * own preferences and quiet hours. Returns the people actually told.
  */
 export async function notifyRostered(tx: TenantTx, ctx: Pick<RosterCtx, "tenantId">, env: RosterEnv, userIds: (string | null)[], kind: keyof typeof NOTICE, weekStart: string): Promise<string[]> {
-  const people = [...new Set(userIds.filter((u): u is string => u !== null))].sort()
-  for (const userId of people) await notify(tx, ctx.tenantId, { userId, kind: "member", title: NOTICE[kind].title, body: NOTICE[kind].body(weekStart), link: "/rosters" }, env.deps, env.enqueue)
+  const wanted = [...new Set(userIds.filter((u): u is string => u !== null))].sort()
+  if (wanted.length === 0) return []
+  const active = new Set((await tx.select({ userId: memberships.userId }).from(memberships).where(and(eq(memberships.tenantId, ctx.tenantId), eq(memberships.status, "active"), inArray(memberships.userId, wanted)))).map((m) => m.userId))
+  const people = wanted.filter((u) => active.has(u))
+  await notifyMany(tx, ctx.tenantId, people.map((userId) => ({ userId, kind: "member" as const, title: NOTICE[kind].title, body: NOTICE[kind].body(weekStart), link: "/rosters" })), env.deps, env.enqueue)
   return people
 }

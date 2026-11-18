@@ -1,4 +1,4 @@
-import { and, desc, eq, sql } from "drizzle-orm"
+import { and, desc, eq, inArray, sql } from "drizzle-orm"
 import { buildKeyring, open, seal } from "../../core/crypto/secret-box"
 import { sha256Hex } from "../../core/middleware/device"
 import { AppError, Forbidden, NotFound } from "../../core/errors"
@@ -7,7 +7,7 @@ import { notificationPreferences } from "../../db/schema"
 import { withTenant, type TenantTx } from "../../db/tenant-tx"
 import type { Deps } from "../../deps"
 import { isHHMM, quietWindow } from "./quiet-hours"
-import { KINDS, loadPrefs, type NotificationKind, type Prefs } from "./prefs"
+import { KINDS, loadPrefs, resolveChannels, type NotificationKind, type Prefs } from "./prefs"
 
 export type NotifyInput = { userId: string; kind: NotificationKind; title: string; body: string; link?: string; subjectUserId?: string }
 export type Enqueue = (name: string, data: unknown, opts?: { delayMs?: number; key?: string }) => void
@@ -61,6 +61,43 @@ export async function notify(tx: TenantTx, tenantId: string, input: NotifyInput,
       .returning({ id: notificationDeliveries.id })
     enqueue(SEND_JOB, { deliveryId: d.id, tenantId }, { key: d.id, delayMs: win.quiet ? Math.max(0, win.endsAt.getTime() - now.getTime()) : undefined })
   }
+}
+
+/**
+ * `notify` for many people at once (a roster publish): the preferences, push tokens and the tenant zone are read once and the notifications and
+ * deliveries are written as two batch inserts, so the cost is O(1) lookups plus the rows, not four queries per person. Same rules as `notify`
+ * (channels from each person's preferences, quiet hours, nothing when every channel is off); one input per person is expected.
+ */
+export async function notifyMany(tx: TenantTx, tenantId: string, inputs: NotifyInput[], deps: Deps, enqueue: Enqueue): Promise<void> {
+  if (inputs.length === 0) return
+  const ids = [...new Set(inputs.map((i) => i.userId))]
+  const prefRows = await tx.select().from(notificationPreferences).where(and(eq(notificationPreferences.tenantId, tenantId), inArray(notificationPreferences.userId, ids)))
+  const tokens = new Set((await tx.select({ userId: pushTokens.userId }).from(pushTokens).where(and(eq(pushTokens.tenantId, tenantId), inArray(pushTokens.userId, ids)))).map((t) => t.userId))
+  const [t] = await tx.select({ tz: tenants.timezone }).from(tenants).where(eq(tenants.id, tenantId))
+  const now = deps.clock.now()
+  const hhmm = (v: string | null): string | null => (v ? v.slice(0, 5) : null)
+  const plan = inputs.flatMap((input) => {
+    const r = prefRows.find((p) => p.userId === input.userId)
+    const prefs: Prefs = { channels: resolveChannels(r?.channels), quietStart: hhmm(r?.quietStart ?? null), quietEnd: hhmm(r?.quietEnd ?? null) }
+    const ch = prefs.channels[input.kind]
+    const channels = ([ch.email && "email", ch.push && tokens.has(input.userId) && "push"] as const).filter((c): c is "email" | "push" => Boolean(c))
+    return !ch.inApp && channels.length === 0 ? [] : [{ input, ch, channels, prefs }]
+  })
+  if (plan.length === 0) return
+  const created = await tx
+    .insert(notifications)
+    .values(plan.map(({ input, ch }) => ({ tenantId, userId: input.userId, kind: input.kind, title: input.title, body: input.body, link: input.link ?? null, subjectUserId: input.subjectUserId ?? null, inApp: ch.inApp, createdAt: now })))
+    .returning({ id: notifications.id })
+  const rows = plan.flatMap((p, i) => {
+    const win = p.input.kind === "security" ? { quiet: false, endsAt: now } : quietFor(p.prefs, t?.tz, now)
+    return p.channels.map((channel) => ({ notificationId: created[i].id, channel, win }))
+  })
+  if (rows.length === 0) return
+  const deliveries = await tx
+    .insert(notificationDeliveries)
+    .values(rows.map((r) => ({ tenantId, notificationId: r.notificationId, channel: r.channel, status: r.win.quiet ? ("held" as const) : ("queued" as const), sendAfter: r.win.quiet ? r.win.endsAt : now })))
+    .returning({ id: notificationDeliveries.id })
+  deliveries.forEach((d, i) => enqueue(SEND_JOB, { deliveryId: d.id, tenantId }, { key: d.id, delayMs: rows[i].win.quiet ? Math.max(0, rows[i].win.endsAt.getTime() - now.getTime()) : undefined }))
 }
 
 function quietFor(prefs: Prefs, tz: string | undefined, now: Date) {

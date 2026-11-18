@@ -1,7 +1,7 @@
 import { and, eq, sql, type AnyColumn, type SQL } from "drizzle-orm"
 import type { Context, MiddlewareHandler } from "hono"
 import { can } from "@opsdesk/domain/permissions"
-import { rosterAccess, canSeeLocation, type RosterAccess } from "@opsdesk/domain/roster-access"
+import { rosterAccess, canSeeLocation, seesAllLocations, type RosterAccess } from "@opsdesk/domain/roster-access"
 import type { AppEnv, ResolvedRole } from "../../core/context"
 import { AppError, Forbidden, NotFound } from "../../core/errors"
 import { requireModule } from "../../core/middleware/module"
@@ -70,6 +70,17 @@ export async function loadRosterCtx(c: Context<AppEnv>, tx: TenantTx, need: "rea
 /** R8-4: a location the caller may not see is a 404, identical to one that does not exist (no existence oracle, no counts, never 403). */
 export function assertLocation(ctx: RosterCtx, locationId: string): void {
   if (!canSeeLocation(ctx.access, locationId)) throw NotFound()
+}
+
+/**
+ * Whether the caller may know ANYTHING about a person beyond their id (name, qualification state, leave, availability): oneself; a role that sees every site; an office role cut by
+ * an except list when the person is homed nowhere or at a site it sees; a supervisor when the person is homed at a granted site. A person of a site the caller cannot see (a "cross-site
+ * loan" on the caller's roster) stays opaque: the caller may roster them, but every answer about them is generic.
+ */
+export function canSeePerson(ctx: RosterCtx, userId: string, homeLocationId: string | null): boolean {
+  if (userId === ctx.me || seesAllLocations(ctx.access, ctx.allLocationIds)) return true
+  if (homeLocationId !== null) return canSeeLocation(ctx.access, homeLocationId)
+  return ctx.access.scope === "all"
 }
 
 /**

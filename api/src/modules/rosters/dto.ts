@@ -206,13 +206,14 @@ export const AddShiftsBody = z
       .array(z.object({ date: z.string().max(10), userIds: z.array(z.string().max(128).nullable()).max(50), shiftTypeId: z.string().max(64), role: z.string().max(200).optional(), start: z.string().max(10).optional(), end: z.string().max(10).optional(), unpaidBreakMin: z.number().optional() }))
       .max(50),
     reason: Reason.optional(),
+    overrideRuleIds: z.array(z.string().max(40)).max(20).optional(),
   })
   .openapi({ example: { shifts: [{ date: "2026-11-02", userIds: [UID, null], shiftTypeId: STID, start: "08:00", end: "16:00" }] } })
 export const AddShiftsOut = z
   .object({ shifts: z.array(ShiftOut), violations: z.array(ViolationOut) })
   .openapi({ example: { shifts: [shiftEx], violations: [] } })
 export const PatchShiftBody = z
-  .object({ version: z.number().int().min(1), patch: z.record(z.string().max(40), z.unknown()), reason: Reason.optional() })
+  .object({ version: z.number().int().min(1), patch: z.record(z.string().max(40), z.unknown()), reason: Reason.optional(), overrideRuleIds: z.array(z.string().max(40)).max(20).optional() })
   .openapi({ example: { version: 1, patch: { start: "09:00", end: "17:00" } } })
 export const PatchShiftOut = z.object({ shift: ShiftOut, violations: z.array(ViolationOut) }).openapi({ example: { shift: shiftEx, violations: [] } })
 export const DeleteShiftQuery = z.object({

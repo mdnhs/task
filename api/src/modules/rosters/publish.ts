@@ -1,5 +1,5 @@
 import { and, asc, eq } from "drizzle-orm"
-import { RULE_IDS, type RuleViolation } from "@opsdesk/domain/roster-rules"
+import { type RuleViolation } from "@opsdesk/domain/roster-rules"
 import { canSeeLocation } from "@opsdesk/domain/roster-access"
 import { AppError, Conflict, Forbidden, NotFound } from "../../core/errors"
 import { rosterShifts, rosterWeeks } from "../../db/schema"
@@ -9,7 +9,7 @@ import { notifyRostered, weekPublishedPayload } from "./events"
 import { checkWeek } from "./rules"
 import { type RosterCtx } from "./scope"
 import { getWeek, loadWeek, shiftDto, shiftSnap } from "./weeks"
-import { auditRoster, cleanReason, isUuid, publishRoster, writeHistory, type RosterEnv } from "./write"
+import { auditRoster, checkOverrideIds, cleanReason, isUuid, publishRoster, writeHistory, type RosterEnv } from "./write"
 
 const unprocessable = (code: string, extra?: Record<string, unknown>) => new AppError(422, code, "Unprocessable Entity", extra)
 /**
@@ -28,8 +28,7 @@ export async function publishWeek(tx: TenantTx, ctx: RosterCtx, env: RosterEnv, 
   if (week.version !== input.version) throw Conflict("version_conflict")
   if (loaded.archived) throw Conflict("location_archived")
   const reason = cleanReason(input.reason)
-  const override = input.overrideRuleIds
-  if (override && (override.length > RULE_IDS.length + 1 || override.some((r) => !(RULE_IDS as readonly string[]).includes(r) && r !== "elsewhere"))) throw unprocessable("invalid_override")
+  const override = checkOverrideIds(input.overrideRuleIds)
   const violations = await checkWeek(tx, ctx, week.id)
   const blocks = violations.filter((v) => v.severity === "block")
   const office = ctx.access.scope === "all" && ctx.access.editPublished

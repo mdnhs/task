@@ -1,4 +1,4 @@
-export { ROSTER_LOCK_NS, ROSTER_LOCK_TIMEOUT_MS, lockRoster, loadRosterCtx, assertLocation, inScopeSql, weekEditGate, rosterGuard, type RosterCtx } from "./scope"
+export { ROSTER_LOCK_NS, ROSTER_LOCK_TIMEOUT_MS, lockRoster, loadRosterCtx, assertLocation, canSeePerson, inScopeSql, weekEditGate, rosterGuard, type RosterCtx } from "./scope"
 export { rosterProbeRoutes } from "./probe"
 export { rosterRoutes } from "./routes"
 export { rosterRead, rosterWrite, officeOnly, unrestrictedOffice, writeHistory, auditRoster, publishRoster, isUuid, type RosterEnv } from "./write"

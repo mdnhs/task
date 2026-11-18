@@ -6,7 +6,7 @@ import { locations, memberships, rosterShifts, rosterWeeks, shiftTypes, shiftTyp
 import type { TenantTx } from "../../db/tenant-tx"
 import type { ShiftDto, ShiftTypeDto, WeekDto, WeeksDto } from "./dto"
 import { realDate, todayOf } from "./qualifications"
-import { assertLocation, inScopeSql, type RosterCtx } from "./scope"
+import { assertLocation, canSeePerson, inScopeSql, type RosterCtx } from "./scope"
 import { auditRoster, isUuid, writeHistory } from "./write"
 
 const unprocessable = (code: string) => new AppError(422, code, "Unprocessable Entity")
@@ -118,7 +118,7 @@ async function payload(tx: TenantTx, ctx: RosterCtx, weeks: WeekRow[], range: We
     weeks: weeks.map((w) => weekDto(w, shifts.filter((s) => s.weekId === w.id), flat.filter((t) => t.locationId === w.locationId), targets.filter((t) => t.locationId === w.locationId))),
     shifts: shifts.map(shiftDto),
     shiftTypes: typeDtos,
-    members: members.map((m) => ({ userId: m.userId, name: m.erased ? "Erased user" : m.name, active: m.status === "active", homeLocationId: seesHome && m.home && ctx.access.locationIds?.includes(m.home) ? m.home : null })),
+    members: members.map((m) => ({ userId: m.userId, name: !canSeePerson(ctx, m.userId, m.home) ? "Member" : m.erased ? "Erased user" : m.name, active: !canSeePerson(ctx, m.userId, m.home) || m.status === "active", homeLocationId: seesHome && m.home && ctx.access.locationIds?.includes(m.home) ? m.home : null })),
   }
 }
 

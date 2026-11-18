@@ -1,12 +1,13 @@
-import { and, desc, eq, lt, or } from "drizzle-orm"
+import { and, desc, eq, inArray, lt, or } from "drizzle-orm"
 import { canSeeLocation } from "@opsdesk/domain/roster-access"
 import { decodeCursor, encodeCursor } from "../../core/cursor"
 import { AppError, NotFound } from "../../core/errors"
-import { rosterHistory } from "../../db/schema"
+import { memberships, rosterHistory, rosterShifts } from "../../db/schema"
 import type { TenantTx } from "../../db/tenant-tx"
 import type { HistoryDto } from "./dto"
-import { assertLocation, type RosterCtx } from "./scope"
+import { assertLocation, canSeePerson, type RosterCtx } from "./scope"
 import { loadWeek } from "./weeks"
+import { isUuid } from "./write"
 
 const DEFAULT_LIMIT = 50
 const MAX_LIMIT = 100
@@ -32,6 +33,30 @@ export function maskSites(value: unknown, ctx: RosterCtx): unknown {
   return out
 }
 
+type Snapshot = Record<string, unknown> | null
+type Entry = { rule?: unknown; shiftId?: unknown; personId?: unknown }
+const entriesOf = (snap: unknown): Entry[] => (snap && typeof snap === "object" && Array.isArray((snap as { overrides?: unknown }).overrides) ? ((snap as { overrides: Entry[] }).overrides) : [])
+
+/**
+ * A published-week or override line records `overrides: [{ rule, shiftId, personId }]`. For a reader the ids of a shift at a site they cannot see, and of a person they may not know
+ * (homed at a site they cannot see: a cross-site loan), become null; the rule id stays. Two lookups for the whole page, none when it has no override.
+ */
+async function overrideMask(tx: TenantTx, ctx: RosterCtx, items: { before: Snapshot; after: Snapshot }[]): Promise<(snap: unknown) => Snapshot> {
+  const entries = items.flatMap((i) => [...entriesOf(i.before), ...entriesOf(i.after)])
+  const shiftIds = [...new Set(entries.map((e) => e.shiftId).filter((v): v is string => typeof v === "string" && isUuid(v)))]
+  const personIds = [...new Set(entries.map((e) => e.personId).filter((v): v is string => typeof v === "string"))]
+  const shifts = shiftIds.length ? await tx.select({ id: rosterShifts.id, locationId: rosterShifts.locationId }).from(rosterShifts).where(and(eq(rosterShifts.tenantId, ctx.tenantId), inArray(rosterShifts.id, shiftIds))) : []
+  const people = personIds.length ? await tx.select({ userId: memberships.userId, home: memberships.homeLocationId }).from(memberships).where(and(eq(memberships.tenantId, ctx.tenantId), inArray(memberships.userId, personIds))) : []
+  const hiddenShift = new Set(shifts.filter((s) => !canSeeLocation(ctx.access, s.locationId)).map((s) => s.id)) // a shift that no longer exists belonged to the line's own (visible) site
+  const hiddenPerson = new Set(people.filter((p) => !canSeePerson(ctx, p.userId, p.home)).map((p) => p.userId)) // an erased member has no site to hide
+  return (snap) => {
+    if (!snap || typeof snap !== "object") return null
+    const o = snap as Record<string, unknown>
+    if (!Array.isArray(o.overrides)) return o
+    return { ...o, overrides: (o.overrides as Entry[]).map((e) => ({ ...e, shiftId: typeof e.shiftId === "string" && !hiddenShift.has(e.shiftId) ? e.shiftId : null, personId: typeof e.personId === "string" && !hiddenPerson.has(e.personId) ? e.personId : null })) }
+  }
+}
+
 type Page = { limit?: string; cursor?: string }
 
 async function page(tx: TenantTx, ctx: RosterCtx, scope: { locationId: string; weekId?: string }, q: Page): Promise<{ items: HistoryDto[]; nextCursor: string | null }> {
@@ -51,10 +76,11 @@ async function page(tx: TenantTx, ctx: RosterCtx, scope: { locationId: string; w
     .limit(limit + 1)
   const items = rows.slice(0, limit)
   const last = items[items.length - 1]
+  const overrides = await overrideMask(tx, ctx, items)
   return {
     items: items.map((r) => ({
       id: r.id, at: r.createdAt.toISOString(), actorId: r.actorId, action: r.action, locationId: r.locationId, weekId: r.weekId, shiftId: r.shiftId, reason: r.reason,
-      before: maskSites(r.before, ctx) as Record<string, unknown> | null, after: maskSites(r.after, ctx) as Record<string, unknown> | null,
+      before: overrides(maskSites(r.before, ctx)), after: overrides(maskSites(r.after, ctx)),
     })),
     nextCursor: rows.length > limit && last ? encodeCursor(last.createdAt, last.id) : null,
   }
