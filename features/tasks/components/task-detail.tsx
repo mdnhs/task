@@ -73,7 +73,8 @@ export function TaskDetail({
   patterns?: PatternChoice[]
 }) {
   const router = useRouter()
-  const { tasks, write, act, client } = useTaskWrites(useMemo(() => (server ? [server] : []), [server]))
+  const nameOf = useCallback((id: string) => people.find((p) => p.id === id)?.name ?? "Member", [people])
+  const { tasks, write, act, client } = useTaskWrites(useMemo(() => (server ? [server] : []), [server]), undefined, nameOf)
   const task = tasks[0]
   const me = viewer.name
   const now = nowIso(today)

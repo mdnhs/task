@@ -16,7 +16,8 @@ export default async function Page({ params }: { params: Promise<{ ref: string }
     // malformed escape: look the raw value up, it simply will not be found
   }
   const [{ api, people }, org] = await Promise.all([taskScreenData(), getOrg()])
-  const [task, projects, patterns] = await Promise.all([loadTaskByRef(api, taskRef), loadProjects(api), loadShiftPatterns(api)])
+  const names = new Map(people.map((p) => [p.id, p.name]))
+  const [task, projects, patterns] = await Promise.all([loadTaskByRef(api, taskRef, (id) => names.get(id) ?? "Member"), loadProjects(api), loadShiftPatterns(api)])
   const viewer = viewerOf(session)
   const canEdit = canWrite(session, "tasks")
   return (

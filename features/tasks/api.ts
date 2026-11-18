@@ -19,14 +19,14 @@ export async function loadTaskPage(api: Reader, q: TaskQuery = {}): Promise<{ ta
 }
 
 /** The task for a ref (`TSK-1042`), resolved through `GET /v1/tasks?ref=` then the detail by uuid (I11). Null when the caller has no such task (404 or no hit): out of scope looks the same. */
-export async function loadTaskByRef(api: Reader, ref: string): Promise<Task | null> {
+export async function loadTaskByRef(api: Reader, ref: string, nameOf?: (id: string) => string): Promise<Task | null> {
   if (!/^(tsk-)?\d{1,9}$/i.test(ref)) return null
   try {
     const hit = await api.get("/v1/tasks", { query: { ref, limit: 1 } })
     const found = hit.items[0]
     if (!found) return null
     const [dto, comments] = await Promise.all([api.get("/v1/tasks/{id}", { path: { id: found.id } }), api.get("/v1/tasks/{id}/comments", { path: { id: found.id }, query: { limit: 100 } })])
-    return toTask(dto, { comments: comments.items })
+    return toTask(dto, { comments: comments.items, nameOf })
   } catch (e) {
     if (classifyApiError(e).kind === "not_found") return null
     throw e

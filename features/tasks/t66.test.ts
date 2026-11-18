@@ -72,6 +72,17 @@ describe("toTask maps a real DTO", () => {
   })
 })
 
+describe("history notified list (T6.9 browser-walk defect: the timeline printed raw user ids)", () => {
+  const h = { id: "h", at: "2026-10-24T10:00:00", atUtc: "x", actorId: null, by: "Ann", kind: "assigned", text: "Assigned", changes: [], notified: ["u-1", "u-gone"] }
+  test("ids become display names through the people the caller can see; anyone else reads as Member", () => {
+    const names = new Map([["u-1", "Tomasz Wojcik"]])
+    expect(toTimeline([h], (id) => names.get(id) ?? "Member")[0].notified).toEqual(["Tomasz Wojcik", "Member"])
+  })
+  test("with no resolver an id is never shown", () => {
+    expect(toTimeline([h])[0].notified).toEqual(["Member", "Member"])
+  })
+})
+
 describe("toPatch (DST fold, D4)", () => {
   const prev = toTask(dto({ status: "not_started" }))
   test("unchanged dates are NOT re-sent as wall strings: the stored instant (25 Oct 01:30 Dublin, first occurrence) cannot move", () => {

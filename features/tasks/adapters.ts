@@ -27,14 +27,15 @@ export type TaskCtxFE = {
 
 // ---- timeline and notes ----
 
-export function toTimeline(history: readonly unknown[]): TimelineEvent[] {
+/** `notified` arrives as user ids; a raw id is never shown, so each one is resolved through the people the caller can see ("Member" otherwise). */
+export function toTimeline(history: readonly unknown[], nameOf: (id: string) => string = () => "Member"): TimelineEvent[] {
   return history.map((h) => {
     const r = rec(h, "history item")
     const changes = arr(r, "changes").map((c) => {
       const x = rec(c, "change")
       return { field: str(x, "field"), from: str(x, "from"), to: str(x, "to") }
     })
-    const notified = strs(r, "notified")
+    const notified = strs(r, "notified").map(nameOf)
     const updateId = optStr(r, "updateId")
     return { at: str(r, "at"), by: str(r, "by"), text: str(r, "text"), ...(changes.length ? { changes } : {}), ...(notified.length ? { notified } : {}), ...when(updateId, "updateId") }
   })
@@ -100,7 +101,7 @@ function toRule(v: unknown): Task["evidenceRule"] {
  * A task DTO as the FE Task. `ctx.comments` are the task's comments (the DTO's own `notes` is empty): only the detail page loads them. A missing `parentRef` means no parent link
  * (the parent is out of scope, E15). `seriesId` stays an opaque string: the FE groups by it and never shows it.
  */
-export function toTask(dto: unknown, ctx: { comments?: readonly unknown[] } = {}): Task {
+export function toTask(dto: unknown, ctx: { comments?: readonly unknown[]; nameOf?: (id: string) => string } = {}): Task {
   const r = rec(dto, "task")
   const status = oneOf(r, "status", STATUS_ORDER)
   const priority = int(r, "priority")
@@ -178,7 +179,7 @@ export function toTask(dto: unknown, ctx: { comments?: readonly unknown[] } = {}
     ...when(optStr(r, "completedAt"), "completedAt"),
     notes: toNotes(ctx.comments ?? []),
     evidence: arr(r, "evidence").map(toEvidence),
-    timeline: toTimeline(arr(r, "timeline")),
+    timeline: toTimeline(arr(r, "timeline"), ctx.nameOf),
     ...(overdue ? { overdue: { reason: str(overdue, "reason"), nextAction: str(overdue, "nextAction"), owner: str(overdue, "owner"), revisedDue: str(overdue, "revisedDue") } } : {}),
     timeEntries: arr(r, "timeEntries").map((t) => {
       const x = rec(t, "time entry")

@@ -34,7 +34,7 @@ export type WriteOpts<T> = {
   handled?: (e: unknown) => boolean
 }
 
-export function useTaskWrites(server: readonly Task[], client: TasksClient = makeTasksClient(apiBrowser)) {
+export function useTaskWrites(server: readonly Task[], client: TasksClient = makeTasksClient(apiBrowser), nameOf?: (id: string) => string) {
   const run = useApiAction()
   const { tasks, predict, clear } = useTaskOverlay(server)
 
@@ -48,7 +48,7 @@ export function useTaskWrites(server: readonly Task[], client: TasksClient = mak
       if (r.ok) {
         // Most writes answer with the task itself: show exactly that (and its NEW version) at once, so a second write before the refresh lands is not sent with a stale version.
         try {
-          if (r.value && typeof r.value === "object" && "version" in r.value && "ref" in r.value) predict(id, { ...toTask(r.value), notes: task.notes })
+          if (r.value && typeof r.value === "object" && "version" in r.value && "ref" in r.value) predict(id, { ...toTask(r.value, { nameOf }), notes: task.notes })
         } catch {
           /* not a task answer: the refresh brings the record */
         }
@@ -56,7 +56,7 @@ export function useTaskWrites(server: readonly Task[], client: TasksClient = mak
       }
       return r.ok
     },
-    [client, clear, predict, run],
+    [client, clear, predict, run, nameOf],
   )
   /** A write that is not about one task (create, a project, a template). */
   const act = useCallback(
