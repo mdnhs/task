@@ -26,6 +26,7 @@ import {
   searchItems,
 } from "../match"
 import { pushRecent, removeRecent } from "../recents"
+import { createLoadGate } from "../load-gen"
 import { loadSearch, onSearchReset, recentsFor, type SearchData, type SearchLoader } from "../session-stores"
 import { isFilterShortcut, isMacPlatform, isNewTabEnter, isSlashShortcut, isToggleShortcut, shortcutLabel } from "../shortcuts"
 import type { FilterKey, SearchConfig, SearchFilters, SearchItem } from "../types"
@@ -165,15 +166,21 @@ export function GlobalSearch({
   const activeId = open && view === "list" && opts[cur] ? optId(opts[cur].id) : undefined
 
   // Sign-out or company switch in this tab: drop the old index so the next person never sees it.
-  React.useEffect(() => onSearchReset(() => { setData(null); setApiItems(NO_ITEMS) }), [])
+  // A load that started before the reset resolves later: its ticket is stale then, so it never commits the old index (see load-gen.ts).
+  const loadGen = React.useRef(createLoadGate())
+  React.useEffect(() => onSearchReset(() => { loadGen.current.invalidate(); setData(null); setLoadError(false); setApiItems(NO_ITEMS) }), [])
 
   const openPanel = React.useCallback((v: "list" | "filters" = "list") => {
+    const live = loadGen.current.begin()
     loadSearch(scope, load).then(
       (d) => {
+        if (!live()) return
         setData(d)
         setLoadError(false)
       },
-      () => setLoadError(true),
+      () => {
+        if (live()) setLoadError(true)
+      },
     )
     setOpen(true)
     setClosing(false)
@@ -218,7 +225,8 @@ export function GlobalSearch({
   // Warm the lazily loaded index once the page is idle, so the first open doesn't grow when results arrive mid-morph.
   React.useEffect(() => {
     const t = window.setTimeout(() => {
-      loadSearch(scope, load).then(setData, () => {})
+      const live = loadGen.current.begin()
+      loadSearch(scope, load).then((d) => { if (live()) setData(d) }, () => {})
     }, 1200)
     return () => window.clearTimeout(t)
   }, [scope, load])
