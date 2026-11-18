@@ -9470,6 +9470,293 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/leave": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    /** @description requested | approved | rejected | cancelled */
+                    status?: string;
+                    userId?: string;
+                    /** @description Leave that ends on or after this date (YYYY-MM-DD) */
+                    from?: string;
+                    /** @description Leave that starts on or before this date (YYYY-MM-DD) */
+                    to?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The caller's own leave, plus (supervisor) people homed at their sites or (office) people within scope: homed at a site the role manages or nowhere. A read-only manager and staff see their own only. 422 invalid_filter. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            items: {
+                                /** Format: uuid */
+                                id: string;
+                                userId: string;
+                                from: string;
+                                to: string;
+                                kind: string;
+                                /** @enum {string} */
+                                status: "requested" | "approved" | "rejected" | "cancelled";
+                                note: string;
+                                decidedBy: string | null;
+                                decidedAt: string | null;
+                                decisionNote: string | null;
+                                createdAt: string;
+                            }[];
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        from: string;
+                        to: string;
+                        kind: string;
+                        note?: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description The caller's own request (status requested); the approvers are told. 409 leave_overlap (own open or approved leave); 422 invalid_leave (real dates, to not before from, at most a year, kind 1..40, note up to 500). */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** Format: uuid */
+                            id: string;
+                            userId: string;
+                            from: string;
+                            to: string;
+                            kind: string;
+                            /** @enum {string} */
+                            status: "requested" | "approved" | "rejected" | "cancelled";
+                            note: string;
+                            decidedBy: string | null;
+                            decidedAt: string | null;
+                            decisionNote: string | null;
+                            createdAt: string;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/leave/{id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The requester withdraws an open or approved request. Someone who can see it but did not ask: 403 forbidden. 409 leave_not_open. 404 leave_not_found for a leave the caller may not see, one that does not exist, another tenant's and an id that is not a uuid (all the same answer) */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** Format: uuid */
+                            id: string;
+                            userId: string;
+                            from: string;
+                            to: string;
+                            kind: string;
+                            /** @enum {string} */
+                            status: "requested" | "approved" | "rejected" | "cancelled";
+                            note: string;
+                            decidedBy: string | null;
+                            decidedAt: string | null;
+                            decisionNote: string | null;
+                            createdAt: string;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/leave/{id}/decide": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** @enum {string} */
+                        decision: "approve" | "reject";
+                        note?: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Approve or reject an open request (D8): the supervisor of the person's home site, else an office role whose scope covers it; never the requester (403 self_decision). 409 already_decided. 404 leave_not_found for a leave the caller may not see, one that does not exist, another tenant's and an id that is not a uuid (all the same answer) */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** Format: uuid */
+                            id: string;
+                            userId: string;
+                            from: string;
+                            to: string;
+                            kind: string;
+                            /** @enum {string} */
+                            status: "requested" | "approved" | "rejected" | "cancelled";
+                            note: string;
+                            decidedBy: string | null;
+                            decidedAt: string | null;
+                            decisionNote: string | null;
+                            createdAt: string;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/roster/availability": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The caller's own "not available" windows per weekday (0 = Sunday ... 6); an overnight window is its two stored rows, split at midnight. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            windows: {
+                                weekday: number;
+                                from: string;
+                                to: string;
+                            }[];
+                        };
+                    };
+                };
+            };
+        };
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        windows: {
+                            weekday: number;
+                            from: string;
+                            to: string;
+                        }[];
+                    };
+                };
+            };
+            responses: {
+                /** @description The caller's whole set, replaced atomically. A window with `to` before `from` crosses midnight and is stored as two rows; to 00:00 means 24:00. 422 invalid_availability (weekday 0..6, HH:MM, from not equal to to, at most 50 rows). */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            windows: {
+                                weekday: number;
+                                from: string;
+                                to: string;
+                            }[];
+                        };
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/members/{userId}/deactivate": {
         parameters: {
             query?: never;

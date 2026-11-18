@@ -18,7 +18,7 @@ export const todayOf = (ctx: Pick<RosterCtx, "now" | "tz">): string => epochToWa
 /** A qualification is valid THROUGH its expiry date: expired is true from the day after. No expiry date never expires. */
 export const isExpired = (expiresOn: string | null, today: string): boolean => expiresOn !== null && expiresOn < today
 
-const realDate = (d: string): boolean => {
+export const realDate = (d: string): boolean => {
   const ms = /^\d{4}-\d{2}-\d{2}$/.test(d) ? Date.parse(`${d}T00:00:00Z`) : Number.NaN
   return Number.isFinite(ms) && epochToWall(ms, "UTC").slice(0, 10) === d
 }

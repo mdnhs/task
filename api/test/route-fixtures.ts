@@ -21,7 +21,7 @@ import { notify, withTenantAfterCommit } from "../src/modules/notifications"
 export type Fixture = { kind: "id" | "static"; value: string }
 export type TenantFixtures = Record<string, Record<string, Fixture>>
 
-type Resource = "role" | "member" | "team" | "device" | "feature" | "notification" | "pushToken" | "file" | "integration" | "dataRequest" | "supportGrant" | "apiKey" | "webhook" | "task" | "checklistItem" | "comment" | "taskFile" | "project" | "milestone" | "template" | "evidence" | "pattern" | "assignment" | "report" | "reportFile" | "reportExport" | "session" | "invite" | "location" | "shiftType" | "lifecycleMember"
+type Resource = "leave" | "role" | "member" | "team" | "device" | "feature" | "notification" | "pushToken" | "file" | "integration" | "dataRequest" | "supportGrant" | "apiKey" | "webhook" | "task" | "checklistItem" | "comment" | "taskFile" | "project" | "milestone" | "template" | "evidence" | "pattern" | "assignment" | "report" | "reportFile" | "reportExport" | "session" | "invite" | "location" | "shiftType" | "lifecycleMember"
 
 /** path template -> param -> which resource that param names on that route. */
 export const ROUTE_PARAMS: Record<string, Record<string, Resource>> = {
@@ -108,6 +108,8 @@ export const ROUTE_PARAMS: Record<string, Record<string, Resource>> = {
   "/v1/members/{userId}/reactivate": { userId: "lifecycleMember" },
   "/v1/members/{userId}/qualifications": { userId: "member" },
   "/v1/members/{userId}/home-location": { userId: "member" },
+  "/v1/leave/{id}/cancel": { id: "leave" },
+  "/v1/leave/{id}/decide": { id: "leave" },
   "/v1/projects/{id}": { id: "project" },
   "/v1/projects/{id}/milestones": { id: "project" },
   "/v1/projects/{id}/milestones/{milestoneId}": { id: "project", milestoneId: "milestone" },
@@ -125,6 +127,7 @@ export type World = {
 }
 
 let n = 0
+let leaveSeq = 0
 
 const DAY_MS = 86_400_000
 /** A date that is always comfortably in the future of the REAL clock (the walker runs on it): the control DELETE of an assignment is only allowed while it has not started (409 assignment_started). */
@@ -254,7 +257,12 @@ export async function fixtureIds(t: { app: AppType; deps: Deps }, tenant: { id: 
   if (stRes.status !== 201) throw new Error(`fixture shift type failed: ${stRes.status} ${await stRes.text()}`)
   const shiftType = (await stRes.json()) as { id: string }
   const lifecycle = await makeMember(t.deps, tenant.id, "employee")
-  const resources = { lifecycleMember: lifecycle.userId, location: location.id, shiftType: shiftType.id, invite: invite.id, session: String(sess.id), pattern: pattern.id, assignment: assignment.id, report: report.id, reportFile: reportFile.fileId, reportExport: reportExport.id, evidence: evItem.id!, template: template.id, project: project.id, milestone: milestone.id, checklistItem: item.id!, comment: comment.id!, taskFile: taskFile.fileId!, task: task.id, apiKey: apiKey.id, webhook: hook.id, supportGrant: String(sg.id), dataRequest: dsr.id, integration: String(integ.id), file: file.fileId, role: await roleIdOf(t.deps, tenant.id, "employee"), member: staff.userId, team: team.id, device: device.id, notification: String(notif.id), pushToken: ((await tokRes.json()) as { id: string }).id }
+  // B8 T7: the OWNER'S own leave request (control: cancel 200, decide 403 self_decision: nobody decides their own)
+  const leaveDay = new Date(Date.UTC(2030, 0, 1) + leaveSeq++ * 7 * DAY_MS).toISOString().slice(0, 10) // a fresh week per fixture: the owner may not hold overlapping leave
+  const leaveRes = await call(t.app, "POST", "/v1/leave", { cookie: owner.cookie, tenant: tenant.slug, body: { from: leaveDay, to: leaveDay, kind: "annual", note: `Leave ${uniq}` } })
+  if (leaveRes.status !== 201) throw new Error(`fixture leave failed: ${leaveRes.status} ${await leaveRes.text()}`)
+  const leave = (await leaveRes.json()) as { id: string }
+  const resources = { leave: leave.id, lifecycleMember: lifecycle.userId, location: location.id, shiftType: shiftType.id, invite: invite.id, session: String(sess.id), pattern: pattern.id, assignment: assignment.id, report: report.id, reportFile: reportFile.fileId, reportExport: reportExport.id, evidence: evItem.id!, template: template.id, project: project.id, milestone: milestone.id, checklistItem: item.id!, comment: comment.id!, taskFile: taskFile.fileId!, task: task.id, apiKey: apiKey.id, webhook: hook.id, supportGrant: String(sg.id), dataRequest: dsr.id, integration: String(integ.id), file: file.fileId, role: await roleIdOf(t.deps, tenant.id, "employee"), member: staff.userId, team: team.id, device: device.id, notification: String(notif.id), pushToken: ((await tokRes.json()) as { id: string }).id }
   const fixtures: TenantFixtures = {}
   for (const [path, params] of Object.entries(ROUTE_PARAMS)) {
     fixtures[path] = {}
@@ -262,7 +270,7 @@ export async function fixtureIds(t: { app: AppType; deps: Deps }, tenant: { id: 
       fixtures[path][param] = res === "feature" ? { kind: "static", value: "drive" } : { kind: "id", value: resources[res] }
     }
   }
-  return { fixtures, resources, marks: [lifecycle.userId, lifecycle.email, location.id, shiftType.id, `Location ${uniq}`, `Address ${uniq}`, `Shift type ${uniq}`, `Role ${uniq}`, tenant.id, tenant.slug, String(integ.id), `drive-${uniq}@example.com`, team.id, device.id, file.fileId, dsr.id, `Fix ${uniq}`, `Support ${uniq}`, String(sg.id), `File ${uniq}.pdf`, staff.userId, owner.userId, `Team ${uniq}`, `Device ${uniq}`, apiKey.id, apiKey.prefix, `Key ${uniq}`, hook.id, `hooks-${uniq}.example.com`, task.id, `Task ${uniq}`, `Desc ${uniq}`, item.id!, comment.id!, taskFile.fileId!, `Item ${uniq}`, `Comment ${uniq}`, `Attach ${uniq}.pdf`, project.id, milestone.id, template.id, `Template ${uniq}`, `Blueprint ${uniq}`, `Steps ${uniq}`, evItem.id!, evFile.fileId!, `Evid ${uniq}.pdf`, `Project ${uniq}`, `Plan ${uniq}`, pattern.id, assignment.id, `Pattern ${uniq}`, rpat.id, `Report pattern ${uniq}`, report.id, reportFile.fileId, reportExport.id, `Shot ${uniq}.pdf`, `Milestone ${uniq}`, String(sess.id), invite.id, invite.email] }
+  return { fixtures, resources, marks: [leave.id, `Leave ${uniq}`, lifecycle.userId, lifecycle.email, location.id, shiftType.id, `Location ${uniq}`, `Address ${uniq}`, `Shift type ${uniq}`, `Role ${uniq}`, tenant.id, tenant.slug, String(integ.id), `drive-${uniq}@example.com`, team.id, device.id, file.fileId, dsr.id, `Fix ${uniq}`, `Support ${uniq}`, String(sg.id), `File ${uniq}.pdf`, staff.userId, owner.userId, `Team ${uniq}`, `Device ${uniq}`, apiKey.id, apiKey.prefix, `Key ${uniq}`, hook.id, `hooks-${uniq}.example.com`, task.id, `Task ${uniq}`, `Desc ${uniq}`, item.id!, comment.id!, taskFile.fileId!, `Item ${uniq}`, `Comment ${uniq}`, `Attach ${uniq}.pdf`, project.id, milestone.id, template.id, `Template ${uniq}`, `Blueprint ${uniq}`, `Steps ${uniq}`, evItem.id!, evFile.fileId!, `Evid ${uniq}.pdf`, `Project ${uniq}`, `Plan ${uniq}`, pattern.id, assignment.id, `Pattern ${uniq}`, rpat.id, `Report pattern ${uniq}`, report.id, reportFile.fileId, reportExport.id, `Shot ${uniq}.pdf`, `Milestone ${uniq}`, String(sess.id), invite.id, invite.email] }
 }
 
 // ---- B7 Task 14: the route inventory ----

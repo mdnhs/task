@@ -175,6 +175,9 @@ const SPECS: Record<string, Spec> = {
   "GET /v1/members/{userId}/qualifications": { actor: "owner", expect: "member_not_found" },
   "PUT /v1/members/{userId}/qualifications": { actor: "owner", expect: "member_not_found" },
   "PUT /v1/members/{userId}/home-location": { actor: "owner", expect: "member_not_found", body: (w) => ({ locationId: w.resources.location }) },
+  // B8 T7: leave (controls: the owner's own request: cancel 200, decide 403 self_decision). Another tenant's, a missing and a hidden leave are one 404 leave_not_found.
+  "POST /v1/leave/{id}/cancel": { actor: "owner", expect: "leave_not_found" },
+  "POST /v1/leave/{id}/decide": { actor: "owner", expect: "leave_not_found" },
   "PATCH /v1/task-templates/{id}": { actor: "owner", expect: "template_not_found" },
   "DELETE /v1/task-templates/{id}": { actor: "owner", expect: "template_not_found" },
   // T5.1: shift patterns (control: PATCH 200, DELETE 204), assignments (control: PATCH 200 with an end date after the fixture's start, DELETE 204 for the future one),

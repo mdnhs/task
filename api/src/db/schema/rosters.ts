@@ -334,6 +334,7 @@ export const leaveRequests = pgTable(
     note: text("note").notNull().default(""),
     decidedBy: text("decided_by"),
     decidedAt: ts("decided_at"),
+    decisionNote: text("decision_note"), // the approver's note on approve or reject (null until decided)
     createdAt: ts("created_at").notNull(),
     updatedAt: ts("updated_at").notNull(),
   },

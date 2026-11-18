@@ -21,13 +21,14 @@ export const rosterRead = <T>(c: Context<AppEnv>, fn: (tx: TenantTx, ctx: Roster
 /**
  * A mutation, in the one order every roster write uses (R8-5): the tenant roster lock FIRST, then the actor re-read (R25, inside `loadRosterCtx`), then the
  * service takes its rows FOR UPDATE, writes, roster history, notify, audit and publishes LAST. Notifications buffer their jobs until the tx commits.
+ * `need: "self"` is for a write to the caller's own data (leave, availability): same order, roster read access is enough.
  */
-export const rosterWrite = <T>(c: Context<AppEnv>, fn: (tx: TenantTx, ctx: RosterCtx, env: RosterEnv) => Promise<T>): Promise<T> => {
+export const rosterWrite = <T>(c: Context<AppEnv>, fn: (tx: TenantTx, ctx: RosterCtx, env: RosterEnv) => Promise<T>, need: "write" | "self" = "write"): Promise<T> => {
   const deps = c.get("deps")
   const tenantId = c.get("tenant")!.id
   return withTenantAfterCommit(deps, tenantId, async (tx, enqueue) => {
     await lockRoster(tx, tenantId)
-    return fn(tx, await loadRosterCtx(c, tx, "write"), { deps, enqueue })
+    return fn(tx, await loadRosterCtx(c, tx, need), { deps, enqueue })
   })
 }
 

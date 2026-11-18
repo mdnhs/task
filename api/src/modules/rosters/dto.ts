@@ -97,3 +97,36 @@ export const QualificationsBody = z
 
 export const HomeLocationBody = z.object({ locationId: z.string().max(64).nullable() }).openapi({ example: { locationId: LID } })
 export const HomeLocationOut = z.object({ userId: z.string(), homeLocationId: z.uuid().nullable() }).openapi({ example: { userId: UID, homeLocationId: LID } })
+
+// ------------------------------------------------------------------ leave and availability (FR-RS-41)
+
+const LEAVE_ID = "3f2b8c1d-6a47-4e0b-9d15-2c7e5a9b4f10"
+export const LeaveOut = z.object({
+  id: z.uuid(), userId: z.string(), from: z.string(), to: z.string(), kind: z.string(), status: z.enum(["requested", "approved", "rejected", "cancelled"]), note: z.string(),
+  decidedBy: z.string().nullable(), decidedAt: z.string().nullable(), decisionNote: z.string().nullable(), createdAt: z.string(),
+})
+export type LeaveDto = z.infer<typeof LeaveOut>
+const leaveEx = {
+  id: LEAVE_ID, userId: UID, from: "2026-12-01", to: "2026-12-05", kind: "annual", status: "requested", note: "Family trip", decidedBy: null, decidedAt: null, decisionNote: null, createdAt: "2026-11-16T09:00:00.000Z",
+}
+export const LeaveSchema = LeaveOut.openapi({ example: leaveEx })
+export const LeaveListOut = z.object({ items: z.array(LeaveOut) }).openapi({ example: { items: [leaveEx] } })
+// Loose strings: the service validates and answers 422 with a specific code instead of the generic 400.
+export const LeaveQuery = z.object({
+  status: z.string().max(20).optional().openapi({ description: "requested | approved | rejected | cancelled", example: "requested" }),
+  userId: z.string().max(128).optional().openapi({ example: UID }),
+  from: z.string().max(10).optional().openapi({ description: "Leave that ends on or after this date (YYYY-MM-DD)", example: "2026-12-01" }),
+  to: z.string().max(10).optional().openapi({ description: "Leave that starts on or before this date (YYYY-MM-DD)", example: "2026-12-31" }),
+})
+export const CreateLeaveBody = z
+  .object({ from: z.string().max(10), to: z.string().max(10), kind: z.string().max(100), note: z.string().max(2000).optional() })
+  .openapi({ example: { from: "2026-12-01", to: "2026-12-05", kind: "annual", note: "Family trip" } })
+export const DecideLeaveBody = z
+  .object({ decision: z.enum(["approve", "reject"]), note: z.string().max(2000).optional() })
+  .openapi({ example: { decision: "approve", note: "Enjoy the break" } })
+const WindowOut = z.object({ weekday: z.number().int(), from: z.string(), to: z.string() })
+export const AvailabilityOut = z.object({ windows: z.array(WindowOut) }).openapi({ example: { windows: [{ weekday: 1, from: "09:00", to: "12:00" }, { weekday: 5, from: "22:00", to: "24:00" }, { weekday: 6, from: "00:00", to: "06:00" }] } })
+export type AvailabilityDto = z.infer<typeof AvailabilityOut>
+export const AvailabilityBody = z
+  .object({ windows: z.array(z.object({ weekday: z.number(), from: z.string().max(10), to: z.string().max(10) })).max(500) })
+  .openapi({ example: { windows: [{ weekday: 1, from: "09:00", to: "12:00" }, { weekday: 5, from: "22:00", to: "06:00" }] } })

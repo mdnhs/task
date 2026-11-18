@@ -47,12 +47,13 @@ export type RosterCtx = { tenantId: string; tz: string; me: string; actorId: str
  * The role's `roster_level`, the caller's supervisor grants and office limits and the tenant's locations are read here, in the same tx.
  * Archived locations stay in the visible set (their weeks and history remain readable); the service decides whether an archived site is editable.
  */
-export async function loadRosterCtx(c: Context<AppEnv>, tx: TenantTx, need: "read" | "write" = "read"): Promise<RosterCtx> {
+export async function loadRosterCtx(c: Context<AppEnv>, tx: TenantTx, need: "read" | "write" | "self" = "read"): Promise<RosterCtx> {
   const tenant = c.get("tenant")!
   const actorId = actorIdOf(c)
-  if (need === "write" && lockedTx.get(tx) !== tenant.id) throw new Error("loadRosterCtx(write) requires lockRoster first (R8-5 lock order)")
-  const role = need === "write" ? await lockActor(tx, tenant.id, actorId, "roster", "write") : c.get("role")!
-  if (!can(role, "roster", need)) throw Forbidden("forbidden") // the route guard already answered; fail closed
+  if (need !== "read" && lockedTx.get(tx) !== tenant.id) throw new Error(`loadRosterCtx(${need}) requires lockRoster first (R8-5 lock order)`)
+  // "self": a write to the caller's OWN data (leave, availability): the same lock order and actor re-read, but roster READ is enough
+  const role = need === "read" ? c.get("role")! : await lockActor(tx, tenant.id, actorId, "roster", need === "write" ? "write" : "read")
+  if (!can(role, "roster", need === "write" ? "write" : "read")) throw Forbidden("forbidden") // the route guard already answered; fail closed
   const me = subjectUserId(c)
   const [row] = await tx.select({ level: roles.rosterLevel }).from(roles).where(and(eq(roles.tenantId, tenant.id), eq(roles.id, role.id)))
   const level = row?.level === "office" || row?.level === "supervisor" ? row.level : undefined

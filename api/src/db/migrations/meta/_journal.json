@@ -323,6 +323,13 @@
       "when": 1795010479052,
       "tag": "0045_member_lifecycle",
       "breakpoints": true
+    },
+    {
+      "idx": 46,
+      "version": "7",
+      "when": 1795014554716,
+      "tag": "0046_leave_decision_note",
+      "breakpoints": true
     }
   ]
 }
