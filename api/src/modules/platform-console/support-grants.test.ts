@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, test } from "vitest"
+import { beforeEach, describe, expect, test, vi } from "vitest"
 import { ownerQuery, ownerTenantQuery } from "../../../test/db"
 import { makeMember, makeStaff as rawStaff, makeTenant, makeUser, signIn } from "../../../test/factories"
 import { call, resetDb, testApp } from "../../../test/harness"
@@ -388,5 +388,97 @@ describe("rulings", () => {
     expect((await w.req("GET", "/v1/_probe/support/tasks/write", desk.cookie, { tenant: w.tenant.slug })).status).toBe(200)
     // billing reads are owner/admin by role key: "support" is neither
     expect((await w.asStaff("GET", "/v1/billing/subscription")).status).toBe(403)
+  })
+})
+
+describe("GET /v1/platform/support-grants (staff list)", () => {
+  const LIST = "/v1/platform/support-grants"
+  const ids = (b: Json) => (b.items as Json[]).map((i) => i.id)
+
+  test("staff lists active grants across tenants, newest first, with the documented fields and no secret", async () => {
+    const w = await world()
+    const a = (await (await w.grant(w.support, w.tenant.id)).json()) as Json
+    w.clock.advance({ minutes: 5 })
+    const b = (await (await w.grant(w.platOwner, w.other.id)).json()) as Json
+    for (const role of ["owner", "support", "billing", "viewer"] as const) {
+      const s = role === "owner" ? w.platOwner : role === "support" ? w.support : await makeStaff(w.deps, role)
+      const r = await w.req("GET", `${LIST}?status=active`, s.cookie)
+      expect(r.status, role).toBe(200)
+      const body = (await r.json()) as Json
+      expect(ids(body)).toEqual([b.id, a.id])
+      expect(body.nextCursor).toBeNull()
+      expect(body.items[0]).toEqual({
+        id: b.id, tenantId: w.other.id, tenantName: expect.any(String), grantedBy: w.platOwner.userId, staffName: expect.anything(), scope: "read_only", reason: b.reason, status: "active",
+        createdAt: b.startsAt, expiresAt: b.expiresAt, revokedAt: null,
+      })
+    }
+    const text = JSON.stringify(await (await w.req("GET", LIST, w.support.cookie)).json())
+    expect(text).not.toMatch(/token|secret|password/i)
+  })
+
+  test("tenantId and status filters narrow the list; an unknown tenant is 404 and a bad status 400", async () => {
+    const w = await world()
+    const a = (await (await w.grant(w.support, w.tenant.id)).json()) as Json
+    const b = (await (await w.grant(w.support, w.other.id)).json()) as Json
+    expect((await w.req("DELETE", `/v1/platform/support-grants/${b.id}`, w.support.cookie)).status).toBe(200)
+    const get = async (q: string) => (await w.req("GET", `${LIST}?${q}`, w.support.cookie))
+    expect(ids((await (await get(`tenantId=${w.tenant.id}`)).json()) as Json)).toEqual([a.id])
+    expect(ids((await (await get("status=revoked")).json()) as Json)).toEqual([b.id])
+    expect(ids((await (await get("status=active")).json()) as Json)).toEqual([a.id])
+    w.clock.advance({ hours: 3 })
+    expect(ids((await (await get("status=expired")).json()) as Json)).toEqual([a.id])
+    expect(ids((await (await get("status=active")).json()) as Json)).toEqual([])
+    expect(ids((await (await get(`tenantId=${w.other.id}&status=revoked`)).json()) as Json)).toEqual([b.id])
+    const missing = await get(`tenantId=${NIL}`)
+    expect([missing.status, await code(missing)]).toEqual([404, "tenant_not_found"])
+    expect((await get("status=bogus")).status).toBe(400)
+  })
+
+  test("a tenant owner, a stranger and anonymous callers do not get the platform list (404 / 401)", async () => {
+    const w = await world()
+    await w.grant(w.support)
+    const owner = await w.req("GET", LIST, w.owner.cookie, { tenant: w.tenant.slug })
+    expect([owner.status, await code(owner)]).toEqual([404, "not_found"])
+    const stranger = await makeUser(w.deps, { totp: true })
+    expect((await w.req("GET", LIST, stranger.cookie!)).status).toBe(404)
+    expect((await w.req("GET", LIST, undefined)).status).toBe(401)
+    const stale = await w.req("GET", LIST, w.support.staleCookie)
+    expect([stale.status, await code(stale)]).toEqual([401, "mfa_challenge"])
+  })
+
+  test("cursor pages are stable with equal createdAt and cover every grant exactly once", async () => {
+    const w = await world()
+    const staff = [w.support, w.platOwner, await makeStaff(w.deps, "billing"), await makeStaff(w.deps, "viewer")]
+    const tenants = [w.tenant, w.other, await makeTenant(w.deps, { slug: "charlie" })]
+    const made: string[] = []
+    for (const t of tenants) for (const s of staff.slice(0, 2)) made.push(((await (await w.grant(s, t.id)).json()) as Json).id) // one clock instant: every createdAt is equal
+    expect(made).toHaveLength(6)
+    const seen: string[] = []
+    let cursor: string | null = null
+    for (let i = 0; i < 10; i++) {
+      const r = await w.req("GET", `${LIST}?limit=2${cursor ? `&cursor=${cursor}` : ""}`, w.support.cookie)
+      const b = (await r.json()) as Json
+      seen.push(...ids(b))
+      expect((b.items as Json[]).length).toBeLessThanOrEqual(2)
+      cursor = b.nextCursor
+      if (!cursor) break
+    }
+    expect(seen).toHaveLength(6)
+    expect(new Set(seen)).toEqual(new Set(made))
+    expect([...seen].sort().reverse()).toEqual(seen) // equal instants: ties break on id, descending
+    expect((await w.req("GET", `${LIST}?cursor=nonsense`, w.support.cookie)).status).toBe(400)
+    expect((await w.req("GET", `${LIST}?limit=101`, w.support.cookie)).status).toBe(400)
+  })
+
+  test("the response has no grant secret or token and the read writes no audit row; a read is logged at info", async () => {
+    const w = await world()
+    await w.grant(w.support)
+    const before = [(await tenantAudit(w.tenant.id)).length, (await platAudit()).length]
+    const info = vi.spyOn(w.deps.logger, "info")
+    const r = await w.req("GET", LIST, w.support.cookie)
+    expect(Object.keys(((await r.json()) as Json).items[0]).sort()).toEqual(["createdAt", "expiresAt", "grantedBy", "id", "reason", "revokedAt", "scope", "staffName", "status", "tenantId", "tenantName"])
+    expect([(await tenantAudit(w.tenant.id)).length, (await platAudit()).length]).toEqual(before)
+    expect(info).toHaveBeenCalledWith(expect.objectContaining({ staffUserId: w.support.userId, tenants: 1, returned: 1 }), "support_grant.list")
+    info.mockRestore()
   })
 })

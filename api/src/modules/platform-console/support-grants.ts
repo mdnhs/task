@@ -1,12 +1,13 @@
-import { and, desc, eq, gt, isNull, lte, sql } from "drizzle-orm"
+import { and, desc, eq, gt, inArray, isNotNull, isNull, lt, lte, or, sql, type SQL } from "drizzle-orm"
 import { AppError, Conflict, Forbidden, NotFound } from "../../core/errors"
 import type { PlatformRole } from "../../core/context"
-import { memberships, roles, supportGrantIndex, supportGrants, user } from "../../db/schema"
+import { memberships, roles, supportGrantIndex, supportGrants, tenants, user } from "../../db/schema"
 import { withTenant, type TenantTx } from "../../db/tenant-tx"
 import type { Deps } from "../../deps"
 import { recordAudit } from "../audit"
 import { notify, withTenantAfterCommit } from "../notifications"
 import { recordPlatformAudit } from "../platform-audit"
+import { decodeCursor, encodeCursor } from "../tasks"
 import { assertReason } from "./lifecycle"
 import { getTenantMeta, TenantNotFound } from "./tenants"
 
@@ -136,4 +137,45 @@ export async function listSupportGrants(deps: Deps, tenantId: string): Promise<(
       .where(eq(supportGrants.tenantId, tenantId)).orderBy(desc(supportGrants.startsAt), desc(supportGrants.id)).limit(200),
   )
   return rows.map((r) => ({ ...view(r.g, now), staffName: r.staffName }))
+}
+
+export type StaffGrantItem = GrantView & { tenantName: string; staffName: string | null }
+
+/**
+ * The staff list (read-only, every platform role): grants across tenants, newest first by (starts_at, id) with a keyset cursor (the tasks codec). RLS is never bypassed:
+ * the candidate tenants come from the ids-only support_grant_index (or the one `tenantId` filter, 404 tenant_not_found when unknown) and each tenant's rows are read under
+ * withTenant(), the status filter and cursor pushed into SQL and capped at limit+1 per tenant before the merge. O(tenants that ever held a grant) round trips, accepted for
+ * Phase 1 (see eachTenant in tenants.ts for the scale limit). Writes no audit row (a read); one info log line names the staff member and how many tenants were read.
+ */
+export async function listSupportGrantsForStaff(deps: Deps, staff: { userId: string }, q: { tenantId?: string; status?: GrantStatus; limit: number; cursor?: string }): Promise<{ items: StaffGrantItem[]; nextCursor: string | null }> {
+  const now = deps.clock.now()
+  const after = q.cursor ? decodeCursor(q.cursor) : undefined
+  let candidates: { id: string; name: string }[]
+  if (q.tenantId !== undefined) {
+    const meta = await getTenantMeta(deps.db, q.tenantId)
+    candidates = [{ id: meta.id, name: meta.name }]
+  } else {
+    const idx = deps.db.selectDistinct({ id: supportGrantIndex.targetTenantId }).from(supportGrantIndex)
+    candidates = await deps.db.select({ id: tenants.id, name: tenants.name }).from(tenants).where(inArray(tenants.id, idx))
+  }
+  const statusCond = (): SQL | undefined => {
+    if (q.status === "revoked") return isNotNull(supportGrants.revokedAt)
+    if (q.status === "active") return and(isNull(supportGrants.revokedAt), lte(supportGrants.startsAt, now), gt(supportGrants.expiresAt, now))
+    if (q.status === "expired") return and(isNull(supportGrants.revokedAt), or(gt(supportGrants.startsAt, now), lte(supportGrants.expiresAt, now)))
+    return undefined
+  }
+  const afterCond = after ? or(lt(supportGrants.startsAt, after.at), and(eq(supportGrants.startsAt, after.at), lt(supportGrants.id, after.id))) : undefined
+  const all: StaffGrantItem[] = []
+  for (const t of candidates) {
+    const rows = await withTenant(deps.db, t.id, (tx) =>
+      tx.select({ g: supportGrants, staffName: user.name }).from(supportGrants).leftJoin(user, eq(user.id, supportGrants.staffUserId))
+        .where(and(eq(supportGrants.tenantId, t.id), statusCond(), afterCond)).orderBy(desc(supportGrants.startsAt), desc(supportGrants.id)).limit(q.limit + 1),
+    )
+    for (const r of rows) all.push({ ...view(r.g, now), tenantName: t.name, staffName: r.staffName })
+  }
+  all.sort((a, b) => b.startsAt.getTime() - a.startsAt.getTime() || (a.id < b.id ? 1 : a.id > b.id ? -1 : 0))
+  const page = all.slice(0, q.limit)
+  const last = page[page.length - 1]
+  deps.logger.info({ staffUserId: staff.userId, tenantFilter: q.tenantId ?? null, tenants: candidates.length, returned: page.length }, "support_grant.list")
+  return { items: page, nextCursor: all.length > q.limit && last ? encodeCursor(last.startsAt, last.id) : null }
 }

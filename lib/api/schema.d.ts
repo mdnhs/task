@@ -13075,6 +13075,63 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/platform/support-grants": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    tenantId?: string;
+                    status?: "active" | "expired" | "revoked";
+                    limit?: number;
+                    cursor?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Support grants across tenants (or one tenant), newest first by start time then id, keyset `cursor` (400 invalid_cursor), at most `limit` (default 50, max 100). Every platform role may read; scope is always read_only; no secret exists on a grant. A read: no audit row, an info log line. 404 tenant_not_found for an unknown `tenantId` */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            items: {
+                                id: string;
+                                tenantId: string;
+                                tenantName: string;
+                                grantedBy: string;
+                                staffName: string | null;
+                                /** @enum {string} */
+                                scope: "read_only";
+                                reason: string;
+                                /** @enum {string} */
+                                status: "active" | "expired" | "revoked";
+                                createdAt: string;
+                                expiresAt: string;
+                                revokedAt: string | null;
+                            }[];
+                            nextCursor: string | null;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/platform/support-grants/{id}": {
         parameters: {
             query?: never;
