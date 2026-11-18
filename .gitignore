@@ -46,3 +46,6 @@ playwright-report/
 
 # load test (B7 Task 17): session cookies of throwaway users
 /load/.users.json
+
+# npm run dev:all logs
+/.local-run/
