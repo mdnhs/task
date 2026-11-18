@@ -89,7 +89,8 @@ button.pf-arrow:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
 .pf-sub-h{margin:0 0 8px;font-size:12px;font-weight:700;letter-spacing:.02em;color:var(--ink-3);line-height:18px}
 .pf-chips{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:6px}
 /* Edit plan page (/platform/plans/[id]/edit) */
-.pf-form{width:100%}
+.pf-form{width:100%;display:flex;flex-direction:column;gap:16px}
+.pf-form>.btn{align-self:flex-start}
 .pf-form [data-slot="switch"]{width:40px;height:24px;min-height:0;padding:0;flex:none}
 .pf-form [data-slot="switch-thumb"]{width:18px;height:18px}
 :root[data-theme="dark"] .pf-form input{color-scheme:dark}
@@ -495,3 +496,28 @@ button.pf-arrow:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
 .pf-fieldset:disabled .od-datepick,.pf-fieldset:disabled [data-slot="select-trigger"]{cursor:default;opacity:.7}
 /* Read only (no settings.write): the values stay readable, only the controls are inert */
 .pf-fieldset:disabled :is(input,textarea){opacity:1;color:var(--ink-2);-webkit-text-fill-color:var(--ink-2);cursor:default}
+/* Settings cards (live-settings.tsx): .od-form gives the 16px field rhythm; the form stays at a readable width, buttons keep their own size instead of stretching. */
+.pf-set{max-width:640px}
+.pf-set>.btn,.pf-set-row>.btn{justify-content:center;padding:0 20px;cursor:pointer;border:1.6px solid transparent;flex:none}
+.pf-set>.btn-outline,.pf-set-row>.btn-outline{border-color:var(--brand)}
+.pf-set .btn:disabled{opacity:.5;cursor:not-allowed}
+.pf-set .btn-primary:disabled:hover{background:var(--brand)}
+.pf-set .btn-outline:disabled:hover{background:transparent}
+.pf-set>.btn{align-self:flex-start}
+.pf-set>.btn-primary{margin-top:4px}
+.pf-set .st{align-self:flex-start;white-space:normal;overflow-wrap:anywhere}
+.pf-set-test{display:flex;flex-direction:column;gap:12px;margin-top:20px}
+.pf-set-row{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap}
+.pf-set-row>.od-field{flex:1 1 260px}
+.pf-note-info{background:var(--mute-bg);color:var(--ink-2);overflow-wrap:anywhere;margin:0}
+/* Settings vertical tabs reuse .set-layout/.set-tabs/.set-tab (settings.css); these are role="tab" buttons, so the active state is aria-selected. */
+.pf-tab{border:0;background:none;font:inherit;font-size:13.5px;font-weight:600;text-align:left;cursor:pointer;width:100%}
+.pf-tab[aria-selected="true"]{color:var(--brand-deep)}
+.set-tabs:not([data-st]) .pf-tab[aria-selected="true"]{background:var(--brand-soft)}
+:root[data-theme="dark"] .pf-tab[aria-selected="true"]{color:var(--brand-3)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .pf-tab[aria-selected="true"]{color:var(--brand-3)}}
+.pf-tab-txt{display:flex;flex-direction:column;gap:1px;min-width:0}
+.pf-tab-st{font-size:11.5px;font-weight:500;color:var(--ink-3);line-height:16px}
+.pf-set-panel[hidden]{display:none}
+.pf-set-panel{min-width:0}
+@media (max-width:900px){.pf-tab{width:auto;flex:none}}
