@@ -20,6 +20,16 @@ describe("T6.4 the bell reads the API's notifications", () => {
     for (const bad of ["https://evil.example/x", "//evil.example", "javascript:alert(1)", "/\\evil.example"]) expect(toNotification({ ...DTO, link: bad }, "UTC").href, bad).toBe("/tasks")
   })
 
+  test("T6.7: the API's report links (/reports, /reports/<id>) open the web's /daily-reports pages; an export download link stays the same-origin API path", () => {
+    const rid = "9b1c0d52-8d3a-4b7e-9c41-2a5b7e90d3f8"
+    expect(toNotification({ ...DTO, kind: "report", link: "/reports" }, "UTC").href).toBe("/daily-reports")
+    expect(toNotification({ ...DTO, kind: "report", link: `/reports/${rid}` }, "UTC").href).toBe(`/daily-reports/${rid}`)
+    expect(toNotification({ ...DTO, kind: "report", link: "/reports?team=x" }, "UTC").href).toBe("/daily-reports?team=x")
+    expect(toNotification({ ...DTO, kind: "report", link: `/v1/report-exports/${rid}/download` }, "UTC").href).toBe(`/v1/report-exports/${rid}/download`)
+    expect(toNotification({ ...DTO, kind: "report", link: "/daily-reports" }, "UTC").href).toBe("/daily-reports")
+    expect(toNotification({ ...DTO, kind: "report", link: "/reportsx" }, "UTC").href).toBe("/reportsx") // only the exact /reports segment is renamed
+  })
+
   test("an unknown kind is a system notice, never a crash or an undefined type", () => {
     expect(toNotification({ ...DTO, kind: "from-the-future" as never, link: null }, "UTC")).toMatchObject({ type: "system", href: "/" })
   })

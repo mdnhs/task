@@ -14,49 +14,88 @@ import { Icon } from "@/components/icons"
 import { PageHead } from "@/components/page-head"
 import { Textarea } from "@/components/ui/textarea"
 import { When } from "@/components/when"
+import { apiBrowser } from "@/lib/api/browser"
+import { classifyApiError, userMessage } from "@/lib/api/problem"
 import { formatDate, formatTime } from "@/lib/dates"
-import { extraSections, isRequired, sectionOn, submitReport, taskUpdatesFor, validateReport, windowLabel } from "@/lib/shift-report"
-import { taskInbox } from "@/lib/task-inbox"
+import { extraSections, isRequired, sectionOn, validateReport, windowLabel } from "@/lib/shift-report"
+import { fieldErrorsOf, forValidation } from "../adapters"
+import { ReportFileRefused, makeReportsClient, makeSubmitter } from "../client"
+import { useDraftAutosave } from "../use-draft-autosave"
+import { reportStateAt } from "../time"
 import { ITEM_STATUS, ITEM_STATUS_ORDER } from "../types"
-import type { ItemStatus, ReportItem, ReportState, ShiftReport, TemplateSection } from "../types"
+import type { ItemStatus, ReportItem, ShiftReport, TemplateSection } from "../types"
 import type { ReportPageProps } from "./report-page"
-import { ReportMeta, taskHref } from "./report-parts"
+import { AttachmentLine, ReportMeta, taskHref } from "./report-parts"
 
 const STATUS_OPTIONS = ITEM_STATUS_ORDER.map((s) => ({ value: s, label: ITEM_STATUS[s].label }))
-const kb = (n: number) => (n >= 1_048_576 ? `${(n / 1_048_576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`)
+/** A short random suffix for a new unplanned row (a row id, never a time). */
+const rowId = () => `u-${crypto.randomUUID().slice(0, 8)}`
 
 /**
- * The member's report (FR-M1-23/24): one row per shift task (status, time, note), summary, blockers, unplanned work,
- * attachments and the team template's extra fields. Save draft keeps it editable; Submit validates against the template,
- * locks it (FR-M1-27) and queues the task updates (FR-M1-26) for the tasks store.
+ * The member's report (FR-M1-23/24) on the API (B6 T6.7): one row per shift task (status, time, note), summary, blockers, unplanned work, attachments and the team template's extra fields.
+ *  - Edits autosave through a debounced (800 ms) PUT …/draft that carries the report `version` and adopts the one the server answers with; "Save draft" flushes it at once. A 409
+ *    version_conflict (another tab, or a manager) reloads the report and says so.
+ *  - Submit flushes the draft, validates against the team template, then sends { version, requestId }. The request id is made once per attempt and REUSED on a retry (F7), so a network
+ *    error followed by another tap can never submit twice; a double tap sends one request. A submit locks the report (FR-M1-27); the API updates the tasks of the rows (FR-M1-26).
+ *  - Row notes stay in the report (H4); task history only gets a neutral line from the API.
+ *  - Attachments: upload intent, direct PUT, complete, wait for the malware scan (Scanning, then clean; an infected file is refused).
  */
 export function ReportEditor({
-  report: r,
+  report,
   owner,
   template,
-  state,
-  apply,
   back,
   now,
+  nowAt,
+  tz,
   tzLabel,
-  me,
-  tenantId,
 }: ReportPageProps & {
   report: ShiftReport
   owner: string
   template: TemplateSection[]
-  state: ReportState
-  apply(fn: (r: ShiftReport) => ShiftReport): void
   back: React.ReactNode
 }) {
   const router = useRouter()
+  const client = useState(() => makeReportsClient(apiBrowser, tz))[0]
+  const submitter = useState(() => makeSubmitter(client))[0]
+  const [r, setForm] = useState<ShiftReport>(report)
+  const form = useRef<ShiftReport>(report)
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [summaryOpen, setSummaryOpen] = useState(false)
+  const [notice, setNotice] = useState<string | null>(null)
+  const [uploading, setUploading] = useState<string[]>([])
   const summaryRef = useRef<HTMLDivElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
+  const live = useRef(true)
+  const state = reportStateAt(r, nowAt)
+
+  const auto = useDraftAutosave({
+    client,
+    version: report.version,
+    onConflict: () => void reload("This report was changed somewhere else. It was reloaded: check your last edit."),
+    onError: (e) => toast.error(`Draft not saved. ${userMessage(e).text}`),
+  })
+
   useEffect(() => {
+    live.current = true
     if (summaryOpen) summaryRef.current?.focus()
+    return () => {
+      live.current = false
+    }
   }, [summaryOpen])
+
+  async function reload(message: string) {
+    try {
+      const fresh = await client.get(report.reportId ?? "")
+      form.current = fresh
+      setForm(fresh)
+      auto.resume(fresh.version)
+      setNotice(message)
+      if (fresh.status !== "draft" && fresh.status !== "returned") router.refresh()
+    } catch (e) {
+      toast.error(userMessage(e).text)
+    }
+  }
 
   const touch = (key: string, fn: (r: ShiftReport) => ShiftReport) => {
     setErrors((e) => {
@@ -65,41 +104,80 @@ export function ReportEditor({
       delete rest[key]
       return rest
     })
-    apply((x) => ({ ...fn(x), updatedAt: now.slice(0, 16) }))
+    const next = fn(form.current)
+    form.current = next
+    setForm(next)
+    auto.schedule(next)
   }
   const setItem = (ref: string, key: string, patch: Partial<ReportItem>) =>
     touch(key, (x) => ({ ...x, items: x.items.map((i) => (i.taskRef === ref ? { ...i, ...patch } : i)) }))
 
-  const save = () => {
-    apply((x) => ({ ...x, updatedAt: now.slice(0, 16) }))
+  const save = async () => {
+    if (!(await auto.flush())) return false
     toast.success("Draft saved")
   }
-  const submit = () => {
-    const errs = validateReport(r, template)
+
+  const submit = async () => {
+    const errs = validateReport(forValidation(form.current), template)
     if (errs.length) {
       setErrors(Object.fromEntries(errs.map((e) => [e.key, e.message])))
       setSummaryOpen(true)
       return false
     }
-    const at = now.slice(0, 16)
-    const next = submitReport(r, at, me)
-    apply(() => next)
-    taskInbox.pushUpdates(taskUpdatesFor(next, tenantId, me, at))
     setErrors({})
     setSummaryOpen(false)
-    toast.success(`Report ${r.status === "returned" ? "resubmitted" : "submitted"} ${formatTime(at)} ${tzLabel}`, {
-      description: `${next.items.length} ${next.items.length === 1 ? "task" : "tasks"} updated. Your manager can see it now.`,
-    })
-    router.push("/daily-reports")
+    try {
+      if (!(await auto.flush())) return false
+      const sent = await submitter.submit({ ...form.current, version: auto.version() })
+      toast.success(`Report ${r.status === "returned" ? "resubmitted" : "submitted"} ${formatTime(sent.submittedAt ?? now)} ${tzLabel}`, {
+        description: `${sent.items.length} ${sent.items.length === 1 ? "task" : "tasks"} updated. Your manager can see it now.`,
+      })
+      router.push("/daily-reports")
+      router.refresh()
+    } catch (e) {
+      const kind = classifyApiError(e).kind
+      const fields = fieldErrorsOf(e)
+      if (Object.keys(fields).length) {
+        setErrors(fields)
+        setSummaryOpen(true)
+      } else if (kind === "version_conflict") {
+        await reload("This report was changed somewhere else. It was reloaded: check it and submit again.")
+      } else if (classifyApiError(e).code === "report_locked") {
+        toast.error(userMessage(e).text)
+        router.refresh()
+      } else if (kind === "network") {
+        // the request id is kept: pressing Submit again retries the SAME submission
+        toast.error("No connection. Your report is saved here: tap Submit again.")
+      } else {
+        const m = userMessage(e)
+        toast.error(m.ref ? `${m.text} (Ref ${m.ref})` : m.text)
+      }
+      return false
+    }
   }
 
-  const addAttachments = (files: FileList | null) => {
+  const addAttachments = async (files: FileList | null) => {
     if (!files?.length) return
-    const stamp = Date.now().toString(36)
-    // Mock: only the name and size are kept; nothing is uploaded.
-    const list = [...files].map((f, i) => ({ id: `a-${stamp}-${i}`, name: f.name, kind: f.type.startsWith("image/") ? ("image" as const) : ("file" as const), size: kb(f.size) }))
-    touch("attachments", (x) => ({ ...x, attachments: [...x.attachments, ...list] }))
+    const list = [...files]
     if (fileRef.current) fileRef.current.value = ""
+    for (const f of list) {
+      setUploading((u) => [...u, f.name])
+      try {
+        // the attachment needs the report's uuid: it was opened before this page rendered
+        const att = await client.upload(form.current, f)
+        touch("attachments", (x) => ({ ...x, attachments: [...x.attachments, att] }))
+      } catch (e) {
+        if (e instanceof ReportFileRefused) {
+          toast.error(
+            e.reason === "infected" ? `${f.name} failed the malware scan and was not attached.` : e.reason === "slow" ? `${f.name} is still being scanned. Try again in a moment.` : `${f.name} could not be uploaded.`,
+          )
+        } else {
+          toast.error(userMessage(e).text)
+        }
+      } finally {
+        if (live.current) setUploading((u) => u.filter((n, i) => !(n === f.name && i === u.indexOf(f.name))))
+      }
+    }
   }
 
   const errorCount = Object.keys(errors).length
@@ -152,7 +230,7 @@ export function ReportEditor({
               </button>
             </div>
           ))}
-          <button type="button" className="rf-add" onClick={() => touch("unplanned", (x) => ({ ...x, unplanned: [...x.unplanned, { id: `u-${Date.now().toString(36)}`, text: "", minutes: 0 }] }))}>
+          <button type="button" className="rf-add" onClick={() => touch("unplanned", (x) => ({ ...x, unplanned: [...x.unplanned, { id: rowId(), text: "", minutes: 0 }] }))}>
             <Icon name="plus" /> Add unplanned work
           </button>
           {err("unplanned") && <p className="od-field-err" id="sr-unplanned-e">{err("unplanned")}</p>}
@@ -166,17 +244,30 @@ export function ReportEditor({
           {r.attachments.length > 0 && (
             <ul className="sr-list">
               {r.attachments.map((a) => (
-                <li key={a.id}>
-                  <span>{a.name}</span>
-                  <span className="num">{a.size}</span>
-                  <button type="button" className="rf-entry-x" aria-label={`Remove ${a.name}`} onClick={() => touch("attachments", (x) => ({ ...x, attachments: x.attachments.filter((y) => y.id !== a.id) }))}>
-                    <X aria-hidden="true" />
-                  </button>
+                <AttachmentLine
+                  key={a.id}
+                  a={a}
+                  reportId={r.reportId}
+                  action={
+                    <button type="button" className="rf-entry-x" aria-label={`Remove ${a.name}`} onClick={() => touch("attachments", (x) => ({ ...x, attachments: x.attachments.filter((y) => y.id !== a.id) }))}>
+                      <X aria-hidden="true" />
+                    </button>
+                  }
+                />
+              ))}
+            </ul>
+          )}
+          {uploading.length > 0 && (
+            <ul className="sr-list" aria-live="polite">
+              {uploading.map((n, i) => (
+                <li key={`${n}:${i}`}>
+                  <span>{n}</span>
+                  <span className="num">Scanning…</span>
                 </li>
               ))}
             </ul>
           )}
-          <input ref={fileRef} type="file" multiple className="sr-only" id="sr-file" onChange={(e) => addAttachments(e.target.files)} />
+          <input ref={fileRef} type="file" multiple className="sr-only" id="sr-file" onChange={(e) => void addAttachments(e.target.files)} />
           <label htmlFor="sr-file" className="rf-add">
             <Icon name="plus" /> Add photo or file
           </label>
@@ -215,6 +306,12 @@ export function ReportEditor({
         <div ref={summaryRef} tabIndex={-1} role="alert" className="rf-summary">
           <strong>{errorCount} {errorCount === 1 ? "field needs" : "fields need"} attention before you can submit</strong>
           <span>{Object.values(errors).filter((v, i, a) => a.indexOf(v) === i).join(" · ")}</span>
+        </div>
+      )}
+      {notice && (
+        <div className="td-state warn sr-banner" role="status">
+          <strong>Report reloaded</strong>
+          <span>{notice}</span>
         </div>
       )}
       {returned && (

@@ -9,9 +9,8 @@ import type { AccountTabId } from "@/features/account"
 import { getUser } from "@/features/shell"
 import { getMfaState } from "@/lib/device-session"
 import { getOrg } from "@/lib/org"
-import { getPeople } from "@/lib/people"
+import { getPeople, todayUserId } from "@/lib/people"
 import { requireMfaOk } from "@/lib/session"
-import { todayUserId } from "@/lib/today-data"
 
 export const dynamicParams = false
 

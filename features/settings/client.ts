@@ -5,6 +5,8 @@ import { isAllowedRedirect } from "@/features/billing/redirect"
 import type { DeviceAllow, DeviceFeature, DeviceOwner, DeviceType } from "@/lib/devices"
 import type { MfaPolicy } from "@/lib/mfa"
 import type { Access, Module } from "@/lib/types"
+import { toTemplateBody, toTemplateData } from "@/lib/report-template"
+import type { TemplateData } from "@opsdesk/domain/shift-report"
 import { roleUuid } from "./adapters"
 import { OAUTH_REDIRECT_HOSTS } from "./constants"
 import type { MatrixRole, Organisation } from "./types"
@@ -20,6 +22,11 @@ export function makeSettingsClient(api: ApiClient, nav: Navigator) {
     },
     async saveBranding(b: { color: string; logoFileId: string | null }) {
       return api.put("/v1/settings/branding", { body: { logoFileId: b.logoFileId, primaryColor: b.color } })
+    },
+
+    // the report template (FR-M1-25): the WHOLE template is replaced; the answer is what the API holds now (department names follow a team rename, I26). Over 64 KB it throws template_too_large before any request.
+    async saveReportTemplate(data: TemplateData): Promise<TemplateData> {
+      return toTemplateData(await api.put("/v1/shift-reports/template", { body: toTemplateBody(data) }))
     },
 
     // departments are teams of kind "department"

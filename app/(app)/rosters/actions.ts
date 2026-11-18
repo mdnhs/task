@@ -5,11 +5,10 @@ import { assignmentViolations, weekViolations } from "@/features/rosters"
 import { getData } from "@/lib/data"
 import { getMockOrg } from "@/lib/org"
 import { can } from "@/lib/permissions"
-import { getMockPeople } from "@/lib/people"
+import { getMockPeople, todayUserId } from "@/lib/people"
 import { rosterAccess, type LocationGrant, type OfficeLimit } from "@/lib/roster-access"
 import type { RuleViolation } from "@/lib/roster-rules"
 import { getSession } from "@/lib/session"
-import { todayUserId } from "@/lib/today-data"
 
 /**
  * Rule check of one week for the publish dialog (D9). The caller's role and locations come from the session, never from the arguments:

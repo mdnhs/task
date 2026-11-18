@@ -1,6 +1,5 @@
 import { When } from "@/components/when"
 import { PageHeadSkeleton } from "@/components/page-head"
-import { PagerSkeleton, needsPager, pageRows } from "@/components/pager-skeleton"
 import { Sk, SkGroup } from "@/components/sk"
 import { REPORT_PAGE_SIZE } from "../types"
 
@@ -21,7 +20,7 @@ const CardHead = ({ title, sub, button, pill }: { title: number; sub: number; bu
 /** The member view's real text (built in loading.tsx from the same seed) as ghost text, so wrapped lines match on phones. */
 export type OwnReportText = {
   prompts: { title: string; text: React.ReactNode; button: string }[]
-  mine?: { sub: string; due: string; dueTz?: string; tasks: number; time: string; progress: string; button: string; pill: string }
+  mine?: { sub: string; due: string; dueTz?: string; tasks: number; progress: string; button: string; pill: string }
 }
 
 /** One inbox row's real text (first page, built in loading.tsx): ghost text so every wrapped cell matches at any width. */
@@ -62,7 +61,7 @@ export function ReportsSkeleton({ own = false, prompts = 0, mine = true, rows = 
             <CardHead title={130} sub={200} pill />
           )}
           <dl className="td-meta sr-mine-meta">
-            {(ownText?.mine ? [["Due", ownText.mine.due, ownText.mine.dueTz], ["Tasks", String(ownText.mine.tasks)], ["Time reported", ownText.mine.time]] : [0, 1, 2]).map((v, i) => (
+            {(ownText?.mine ? [["Due", ownText.mine.due, ownText.mine.dueTz], ["Tasks", String(ownText.mine.tasks)]] : [0, 1]).map((v, i) => (
               <div key={i}>
                 {typeof v === "number" ? <Sk w={60} h={10} lh={16} /> : <dt>{v[0]}</dt>}
                 {typeof v === "number" ? <Sk w={i ? 50 : 130} h={12} lh={i ? 22 : 23} style={{ marginTop: 4 }} /> : <dd><span className="sk-ghost">{v[2] ? <time className="od-when">{v[1]}<span className="od-tz"> {v[2]}</span></time> : v[1]}</span></dd>}
@@ -93,8 +92,8 @@ export function ReportsSkeleton({ own = false, prompts = 0, mine = true, rows = 
       <section className="card sr-inbox">
         <CardHead title={own ? 100 : 120} sub={200} button />
         {!own && (
-          // status tab seg (All + five states with counts): 42px buttons + 4px padding
-          <div className="sr-counts"><Sk w={568} h={48} r="pill" style={{ maxWidth: "100%" }} /></div>
+          // status tab seg (All + five states, labels only: the API gives no per-state counts): about 450px, 42px buttons + 4px padding (T6.9: measure)
+          <div className="sr-counts"><Sk w={450} h={48} r="pill" style={{ maxWidth: "100%" }} /></div>
         )}
         <div className="od-filters">
           <div className="rep-date"><Sk w="100%" h={48} r={14} /></div>
@@ -117,7 +116,7 @@ export function ReportsSkeleton({ own = false, prompts = 0, mine = true, rows = 
                   <tr>{(own ? [40, 40, 50, 66, 40] : [40, 50, 40, 50, 66, 40]).map((w, i) => <th key={i}><Sk w={w} h={10} lh={16} /></th>)}</tr>
                 </thead>
                 <tbody>
-                  {Array.from({ length: pageRows(rows, REPORT_PAGE_SIZE) }, (_, i) => (
+                  {Array.from({ length: Math.min(rows, REPORT_PAGE_SIZE) }, (_, i) => (
                     inbox[i] ? (
                       <tr key={i}>
                         <td data-label="Shift">
@@ -162,7 +161,10 @@ export function ReportsSkeleton({ own = false, prompts = 0, mine = true, rows = 
                 </tbody>
               </table>
             </div>
-            {needsPager(rows, REPORT_PAGE_SIZE) && <PagerSkeleton rows={rows} size={REPORT_PAGE_SIZE} />}
+            {rows >= REPORT_PAGE_SIZE && (
+              // "Load more" (the API's cursor): the same 104 x 40 pill as the tasks list, 16 px above and 4 below (T6.9: measure)
+              <div className="tasks-more"><Sk w={104} h={40} r="pill" /></div>
+            )}
           </>
         )}
       </section>

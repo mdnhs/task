@@ -1,25 +1,24 @@
-import { ReportsView, getReportSeed } from "@/features/reports"
-import { AccessRestricted } from "@/features/shell"
-import { formatDate } from "@/lib/dates"
-import { getMockOrg } from "@/lib/org"
-import { parseReportFilters } from "@/lib/shift-report"
-import { getSession } from "@/lib/session"
+import { ReportsView, loadReportsData, reportsScreenData } from "@/features/reports"
+import { AccessRestricted, apiFailureView } from "@/features/shell"
+import { getOrg } from "@/lib/org"
+import { can } from "@/lib/permissions"
+import { requireMfaOk } from "@/lib/session"
 
-// Shift reports (FR-M1-22..31). The URL stays /daily-reports so old links keep working; the nav label is "Shift Reports".
+// Shift reports (FR-M1-22..31) on the API (B6 T6.7). The URL stays /daily-reports so old links keep working; the nav label is "Shift Reports". The inbox is the API's: filters in the URL are
+// answered by the server, paging is its cursor, and the scope is the API's (own, direct reports, or everyone): nothing is widened here (F5).
 export default async function Page({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
-  const [sp, session, org] = await Promise.all([searchParams, getSession(), getMockOrg()])
-  const seed = await getReportSeed(session)
-  if (!seed) return <AccessRestricted moduleLabel="Shift Reports" />
-  const initialFilters = parseReportFilters(sp, { teams: seed.teams, people: seed.people.map((p) => p.id) })
-  return (
-    <ReportsView
-      key={JSON.stringify(initialFilters)}
-      seed={seed}
-      now={org.today}
-      tz={org.timezone}
-      tzLabel={org.tzLabel}
-      initialFilters={initialFilters}
-      exportMeta={{ company: session.tenant.name, generated: `${formatDate(org.today)} · ${org.tzLabel}`, brand: session.tenant.brand }}
-    />
-  )
+  const session = await requireMfaOk()
+  if (!can(session.role, "reports")) return <AccessRestricted moduleLabel="Shift Reports" />
+  const sp = await searchParams
+  // a refusal (403, module not in the plan) is a full-page state; anything else goes to the error boundary
+  const loaded = await Promise.all([reportsScreenData(), getOrg()])
+    .then(async ([{ api, people }, org]) => ({ ok: true as const, org, data: await loadReportsData(api, { tz: org.timezone, today: org.today, session, params: sp, people }) }))
+    .catch((e: unknown) => ({ ok: false as const, e }))
+  if (!loaded.ok) {
+    const v = apiFailureView(loaded.e, "Shift Reports")
+    if (v) return v
+    throw loaded.e
+  }
+  const { org, data } = loaded
+  return <ReportsView key={JSON.stringify(data.filters)} data={data} now={org.today} nowAt={org.nowAt ?? ""} tz={org.timezone} tzLabel={org.tzLabel} initialFilters={data.filters} />
 }

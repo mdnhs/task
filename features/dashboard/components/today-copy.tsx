@@ -1,7 +1,7 @@
 import { Icon } from "@/components/icons"
 import { formatDateYear, formatTime } from "@/lib/dates"
 import type { TodayCounts } from "@/lib/today"
-import type { TodayData } from "@/lib/today-data"
+import type { TodayData } from "../types"
 
 // Compact copy for the Today card, shared by the card and its skeleton so both wrap the same.
 // The client prefers numbers and icons to sentences: names are first names only, lists cap at 3 with "+N".
@@ -13,13 +13,16 @@ export function shortNames(names: string[], max = 3) {
   return first.length > max ? `${first.slice(0, max).join(", ")} +${first.length - max}` : first.join(", ")
 }
 
+/** The manager's lines, from the SERVER's numbers: the team's overdue tasks (with who) and the reports waiting for review. */
 export function teamLines(team: NonNullable<TodayData["team"]>, reports: number) {
   return [
-    { href: "/tasks?due=overdue", n: team.overdue.count, label: "team overdue", who: shortNames(team.overdue.items.map((i) => i.who)) },
-    { href: "/daily-reports", n: team.missing.length, label: "reports missing", who: shortNames(team.missing.map((m) => m.who)) },
+    { href: "/tasks?due=overdue", n: team.count, label: "team overdue", who: shortNames(team.items.map((i) => i.who)) },
     { href: "/daily-reports", n: reports, label: "reports to review", who: "" },
   ]
 }
+
+/** Anything worth opening the card for: drives the pulse dot on the compact entry. The numbers are the server's. */
+export const todayNews = (c: TodayCounts, team?: { count: number }, mine = 0): boolean => c.overdue + c.dueToday + c.high + c.review + c.blocked + mine > 0 || (!!team && team.count > 0)
 
 // The closed card's line: three icon + number chips instead of "0 overdue · 0 due today · 0 high priority".
 export function TodayChipCounts({ counts }: { counts: TodayCounts }) {

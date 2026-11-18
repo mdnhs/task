@@ -1,11 +1,10 @@
 import Link from "next/link"
 
 import { Icon } from "@/components/icons"
-import { StatusPill } from "@/components/status-pill"
-import { When } from "@/components/when"
 import type { StaffEvidenceData } from "../types"
 
-export function EvidenceList({ data, today, tzLabel }: { data: StaffEvidenceData; today: string; tzLabel: string }) {
+// Evidence waiting for review (a count, the API gives no rows for it) and the items a reviewer returned, each with the reason.
+export function EvidenceList({ data }: { data: StaffEvidenceData }) {
   return (
     <div className="card">
       <div className="card-head">
@@ -15,20 +14,23 @@ export function EvidenceList({ data, today, tzLabel }: { data: StaffEvidenceData
         </div>
       </div>
       <div className="list">
-        {data.items.map((e) => (
+        {data.awaitingReview > 0 && (
+          <Link href="/tasks?status=submitted" className="item item-link">
+            <span className="kind blue"><Icon name="folder" /></span>
+            <div>
+              <div className="t">{data.awaitingReview} awaiting review</div>
+              <div className="m">Sent for review and not yet approved</div>
+            </div>
+          </Link>
+        )}
+        {data.returned.map((e) => (
           <Link key={e.ref} href={`/tasks/${e.ref}`} className="item item-link">
-            <span className={`kind ${e.state === "returned" ? "amber" : "blue"}`}><Icon name="folder" /></span>
+            <span className="kind amber"><Icon name="folder" /></span>
             <div>
               <div className="t">{e.title}</div>
-              <div className="m">
-                {e.state === "returned" ? (
-                  <><b>{e.reviewer}</b> returned it: <span className="reason">{e.reason}</span></>
-                ) : (
-                  <>Sent <When iso={e.at} today={today} tzLabel={tzLabel} /> · with <b>{e.reviewer}</b></>
-                )}
-              </div>
+              <div className="m">Returned: <span className="reason">{e.reason}</span></div>
             </div>
-            <div className="r"><StatusPill status={e.status} /></div>
+            <div className="r"><span className="st warn">Returned</span></div>
           </Link>
         ))}
       </div>

@@ -2,18 +2,13 @@ import { getData } from "./data"
 import { initialsOf } from "./branding"
 import type { ApiClient } from "./api/client"
 import type { Person } from "./types"
+import { avatarFor } from "./avatar"
 
-// ---- The real directory: GET /v1/people (B6 T6.4, ruling I11) ----
+export { avatarFor }
 
-const AVATARS = ["av1", "av2", "av3", "av4", "av5", "av6"] as const
 const FORMER = "Former member"
 
-/** A stable colour class for a user id (FNV-1a of the id): the same person always gets the same avatar, on every screen and every load. */
-export function avatarFor(id: string): Person["avatar"] {
-  let h = 0x811c9dc5
-  for (let i = 0; i < id.length; i++) h = Math.imul(h ^ id.charCodeAt(i), 0x01000193)
-  return AVATARS[(h >>> 0) % AVATARS.length]!
-}
+// ---- The real directory: GET /v1/people (B6 T6.4, ruling I11) ----
 
 type PersonDto = { userId: string; name: string; email: string; roleKey: string; managerId: string | null }
 
@@ -53,11 +48,20 @@ export async function getPeople(): Promise<Person[]> {
 
 // ---- MOCK: no backend until T6.5 to T6.8 ----
 
-// "me" for any staff-home role (mock): Daniel Okafor, same person as public/data/dashboard/staff/*.json.
+// "me" for any staff-home role (mock): Daniel Okafor, the seed person the other mock screens act as.
 export const ME_ID = "p-daniel"
 
 /** MOCK: the seed directory (tasks/people.json, ids `p-*`) that pages still running on mock records use. A switched page uses getPeople(). */
 export async function getMockPeople(): Promise<Person[]> {
   const { people } = await getData<{ people: Person[] }>("tasks/people.json")
   return people
+}
+
+/**
+ * MOCK: the directory person a mock-backed screen (rosters, staff rosters, the account's roster settings) acts as: staff roles are "me", other roles their linked person, else the signed-in
+ * user's name. Moved here from the deleted lib/today-data.ts (B6 T6.7); it goes with those screens in B8.
+ */
+export function todayUserId(session: { role: { home: string; person?: string } }, people: { id: string; name: string }[], userName?: string): string {
+  if (session.role.home === "staff") return ME_ID
+  return session.role.person ?? people.find((p) => p.name === userName)?.id ?? ME_ID
 }

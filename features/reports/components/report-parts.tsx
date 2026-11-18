@@ -4,7 +4,8 @@ import { StatusPill } from "@/components/status-pill"
 import { When } from "@/components/when"
 import { formatDate } from "@/lib/dates"
 import { ITEM_STATUS, REPORT_STATE, extraSections, minutesText, sectionOn, totalMinutes, windowLabel } from "@/lib/shift-report"
-import type { ReportState, ShiftReport, TemplateSection } from "../types"
+import type { ReportAttachment, ReportState, ShiftReport, TemplateSection } from "../types"
+import { AttachmentOpen } from "./attachment-open"
 
 // Pieces shared by the editor and the read-only review, so one skeleton fits both.
 
@@ -28,6 +29,26 @@ export function ReportMeta({ report: r, owner, state, now, tzLabel }: { report: 
 }
 
 export const taskHref = (ref: string) => `/tasks/${encodeURIComponent(ref)}`
+
+/** What the last submit did with a row, in a few words (only the cases a reader acts on). */
+export const OUTCOME_NOTE: Partial<Record<NonNullable<ShiftReport["items"][number]["outcome"]>, string>> = {
+  needs_evidence: "Evidence still needed",
+  submitted_for_review: "Sent for review",
+  skipped_unavailable: "Task not updated",
+  skipped_archived: "Task archived",
+}
+
+/** One attachment line: name, size, and what the malware scan says (Scanning, Blocked), an Open button only for a clean file. */
+export function AttachmentLine({ a, reportId, action }: { a: ReportAttachment; reportId: string | null; action?: React.ReactNode }) {
+  return (
+    <li>
+      <span>{a.name}</span>
+      <span className="num">{a.status === "clean" ? a.size : a.status === "pending" ? "Scanning…" : "Blocked"}</span>
+      {a.status === "clean" && reportId && <AttachmentOpen reportId={reportId} fileId={a.id} />}
+      {action}
+    </li>
+  )
+}
 
 /** Read-only task rows. */
 export function ItemsView({ report: r, canOpenTasks }: { report: ShiftReport; canOpenTasks: boolean }) {
@@ -54,7 +75,10 @@ export function ItemsView({ report: r, canOpenTasks }: { report: ShiftReport; ca
                     {canOpenTasks ? <Link href={taskHref(i.taskRef)} className="tt rep-link">{i.title}</Link> : <span className="tt">{i.title}</span>}
                     <div className="tm num">{i.taskRef}</div>
                   </td>
-                  <td data-label="Status"><StatusPill status={ITEM_STATUS[i.status]} /></td>
+                  <td data-label="Status">
+                    <StatusPill status={ITEM_STATUS[i.status]} />
+                    {i.outcome && OUTCOME_NOTE[i.outcome] && <div className="tm">{OUTCOME_NOTE[i.outcome]}</div>}
+                  </td>
                   <td data-label="Time" className="num">{minutesText(i.minutes)}</td>
                   <td data-label="Note" className="sr-note">{i.note || "—"}</td>
                 </tr>
@@ -87,7 +111,7 @@ export function NotesView({ report: r, template }: { report: ShiftReport; templa
         <div>
           <h2 className="td-h">Attachments</h2>
           {r.attachments.length === 0 ? <p className="td-muted">None.</p> : (
-            <ul className="sr-list">{r.attachments.map((a) => <li key={a.id}><span>{a.name}</span><span className="num">{a.size}</span></li>)}</ul>
+            <ul className="sr-list">{r.attachments.map((a) => <AttachmentLine key={a.id} a={a} reportId={r.reportId} />)}</ul>
           )}
         </div>
       )}

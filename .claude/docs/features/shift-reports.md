@@ -13,11 +13,9 @@ SRS: FR-M1-22..31, CR-01, CR-03, AC-M1-01..03. Replaces the per-department daily
 | Where | What |
 | --- | --- |
 | `lib/shift-report.ts` | Pure model: types, tasks-in-shift rule, `buildDraft`, `mergeStored`, `reportRows`, `reportState`, `needsAction`, `currentReport`, template (`templateFor`, `validateReport`), `submitReport` / `acceptReport` / `returnReport`, `taskStatusFor` + `taskUpdatesFor`, scope (`teamOf`, `scopeReports`), filters. Tests: `lib/shift-report.test.ts` |
-| `lib/shift-reports-data.ts` | Server loader `getShiftReportData(org)`: stored reports + fresh drafts for the last `REPORT_HISTORY_DAYS` (7) days |
 | `lib/permissions.ts` | `reportScope(role, meId)` → own / team / all |
 | `lib/notify.ts` | `missingReportAlerts` (FR-M1-30); the shell bell lists the API's notifications (T6.4), so no client-side alert generation |
-| `lib/task-inbox.ts` | `TaskUpdate` queue (`pushUpdates`, `updates`); `features/tasks/store.ts` `applyTaskUpdates` applies them in `useTasksStore` |
-| `features/reports/` | `api.ts` (`getReportSeed`, scoped seed), `store.ts`, `export-rows.ts` (+ `toCsv`), `export.ts` (+ `exportCsv`), components: `reports-view` (prompt, My shift report, inbox), `report-inbox`, `report-page` → `report-editor` / `report-review`, `report-parts`, `version-history`, `export-menu`, `skeletons` |
+| `features/reports/` | B6 T6.7, on the API: `adapters.ts` (`toReport` strict, instants to tenant walls), `time.ts` (state, countdown and "late/missing" from INSTANTS), `client.ts` (open, draft autosave 800 ms with `version`, idempotent submit `{ version, requestId }` with ONE request id per attempt, accept/return, attachments through the scan gate, template), `export.ts` (server export jobs: request, poll 1 s then 2 s, open `/download` with a fresh nonce, never stored), `export-rows.ts` (a re-export of `@opsdesk/domain/report-export`: ONE builder, parity test), `api.ts` (loaders; the inbox is the API's cursor pages and one-level scope), components: `reports-view` (prompt, My shift report, inbox), `report-inbox`, `report-page` → `report-editor` / `report-review`, `report-parts`, `version-history`, `export-menu`, `skeletons` |
 | `public/data/reports/reports.json` | Stored reports keyed by `shiftKey` (`p-marcus:pat-sec-night:2026-10-19`). Items may be partial: they are laid over the tasks found in the shift |
 | `public/data/settings/template.json` | The report template per team (Settings → Report template edits the same shape) |
 | `app/(app)/daily-reports/` | `page.tsx`, `loading.tsx`, `[id]/page.tsx`, `[id]/loading.tsx` |

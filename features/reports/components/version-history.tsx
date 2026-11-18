@@ -1,10 +1,10 @@
 import { When } from "@/components/when"
-import type { ShiftReport } from "../types"
+import type { ReportVersionRow, ShiftReport } from "../types"
 
-// FR-M1-27/29: every submission is kept (version history). The original submission time is v1's own `at` and is never rewritten by later versions.
-export function VersionHistory({ report, today, tzLabel }: { report: ShiftReport; today: string; tzLabel: string }) {
-  const versions = [...report.versions].sort((a, b) => b.v - a.v)
-  const original = report.versions.find((v) => v.v === 1)?.at ?? report.submittedAt
+// FR-M1-27/29: every submission is kept (version history, GET /v1/shift-reports/{id}/versions). The original submission time is v1's own `at` and is never rewritten by later versions.
+export function VersionHistory({ report, versions: list, today, tzLabel }: { report: ShiftReport; versions: ReportVersionRow[]; today: string; tzLabel: string }) {
+  const versions = [...list].sort((a, b) => b.v - a.v)
+  const original = list.find((v) => v.v === 1)?.at ?? report.submittedAt
   return (
     <section className="card rf-versions" aria-labelledby="rf-versions-h">
       <h2 className="td-h" id="rf-versions-h">Version history</h2>

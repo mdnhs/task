@@ -15,8 +15,8 @@ FR-M0-07 (teams and reporting lines), CR-01. Open questions built on the SRS ass
 | Where | What |
 | --- | --- |
 | `lib/shifts.ts` | Pure model (server-safe). Types, date/zone math, windows, queries, reporting, edits, payload scoping. Tests: `lib/shifts.test.ts` |
-| `lib/shifts-data.ts` | Server loader `getShiftState()` (reads `public/data/shifts/*.json`) |
-| `hooks/use-shifts.ts` | Shared client store `shiftsStore` / `useShifts(seed, scope)` (in-memory edits survive client navigation) |
+| `features/shifts/{adapters,client,api}.ts` | B6 T6.7: the API is the source. `toShiftState` (team name + id, version), `toOccurrences` (walls derived from the stored INSTANTS in the tenant zone: a night over the DST fold or gap shows its real hours), `makeShiftsClient` (every pattern edit sends `version`; teams by id), loaders (`GET /v1/shifts`, `/v1/shifts/occurrences`). A team-scope manager reads but gets 403 on writes ("All-scope managers only"). The M1A roster overlay is gone (I17). |
+| `public/data/shifts/` | Kept ONLY for the demo seed (`api/src/seed/demo/source.ts`); no screen reads it |
 | `public/data/shifts/` | `patterns.json`, `assignments.json`, `members.json` (teams + primary manager), `reporting.json` (due minutes, team defaults, overrides) |
 | `features/shifts/` | `/shifts` page: week grid, people table, patterns table, pattern/assign dialogs, skeleton. `grid.ts` = helpers shared by view and skeleton |
 | `lib/permissions.ts` | Module `shifts` + `shiftScope(role)` → `"all" \| "own" \| "none"` |
@@ -44,8 +44,8 @@ records and the settings `u*` users use other ids and are not linked.
 
 ## API for step 2 (end-of-shift report)
 
-Server: `getShiftState()` from `lib/shifts-data.ts` (scope it with `ownShiftState` for staff-home roles, as `features/shifts/api.ts` does).
-Client: `useShifts(seed, scopeKey)` from `hooks/use-shifts.ts` to see edits made on `/shifts` in the same session.
+Server: `loadShifts(api, ...)` from `features/shifts/api.ts`: the API cuts the bundle to the caller (a staff-home caller gets only their own rows); nothing is re-scoped on the client.
+Client: every edit is one API write, then the server state replaces the screen.
 
 | Need | Function |
 | --- | --- |

@@ -3,9 +3,8 @@ import { PageSkeleton } from "@/features/shell"
 import { getData } from "@/lib/data"
 import { getMockOrg } from "@/lib/org"
 import { can } from "@/lib/permissions"
-import { getMockPeople } from "@/lib/people"
+import { getMockPeople, todayUserId } from "@/lib/people"
 import { rosterAccess, type LocationGrant, type OfficeLimit } from "@/lib/roster-access"
-import { todayUserId } from "@/lib/today-data"
 import { getSkeletonSession, getSkeletonUser } from "@/lib/skeleton-session"
 
 // Async so the skeleton is the real view for the role's default location and the current week (loading.tsx gets no params).

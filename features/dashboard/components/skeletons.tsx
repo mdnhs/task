@@ -4,9 +4,8 @@ import { PagerSkeleton } from "@/components/pager-skeleton"
 import { Sk, SkGroup } from "@/components/sk"
 import { TEAM_TASKS_PAGE_SIZE } from "../constants"
 import { formatDue } from "@/lib/dates"
-import { todayCounts, todayHasNews } from "@/lib/today"
-import { TodayChipCounts, teamLines, todaySub } from "./today-copy"
-import type { TodayData } from "@/lib/today-data"
+import { TodayChipCounts, teamLines, todayNews, todaySub } from "./today-copy"
+import type { TodayData } from "../types"
 import type { CoverageData, DashboardPerms, ManagerAttentionData, TaskProgressData, ReportDeadlineCardData, StaffCommentsData, StaffEvidenceData, StaffMyTasksData, TeamTasksData } from "../types"
 
 const ALL: DashboardPerms = { tasks: true, reports: true, attention: true }
@@ -32,13 +31,13 @@ export type TodaySk = { mode: "card" | "chip"; tiles: number; team: boolean; dat
 const gh = { alignSelf: "flex-start" } as const
 export function TodayCardSkeleton({ mode, tiles, team, data }: TodaySk) {
   // With the real data the texts are ghost text, so the tiles, team lines and subtitle wrap like the loaded card (phones).
-  const counts = data && todayCounts(data.tasks, data.now, data.review)
+  const counts = data?.counts
   const open = mode === "card"
   const bar = (
     <div className="today-bar" aria-expanded={open}>
       <Sk w={72} h={15} lh={22} />
       <span className="today-peek">{counts ? <TodayChipCounts counts={counts} /> : <span className="today-chip-m"><Sk w={120} h={12} lh={19} /></span>}</span>
-      {counts && todayHasNews(counts, data!.team) && <span className="today-pulse" />}
+      {counts && todayNews(counts, data!.team, data!.reports) && <span className="today-pulse" />}
       <Sk w={open ? 29 : 36} h={12} lh={19} />
       <Sk w={16} h={16} r={4} />
     </div>
@@ -116,10 +115,10 @@ export function PageHeaderSkeleton({ perms = ALL }: { perms?: DashboardPerms }) 
 // Notes are ghost text (the real note, transparent, in the real .note element) so they wrap exactly like the loaded ones at every
 // width. Without `notes` it falls back to bars: `wraps[i]` adds a second line from 1241px up.
 type SkNote = { highlight?: string; text: string; tone?: string }
-export function SectionCardsSkeleton({ wraps = [], notes }: { wraps?: boolean[]; notes?: SkNote[] }) {
+export function SectionCardsSkeleton({ wraps = [], notes, count = 4 }: { wraps?: boolean[]; notes?: SkNote[]; count?: number }) {
   return (
     <section className="stats dash-stats">
-      {Array.from({ length: 4 }, (_, i) => (
+      {Array.from({ length: count }, (_, i) => (
         <article key={i} className="stat">
           <div className="stat-top">
             <div className="stat-title">
@@ -179,7 +178,35 @@ export function TasksClosedSkeleton() {
 
 // Shift report deadline card (report-deadline-card.tsx): the real text as ghost text so lines wrap exactly like the loaded card.
 // Gets the same server data as the page; undefined = the page shows no card either.
-export function ReportDeadlineSkeleton({ data, canRemind }: { data?: ReportDeadlineCardData; canRemind: boolean }) {
+export function ReportDeadlineSkeleton({ data, canRemind, typical }: { data?: ReportDeadlineCardData; canRemind: boolean; /** No data (loading.tsx knows none): the typical card, the team card for a manager and the member card with `member`. */ typical?: "team" | "member" }) {
+  if (!data && typical) {
+    // Intended heights (to measure in T6.9): h2 17px on 26, .big 28px on 33.6, .tz 12px on 18, a .rep-row of two lines, and the member's full-width 48px button.
+    return (
+      <div className="card deadline">
+        <Sk w={typical === "member" ? 110 : 150} h={17} lh={26} />
+        <Sk w={170} h={28} lh={33.6} style={{ marginTop: 10 }} />
+        <Sk w={150} h={12} lh={18} />
+        <div className="countdown">
+          {Array.from({ length: 3 }, (_, i) => (
+            <div key={i} className="sk-count">
+              <Sk w={30} h={20} lh={32} />
+              <Sk w={36} h={8} lh={20} />
+            </div>
+          ))}
+        </div>
+        {Array.from({ length: typical === "member" ? 1 : 2 }, (_, i) => (
+          <div key={i} className="rep-row">
+            <div>
+              <Sk w={90} h={13} lh={20} />
+              <Sk w={120} h={11} lh={17} />
+            </div>
+            <St />
+          </div>
+        ))}
+        {typical === "member" && <Sk w="100%" h={48} r={14} style={{ marginTop: 12 }} />}
+      </div>
+    )
+  }
   if (!data) return null
   const g = (text: string) => <span className="sk-ghost">{text}</span>
   return (
@@ -211,7 +238,7 @@ export function ReportDeadlineSkeleton({ data, canRemind }: { data?: ReportDeadl
 }
 
 // Real titles and notes as ghost text: they wrap to 2 or 3 lines on phones.
-export function ManagerAttentionSkeleton({ canDecide = true, data }: { canDecide?: boolean; data?: ManagerAttentionData }) {
+export function ManagerAttentionSkeleton({ data }: { data?: ManagerAttentionData }) {
   const items = data?.items ?? Array.from({ length: 4 }, () => null)
   return (
     <div className="card">
@@ -223,7 +250,7 @@ export function ManagerAttentionSkeleton({ canDecide = true, data }: { canDecide
             {it ? (
               <div>
                 <div className="t"><span className="sk-ghost">{it.title}</span></div>
-                <div className="m"><span className="sk-ghost">Raised by {it.by} · {it.note}</span></div>
+                <div className="m"><span className="sk-ghost">Owner {it.by} · {it.note}</span></div>
               </div>
             ) : (
               <div>
@@ -233,7 +260,7 @@ export function ManagerAttentionSkeleton({ canDecide = true, data }: { canDecide
             )}
             <div className="r">
               {it ? <span className="st sk-ghost">{it.status.label}</span> : <St />}
-              {canDecide && <Sk w={62} h={29.4} r={8} />}
+              <Sk w={50} h={29.4} r={8} />
             </div>
           </div>
         ))}
@@ -285,7 +312,7 @@ export function TaskProgressSkeleton({ data }: { data?: TaskProgressData }) {
 // Rows are capped at the page size, with a pager row when there are more tasks (count ignores the client-side department filter).
 // Column widths and line wraps in this table depend on the row text, so each cell renders the real text as a transparent
 // `.sk-ghost` (a tinted block that wraps exactly like the text). The table then lays out identically at every width.
-export function TeamTasksSkeleton({ canAssign = true, tasks = [] }: { canAssign?: boolean; tasks?: TeamTasksData["tasks"] }) {
+export function TeamTasksSkeleton({ canAssign = true, tasks = [], rows = TEAM_TASKS_PAGE_SIZE, total }: { canAssign?: boolean; tasks?: TeamTasksData["tasks"]; rows?: number; total?: number }) {
   const g = (text: string) => <span className="sk-ghost">{text}</span>
   return (
     <div className="card">
@@ -301,6 +328,22 @@ export function TeamTasksSkeleton({ canAssign = true, tasks = [] }: { canAssign?
             </tr>
           </thead>
           <tbody>
+            {tasks.length === 0 && Array.from({ length: rows }, (_, i) => (
+              // typical rows (no real text: loading.tsx knows no data): the same cells with bars
+              <tr key={`g${i}`}>
+                <td>
+                  <div className="pers">
+                    <Sk w={34} h={34} r="circle" />
+                    <div><Sk w={96} h={13} lh={20} /><Sk w={72} h={11} lh={17} /></div>
+                  </div>
+                </td>
+                <td><Sk w={170} h={13} lh={20} /><Sk w={58} h={11} lh={17} /></td>
+                <td><Sk w={64} h={22} r={8} /></td>
+                <td><Sk w={16} h={12} r={2} /></td>
+                <td className="num due"><Sk w={96} h={12} lh={20} /></td>
+                <td><St /></td>
+              </tr>
+            ))}
             {tasks.slice(0, TEAM_TASKS_PAGE_SIZE).map((t) => (
               <tr key={t.ref}>
                 <td>
@@ -319,7 +362,7 @@ export function TeamTasksSkeleton({ canAssign = true, tasks = [] }: { canAssign?
           </tbody>
         </table>
       </div>
-      {tasks.length > TEAM_TASKS_PAGE_SIZE && <PagerSkeleton rows={tasks.length} size={TEAM_TASKS_PAGE_SIZE} />}
+      {(tasks.length > TEAM_TASKS_PAGE_SIZE || (total ?? 0) > TEAM_TASKS_PAGE_SIZE) && <PagerSkeleton rows={Math.max(tasks.length, total ?? 0)} size={TEAM_TASKS_PAGE_SIZE} />}
     </div>
   )
 }
@@ -354,22 +397,22 @@ export function CoverageFilesSkeleton({ items }: { items?: CoverageData["coverag
   )
 }
 
-export function DashboardSkeleton({ perms = ALL, teamTasks = [], noteWraps, notes, coverage, today, deadline, attention, progress }: { attention?: ManagerAttentionData; progress?: TaskProgressData; today?: TodaySk; deadline?: ReportDeadlineCardData; perms?: DashboardPerms; teamTasks?: TeamTasksData["tasks"]; noteWraps?: boolean[]; notes?: SkNote[]; coverage?: CoverageData["coverage"] }) {
+export function DashboardSkeleton({ perms = ALL, teamTasks = [], noteWraps, notes, coverage, withCoverage = false, today, deadline, attention, progress, cards = 4, teamRows = TEAM_TASKS_PAGE_SIZE, teamTotal }: { attention?: ManagerAttentionData; progress?: TaskProgressData; today?: TodaySk; deadline?: ReportDeadlineCardData; perms?: DashboardPerms; teamTasks?: TeamTasksData["tasks"]; noteWraps?: boolean[]; notes?: SkNote[]; coverage?: CoverageData["coverage"]; /** The mock Coverage & Files card (a demo deployment only). */ withCoverage?: boolean; /** Summary cards: 4 with the shift-report card, 3 without. */ cards?: number; teamRows?: number; teamTotal?: number }) {
   return (
     <SkGroup label="Loading dashboard" className="sk-page">
       <PageHeaderSkeleton perms={perms} />
       {today && <TodayCardSkeleton {...today} />}
-      <SectionCardsSkeleton wraps={noteWraps} notes={notes} />
+      <SectionCardsSkeleton wraps={noteWraps} notes={notes} count={cards} />
       <section className="grid-3 dash-fix dash-fix-a">
         <TasksClosedSkeleton />
         <TaskProgressSkeleton data={progress} />
-        <ReportDeadlineSkeleton data={deadline} canRemind={perms.reports} />
+        <ReportDeadlineSkeleton data={deadline} canRemind={perms.reports} typical="team" />
       </section>
-      <section className="grid-2 dash-fix dash-fix-c">
-        <ManagerAttentionSkeleton canDecide={perms.attention} data={attention} />
-        <CoverageFilesSkeleton items={coverage} />
+      <section className="grid-2 dash-fix dash-fix-c" style={withCoverage || coverage ? undefined : { gridTemplateColumns: "minmax(0,1fr)" }}>
+        <ManagerAttentionSkeleton data={attention} />
+        {(withCoverage || coverage) && <CoverageFilesSkeleton items={coverage} />}
       </section>
-      <TeamTasksSkeleton canAssign={perms.tasks} tasks={teamTasks} />
+      <TeamTasksSkeleton canAssign={perms.tasks} tasks={teamTasks} rows={teamRows} total={teamTotal} />
     </SkGroup>
   )
 }
@@ -457,16 +500,15 @@ export function StaffDashboardSkeleton({ deadline, noteWraps, notes, today, comm
             <CardHead />
             <StaffItemsSkeleton
               count={3}
-              rows={evidence?.items.map((e) => ({
-                title: e.title,
-                meta: e.state === "returned" ? <><b>{e.reviewer}</b> returned it: {e.reason}</> : <>Sent <When iso={e.at} today={date ?? ""} tzLabel={tzLabel} /> · with <b>{e.reviewer}</b></>,
-                pill: e.status.label,
-              }))}
+              rows={evidence && [
+                ...(evidence.awaitingReview > 0 ? [{ title: `${evidence.awaitingReview} awaiting review`, meta: <>Sent for review and not yet approved</>, pill: "" }] : []),
+                ...evidence.returned.map((e) => ({ title: e.title, meta: <>Returned: {e.reason}</>, pill: "Returned" })),
+              ]}
             />
           </div>
         </div>
         <div className="staff-col">
-          <ReportDeadlineSkeleton data={deadline} canRemind={false} />
+          <ReportDeadlineSkeleton data={deadline} canRemind={false} typical="member" />
           <StaffCommentsSkeleton data={comments} today={date ?? ""} tzLabel={tzLabel} />
         </div>
       </section>

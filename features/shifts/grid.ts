@@ -1,4 +1,4 @@
-import { WEEKDAY_SHORT, addDays, managerOf, onTeam, reportsFor, shiftsOn, weekDates, weekdayOf } from "@/lib/shifts"
+import { WEEKDAY_SHORT, addDays, managerOf, onTeam, reportsFor, weekDates, weekdayOf } from "@/lib/shifts"
 import type { ShiftOccurrence, ShiftState } from "@/lib/shifts"
 import type { Person } from "@/lib/types"
 
@@ -10,10 +10,21 @@ export function rosterPeople(people: Person[], state: ShiftState, team: string):
   return people.filter((p) => lined.has(p.id) && onTeam(p.id, state.members, team)).sort((a, b) => a.name.localeCompare(b.name))
 }
 
-/** Shifts per person per day of the week starting `start`, keeping only patterns of `team` unless "all". */
-export function weekGrid(personIds: string[], state: ShiftState, start: string, tz: string, team: string): Map<string, ShiftOccurrence[][]> {
-  const days = weekDates(start).map((d) => shiftsOn(d, state.patterns, state.assignments, tz).filter((o) => team === "all" || o.pattern.team === team))
-  return new Map(personIds.map((id) => [id, days.map((list) => list.filter((o) => o.personId === id))]))
+/**
+ * Shifts per person per day of the week starting `start`, from the API's OCCURRENCES (stored instants; a shift belongs to its START date), keeping only patterns of `team` unless "all".
+ * Nothing here recomputes a shift from a pattern, so a night over the DST fold or gap shows the hours the API stored.
+ */
+export function weekGridFrom(personIds: string[], occurrences: ShiftOccurrence[], start: string, team: string): Map<string, ShiftOccurrence[][]> {
+  const dates = weekDates(start)
+  const grid = new Map<string, ShiftOccurrence[][]>(personIds.map((id) => [id, dates.map(() => [])]))
+  for (const o of occurrences) {
+    const row = grid.get(o.personId)
+    const day = dates.indexOf(o.window.date)
+    if (!row || day < 0 || (team !== "all" && o.pattern.team !== team)) continue
+    row[day]!.push(o)
+  }
+  for (const row of grid.values()) for (const day of row) day.sort((a, b) => a.window.start.localeCompare(b.window.start))
+  return grid
 }
 
 /** Page subtitle, shared with the skeleton so its ghost text wraps the same way. */
@@ -21,7 +32,7 @@ export function shiftsSubtitle(people: Person[], state: ShiftState, scope: "all"
   if (scope === "own") {
     const rep = reportsFor(meId, state.members, state.reporting)
     const mgr = managerOf(meId, state.members)
-    const name = mgr ? (people.find((p) => p.id === mgr)?.name ?? "Unknown") : "none"
+    const name = mgr ? (people.find((p) => p.id === mgr)?.name ?? "Your manager") : "none"
     return `Your shifts · Manager: ${name} · Shift reporting ${rep.on ? "on" : "off"}`
   }
   const n = rosterPeople(people, state, team).length

@@ -1,12 +1,11 @@
 "use client"
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useLayoutEffect, useRef, useState } from "react"
 import { useInView, useReducedMotion } from "motion/react"
 import { Bar, BarChart, Cell, ResponsiveContainer, XAxis } from "recharts"
 
 import { cssZoom, unzoom } from "@/lib/zoom"
 
-import { useDept } from "@/hooks/use-dept"
 import { DUR } from "@/lib/motion"
 import { DayDetailsDialog } from "./day-details-dialog"
 import type { TasksClosedData } from "../types"
@@ -49,16 +48,12 @@ function placeTip(wrap: HTMLElement, tip: HTMLElement, i: number) {
 }
 
 const ENTER_MS = 900
-// Department switch: bars ease to their new heights (Recharts animates data changes).
+// A new answer: bars ease to their new heights (Recharts animates data changes).
 const UPDATE_MS = Math.round(DUR.count * 1000)
 
 export function TasksClosedChart({ data }: { data: TasksClosedData }) {
-  const dep = useDept()
-  // The topbar department filter shows that department's closed count per day (byDept, 0 when absent); "all" is the total.
-  const days = useMemo(
-    () => (dep === "all" ? data.days : data.days.map((d) => ({ ...d, n: d.byDept[dep] ?? 0 }))),
-    [data.days, dep]
-  )
+  // The API counts closed tasks per tenant day for the caller's scope; it has no department split, so the topbar department filter does not change the bars.
+  const days = data.days
   const last = days.length - 1
   const [active, setActive] = useState(last)
   const [ready, setReady] = useState(false)
@@ -105,10 +100,10 @@ export function TasksClosedChart({ data }: { data: TasksClosedData }) {
       delete tip.dataset.follow
       ro.disconnect()
     }
-    // `days` re-runs it after a department switch, so the tip rides the bars to their new heights.
+    // `days` re-runs it when a fresh answer changes the bars, so the tip rides them to their new heights.
   }, [days, inView, reduce])
 
-  const d = days[active]
+  const d = days[active] ?? days[last]
   return (
     <div className="card chart-card">
       <div className="card-head">

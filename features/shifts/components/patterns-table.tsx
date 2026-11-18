@@ -2,7 +2,7 @@
 
 import { PagedBody } from "@/components/data-pagination"
 import { daysLabel, durationLabel, hmMinutes, patternTimeLabel } from "@/lib/shifts"
-import type { ShiftPattern } from "@/lib/shifts"
+import type { ShiftPatternRow as ShiftPattern } from "../types"
 
 /** Nominal length from the pattern's own clock (the week view shows real lengths on DST nights). */
 export const nominalMinutes = (p: Pick<ShiftPattern, "start" | "end">) => {

@@ -46,3 +46,16 @@ export function writeDismissed(userId: string, dayKey: string, dismissed: boolea
   set(K("dismissed", userId), dismissed ? dayKey : null)
   cookie(TODAY_COOKIE_DISMISSED, dismissed ? dismissedValue(userId, dayKey) : null)
 }
+
+/** Tasks the user snoozed from the card on this working day (the server keeps only a history line, so the card remembers them in this browser). */
+export function readSnoozed(userId: string, dayKey: string): string[] {
+  try {
+    const v = JSON.parse(get(K("snoozed", userId)) ?? "null") as { day?: unknown; refs?: unknown } | null
+    return v && v.day === dayKey && Array.isArray(v.refs) ? v.refs.filter((r): r is string => typeof r === "string") : []
+  } catch {
+    return []
+  }
+}
+export function writeSnoozed(userId: string, dayKey: string, refs: string[]) {
+  set(K("snoozed", userId), refs.length ? JSON.stringify({ day: dayKey, refs }) : null)
+}

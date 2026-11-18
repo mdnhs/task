@@ -5,12 +5,9 @@ import { X } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog"
-import type { TasksClosedData } from "../types"
+import type { TasksClosedDay } from "../types"
 
-type Day = TasksClosedData["days"][number]
-
-// Segment tones cycle by department index (opsdesk.css .dd-split .t0-.t3); departments come from the data, never hard-coded.
-const TONES = 4
+type Day = TasksClosedDay
 
 const kindLabel: Record<Day["t"], string> = { s1: "Weekday", s2: "Weekday", weekend: "Weekend cover", today: "Today" }
 
@@ -18,8 +15,6 @@ export function DayDetailsDialog({ day: current, onClose }: { day: Day | null; o
   // Keep showing the last day while the close animation runs; otherwise the popup empties and collapses mid-fade.
   const [day, setDay] = useState(current)
   if (current && current !== day) setDay(current)
-  const depts = day ? Object.entries(day.byDept) : []
-
   return (
     <Dialog open={!!current} onOpenChange={(o) => !o && onClose()}>
       <DialogContent showCloseButton={false} className="od-dialog">
@@ -42,38 +37,15 @@ export function DayDetailsDialog({ day: current, onClose }: { day: Day | null; o
               <div><b className="num">{day.n}</b><span>Closed</span></div>
               <div><b className="num">{day.on}%</b><span>On time</span></div>
               <div><b className={`num ${day.late ? "late" : ""}`}>{day.late}</b><span>Late</span></div>
-              <div><b className="num">{day.avgHours}h</b><span>Avg to close</span></div>
             </div>
 
-            <div className="dd-sec">
-              <div className="sec-title">By department</div>
-              <div className="dd-split" role="img" aria-label={depts.map(([name, n]) => `${name} ${n}`).join(", ")}>
-                {depts.map(([name, n], i) => <i key={name} className={`t${i % TONES}`} style={{ flex: n }} />)}
+            {day.topCloser && (
+              <div className="dd-sec">
+                <div className="dd-top">
+                  Top closer: <b>{day.topCloser.name}</b> · <span className="num">{day.topCloser.count}</span> {day.topCloser.count === 1 ? "task" : "tasks"}
+                </div>
               </div>
-              <div className="dd-split-legend">
-                {depts.map(([name, n], i) => (
-                  <span key={name}><i className={`sw t${i % TONES}`} />{name} <b className="num">{n}</b></span>
-                ))}
-              </div>
-            </div>
-
-            <div className="dd-sec">
-              <div className="sec-title">Closed tasks</div>
-              <div className="dd-tasks">
-                {day.tasks.map((t) => (
-                  <div key={t.ref} className="dd-task">
-                    <div>
-                      <div className="tt">{t.title}</div>
-                      <div className="tm"><span className="num">{t.ref}</span> · {t.by}</div>
-                    </div>
-                    <span className="dep-tag">{t.dept}</span>
-                  </div>
-                ))}
-              </div>
-              <div className="dd-top">
-                Top closer: <b>{day.topCloser.name}</b> · <span className="num">{day.topCloser.count}</span> tasks
-              </div>
-            </div>
+            )}
           </>
         )}
       </DialogContent>

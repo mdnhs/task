@@ -1,24 +1,23 @@
-import { ShiftsView, getShifts } from "@/features/shifts"
-import { AccessRestricted } from "@/features/shell"
-import { getMockOrg } from "@/lib/org"
-import { ME_ID } from "@/lib/people"
+import { ShiftsView, loadShifts, shiftsScreenData } from "@/features/shifts"
+import { AccessRestricted, apiFailureView } from "@/features/shell"
+import { getOrg } from "@/lib/org"
 import { shiftScope } from "@/lib/permissions"
-import { canWrite, getSession } from "@/lib/session"
+import { canWrite, requireMfaOk } from "@/lib/session"
 
-// Shifts (FR-M1-20/21, FR-M0-07). Write roles edit everyone; staff-home readers get only their own shifts, cut on the server.
+// Shifts (FR-M1-20/21, FR-M0-07) on the API (B6 T6.7). Write roles edit; staff-home readers get only their own shifts, cut by the API (nothing is re-scoped here). A team-scope manager reads
+// but the API refuses their edits (403, shown as "All-scope managers only"). The week grid is the API's occurrences, from the stored instants.
 export default async function Page() {
-  const [session, org] = await Promise.all([getSession(), getMockOrg()])
+  const session = await requireMfaOk()
   const scope = shiftScope(session.role)
   if (scope === "none") return <AccessRestricted moduleLabel="Shifts" />
-  const data = await getShifts(scope, ME_ID, session)
-  return (
-    <ShiftsView
-      data={data}
-      today={org.today}
-      tz={org.timezone}
-      tzLabel={org.tzLabel}
-      canWrite={scope === "all" && canWrite(session, "shifts")}
-      scopeKey={`${session.tenant.id}:${session.role.id}`}
-    />
-  )
+  const loaded = await Promise.all([shiftsScreenData(session), getOrg()])
+    .then(async ([{ api, people }, org]) => ({ ok: true as const, org, data: await loadShifts(api, { tz: org.timezone, today: org.today, scope, meId: session.user.id, people }) }))
+    .catch((e: unknown) => ({ ok: false as const, e }))
+  if (!loaded.ok) {
+    const v = apiFailureView(loaded.e, "Shifts")
+    if (v) return v
+    throw loaded.e
+  }
+  const { org, data } = loaded
+  return <ShiftsView data={data} today={org.today} tz={org.timezone} tzLabel={org.tzLabel} canWrite={scope === "all" && canWrite(session, "shifts")} />
 }

@@ -1,84 +1,67 @@
-import { getData } from "@/lib/data"
-import type { Org } from "@/lib/org"
-import { getMockPeople } from "@/lib/people"
-import { reportScope } from "@/lib/permissions"
-import { memberDeadline, secondsUntil, teamDeadline } from "@/lib/report-deadline"
-import { inScope, scopeReports } from "@/lib/shift-report"
-import { getShiftReportData } from "@/lib/shift-reports-data"
+// Server side of the home screen (B6 T6.7): the manager and staff dashboards, the attention feed and Today are the API's read models for this caller (F17, F18, F21). They are cached per user for 30 s
+// on the server, so the numbers may lag the user's own write by up to 30 s: the card refreshes after its own writes and the page tolerates a stale figure. A support session gets 403 on Today and the
+// staff dashboard (the page shows the restricted state). Nothing here re-scopes or recounts.
+import type { ApiClient } from "@/lib/api/client"
+import { ApiError } from "@/lib/api/problem"
+import { apiServer } from "@/lib/api/server"
+import { getPeople } from "@/lib/people"
 import { canWrite, type Session } from "@/lib/session"
-import { todayUserId } from "@/lib/today-data"
+import type { Org } from "@/lib/org"
+import type { Person } from "@/lib/types"
+import { toAttention, toDashboard, toDeadlineCard, toStaff, toTeamTasks, toToday } from "./adapters"
+import type { DashboardPerms, ReportDeadlineCardData, StaffMyTasksData, TodayData } from "./types"
+import { todayMode } from "@/lib/today"
 
-import type {
-  CoverageData,
-  DashboardPerms,
-  HeaderData,
-  ReportDeadlineCardData,
-  ManagerAttentionData,
-  StaffCommentsData,
-  StaffEvidenceData,
-  StaffHeaderData,
-  StaffMyTasksData,
-  SummaryData,
-  TaskProgressData,
-  TasksClosedData,
-  TeamTasksData,
-} from "./types"
+type Reader = Pick<ApiClient, "get">
 
-// One call per widget, like separate API endpoints; getDashboard loads them in parallel.
-export async function getDashboard() {
-  const [header, summary, tasksClosed, attention, progress, teamTasks, coverage] = await Promise.all([
-    getData<HeaderData>("dashboard/header.json"),
-    getData<SummaryData>("dashboard/summary.json"),
-    getData<TasksClosedData>("dashboard/tasks-closed.json"),
-    getData<ManagerAttentionData>("dashboard/manager-attention.json"),
-    getData<TaskProgressData>("dashboard/task-progress.json"),
-    getData<TeamTasksData>("dashboard/team-tasks.json"),
-    getData<CoverageData>("dashboard/coverage.json"),
-  ])
-  return { header, summary, tasksClosed, attention, progress, teamTasks, coverage }
+/** The Today read model; a 403 (a support session) is `null` so the card is left out. */
+export async function loadToday(api: Reader, o: { meId: string; org: Org; mode?: "all" | "high-and-overdue"; cookies: { auto?: string; dismissed?: string } }): Promise<TodayData | null> {
+  const nowAt = o.org.nowAt ?? ""
+  try {
+    const dto = await api.get("/v1/today", { query: { mode: o.mode ?? "all" } })
+    // card or chip at first paint: the two cookies the browser mirrors its choice into, keyed by the SERVER's working day
+    const card = todayMode(o.cookies.auto, o.cookies.dismissed, o.meId, dto.workingDay.key)
+    return toToday(dto, { meId: o.meId, tz: o.org.timezone, nowAt, now: o.org.today, tzLabel: o.org.tzLabel, mode: card })
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 403) return null
+    throw e
+  }
 }
 
-// Just the summary cards, for loading.tsx to know which stat notes wrap.
-export const getCoverage = () => getData<CoverageData>("dashboard/coverage.json")
-export const getSummary = () => getData<SummaryData>("dashboard/summary.json")
-
-// Just the team tasks, for loading.tsx to size the table skeleton (rows and pager).
-export const getTeamTasks = () => getData<TeamTasksData>("dashboard/team-tasks.json")
-
-// Staff home: "me" is Daniel Okafor for any staff-home role (mock). One file per widget, loaded in parallel.
-export async function getStaffDashboard() {
-  const [header, myTasks, evidence, comments] = await Promise.all([
-    getData<StaffHeaderData>("dashboard/staff/header.json"),
-    getData<StaffMyTasksData>("dashboard/staff/my-tasks.json"),
-    getData<StaffEvidenceData>("dashboard/staff/evidence.json"),
-    getData<StaffCommentsData>("dashboard/staff/comments.json"),
+export async function loadManagerHome(api: Reader, o: { org: Org; people: Person[]; perms: DashboardPerms; withAttention: boolean }) {
+  const [dto, team, attention] = await Promise.all([
+    api.get("/v1/dashboard"),
+    api.get("/v1/dashboard/team-tasks", { query: { limit: 25 } }).catch(forbiddenAsNull),
+    o.withAttention ? api.get("/v1/attention", { query: { limit: 5 } }).catch(forbiddenAsNull) : Promise.resolve(null),
   ])
-  return { header, myTasks, evidence, comments }
+  const home = toDashboard(dto, { tz: o.org.timezone, nowAt: o.org.nowAt ?? "", tzLabel: o.org.tzLabel, ...(o.org.reportDueAfterMinutes === undefined ? {} : { dueAfterMinutes: o.org.reportDueAfterMinutes }) })
+  return {
+    ...home,
+    teamTasks: team ? toTeamTasks(team, { people: o.people, tz: o.org.timezone, today: o.org.today }) : null,
+    attention: attention ? toAttention(attention) : null,
+  }
 }
 
-// Which owner-dashboard actions the session may take (the view and its skeleton both read this).
+export async function loadStaffHome(api: Reader, o: { org: Org }) {
+  const dto = await api.get("/v1/dashboard/staff")
+  const home = toStaff(dto, { tz: o.org.timezone })
+  const deadline = toDeadlineCard(home.reportDeadline, { tz: o.org.timezone, nowAt: o.org.nowAt ?? "", tzLabel: o.org.tzLabel, ...(o.org.reportDueAfterMinutes === undefined ? {} : { dueAfterMinutes: o.org.reportDueAfterMinutes }) })
+  return { ...home, deadline }
+}
+
+function forbiddenAsNull(e: unknown): null {
+  if (e instanceof ApiError && e.status === 403) return null
+  throw e
+}
+
+/** Which owner-dashboard actions the session may take (the view reads this). */
 export function getDashboardPerms(session: Session): DashboardPerms {
   return { tasks: canWrite(session, "tasks"), reports: canWrite(session, "reports"), attention: canWrite(session, "attention") }
 }
 
-/**
- * Shift report deadline card (FR-M1-22, FR-M1-28, FR-M1-30), cut to the viewer's report scope on the server: a member gets
- * only their own report, a manager the teams in scope. Undefined when the role has no reports access or nothing to show
- * (no reporting shift in the window), so the page and loading.tsx leave the card out alike.
- */
-export async function getReportDeadline(session: Session, org: Org, userName?: string): Promise<ReportDeadlineCardData | undefined> {
-  const people = await getMockPeople()
-  const meId = todayUserId(session, people, userName)
-  const scope = reportScope(session.role, meId)
-  if (!scope) return undefined
-  const data = await getShiftReportData(org, session)
-  const rows = scopeReports(data.rows, scope, data.shifts.members)
-  const tz = org.timezone
-  const note = `${org.tzLabel} · shift end + ${data.shifts.reporting.dueAfterMinutes} min`
-  const d =
-    scope.kind === "own"
-      ? { kind: "member" as const, title: "My shift report", ...memberDeadline(scope.personId, rows, data.shifts, org.today, tz) }
-      : { kind: "team" as const, title: "Shift report deadline", ...teamDeadline(rows, org.departments, data.shifts, org.today, tz, (p) => inScope(p, scope, data.shifts.members)) }
-  if (!d.dueAt && !d.rows.length) return undefined
-  return { ...d, note, seconds: secondsUntil(d.dueAt, org.today, tz) }
+export async function dashboardScreenData(): Promise<{ api: ApiClient; people: Person[] }> {
+  const [api, people] = await Promise.all([apiServer(), getPeople().catch(() => [] as Person[])])
+  return { api, people }
 }
+
+export type { ReportDeadlineCardData, StaffMyTasksData }

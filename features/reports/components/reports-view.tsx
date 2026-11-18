@@ -7,39 +7,38 @@ import { PageHead } from "@/components/page-head"
 import { StatusPill } from "@/components/status-pill"
 import { When } from "@/components/when"
 import { formatDate } from "@/lib/dates"
-import { currentReport, draftPhase, itemProgress, minutesText, needsAction, reportState, totalMinutes, windowLabel, EMPTY_REPORT_FILTERS } from "@/lib/shift-report"
-import type { ExportMeta } from "../export"
-import { reportsStore } from "../store"
+import { windowLabel, EMPTY_REPORT_FILTERS } from "@/lib/shift-report"
+import { currentRowAt, draftPhaseAt, needsActionAt, reportStateAt } from "../time"
 import { REPORT_STATE } from "../types"
-import type { ReportFilters, ReportsSeed, ShiftReport } from "../types"
-import { ReportInbox } from "./report-inbox"
-
-const reportHref = (id: string) => `/daily-reports/${encodeURIComponent(id)}`
+import type { InboxRow, ReportFilters, ReportsData } from "../types"
+import { ReportInbox, rowHref } from "./report-inbox"
 
 /**
- * /daily-reports (FR-M1-22, FR-M1-28). Members (own scope): a prompt for every report that needs them, their current or last
- * shift's report, and their own list. Managers: the inbox for their team (team scope) or everyone (all scope).
+ * /daily-reports (FR-M1-22, FR-M1-28). Members (own scope): a prompt for every report that needs them, their current or last shift's report, and their own list. Managers: the inbox for their
+ * scope. The scope is the API's: a team manager sees themself and their direct reports, an all-scope manager everyone (F5); the screen never widens it.
  */
 export function ReportsView({
-  seed,
+  data,
   now,
+  nowAt,
   tz,
   tzLabel,
   initialFilters = EMPTY_REPORT_FILTERS,
-  exportMeta,
 }: {
-  seed: ReportsSeed
-  /** Tenant "now" (org.today, wall clock). */
+  data: ReportsData & { mine?: InboxRow[] }
+  /** Tenant wall "now" (date words only). */
   now: string
+  /** The same moment as a UTC instant: every comparison reads it (the repeated DST hour, I12). */
+  nowAt: string
   tz: string
   tzLabel: string
   initialFilters?: ReportFilters
-  exportMeta: ExportMeta
 }) {
-  const [reports] = reportsStore.useStore(seed.reports, seed.scopeKey)
-  const own = seed.scope === "own"
-  const pending = useMemo(() => (own ? needsAction(reports, seed.meId, now, tz) : []), [own, reports, seed.meId, now, tz])
-  const current = useMemo(() => (own ? currentReport(reports, seed.meId, now, tz) : undefined), [own, reports, seed.meId, now, tz])
+  const own = data.scope === "own"
+  // The member's prompts come from the UNFILTERED window (the list below may be filtered by the URL).
+  const base = data.mine ?? data.rows
+  const pending = useMemo(() => (own ? needsActionAt(base, nowAt) : []), [own, base, nowAt])
+  const current = useMemo(() => (own ? currentRowAt(base, nowAt) : undefined), [own, base, nowAt])
 
   return (
     <>
@@ -47,40 +46,40 @@ export function ReportsView({
         title="Shift Reports"
         subtitle={
           own
-            ? `Your end-of-shift reports · due ${seed.dueAfterMinutes} min after your shift ends`
-            : `${seed.scope === "team" ? "Your team's" : "Every"} report per person and shift · due ${seed.dueAfterMinutes} min after shift end`
+            ? `Your end-of-shift reports · due ${data.dueAfterMinutes} min after your shift ends`
+            : `${data.scope === "team" ? "Your team's" : "Every"} report per person and shift · due ${data.dueAfterMinutes} min after shift end`
         }
       />
-      {own && pending.length > 0 && <ReportPrompt reports={pending} now={now} tz={tz} tzLabel={tzLabel} />}
-      {own && <MyReportCard report={current} now={now} tz={tz} tzLabel={tzLabel} />}
-      <ReportInbox reports={reports} seed={seed} now={now} tz={tz} tzLabel={tzLabel} initialFilters={initialFilters} exportMeta={exportMeta} />
+      {own && pending.length > 0 && <ReportPrompt rows={pending} meId={data.meId} now={now} nowAt={nowAt} tzLabel={tzLabel} />}
+      {own && <MyReportCard row={current} meId={data.meId} now={now} nowAt={nowAt} tzLabel={tzLabel} />}
+      <ReportInbox data={data} nowAt={nowAt} today={now} tz={tz} tzLabel={tzLabel} initialFilters={initialFilters} />
     </>
   )
 }
 
 /** FR-M1-22: the shift has ended and the report is due (or missing, or was returned). */
-function ReportPrompt({ reports, now, tz, tzLabel }: { reports: ShiftReport[]; now: string; tz: string; tzLabel: string }) {
+function ReportPrompt({ rows, meId, now, nowAt, tzLabel }: { rows: InboxRow[]; meId: string; now: string; nowAt: string; tzLabel: string }) {
   return (
     <section className="card sr-prompt" aria-labelledby="sr-prompt-h">
       <h2 className="td-h" id="sr-prompt-h">
-        {reports.length === 1 ? "A shift report needs you" : `${reports.length} shift reports need you`}
+        {rows.length === 1 ? "A shift report needs you" : `${rows.length} shift reports need you`}
       </h2>
       <ul className="sr-prompt-list">
-        {reports.map((r) => {
-          const s = reportState(r, now, tz)
+        {rows.map((r) => {
+          const s = reportStateAt(r, nowAt)
           return (
             <li key={r.id} data-tone={REPORT_STATE[s].tone}>
               <div className="sr-prompt-main">
                 <strong>{r.shiftName}, {formatDate(r.date)}</strong>
                 <span>
                   {s === "returned"
-                    ? `Returned: ${r.comments.at(-1)?.text ?? "your manager asked for changes."}`
+                    ? "Returned: your manager asked for changes."
                     : s === "missing"
                       ? <>Missing. It was due <When iso={r.due} today={now} tzLabel={tzLabel} />. Submit it now; it will be marked late.</>
                       : <>Your shift has ended. Due <When iso={r.due} today={now} tzLabel={tzLabel} />.</>}
                 </span>
               </div>
-              <Link href={reportHref(r.id)} className="btn btn-primary sr-prompt-btn">
+              <Link href={rowHref(r, meId) ?? "/daily-reports"} className="btn btn-primary sr-prompt-btn">
                 {s === "returned" ? "Fix and resubmit" : "Open report"}
               </Link>
             </li>
@@ -92,7 +91,7 @@ function ReportPrompt({ reports, now, tz, tzLabel }: { reports: ShiftReport[]; n
 }
 
 /** "My shift report": the running shift's report, else the latest one. */
-function MyReportCard({ report: r, now, tz, tzLabel }: { report?: ShiftReport; now: string; tz: string; tzLabel: string }) {
+function MyReportCard({ row: r, meId, now, nowAt, tzLabel }: { row?: InboxRow; meId: string; now: string; nowAt: string; tzLabel: string }) {
   if (!r) {
     return (
       <section className="card sr-mine" aria-labelledby="sr-mine-h">
@@ -101,9 +100,9 @@ function MyReportCard({ report: r, now, tz, tzLabel }: { report?: ShiftReport; n
       </section>
     )
   }
-  const s = reportState(r, now, tz)
-  const { done, total } = itemProgress(r)
-  const pct = total ? Math.round((done / total) * 100) : 0
+  const s = reportStateAt(r, nowAt)
+  const total = r.itemCount
+  const pct = total ? Math.round((r.doneCount / total) * 100) : 0
   return (
     <section className="card sr-mine" aria-labelledby="sr-mine-h">
       <div className="card-head">
@@ -111,7 +110,7 @@ function MyReportCard({ report: r, now, tz, tzLabel }: { report?: ShiftReport; n
           <h2 id="sr-mine-h">My shift report</h2>
           <div className="sub">
             {r.shiftName} · {formatDate(r.date)} {windowLabel(r)}
-            {s === "draft" && draftPhase(r, now, tz) === "in_shift" ? " · in shift now" : ""}
+            {s === "draft" && draftPhaseAt(r, nowAt) === "in_shift" ? " · in shift now" : ""}
           </div>
         </div>
         <StatusPill status={REPORT_STATE[s]} />
@@ -119,13 +118,12 @@ function MyReportCard({ report: r, now, tz, tzLabel }: { report?: ShiftReport; n
       <dl className="td-meta sr-mine-meta">
         <div><dt>Due</dt><dd><When iso={r.due} today={now} tzLabel={tzLabel} /></dd></div>
         <div><dt>Tasks</dt><dd className="num">{total}</dd></div>
-        <div><dt>Time reported</dt><dd className="num">{minutesText(totalMinutes(r))}</dd></div>
       </dl>
       <div className="sr-mine-prog">
-        <span className="tm">{done} of {total} task rows filled in</span>
-        <div className="progress" role="progressbar" aria-label="Task rows filled in" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct}><i style={{ width: `${pct}%` }} /></div>
+        <span className="tm">{r.doneCount} of {total} tasks done</span>
+        <div className="progress" role="progressbar" aria-label="Tasks done" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct}><i style={{ width: `${pct}%` }} /></div>
       </div>
-      <Link href={reportHref(r.id)} className="btn btn-primary sr-mine-btn">
+      <Link href={rowHref(r, meId) ?? "/daily-reports"} className="btn btn-primary sr-mine-btn">
         {r.status === "draft" || r.status === "returned" ? "Open my report" : "View my report"}
       </Link>
     </section>

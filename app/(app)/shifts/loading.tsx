@@ -1,16 +1,13 @@
-import { ShiftsSkeleton, getShifts } from "@/features/shifts"
+import { ShiftsSkeleton } from "@/features/shifts"
 import { PageSkeleton } from "@/features/shell"
-import { getMockOrg } from "@/lib/org"
-import { ME_ID } from "@/lib/people"
-import { shiftScope } from "@/lib/permissions"
-import { canWrite } from "@/lib/permissions"
+import { canWrite, shiftScope } from "@/lib/permissions"
 import { getSkeletonSession } from "@/lib/skeleton-session"
 
-// Async so the skeleton uses the role's scope, its controls and the real week grid (loading.tsx gets no params).
+// Static (K1, ruling I9): no API, no session lookup. The TYPICAL manager view: the week grid with a full page of people and the write controls; a staff member's own-shifts view differs by a
+// small layout change when the real page replaces it.
 export default async function Loading() {
-  const [session, org] = await Promise.all([getSkeletonSession(), getMockOrg()])
+  const session = await getSkeletonSession()
   const scope = shiftScope(session.role)
   if (scope === "none") return <PageSkeleton />
-  const data = await getShifts(scope, ME_ID, session)
-  return <ShiftsSkeleton data={data} today={org.today} tz={org.timezone} tzLabel={org.tzLabel} canWrite={scope === "all" && canWrite(session, "shifts")} />
+  return <ShiftsSkeleton canWrite={scope === "all" && canWrite(session, "shifts")} />
 }

@@ -1,10 +1,6 @@
 import { getData } from "@/lib/data"
 import type { TenantEntitlements } from "@/lib/entitlements"
-import { getMockOrg } from "@/lib/org"
-import { ME_ID, getMockPeople } from "@/lib/people"
-import { reportScope } from "@/lib/permissions"
-import { reportState, scopeReports } from "@/lib/shift-report"
-import { getShiftReportData } from "@/lib/shift-reports-data"
+import { ME_ID } from "@/lib/people"
 import type { Module, Role } from "@/lib/types"
 import { mockSearchEnabled } from "./adapters"
 
@@ -12,24 +8,12 @@ import { buildIndex, filterActionsForRole, filterIndexForRole, filterPopularForR
 import type { QuickAction, SearchConfig, SearchItem } from "./types"
 
 // Reads the JSON files directly (not other features' api.ts) so features stay independent.
-// Shift reports (FR-M1-28) come from the shared report model, cut to what the role may see (own / team / all).
-async function getShiftReports(role: Role, session: { entitlements: TenantEntitlements }): Promise<RawSources["reports"]> {
-  const org = await getMockOrg()
-  const [{ rows, shifts }, people] = await Promise.all([getShiftReportData(org, session), getMockPeople()])
-  const scope = reportScope(role, ME_ID)
-  if (!scope) return []
-  const name = (id: string) => people.find((p) => p.id === id)?.name ?? id
-  return scopeReports(rows, scope, shifts.members).map((r) => ({
-    id: r.id, date: r.date, dept: r.team, owner: r.personId, status: reportState(r, org.today, org.timezone),
-    title: `Shift report: ${name(r.personId)}, ${r.shiftName}, ${r.date}`,
-  }))
-}
+// Shift reports are the API's now (B6 T6.7): their search hits come from GET /v1/search as the user types (T6.8), so the mock index holds no reports.
 
-async function getSources(role: Role, session: { entitlements: TenantEntitlements }): Promise<RawSources> {
-  const [people, tasks, reports, issues, payroll, orders, staff, candidates, clients, documents] = await Promise.all([
+async function getSources(): Promise<RawSources> {
+  const [people, tasks, issues, payroll, orders, staff, candidates, clients, documents] = await Promise.all([
     getData<{ people: RawSources["people"] }>("tasks/people.json"),
     getData<{ tasks: RawSources["tasks"] }>("tasks/tasks.json"),
-    getShiftReports(role, session),
     getData<{ items: RawSources["issues"] }>("attention/items.json"),
     getData<{ issues: RawSources["payroll"] }>("payroll/issues.json"),
     getData<{ orders: RawSources["orders"] }>("orders/orders.json"),
@@ -41,7 +25,7 @@ async function getSources(role: Role, session: { entitlements: TenantEntitlement
   return {
     people: people.people,
     tasks: tasks.tasks,
-    reports,
+    reports: [],
     issues: issues.items,
     payroll: payroll.issues,
     orders: orders.orders,
@@ -53,7 +37,7 @@ async function getSources(role: Role, session: { entitlements: TenantEntitlement
 }
 
 /** The role-filtered index plus quick actions and popular searches. Call on the server only. */
-export async function getSearchData(role: Role, session: { entitlements: TenantEntitlements }): Promise<{ items: SearchItem[]; config: SearchConfig }> {
+export async function getSearchData(role: Role, _session: { entitlements: TenantEntitlements }): Promise<{ items: SearchItem[]; config: SearchConfig }> {
   // MOCK: no backend until B8 to B11. The mock-backed kinds are indexed only on a demo deployment (ENABLE_MOCK_MODULES=1); data hits come from the API as the user types.
   if (!mockSearchEnabled(process.env)) {
     const [popular, actions] = await Promise.all([
@@ -63,7 +47,7 @@ export async function getSearchData(role: Role, session: { entitlements: TenantE
     return { items: [], config: { popular: filterPopularForRole(popular.popular, role), actions: filterActionsForRole(actions.actions, role) } }
   }
   const [src, popular, actions] = await Promise.all([
-    getSources(role, session),
+    getSources(),
     getData<{ popular: { term: string; module: Module }[] }>("search/popular.json"),
     getData<{ actions: QuickAction[] }>("search/actions.json"),
   ])

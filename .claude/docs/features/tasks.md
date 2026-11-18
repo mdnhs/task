@@ -25,7 +25,7 @@ Phase 1 steps 3 (evidence rules) and 6 (task model and views), built 28 Oct 2026
 - `knockOn()`: moving a task pushes open dependants that would start before it is due, by whole days, down the chain (never pulls earlier). Shown in the Reschedule dialog before saving.
 - Remove = `archiveTask()`; `archivedTasks()` hides tasks older than 30 days (a backend purges them). "Delete now" is audited by the API (`task.purged`, same transaction as the purge; FR-M0-13). There is no client audit outbox.
 - History: `TimelineEvent.changes` holds old → new values; `notified` lists members told about a manager's change. The notices themselves are written by the API and listed by the shell bell (`lib/notifications.ts`); there is no client notice store.
-- Changes from outside /tasks arrive through `lib/task-inbox.ts` and `applyTaskUpdates`: shift report rows (status + time) and the Today card ("Mark done", "Snooze" = timeline line only). Each update id is kept on its timeline line, so it applies once.
+- Changes from outside /tasks (shift report rows, the Today card) are the API's own: submit and `POST /v1/today/updates` update the task and write the history line server-side (B6 T6.7).. Each update id is kept on its timeline line, so it applies once.
 - Filters: `status=open` (not done), `status=review` (submitted, not the reviewer's own; managers only). Drive URLs are removed from the seed on devices without Drive access (`withholdDriveLinks`, FR-M1-52).
 - Q8 assumption: members don't change dates; they "Propose new dates", a manager reviews (with knock-on) and approves or declines.
 
@@ -64,5 +64,5 @@ Timeline (Gantt) and workload views (Should), custom statuses (FR-M1-06), milest
 - Dates: wall strings are for display, comparisons read `dueAt`/`startAt` (`time.ts`). `PATCH` leaves an unchanged date out (the API's `Wall` refuses a "Z" instant), so the repeated DST hour cannot shift it. Reschedule/approve show the SERVER's preview, send its `previewHash`, and repeat the preview on `409 knock_on_changed`; hidden moves are a count.
 - Evidence (D8, D10): `evidence-view.ts` holds `canVerifyTask(task, viewer)` (whole assignee list, uploader by name), the counted evidence (only clean files) and the Scanning/Infected pills. Drive links are whatever the API sent.
 - Voice (D21): `components/voice-card.tsx`; the player asks for a fresh play path per click (`playUrl`), the API answers with a 60 s redirect and logs the play; no URL is kept.
-- Recurring instances come from the API job; `materialiseRecurring`, `store.ts` and `task-detail-loading.tsx` are gone. `lib/task-inbox.ts` stays only for the Today card and the report editor (T6.7 removes it).
+- Recurring instances come from the API job; `materialiseRecurring`, `store.ts` and `task-detail-loading.tsx` are gone.
 - Skeletons are static (K1): see `app/(app)/tasks/**/loading.tsx`.

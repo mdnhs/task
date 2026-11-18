@@ -22,11 +22,14 @@ const KIND_HOME: Record<NotificationKind, string> = {
 /** Only an in-app absolute path is followed: never a scheme, a host, a protocol-relative URL or a backslash. */
 const isAppPath = (l: string) => /^\/(?![/\\])[^\s\\]*$/.test(l)
 
+/** The API's report notices link to `/reports` and `/reports/<id>`; the web's pages live under `/daily-reports` (the URL kept so old links work). Only the exact first segment is renamed. */
+const webPath = (l: string) => l.replace(/^\/reports(?=$|[/?#])/, "/daily-reports")
+
 export function toNotification(dto: Dto, timezone: string): BellItem {
   const type = (KINDS as readonly string[]).includes(dto.kind) ? (dto.kind as NotificationKind) : "system"
   return {
     id: dto.id, type, title: dto.title, at: wallInTz(dto.createdAt, timezone), read: dto.readAt !== null,
-    href: dto.link && isAppPath(dto.link) ? dto.link : KIND_HOME[type],
+    href: dto.link && isAppPath(dto.link) ? webPath(dto.link) : KIND_HOME[type],
   }
 }
 

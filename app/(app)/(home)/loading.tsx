@@ -1,22 +1,16 @@
-import { DashboardSkeleton, StaffDashboardSkeleton, getCoverage, getDashboard, getDashboardPerms, getReportDeadline, getStaffDashboard, getSummary, getTeamTasks } from "@/features/dashboard"
+import { DashboardSkeleton, StaffDashboardSkeleton } from "@/features/dashboard"
 import { PageSkeleton } from "@/features/shell"
 import { can } from "@/lib/permissions"
-import { getMockOrg } from "@/lib/org"
-import { getTodayData } from "@/lib/today-data"
-import { getSkeletonSession, getSkeletonUser } from "@/lib/skeleton-session"
+import { mockEnabled } from "@/lib/mock-registry"
+import { getSkeletonSession } from "@/lib/skeleton-session"
 
-// Async so the skeleton matches the role's home (cookies() is allowed here; it just reads the request).
+// Static (K1, ruling I9): no API, no session lookup. The TYPICAL manager home (the owner's: every card) or the staff home; the real page then replaces it, and a role with less access
+// sees a small layout change, never a delay. The Today entry is the closed "chip" (the default until the user switches the automatic card on).
 export default async function Loading() {
   const session = await getSkeletonSession()
   if (!can(session.role, "dashboard")) return <PageSkeleton />
   if (session.role.home !== "staff") {
-    const [{ tasks }, { stats }, { coverage }, org, user, { attention, progress }] = await Promise.all([getTeamTasks(), getSummary(), getCoverage(), getMockOrg(), getSkeletonUser(), getDashboard()])
-    // The Today card is folded to a compact entry once dismissed; the same cookies decide it here as on the page (needs the real data's shape only).
-    const [t, deadline] = await Promise.all([getTodayData(session, org, user.name), getReportDeadline(session, org, user.name)])
-    const today = { mode: t.mode, tiles: t.team ? 5 : 4, team: !!t.team, data: t }
-    return <DashboardSkeleton today={today} deadline={deadline} perms={getDashboardPerms(session)} teamTasks={tasks} notes={stats.map((s) => s.note)} coverage={coverage} attention={attention} progress={progress} />
+    return <DashboardSkeleton today={{ mode: "chip", tiles: 5, team: true }} cards={4} teamRows={5} teamTotal={25} withCoverage={mockEnabled()} />
   }
-  const [{ myTasks, comments, evidence }, org] = await Promise.all([getStaffDashboard(), getMockOrg()])
-  const [t, deadline] = await Promise.all([getTodayData(session, org), getReportDeadline(session, org)])
-  return <StaffDashboardSkeleton today={{ mode: t.mode, tiles: 4, team: false, data: t }} deadline={deadline} comments={comments} myTasks={myTasks} evidence={evidence} date={org.today} tzLabel={org.tzLabel} notes={myTasks.stats.map((s) => ({ text: s.note }))} />
+  return <StaffDashboardSkeleton today={{ mode: "chip", tiles: 4, team: false }} />
 }

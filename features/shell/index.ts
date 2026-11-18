@@ -1,5 +1,6 @@
 export { AppShell } from "./components/app-shell"
 export { AccessRestricted } from "./components/access-restricted"
+export { NotAvailableYet } from "./components/not-available"
 export { apiFailureView } from "./components/api-failure"
 export { AppShellSkeleton, NotificationsListSkeleton, PageSkeleton } from "./components/skeletons"
 export { getNavigation, getUser, findNavItem } from "./api"

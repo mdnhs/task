@@ -2,10 +2,9 @@ import { getLocationAdminData, rosterScopeKey, type LocationAdminData } from "@/
 import { getData } from "@/lib/data"
 import { getMockOrg } from "@/lib/org"
 import { can } from "@/lib/permissions"
-import { getMockPeople } from "@/lib/people"
+import { getMockPeople, todayUserId } from "@/lib/people"
 import { rosterAccess, type LocationGrant, type OfficeLimit } from "@/lib/roster-access"
 import type { Session } from "@/lib/session"
-import { todayUserId } from "@/lib/today-data"
 
 // Shared by the locations pages and their loading.tsx: only roles that edit published rosters (office level) may manage locations (D4);
 // everyone else gets nothing, so a supervisor's request carries no location data.

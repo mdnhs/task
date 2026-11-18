@@ -1,11 +1,10 @@
 import { getData } from "@/lib/data"
 import { hasProductModule } from "@/lib/entitlements"
-import { getMockPeople } from "@/lib/people"
+import { getMockPeople, todayUserId } from "@/lib/people"
 import { can } from "@/lib/permissions"
 import { rosterAccess, type LocationGrant, type OfficeLimit } from "@/lib/roster-access"
 import type { Location, RosterShift, RosterWeek, ShiftTemplate } from "@/lib/rosters"
 import type { Session } from "@/lib/session"
-import { todayUserId } from "@/lib/today-data"
 import { gapsFromOpenShifts } from "./logic"
 import type { Incident, RosterGap, StaffMember } from "./types"
 

@@ -16,8 +16,8 @@ export function DeadlineCountdown({ seconds }: { seconds: number }) {
   const [left, setLeft] = React.useState(seconds)
 
   React.useEffect(() => {
-    const start = Date.now()
-    const tick = () => setLeft(Math.max(0, seconds - Math.floor((Date.now() - start) / 1000)))
+    const start = performance.now() // elapsed time since mount (monotonic): the browser clock and zone are never read
+    const tick = () => setLeft(Math.max(0, seconds - Math.floor((performance.now() - start) / 1000)))
     tick()
     const t = setInterval(tick, 1000)
     return () => clearInterval(t)

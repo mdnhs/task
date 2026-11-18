@@ -1,41 +1,53 @@
 "use client"
 
-import { useCallback, useMemo } from "react"
+import { useEffect, useRef, useState } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 
 import { EmptyState } from "@/components/empty-state"
-import { canEditReport, reportState } from "@/lib/shift-report"
-import type { ExportMeta } from "../export"
-import { reportsStore } from "../store"
-import type { ReportsSeed, ShiftReport } from "../types"
+import { apiBrowser } from "@/lib/api/browser"
+import { classifyApiError } from "@/lib/api/problem"
+import { canEditReport } from "@/lib/shift-report"
+import { makeReportsClient } from "../client"
+import type { ReportVersionRow, ShiftReport, TemplateSection } from "../types"
 import { ReportEditor } from "./report-editor"
 import { ReportReview } from "./report-review"
 
 export type ReportPageProps = {
-  id: string
-  seed: ReportsSeed
+  /** The report the API returned; null = not found (an unknown id and an out-of-scope id look the same, no detail). */
+  report: ShiftReport | null
+  /** A shift key (`userId:patternId:date`) of the member's OWN shift with no report yet: the page opens it (POST /v1/shift-reports/open) and goes to the report. */
+  openKey?: { patternId: string; date: string } | null
+  versions: ReportVersionRow[]
+  /** The sections of the report's team template (matched by team NAME on the server). */
+  template: TemplateSection[]
+  /** The owner's display name (the report carries the user id only). */
+  owner: string
+  /** The signed-in member's user id. */
+  meId: string
+  /** Tenant wall "now" (date words only) and the same moment as an instant (every comparison). */
   now: string
+  nowAt: string
   tz: string
   tzLabel: string
   /** Role may write reports (and the tenant is not suspended). Editing also needs ownership and a draft/returned report. */
   canWrite: boolean
   /** Manager-home role with write access: accept / return (FR-M1-29). */
   canReview: boolean
-  /** Display name written on versions, comments and task timelines. */
-  me: string
-  tenantId: string
-  exportMeta: ExportMeta
+  /** The role may open tasks (the rows link to them). */
+  canOpenTasks: boolean
 }
 
-// /daily-reports/[id]: the owner edits a draft or returned report; everyone else (and the owner after submitting) reads it.
-// The mode is derived from the store, so a report submitted in this session locks at once (FR-M1-27).
+// /daily-reports/[id]: the owner edits a draft or returned report; everyone else (and the owner after submitting) reads it. The mode comes from what the API returned, so a report submitted in
+// another tab locks at the next refresh (FR-M1-27).
 export function ReportPage(props: ReportPageProps) {
-  const { id, seed } = props
-  const [reports, setReports] = reportsStore.useStore(seed.reports, seed.scopeKey)
-  const report = reports.find((r) => r.id === id)
-  const apply = useCallback((fn: (r: ShiftReport) => ShiftReport) => setReports((prev) => prev.map((r) => (r.id === id ? fn(r) : r))), [setReports, id])
-  const people = useMemo(() => new Map(seed.people.map((p) => [p.id, p])), [seed.people])
-
+  const { report, openKey, owner, template } = props
+  const back = (
+    <Link href="/daily-reports" className="td-back">
+      ← Shift reports
+    </Link>
+  )
+  if (!report && openKey) return <OpenReport {...props} patternId={openKey.patternId} date={openKey.date} back={back} />
   if (!report) {
     return (
       <div className="card">
@@ -48,15 +60,38 @@ export function ReportPage(props: ReportPageProps) {
       </div>
     )
   }
-  const owner = people.get(report.personId)?.name ?? report.personId
-  const template = seed.templates[report.team] ?? []
-  const back = (
-    <Link href="/daily-reports" className="td-back">
-      ← Shift reports
-    </Link>
+  if (canEditReport(report, props.meId, props.canWrite)) return <ReportEditor {...props} report={report} owner={owner} template={template} back={back} />
+  return <ReportReview {...props} report={report} owner={owner} template={template} back={back} />
+}
+
+/** The member's own shift with no report yet (a virtual inbox row, or the dashboard card): open it, then show it. A shift that has not started, is not theirs or has reporting off is said plainly. */
+function OpenReport({ patternId, date, tz, back }: ReportPageProps & { patternId: string; date: string; back: React.ReactNode }) {
+  const router = useRouter()
+  const [problem, setProblem] = useState<"off" | "none" | "error" | null>(null)
+  const started = useRef(false)
+  useEffect(() => {
+    if (started.current) return
+    started.current = true
+    void makeReportsClient(apiBrowser, tz)
+      .open(patternId, date)
+      .then((r) => router.replace(`/daily-reports/${r.reportId}`))
+      .catch((e) => {
+        const { kind, code } = classifyApiError(e)
+        setProblem(code === "reporting_off" ? "off" : kind === "not_found" ? "none" : "error")
+      })
+  }, [patternId, date, tz, router])
+  if (!problem) return <div className="card" aria-busy="true"><p className="td-muted">Opening your report…</p></div>
+  return (
+    <>
+      {back}
+      <div className="card">
+        <EmptyState
+          icon="report"
+          title={problem === "off" ? "Shift reporting is off" : problem === "none" ? "Report not found" : "Could not open the report"}
+          text={problem === "off" ? "Reporting is switched off for this shift, so there is no report to fill in." : problem === "none" ? "There is no shift report with this link that you can open." : "Something went wrong. Try again."}
+          action={<Link href="/daily-reports" className="btn btn-outline">Back to shift reports</Link>}
+        />
+      </div>
+    </>
   )
-  const state = reportState(report, props.now, props.tz)
-  if (canEditReport(report, seed.meId, props.canWrite && seed.scope === "own"))
-    return <ReportEditor {...props} report={report} owner={owner} template={template} state={state} apply={apply} back={back} />
-  return <ReportReview {...props} report={report} owner={owner} template={template} state={state} apply={apply} back={back} />
 }

@@ -22,7 +22,7 @@ Nav: "Location Rosters" (D1, name kept apart from "Shifts" and "Staff & Rosters"
 | `lib/roster-access.ts` | `rosterAccess(role, personId, grants, limits, locationIds)`, `canSeeLocation` |
 | `lib/roster-rules.ts` | Rule checks (pure) |
 | `lib/roster-repeat.ts` | `repeatWeek`, `saveWeekTemplate`, `applyWeekTemplate`, `autoRepeatDue` |
-| `lib/roster-overlay.ts` | `overlayRoster`: published roster shifts into the shift state |
+| `packages/domain/src/roster-overlay.ts` | `overlayRoster` (pure, tested). No screen uses it since B6 T6.7 (I17): real reports and shifts use the API's shifts only; B8 decides how rosters feed them |
 | `lib/workforce.ts` | `getWorkforce()`: one person list (D2) |
 | `lib/ics.ts` | `toIcs` (UTC times, CRLF, 75-octet folding) |
 | `features/rosters/` | `view.ts` (payload cut + `rosterEdit`), `editing.ts`, `publishing.ts`, `repeating.ts`, `exchange.ts`, `self-service.ts`, `admin.ts`, `api.ts`, `scope.ts` (store scope keys and merges, one place), `store.ts` (client stores), `components/` |
@@ -83,7 +83,7 @@ Rest (11h daily, 24h weekly) and hours use real elapsed time, so DST nights are 
 
 `overlayRoster` turns each published roster shift into a one-day pattern (id = roster shift id, name `<type> · <location>`) plus a one-day assignment, and carves the person's pattern assignment out of that week. So shift reports, Today and deadlines work unchanged.
 
-- `getShiftState()` (`lib/shifts-data.ts`) overlays, only when the tenant has M1A. Used by reports, Today, deadlines and the Shifts "own" view.
+- The M1A overlay is no longer applied to shifts, reports or Today (B6 T6.7, I17): the demo roster does not feed reports until B8.
 - `getBaseShiftState()` has no overlay. The Shifts admin page uses it so it lists only real patterns (it therefore does not show roster shifts).
 - `s-*` staff have no shift-member row, so no report prompt for them.
 

@@ -5,7 +5,7 @@ import { notFound } from "next/navigation"
 import { BillingView, getBilling, getEntitlements, getPlans, getSeatLimit, moduleRows, planCards } from "@/features/billing"
 import {
   BrandingPanel, DepartmentsPanel, DevicePolicyCard, DevicesPanel, IntegrationsPanel, MfaPolicyCard, NotificationsPanel, OrganisationForm, PrivacyPanel, RolesMatrix, SETTINGS_TABS,
-  SettingsLayout, TemplatePanel, UsersPanel, getBrandingPresets, getDeliveryLog, getNames, getNotificationSettings, getOrganisationOptions, getMockUserActivity, getTemplate, isTab, loadBranding, loadSessionIdleHours,
+  SettingsLayout, TemplatePanel, UsersPanel, getBrandingPresets, getDeliveryLog, getNames, getNotificationSettings, getOrganisationOptions, getMockUserActivity, loadReportTemplate, isTab, loadBranding, loadSessionIdleHours,
   loadDepartments, loadDevices, loadIntegrations, loadInvites, loadMatrix, loadMfaPolicy, loadMyExports, loadOrganisation, loadPolicies, loadRequests, loadUsers, nameOfFrom, readable, serverApi,
 } from "@/features/settings"
 import { LOGO_UPLOAD_ENABLED } from "@/features/settings/constants"
@@ -77,9 +77,11 @@ export default async function Page({ params, searchParams }: { params: Promise<{
           </>
         )
       }
-      // MOCK: no backend until T6.7 (the report template editor) and B9 (tenant-default notification settings and the delivery log): demo deployments only (I16).
-      case "template":
-        return mockEnabled() ? <TemplatePanel data={await getTemplate()} canWrite={write} scopeKey={tenant.id} /> : null
+      case "template": {
+        const t = await readable(() => loadReportTemplate(api))
+        return t && <TemplatePanel data={t} canWrite={write} />
+      }
+      // MOCK: no backend until B9 (tenant-default notification settings and the delivery log): demo deployments only (I16).
       case "notifications":
         return mockEnabled() ? <NotificationsPanel data={await getNotificationSettings()} deadline={org.deadline} tzLabel={org.tzLabel} today={org.today} timezone={org.timezone} log={await getDeliveryLog()} canWrite={write} scopeKey={tenant.id} /> : null
       case "integrations": {

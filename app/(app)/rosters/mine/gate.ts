@@ -2,10 +2,9 @@ import { getLeaveQueue, getMyExchange, getMyRoster, mineScopeKey, type LeaveQueu
 import { getData } from "@/lib/data"
 import { getMockOrg } from "@/lib/org"
 import { can } from "@/lib/permissions"
-import { getMockPeople } from "@/lib/people"
+import { getMockPeople, todayUserId } from "@/lib/people"
 import { rosterAccess, type LocationGrant, type OfficeLimit } from "@/lib/roster-access"
 import type { Session } from "@/lib/session"
-import { todayUserId } from "@/lib/today-data"
 
 export type MyRosterGate = { data: MyRosterData; queue: LeaveQueue; exchange: MyExchange; me: string; tz: string; today: string; scopeKey: string }
 

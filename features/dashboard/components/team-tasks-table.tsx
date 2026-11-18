@@ -2,24 +2,60 @@
 
 import { useState, type ReactNode } from "react"
 import Link from "next/link"
+import { toast } from "sonner"
 
 import { DataPagination, PagedBody } from "@/components/data-pagination"
 import { useDept } from "@/hooks/use-dept"
+import { apiBrowser } from "@/lib/api/browser"
+import { userMessage } from "@/lib/api/problem"
 import { paginate } from "@/lib/paginate"
+import { toTeamTasks } from "../adapters"
 import { TEAM_TASKS_PAGE_SIZE } from "../constants"
-import type { TeamTasksData } from "../types"
+import type { TeamTaskRow, TeamTasksData } from "../types"
 
 const prio = ["", "Low", "Medium", "High"]
 
-export function TeamTasksTable({ data, assignTask }: { data: TeamTasksData; assignTask: ReactNode }) {
+/**
+ * The home table of open tasks in the caller's scope, due first (GET /v1/dashboard/team-tasks). The API pages with a cursor: the table keeps its 5-row pages over what is loaded and fetches
+ * the next API page when the reader reaches the last one. The topbar department filter narrows the loaded rows only (the API has no department filter here).
+ */
+export function TeamTasksTable({ data, assignTask, ctx }: { data: TeamTasksData; assignTask: ReactNode; ctx: { tz: string; today: string } }) {
   const dep = useDept()
   const [page, setPage] = useState(1)
   const [seenDept, setSeenDept] = useState(dep)
+  const [base, setBase] = useState(data)
+  const [rows, setRows] = useState<TeamTaskRow[]>(data.tasks)
+  const [cursor, setCursor] = useState<string | null>(data.nextCursor)
+  const [loading, setLoading] = useState(false)
+  if (base !== data) {
+    setBase(data)
+    setRows(data.tasks)
+    setCursor(data.nextCursor)
+    setPage(1)
+  }
   if (seenDept !== dep) {
     setSeenDept(dep)
     setPage(1)
   }
-  const paged = paginate(data.tasks.filter((t) => dep === "all" || t.dept === dep), page, TEAM_TASKS_PAGE_SIZE)
+  const shown = rows.filter((t) => dep === "all" || t.dept === dep)
+  const paged = paginate(shown, page, TEAM_TASKS_PAGE_SIZE)
+
+  async function more(next: number) {
+    setPage(next)
+    if (!cursor || loading || next < paged.pageCount) return
+    setLoading(true)
+    try {
+      const dto = await apiBrowser.get("/v1/dashboard/team-tasks", { query: { limit: 25, cursor } })
+      const add = toTeamTasks(dto, { people: [], tz: ctx.tz, today: ctx.today })
+      // the people directory is not on the client: roles of rows loaded later are left blank (the name and avatar come from the row)
+      setRows((r) => [...r, ...add.tasks])
+      setCursor(add.nextCursor)
+    } catch (e) {
+      toast.error(userMessage(e).text)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   return (
     <div className="card">
@@ -56,7 +92,7 @@ export function TeamTasksTable({ data, assignTask }: { data: TeamTasksData; assi
           </PagedBody>
         </table>
       </div>
-      <DataPagination page={paged.page} pageCount={paged.pageCount} total={paged.total} from={paged.from} to={paged.to} label="Team tasks pages" onPageChange={setPage} />
+      <DataPagination page={paged.page} pageCount={paged.pageCount + (cursor ? 1 : 0)} total={paged.total} from={paged.from} to={paged.to} label="Team tasks pages" onPageChange={(p) => void more(p)} />
     </div>
   )
 }

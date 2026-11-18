@@ -4,10 +4,9 @@ import { AccessRestricted, getUser } from "@/features/shell"
 import { getData } from "@/lib/data"
 import { getMockOrg } from "@/lib/org"
 import { can } from "@/lib/permissions"
-import { getMockPeople } from "@/lib/people"
+import { getMockPeople, todayUserId } from "@/lib/people"
 import { rosterAccess, type LocationGrant, type OfficeLimit } from "@/lib/roster-access"
 import { getSession } from "@/lib/session"
-import { todayUserId } from "@/lib/today-data"
 
 // Location Rosters (Module 1A, FR-RS-10/11/12/33). The role's location access cuts the payload on the server (D4); a location the
 // role may not open shows "no access" and none of its data is sent.

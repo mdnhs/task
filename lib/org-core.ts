@@ -17,18 +17,20 @@ export type Org = {
   locale: string
   /** Shift-report deadline, "HH:mm" tenant-local. */
   deadline: string
+  /** Minutes after a shift ends that its report is due (the tenant setting); absent on mock orgs. */
+  reportDueAfterMinutes?: number
   departments: string[]
 }
 
-export type OrgSources = { timezone: string; currency: string; locale: string; reportDeadline: string; departments: string[] }
+export type OrgSources = { timezone: string; currency: string; locale: string; reportDeadline: string; departments: string[]; reportDueAfterMinutes?: number }
 
 export function composeOrg(s: OrgSources, now: Date): Org {
-  return { today: wallInTz(now, s.timezone), nowAt: now.toISOString(), timezone: s.timezone, tzLabel: zoneLabel(s.timezone, now), currency: s.currency, locale: s.locale, deadline: s.reportDeadline, departments: s.departments }
+  return { today: wallInTz(now, s.timezone), nowAt: now.toISOString(), timezone: s.timezone, tzLabel: zoneLabel(s.timezone, now), currency: s.currency, locale: s.locale, deadline: s.reportDeadline, departments: s.departments, ...(s.reportDueAfterMinutes === undefined ? {} : { reportDueAfterMinutes: s.reportDueAfterMinutes }) }
 }
 
 export async function loadOrg(api: Pick<ApiClient, "get">, now: Date = new Date()): Promise<Org> {
   const [ctx, teams] = await Promise.all([api.get("/v1/me/tenant"), api.get("/v1/teams", { query: { kind: "department" } })])
-  return composeOrg({ timezone: ctx.tenant.timezone, currency: ctx.tenant.currency, locale: ctx.tenant.locale, reportDeadline: ctx.reportDeadline, departments: teams.map((t) => t.name) }, now)
+  return composeOrg({ timezone: ctx.tenant.timezone, currency: ctx.tenant.currency, locale: ctx.tenant.locale, reportDeadline: ctx.reportDeadline, departments: teams.map((t) => t.name), ...(typeof ctx.reportDueAfterMinutes === "number" ? { reportDueAfterMinutes: ctx.reportDueAfterMinutes } : {}) }, now)
 }
 
 /**

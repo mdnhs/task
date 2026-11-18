@@ -1,134 +1,84 @@
-"use client"
+// FR-M1-31 (I27): shift-report exports are SERVER jobs. The page asks for one (`POST /v1/report-exports`), polls it (`GET /v1/report-exports/{id}`: 1 s, then 2 s, bounded, stopped when the tab
+// is hidden or the user leaves) and opens the finished file through the same-origin download path with a FRESH nonce each time. The URL is built at the moment of a click and never stored
+// or cached; the rows are the domain builder's (export-rows.ts). Nothing here makes a file in the browser.
+import type { ApiClient } from "@/lib/api/client"
+import { ApiError } from "@/lib/api/problem"
+import type { ExportFormat } from "./export-rows"
 
-// FR-M1-31 (was FR-REP-12): browser-side PDF, Excel and CSV files. jspdf / jspdf-autotable / exceljs are loaded with dynamic import() only when the
-// user clicks export, so they never land in the page bundle. Rows come from export-rows.ts (pure, tested).
-import { toCsv, type ExportDoc } from "./export-rows"
+export type ExportRequest = { format: ExportFormat; reportId?: string; from?: string; to?: string; team?: string; person?: string; status?: "all" | "draft" | "submitted" | "late" | "missing" | "accepted" | "returned" }
+export type ExportStatus = { id: string; status: "queued" | "running" | "done" | "failed" | "expired"; format: ExportFormat; rowCount: number | null; expiresAt: string | null; errorCode: string | null }
 
-export type ExportMeta = {
-  /** Tenant name, from the session. */
-  company: string
-  /** "Tue 20 Oct · Irish time" (tenant today and timezone label). */
-  generated: string
-  /** Tenant brand colour (#rrggbb); plain when missing or invalid. */
-  brand?: string
+export type ExportOutcome =
+  | { kind: "done"; id: string; status: ExportStatus }
+  | { kind: "failed"; id: string; code: string | null }
+  | { kind: "expired"; id: string }
+  /** Polling stopped (the tab is hidden or the user left): the export keeps running, ask again with `poll`. */
+  | { kind: "paused"; id: string }
+  | { kind: "timeout"; id: string }
+
+/** Copy for the end states. `failed` takes the API's `errorCode` (`forbidden` = the requester's access was reduced before the job ran). */
+export const EXPORT_COPY = {
+  failed: (code: string | null): string => (code === "forbidden" ? "Your access changed, so the export was not created." : "The export could not be created. Try again."),
+  expired: "Expired, export again.",
+  timeout: "Still working. Check back in a moment.",
+  paused: "Still working. It continues when you come back.",
+  /** The PDF is Latin-1 only (B5 limitation): Bengali, Arabic, Chinese and other scripts do not print in it. */
+  pdfNote: "PDF supports Latin letters only. For Bengali and other scripts use CSV or Excel.",
+} as const
+
+/** The path that downloads ONE finished export: our own origin, a fresh `nonce`, no credential. The API answers it with a 60 s presigned redirect (409 export_not_ready, 404 once gone). */
+export const exportPath = (id: string, nonce: string): string => `/v1/report-exports/${encodeURIComponent(id)}/download?o=${encodeURIComponent(nonce)}`
+
+export type ExportDeps = {
+  wait(ms: number): Promise<void>
+  /** True while the tab is hidden. */
+  hidden(): boolean
+  /** Most GETs per run (the bound). */
+  maxPolls?: number
 }
 
-const HEX = /^#[0-9a-f]{6}$/i
-const rgb = (hex: string | undefined, fallback: [number, number, number]): [number, number, number] =>
-  hex && HEX.test(hex) ? [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)) as [number, number, number] : fallback
+export function makeExportClient(api: Pick<ApiClient, "get" | "post">, deps: ExportDeps) {
+  const maxPolls = deps.maxPolls ?? 60
 
-function save(blob: Blob, name: string) {
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement("a")
-  a.href = url
-  a.download = name
-  document.body.appendChild(a)
-  a.click()
-  a.remove()
-  setTimeout(() => URL.revokeObjectURL(url), 1000)
-}
-
-export async function exportPdf(doc: ExportDoc, meta: ExportMeta) {
-  const [{ jsPDF }, { autoTable }] = await Promise.all([import("jspdf"), import("jspdf-autotable")])
-  const pdf = new jsPDF({ unit: "pt", format: "a4" })
-  const brand = rgb(meta.brand, [60, 60, 60])
-  const left = 40
-  pdf.setFont("helvetica", "bold")
-  pdf.setFontSize(10)
-  pdf.setTextColor(...brand)
-  pdf.text(meta.company, left, 40)
-  pdf.setFont("helvetica", "normal")
-  pdf.setTextColor(110)
-  pdf.text(meta.generated, pdf.internal.pageSize.getWidth() - left, 40, { align: "right" })
-  pdf.setFont("helvetica", "bold")
-  pdf.setFontSize(18)
-  pdf.setTextColor(20)
-  pdf.text(doc.title, left, 68)
-  pdf.setFont("helvetica", "normal")
-  pdf.setFontSize(10)
-  pdf.setTextColor(110)
-  pdf.text(doc.subtitle, left, 84)
-  let y = 100
-  if (doc.meta.length) {
-    autoTable(pdf, {
-      startY: y,
-      body: doc.meta,
-      theme: "plain",
-      styles: { fontSize: 9, cellPadding: 2 },
-      columnStyles: { 0: { fontStyle: "bold", cellWidth: 90, textColor: 90 } },
-      margin: { left },
-    })
-    y = (pdf as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 14
-  }
-  for (const t of doc.tables) {
-    if (t.title) {
-      pdf.setFont("helvetica", "bold")
-      pdf.setFontSize(11)
-      pdf.setTextColor(20)
-      if (y > pdf.internal.pageSize.getHeight() - 90) {
-        pdf.addPage()
-        y = 40
-      }
-      pdf.text(t.title, left, y + 8)
-      y += 14
+  async function poll(id: string, o: { onStatus?: (s: ExportStatus) => void; signal?: AbortSignal } = {}): Promise<ExportOutcome> {
+    for (let i = 0; i < maxPolls; i++) {
+      if (o.signal?.aborted || deps.hidden()) return { kind: "paused", id }
+      const s = (await api.get("/v1/report-exports/{id}", { path: { id } })) as ExportStatus
+      o.onStatus?.(s)
+      if (s.status === "done") return { kind: "done", id, status: s }
+      if (s.status === "failed") return { kind: "failed", id, code: s.errorCode }
+      if (s.status === "expired") return { kind: "expired", id }
+      await deps.wait(i === 0 ? 1000 : 2000)
+      if (o.signal?.aborted || deps.hidden()) return { kind: "paused", id }
     }
-    autoTable(pdf, {
-      startY: y,
-      head: [t.head],
-      body: t.rows,
-      styles: { fontSize: 9, cellPadding: 4, overflow: "linebreak" },
-      headStyles: { fillColor: brand, textColor: 255 },
-      margin: { left, right: left },
-    })
-    y = (pdf as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 18
+    return { kind: "timeout", id }
   }
-  const pages = pdf.getNumberOfPages()
-  for (let i = 1; i <= pages; i++) {
-    pdf.setPage(i)
-    pdf.setFontSize(8)
-    pdf.setTextColor(140)
-    pdf.text(`${meta.company} · page ${i} of ${pages}`, left, pdf.internal.pageSize.getHeight() - 20)
+
+  return {
+    poll,
+    /** Ask for the export, then poll it. A refusal (422 range_too_long, export_too_large, pdf_too_large; 409 export_limit) is an ApiError for userMessage. */
+    async run(body: ExportRequest, o: { onStatus?: (s: ExportStatus) => void; signal?: AbortSignal } = {}): Promise<ExportOutcome> {
+      const { id } = await api.post("/v1/report-exports", { body })
+      return poll(id, o)
+    },
   }
-  save(pdf.output("blob"), `${doc.fileBase}.pdf`)
 }
 
-export async function exportXlsx(doc: ExportDoc, meta: ExportMeta) {
-  const { Workbook } = await import("exceljs")
-  const wb = new Workbook()
-  wb.creator = meta.company
-  const ws = wb.addWorksheet(doc.title.slice(0, 31))
-  const [r, g, b] = rgb(meta.brand, [60, 60, 60])
-  const argb = "FF" + [r, g, b].map((n) => n.toString(16).padStart(2, "0")).join("")
-  const widths: number[] = []
-  const track = (row: string[]) => row.forEach((c, i) => (widths[i] = Math.min(60, Math.max(widths[i] ?? 10, ...c.split("\n").map((l) => l.length + 2)))))
-  ws.addRow([meta.company]).font = { bold: true, color: { argb } }
-  ws.addRow([doc.title]).font = { bold: true, size: 14 }
-  ws.addRow([`${doc.subtitle} · ${meta.generated}`])
-  ws.addRow([])
-  for (const m of doc.meta) {
-    ws.addRow(m).getCell(1).font = { bold: true }
-    track(m)
-  }
-  for (const t of doc.tables) {
-    ws.addRow([])
-    if (t.title) ws.addRow([t.title]).font = { bold: true }
-    const head = ws.addRow(t.head)
-    head.eachCell((c) => {
-      c.font = { bold: true, color: { argb: "FFFFFFFF" } }
-      c.fill = { type: "pattern", pattern: "solid", fgColor: { argb } }
-    })
-    track(t.head)
-    for (const row of t.rows) {
-      ws.addRow(row).eachCell((c) => (c.alignment = { wrapText: true, vertical: "top" }))
-      track(row)
-    }
-  }
-  widths.forEach((w, i) => (ws.getColumn(i + 1).width = w))
-  const buf = await wb.xlsx.writeBuffer()
-  save(new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), `${doc.fileBase}.xlsx`)
-}
+/**
+ * Open a finished export: ask the API first (a manual-redirect probe, so a refusal is read as the problem it is), then open a SECOND fresh path in a new tab. A refusal returns the ApiError
+ * for the caller's mapped copy; nothing is kept.
+ */
+export const openExport = (id: string, o: { fetch: typeof fetch; open(url: string): void; nonce(): string }) => openFile((n) => exportPath(id, n), o)
 
-/** CSV (UTF-8 with BOM so Excel reads accents, CRLF). No library needed. */
-export async function exportCsv(doc: ExportDoc) {
-  save(new Blob(["\uFEFF" + toCsv(doc)], { type: "text/csv;charset=utf-8" }), `${doc.fileBase}.csv`)
+/**
+ * Open one file by path (an export or a report attachment): ask the API first (a manual-redirect probe, so a refusal is read as the problem it is), then open a SECOND fresh path. The path
+ * builder takes a fresh nonce every call; nothing is kept.
+ */
+export async function openFile(pathOf: (nonce: string) => string, o: { fetch: typeof fetch; open(url: string): void; nonce(): string }): Promise<{ ok: true } | { ok: false; error: ApiError }> {
+  const res = await o.fetch(pathOf(o.nonce()), { redirect: "manual", credentials: "same-origin" })
+  if (res.type === "opaqueredirect" || (res.status >= 300 && res.status < 400) || res.ok) {
+    o.open(pathOf(o.nonce()))
+    return { ok: true }
+  }
+  return { ok: false, error: await ApiError.fromResponse(res) }
 }
