@@ -244,3 +244,37 @@ export const HistoryQuery = z.object({
   limit: z.string().max(5).optional().openapi({ description: "Page size 1..100 (default 50); anything else is 422 invalid_filter", example: "50" }),
   cursor: z.string().max(200).optional().openapi({ description: "The nextCursor of the previous page (newest first, keyset on creation time and id); garbage is 400 invalid_cursor", example: "MjAyNi0xMS0xNlQwOTowMDowMC4wMDBafDNmMmI4YzFkLTZhNDctNGUwYi05ZDE1LTJjN2U1YTliNGYxMA" }),
 })
+
+// ------------------------------------------------------------------ change requests (FR-RS-36)
+
+const CR_ID = "4e7a1d93-b2c5-4f08-a6d1-83c9e0f57b12"
+/** The patch as it is stored and shown: only the whitelisted shift keys (never a week or a location). */
+const ChangePatchOut = z.object({ date: z.string().optional(), start: z.string().optional(), end: z.string().optional(), unpaidBreakMin: z.number().int().optional(), userId: z.string().nullable().optional(), shiftTypeId: z.string().optional(), role: z.string().optional() })
+export const ChangeRequestOut = z.object({
+  id: z.uuid(), shiftId: z.uuid(), weekId: z.uuid(), locationId: z.uuid(), shiftVersion: z.number().int(), requestedBy: z.string(), patch: ChangePatchOut, reason: z.string(),
+  status: z.enum(["requested", "approved", "rejected"]), decidedBy: z.string().nullable(), decidedAt: z.string().nullable(), decisionNote: z.string().nullable(), createdAt: z.string(),
+})
+export type ChangeRequestDto = z.infer<typeof ChangeRequestOut>
+const changeRequestEx = {
+  id: CR_ID, shiftId: SHIFT_ID, weekId: WEEK_ID, locationId: LID, shiftVersion: 2, requestedBy: UID, patch: { start: "09:00", end: "17:00" }, reason: "Venue opens late", status: "requested",
+  decidedBy: null, decidedAt: null, decisionNote: null, createdAt: "2026-11-16T09:00:00.000Z",
+}
+export const ChangeRequestSchema = ChangeRequestOut.openapi({ example: changeRequestEx })
+export const CreateChangeRequestBody = z
+  .object({ patch: z.record(z.string().max(40), z.unknown()), reason: z.string().max(2000).optional() })
+  .openapi({ example: { patch: { start: "09:00", end: "17:00" }, reason: "Venue opens late" } })
+export const ChangeRequestListOut = z
+  .object({ items: z.array(ChangeRequestOut), nextCursor: z.string().nullable() })
+  .openapi({ example: { items: [changeRequestEx], nextCursor: "MjAyNi0xMS0xNlQwOTowMDowMC4wMDBafDNmMmI4YzFkLTZhNDctNGUwYi05ZDE1LTJjN2U1YTliNGYxMA" } })
+export const ChangeRequestQuery = z.object({
+  status: z.string().max(20).optional().openapi({ description: "requested | approved | rejected; anything else is 422 invalid_filter", example: "requested" }),
+  locationId: z.string().max(64).optional().openapi({ description: "One location (404 when the caller may not see it)", example: LID }),
+  limit: z.string().max(5).optional().openapi({ description: "Page size 1..100 (default 50); anything else is 422 invalid_filter", example: "50" }),
+  cursor: z.string().max(200).optional().openapi({ description: "The nextCursor of the previous page (newest first, keyset on creation time and id); garbage is 400 invalid_cursor", example: "MjAyNi0xMS0xNlQwOTowMDowMC4wMDBafDNmMmI4YzFkLTZhNDctNGUwYi05ZDE1LTJjN2U1YTliNGYxMA" }),
+})
+export const DecideChangeBody = z
+  .object({ decision: z.enum(["approve", "reject"]), note: z.string().max(2000).optional(), overrideReason: z.string().max(2000).optional(), overrideRuleIds: z.array(z.string().max(40)).max(20).optional() })
+  .openapi({ example: { decision: "approve", note: "Agreed with the client" } })
+export const DecideChangeOut = z
+  .object({ request: ChangeRequestOut, shift: ShiftOut.nullable(), violations: z.array(ViolationOut) })
+  .openapi({ example: { request: { ...changeRequestEx, status: "approved", decidedBy: UID, decidedAt: "2026-11-16T10:00:00.000Z", decisionNote: "Agreed with the client" }, shift: { ...shiftEx, start: "09:00", end: "17:00", version: 3 }, violations: [] } })

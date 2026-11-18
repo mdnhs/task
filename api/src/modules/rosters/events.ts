@@ -1,5 +1,5 @@
-import { and, eq, inArray } from "drizzle-orm"
-import { memberships } from "../../db/schema"
+import { and, eq, inArray, notExists, sql } from "drizzle-orm"
+import { locationSupervisors, memberships, roles, rosterOfficeLimits } from "../../db/schema"
 import type { TenantTx } from "../../db/tenant-tx"
 import { notifyMany } from "../notifications"
 import type { RosterCtx } from "./scope"
@@ -33,4 +33,48 @@ export async function notifyRostered(tx: TenantTx, ctx: Pick<RosterCtx, "tenantI
   const people = wanted.filter((u) => active.has(u))
   await notifyMany(tx, ctx.tenantId, people.map((userId) => ({ userId, kind: "member" as const, title: NOTICE[kind].title, body: NOTICE[kind].body(weekStart), link: "/rosters" })), env.deps, env.enqueue)
   return people
+}
+
+/** One notice to one person (generic text; a person is named only through the `{{subject}}` token, rendered when it is read). */
+export type Notice = { userId: string; title: string; body: string; subjectUserId?: string }
+
+/**
+ * Tells ACTIVE people only (a deactivated member hears nothing on any channel), one notice per person and title, in one batch: the lookups are O(1) however many people (`notifyMany`),
+ * never per recipient under the tenant lock.
+ */
+export async function notifyActive(tx: TenantTx, ctx: Pick<RosterCtx, "tenantId">, env: RosterEnv, notices: Notice[]): Promise<void> {
+  const wanted = [...new Set(notices.map((n) => n.userId))].sort()
+  if (wanted.length === 0) return
+  const active = new Set((await tx.select({ userId: memberships.userId }).from(memberships).where(and(eq(memberships.tenantId, ctx.tenantId), eq(memberships.status, "active"), inArray(memberships.userId, wanted)))).map((m) => m.userId))
+  const seen = new Set<string>()
+  const send = notices.filter((n) => {
+    const k = `${n.userId}|${n.title}`
+    if (!active.has(n.userId) || seen.has(k)) return false
+    seen.add(k)
+    return true
+  })
+  await notifyMany(tx, ctx.tenantId, send.map((n) => ({ userId: n.userId, kind: "member" as const, title: n.title, body: n.body, link: "/rosters", ...(n.subjectUserId ? { subjectUserId: n.subjectUserId } : {}) })), env.deps, env.enqueue)
+}
+
+/**
+ * Who decides or is asked about a site's roster: the active office roles that cover it (a Roster Manager excepted from the site is not asked) and, when `supervisors` is set, the active supervisors
+ * granted the site. Never anybody in `exclude` (the requester, the people the request is about). Two queries however many people.
+ */
+export async function approversOf(tx: TenantTx, tenantId: string, locationId: string, o: { supervisors: boolean; exclude: string[] }): Promise<string[]> {
+  const base = [eq(memberships.tenantId, tenantId), eq(memberships.status, "active"), eq(roles.tenantId, tenantId), sql`${roles.access}->>'roster' = 'write'`]
+  const office = await tx
+    .select({ userId: memberships.userId })
+    .from(memberships)
+    .innerJoin(roles, eq(roles.id, memberships.roleId))
+    .where(and(eq(roles.rosterLevel, "office"), ...base, notExists(tx.select({ one: sql`1` }).from(rosterOfficeLimits).where(and(eq(rosterOfficeLimits.tenantId, tenantId), eq(rosterOfficeLimits.userId, memberships.userId), eq(rosterOfficeLimits.locationId, locationId))))))
+  const sup = o.supervisors
+    ? await tx
+        .select({ userId: memberships.userId })
+        .from(locationSupervisors)
+        .innerJoin(memberships, and(eq(memberships.tenantId, locationSupervisors.tenantId), eq(memberships.userId, locationSupervisors.userId)))
+        .innerJoin(roles, eq(roles.id, memberships.roleId))
+        .where(and(eq(locationSupervisors.tenantId, tenantId), eq(locationSupervisors.locationId, locationId), eq(roles.rosterLevel, "supervisor"), ...base))
+    : []
+  const skip = new Set(o.exclude)
+  return [...new Set([...office, ...sup].map((r) => r.userId))].filter((u) => !skip.has(u)).sort()
 }

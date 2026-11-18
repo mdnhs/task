@@ -190,6 +190,9 @@ const SPECS: Record<string, Spec> = {
   "GET /v1/roster/weeks/{id}/history": { actor: "owner", expect: "not_found" },
   "POST /v1/roster/shifts/{id}/confirm": { actor: "owner", expect: "not_found" },
   "GET /v1/locations/{id}/history": { actor: "owner", expect: "not_found" },
+  // B8 T11: a change request on a shift (control: 409 use_direct_edit, the fixture shift is on a draft week) and its decision (control: 403 self_decision, the fixture request is the owner's own). A request of another tenant, a hidden or missing one and a non-uuid id are one 404 change_request_not_found.
+  "POST /v1/roster/shifts/{id}/change-requests": { actor: "owner", expect: "not_found" },
+  "POST /v1/roster/change-requests/{id}/decide": { actor: "owner", expect: "change_request_not_found" },
   "PATCH /v1/task-templates/{id}": { actor: "owner", expect: "template_not_found" },
   "DELETE /v1/task-templates/{id}": { actor: "owner", expect: "template_not_found" },
   // T5.1: shift patterns (control: PATCH 200, DELETE 204), assignments (control: PATCH 200 with an end date after the fixture's start, DELETE 204 for the future one),

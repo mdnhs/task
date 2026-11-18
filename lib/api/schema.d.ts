@@ -10614,6 +10614,259 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/roster/shifts/{id}/change-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        patch: {
+                            [key: string]: unknown;
+                        };
+                        reason?: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description A request for a change to a shift of a PUBLISHED week (a supervisor of the site or an office role); the patch takes the same keys as a shift edit, never a week. Office is told. 404 not_found for a week or shift of a site the caller may not see, a missing or another tenant's one and an id that is not a uuid (all the same answer); 409 use_direct_edit (the week is a draft: edit it) | location_archived; 422 reason_required (missing or blank) | invalid_patch | cannot_move_week | invalid_shift | invalid_shift_type | invalid_reason */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** Format: uuid */
+                            id: string;
+                            /** Format: uuid */
+                            shiftId: string;
+                            /** Format: uuid */
+                            weekId: string;
+                            /** Format: uuid */
+                            locationId: string;
+                            shiftVersion: number;
+                            requestedBy: string;
+                            patch: {
+                                date?: string;
+                                start?: string;
+                                end?: string;
+                                unpaidBreakMin?: number;
+                                userId?: string | null;
+                                shiftTypeId?: string;
+                                role?: string;
+                            };
+                            reason: string;
+                            /** @enum {string} */
+                            status: "requested" | "approved" | "rejected";
+                            decidedBy: string | null;
+                            decidedAt: string | null;
+                            decisionNote: string | null;
+                            createdAt: string;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/roster/change-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    /** @description requested | approved | rejected; anything else is 422 invalid_filter */
+                    status?: string;
+                    /** @description One location (404 when the caller may not see it) */
+                    locationId?: string;
+                    /** @description Page size 1..100 (default 50); anything else is 422 invalid_filter */
+                    limit?: string;
+                    /** @description The nextCursor of the previous page (newest first, keyset on creation time and id); garbage is 400 invalid_cursor */
+                    cursor?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The change requests of the sites the caller sees, newest first (a supervisor: their own sites; staff: an empty list). 404 not_found for a location the caller may not see; 400 invalid_cursor; 422 invalid_filter */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            items: {
+                                /** Format: uuid */
+                                id: string;
+                                /** Format: uuid */
+                                shiftId: string;
+                                /** Format: uuid */
+                                weekId: string;
+                                /** Format: uuid */
+                                locationId: string;
+                                shiftVersion: number;
+                                requestedBy: string;
+                                patch: {
+                                    date?: string;
+                                    start?: string;
+                                    end?: string;
+                                    unpaidBreakMin?: number;
+                                    userId?: string | null;
+                                    shiftTypeId?: string;
+                                    role?: string;
+                                };
+                                reason: string;
+                                /** @enum {string} */
+                                status: "requested" | "approved" | "rejected";
+                                decidedBy: string | null;
+                                decidedAt: string | null;
+                                decisionNote: string | null;
+                                createdAt: string;
+                            }[];
+                            nextCursor: string | null;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/roster/change-requests/{id}/decide": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** @enum {string} */
+                        decision: "approve" | "reject";
+                        note?: string;
+                        overrideReason?: string;
+                        overrideRuleIds?: string[];
+                    };
+                };
+            };
+            responses: {
+                /** @description Approve (the patch is applied as an office edit: rules and eligibility run again, the person confirms again) or reject (office roles only: 403 forbidden for anyone else who can see it). 404 change_request_not_found for a request of a site the caller may not see, a missing or another tenant's one and an id that is not a uuid (all the same answer); 403 self_decision (your own request, or a change to your own shift); 409 already_decided | stale_request (the shift changed since the request; it stays open) | location_archived | version_conflict; 422 rule_blocked (a new block: overrideReason and overrideRuleIds needed) | ineligible | invalid_override | invalid_reason | invalid_decision | invalid_patch | invalid_shift | cannot_move_week | shift_exists */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            request: {
+                                /** Format: uuid */
+                                id: string;
+                                /** Format: uuid */
+                                shiftId: string;
+                                /** Format: uuid */
+                                weekId: string;
+                                /** Format: uuid */
+                                locationId: string;
+                                shiftVersion: number;
+                                requestedBy: string;
+                                patch: {
+                                    date?: string;
+                                    start?: string;
+                                    end?: string;
+                                    unpaidBreakMin?: number;
+                                    userId?: string | null;
+                                    shiftTypeId?: string;
+                                    role?: string;
+                                };
+                                reason: string;
+                                /** @enum {string} */
+                                status: "requested" | "approved" | "rejected";
+                                decidedBy: string | null;
+                                decidedAt: string | null;
+                                decisionNote: string | null;
+                                createdAt: string;
+                            };
+                            shift: {
+                                /** Format: uuid */
+                                id: string;
+                                /** Format: uuid */
+                                weekId: string;
+                                /** Format: uuid */
+                                locationId: string;
+                                date: string;
+                                userId: string | null;
+                                /** Format: uuid */
+                                shiftTypeId: string;
+                                role: string;
+                                start: string;
+                                end: string;
+                                unpaidBreakMin: number;
+                                startAt: string;
+                                endAt: string;
+                                confirmedAt: string | null;
+                                version: number;
+                            } | null;
+                            violations: {
+                                /** @enum {string} */
+                                rule: "double_booking" | "approved_leave" | "unavailable" | "daily_rest" | "weekly_rest" | "avg_48h" | "expired_licence" | "left" | "elsewhere";
+                                shiftId: string;
+                                personId: string;
+                                /** @enum {string} */
+                                severity: "block" | "warn";
+                                message: string;
+                                otherShiftIds: string[];
+                            }[];
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/members/{userId}/deactivate": {
         parameters: {
             query?: never;

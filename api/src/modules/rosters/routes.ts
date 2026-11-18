@@ -17,6 +17,8 @@ import { createWeek, getWeek, listWeeks } from "./weeks"
 import { cancelLeave, createLeave, decideLeave, getAvailability, listLeave, putAvailability } from "./leave"
 import { setHomeLocation } from "./people"
 import { getQualifications, setQualifications } from "./qualifications"
+import { ChangeRequestListOut, ChangeRequestQuery, ChangeRequestSchema, CreateChangeRequestBody, DecideChangeBody, DecideChangeOut } from "./dto"
+import { createChangeRequest, decideChangeRequest, listChangeRequests } from "./requests"
 import { rosterGuard } from "./scope"
 import { rosterRead, rosterWrite } from "./write"
 
@@ -169,6 +171,19 @@ const shiftDeleteR = createRoute({
   method: "delete", path: "/v1/roster/shifts/{id}", middleware: guard("write"), request: { params: RosterIdParam, query: DeleteShiftQuery },
   responses: { 204: { description: `The shift is removed; history keeps it whole. ${WEEK_HIDDEN}; 403 roster_locked (a supervisor on a published week); 409 version_conflict (a stale ?version=); 422 reason_required (office on a published week)` } },
 })
+const CR_HIDDEN = "404 change_request_not_found for a request of a site the caller may not see, a missing or another tenant's one and an id that is not a uuid (all the same answer)"
+const changeCreateR = createRoute({
+  method: "post", path: "/v1/roster/shifts/{id}/change-requests", middleware: guard("write"), request: { params: RosterIdParam, body: body(CreateChangeRequestBody) },
+  responses: { 201: json(ChangeRequestSchema, `A request for a change to a shift of a PUBLISHED week (a supervisor of the site or an office role); the patch takes the same keys as a shift edit, never a week. Office is told. ${WEEK_HIDDEN}; 409 use_direct_edit (the week is a draft: edit it) | location_archived; 422 reason_required (missing or blank) | invalid_patch | cannot_move_week | invalid_shift | invalid_shift_type | invalid_reason`) },
+})
+const changeListR = createRoute({
+  method: "get", path: "/v1/roster/change-requests", middleware: guard("read"), request: { query: ChangeRequestQuery },
+  responses: { 200: json(ChangeRequestListOut, "The change requests of the sites the caller sees, newest first (a supervisor: their own sites; staff: an empty list). 404 not_found for a location the caller may not see; 400 invalid_cursor; 422 invalid_filter") },
+})
+const changeDecideR = createRoute({
+  method: "post", path: "/v1/roster/change-requests/{id}/decide", middleware: guard("write"), request: { params: RosterIdParam, body: body(DecideChangeBody) },
+  responses: { 200: json(DecideChangeOut, `Approve (the patch is applied as an office edit: rules and eligibility run again, the person confirms again) or reject (office roles only: 403 forbidden for anyone else who can see it). ${CR_HIDDEN}; 403 self_decision (your own request, or a change to your own shift); 409 already_decided | stale_request (the shift changed since the request; it stays open) | location_archived | version_conflict; 422 rule_blocked (a new block: overrideReason and overrideRuleIds needed) | ineligible | invalid_override | invalid_reason | invalid_decision | invalid_patch | invalid_shift | cannot_move_week | shift_exists`) },
+})
 
 export const rosterRoutes = newRouter()
   .openapi(listR, async (c) => c.json(await rosterRead(c, (tx, ctx) => listLocations(tx, ctx, { includeArchived: c.req.valid("query").includeArchived === "true" })), 200))
@@ -224,6 +239,9 @@ export const rosterRoutes = newRouter()
   .openapi(confirmR, async (c) => c.json(await rosterWrite(c, (tx, ctx, env) => confirmShift(tx, ctx, env, c.req.valid("param").id), "self"), 200))
   .openapi(weekHistoryR, async (c) => c.json(await rosterRead(c, (tx, ctx) => weekHistory(tx, ctx, c.req.valid("param").id, c.req.valid("query"))), 200))
   .openapi(locationHistoryR, async (c) => c.json(await rosterRead(c, (tx, ctx) => locationHistory(tx, ctx, c.req.valid("param").id, c.req.valid("query"))), 200))
+  .openapi(changeCreateR, async (c) => c.json(await rosterWrite(c, (tx, ctx, env) => createChangeRequest(tx, ctx, env, c.req.valid("param").id, c.req.valid("json"))), 201))
+  .openapi(changeListR, async (c) => c.json(await rosterRead(c, (tx, ctx) => listChangeRequests(tx, ctx, c.req.valid("query"))), 200))
+  .openapi(changeDecideR, async (c) => c.json(await rosterWrite(c, (tx, ctx, env) => decideChangeRequest(tx, ctx, env, c.req.valid("param").id, c.req.valid("json"))), 200))
   .openapi(shiftDeleteR, async (c) => {
     await rosterWrite(c, (tx, ctx, env) => deleteShift(tx, ctx, env, c.req.valid("param").id, c.req.valid("query")))
     return c.body(null, 204)

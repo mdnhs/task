@@ -8,7 +8,7 @@ import { sites, type Json, type Who } from "./testkit"
 type W = Awaited<ReturnType<typeof sites>>
 type Cell = { weekId: string; start: string; shiftId: string; shiftVersion: number }
 type Role = "supervisor" | "office" | "manager" | "staff"
-type Action = "add" | "move" | "remove" | "publish" | "confirm" | "check"
+type Action = "add" | "move" | "remove" | "publish" | "confirm" | "check" | "changeRequest"
 
 /** The one request of each action, as a function of the caller and the cell (`reason` goes where the route takes one). */
 const RUN: Record<Action, (w: W, who: Who, c: Cell, reason?: string) => Promise<Response>> = {
@@ -18,6 +18,7 @@ const RUN: Record<Action, (w: W, who: Who, c: Cell, reason?: string) => Promise<
   publish: async (w, who, c) => w.req("POST", `/v1/roster/weeks/${c.weekId}/publish`, who, { version: Number((await w.rows("select version from roster_weeks where id = $1", [c.weekId]))[0].version) }),
   confirm: (w, who, c) => w.req("POST", `/v1/roster/shifts/${c.shiftId}/confirm`, who),
   check: (w, who, c) => w.req("POST", `/v1/roster/weeks/${c.weekId}/check`, who),
+  changeRequest: (w, who, c, reason) => w.req("POST", `/v1/roster/shifts/${c.shiftId}/change-requests`, who, { patch: { start: "09:00", end: "17:00" }, ...(reason ? { reason } : {}) }),
 }
 
 /** route key of the live document -> the action that exercises it. A new mutating route with a week or shift in its path fails the inventory test until it is listed here. */
@@ -28,6 +29,7 @@ const ROUTE_ACTION: Record<string, Action> = {
   "POST /v1/roster/weeks/{id}/publish": "publish",
   "POST /v1/roster/shifts/{id}/confirm": "confirm",
   "POST /v1/roster/weeks/{id}/check": "check", // a dry run: writes nothing
+  "POST /v1/roster/shifts/{id}/change-requests": "changeRequest", // the supervisor's way into a published week: a request, never an edit (Task 11)
 }
 
 /** [draft, published without reason, published with reason] per role. null = not applicable (the action takes no reason). */
@@ -38,6 +40,7 @@ const EXPECT: Record<Action, Record<Role, [number, number | null, number | null]
   publish: { supervisor: [200, 409, null], office: [200, 409, null], manager: [403, 403, null], staff: [403, 403, null] },
   confirm: { supervisor: [403, 403, null], office: [403, 403, null], manager: [403, 403, null], staff: [409, 200, null] },
   check: { supervisor: [200, 200, null], office: [200, 200, null], manager: [403, 403, null], staff: [403, 403, null] },
+  changeRequest: { supervisor: [409, 422, 201], office: [409, 422, 201], manager: [403, 403, 403], staff: [403, 403, 403] }, // a draft week is edited directly; a request always needs its reason
 }
 
 let n = 0

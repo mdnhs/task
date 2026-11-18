@@ -15,8 +15,8 @@ import { loadWeek, shiftDto, shiftSnap, type LoadedWeek, type ShiftRow } from ".
 import { notifyRostered, shiftChangedPayload } from "./events"
 import { auditRoster, checkOverrideIds, cleanReason, isUuid, publishRoster, writeHistory, type RosterEnv } from "./write"
 
-const unprocessable = (code: string, extra?: Record<string, unknown>) => new AppError(422, code, "Unprocessable Entity", extra)
-type TypeRow = typeof shiftTypes.$inferSelect
+export const unprocessable = (code: string, extra?: Record<string, unknown>) => new AppError(422, code, "Unprocessable Entity", extra)
+export type TypeRow = typeof shiftTypes.$inferSelect
 
 const CTRL = /[\u0000-\u001f\u007f]/
 const MAX_ENTRIES = 50
@@ -55,7 +55,7 @@ export async function loadShift(tx: TenantTx, ctx: RosterCtx, id: string): Promi
 }
 
 /** What a person must be to be rostered (always 422 `ineligible`, whatever the tenant's rule severities): an active member (`left` otherwise) holding every required qualification, not expired on the shift date. The member rows are locked FOR SHARE so a concurrent deactivation waits. */
-async function assertEligible(tx: TenantTx, ctx: RosterCtx, people: { userId: string; date: string; type: TypeRow }[]): Promise<void> {
+export async function assertEligible(tx: TenantTx, ctx: RosterCtx, people: { userId: string; date: string; type: TypeRow }[]): Promise<void> {
   if (people.length === 0) return
   const ids = [...new Set(people.map((p) => p.userId))].sort()
   const members = await tx
@@ -101,7 +101,7 @@ const violationKey = (v: RuleViolation): string => `${v.rule}|${v.shiftId}|${v.p
  * change and only what the change CAUSED counts. A new block is 422 `rule_blocked` (with the violations) unless an office role gives a reason; a new warning never stops a draft edit
  * and is returned. Returns what the caller must show plus the overridden blocks for history and audit.
  */
-async function ruleGate(tx: TenantTx, ctx: RosterCtx, week: { id: string; status: string }, change: { dropShiftIds?: string[]; add: NewShift[] }, o: { reason: string | undefined; overrideRuleIds: string[] | undefined }): Promise<{ violations: RuleViolation[]; overrides: { rule: string; shiftId: string; personId: string }[] }> {
+export async function ruleGate(tx: TenantTx, ctx: RosterCtx, week: { id: string; status: string }, change: { dropShiftIds?: string[]; add: NewShift[] }, o: { reason: string | undefined; overrideRuleIds: string[] | undefined }): Promise<{ violations: RuleViolation[]; overrides: { rule: string; shiftId: string; personId: string }[] }> {
   const override = checkOverrideIds(o.overrideRuleIds)
   const before = new Set((await checkWeek(tx, ctx, week.id)).map(violationKey))
   const fresh = (await checkWeek(tx, ctx, week.id, change)).filter((v) => !before.has(violationKey(v)))
@@ -123,10 +123,10 @@ function instants(date: string, start: string, end: string, unpaidBreakMin: numb
   return t
 }
 
-const inWeek = (weekStart: string, date: string): boolean => realDate(date) && date >= weekStart && date <= addDays(weekStart, 6)
+export const inWeek = (weekStart: string, date: string): boolean => realDate(date) && date >= weekStart && date <= addDays(weekStart, 6)
 
 /** A foreign-key or unique violation from the database (a location pair the composite FK refuses, a racing duplicate) is a 409, never a 500. */
-async function guarded<T>(fn: () => Promise<T>): Promise<T> {
+export async function guarded<T>(fn: () => Promise<T>): Promise<T> {
   try {
     return await fn()
   } catch (err) {
@@ -149,16 +149,16 @@ async function assertNoDuplicate(tx: TenantTx, ctx: RosterCtx, weekId: string, s
   if (assigned.some((s) => have.has(key(s.userId, s.date, s.type.id, s.start, s.end)))) throw Conflict("shift_exists")
 }
 
-const bumpWeek = (tx: TenantTx, ctx: RosterCtx, w: { id: string; version: number }) =>
+export const bumpWeek = (tx: TenantTx, ctx: RosterCtx, w: { id: string; version: number }) =>
   tx.update(rosterWeeks).set({ version: w.version + 1, updatedAt: ctx.now }).where(and(eq(rosterWeeks.tenantId, ctx.tenantId), eq(rosterWeeks.id, w.id)))
 
 /** An office edit of a PUBLISHED week tells the people it touches once each (R8-17); a draft edit tells nobody. */
-const tellPeople = (tx: TenantTx, ctx: RosterCtx, env: RosterEnv, week: { status: string; weekStart: string }, userIds: (string | null)[]): Promise<string[]> =>
+export const tellPeople = (tx: TenantTx, ctx: RosterCtx, env: RosterEnv, week: { status: string; weekStart: string }, userIds: (string | null)[]): Promise<string[]> =>
   week.status === "published" ? notifyRostered(tx, ctx, env, userIds, "changed", week.weekStart) : Promise.resolve([])
 /** The reason travels with the audit line of a published-week edit (history has its own `reason` column). */
-const reasonIf = (week: { status: string }, reason: string | null): { reason?: string } => (week.status === "published" && reason ? { reason } : {})
+export const reasonIf = (week: { status: string }, reason: string | null): { reason?: string } => (week.status === "published" && reason ? { reason } : {})
 /** `roster.shift_changed` for an office edit of a published week (ids only); a draft publishes no event. Call LAST. */
-async function announce(tx: TenantTx, ctx: RosterCtx, week: { id: string; locationId: string; weekStart: string; status: string }, a: { action: "added" | "moved" | "removed"; shiftIds: string[]; userIds: string[] }): Promise<void> {
+export async function announce(tx: TenantTx, ctx: RosterCtx, week: { id: string; locationId: string; weekStart: string; status: string }, a: { action: "added" | "moved" | "removed"; shiftIds: string[]; userIds: string[] }): Promise<void> {
   if (week.status === "published") await publishRoster(tx, ctx, "roster.shift_changed", shiftChangedPayload(week, a))
 }
 
@@ -229,10 +229,10 @@ export async function addShifts(tx: TenantTx, ctx: RosterCtx, env: RosterEnv, we
 // ------------------------------------------------------------------ move / change
 
 const PATCH_KEYS = ["date", "start", "end", "unpaidBreakMin", "userId", "shiftTypeId", "role"] as const
-type Patch = Partial<{ date: string; start: string; end: string; unpaidBreakMin: number; userId: string | null; shiftTypeId: string; role: string }>
+export type Patch = Partial<{ date: string; start: string; end: string; unpaidBreakMin: number; userId: string | null; shiftTypeId: string; role: string }>
 
 /** The whitelisted fields of a patch, typed. A key that would move the shift to another week is 422 cannot_move_week, any other unknown key 422 invalid_patch. */
-function parsePatch(raw: Record<string, unknown>): Patch {
+export function parsePatch(raw: Record<string, unknown>): Patch {
   const keys = Object.keys(raw)
   if (keys.some((k) => k === "weekId" || k === "locationId")) throw unprocessable("cannot_move_week")
   if (keys.length === 0 || keys.some((k) => !(PATCH_KEYS as readonly string[]).includes(k))) throw unprocessable("invalid_patch")
@@ -255,18 +255,9 @@ function parsePatch(raw: Record<string, unknown>): Patch {
   return out
 }
 
-/**
- * PATCH /v1/roster/shifts/{id} (`{ version, patch, reason? }`): move, retime, reassign, retype or re-role one shift inside its week. A stale version is 409 version_conflict; a date outside the
- * week is 422 cannot_move_week; a new person or type or date re-runs eligibility (422 ineligible); a block the change causes is 422 rule_blocked unless an office role gives a reason.
- * A patch that changes nothing writes nothing. Changing the type copies the new type's times, break and role unless the patch gives them.
- */
-export async function patchShift(tx: TenantTx, ctx: RosterCtx, env: RosterEnv, id: string, input: { version: number; patch: Record<string, unknown>; reason?: string; overrideRuleIds?: string[] }): Promise<{ shift: ShiftDto; violations: RuleViolation[] }> {
-  const { shift: cur, loaded } = await loadShift(tx, ctx, id)
+/** What a patch resolves to against the current shift: the full next values, the instants and whether anything changes. Validates the patch (422); writes nothing. */
+export async function resolvePatch(tx: TenantTx, ctx: RosterCtx, cur: ShiftRow, loaded: LoadedWeek, p: Patch) {
   const week = loaded.week
-  editableWeek(ctx, loaded, input.reason)
-  if (cur.version !== input.version) throw Conflict("version_conflict")
-  const reason = cleanReason(input.reason)
-  const p = parsePatch(input.patch)
   if (p.date !== undefined && !inWeek(week.weekStart, p.date)) throw unprocessable(realDate(p.date) ? "cannot_move_week" : "invalid_patch")
   const typeChanged = p.shiftTypeId !== undefined && p.shiftTypeId !== cur.shiftTypeId
   let type: TypeRow | undefined
@@ -289,12 +280,27 @@ export async function patchShift(tx: TenantTx, ctx: RosterCtx, env: RosterEnv, i
   }
   const inst = instants(next.date, next.start, next.end, next.unpaidBreakMin, loaded.zone)
   const same = next.date === cur.date && next.userId === cur.userId && next.shiftTypeId === cur.shiftTypeId && next.role === cur.role && next.start === cur.startTime && next.end === cur.endTime && next.unpaidBreakMin === cur.unpaidBreakMin
-  if (same) return { shift: shiftDto(cur), violations: [] } // nothing changes: no bump, no history, no audit
+  return { next, t, typeChanged, inst, same }
+}
+
+/**
+ * The one change of a shift every route that edits a published or draft shift goes through (an office edit and the approval of a change request): resolves and validates the patch, re-runs
+ * eligibility and the rule gate INSIDE the roster write, updates the row (confirmation cleared, versions bumped), writes history and audit and tells the people. The caller has already
+ * passed the edit gate and the version check. `gateReason` is what may override a block (an office reason; the override contract for a published week is `overrideRuleIds`); `reason` is what history keeps.
+ * Returns what to show and `done`, which the caller awaits LAST (after its own history, notify and audit): the `roster.shift_changed` event of a published week.
+ */
+export async function applyShiftPatch(
+  tx: TenantTx, ctx: RosterCtx, env: RosterEnv, cur: ShiftRow, loaded: LoadedWeek, p: Patch,
+  o: { reason: string | null; gateReason: string | undefined; overrideRuleIds: string[] | undefined; extra?: Record<string, unknown> },
+): Promise<{ shift: ShiftDto; violations: RuleViolation[]; changed: boolean; done: () => Promise<void> }> {
+  const week = loaded.week
+  const { next, t, typeChanged, inst, same } = await resolvePatch(tx, ctx, cur, loaded, p)
+  if (same) return { shift: shiftDto(cur), violations: [], changed: false, done: async () => undefined } // nothing changes: no bump, no history, no audit
   if (loaded.archived) throw Conflict("location_archived")
   const spec: Spec = { id: cur.id, date: next.date, userId: next.userId, type: t, role: next.role, start: next.start, end: next.end, unpaidBreakMin: next.unpaidBreakMin, startAt: inst.startAt, endAt: inst.endAt }
   if (next.userId !== null && (next.userId !== cur.userId || typeChanged || next.date !== cur.date)) await assertEligible(tx, ctx, [{ userId: next.userId, date: next.date, type: t }])
   await assertNoDuplicate(tx, ctx, week.id, [spec], cur.id)
-  const gate = await ruleGate(tx, ctx, week, { dropShiftIds: [cur.id], add: [{ id: cur.id, date: next.date, personId: next.userId, shiftTypeId: t.id, start: next.start, end: next.end, unpaidBreakMin: next.unpaidBreakMin }] }, { reason: input.reason, overrideRuleIds: input.overrideRuleIds })
+  const gate = await ruleGate(tx, ctx, week, { dropShiftIds: [cur.id], add: [{ id: cur.id, date: next.date, personId: next.userId, shiftTypeId: t.id, start: next.start, end: next.end, unpaidBreakMin: next.unpaidBreakMin }] }, { reason: o.gateReason, overrideRuleIds: o.overrideRuleIds })
   const [row] = await guarded(() =>
     tx
       .update(rosterShifts)
@@ -307,13 +313,28 @@ export async function patchShift(tx: TenantTx, ctx: RosterCtx, env: RosterEnv, i
   )
   await bumpWeek(tx, ctx, week)
   await writeHistory(tx, ctx, {
-    locationId: week.locationId, weekId: week.id, shiftId: cur.id, action: "shift_moved", reason, before: shiftSnap(cur),
-    after: { ...shiftSnap(row), ...(gate.overrides.length ? { overrides: gate.overrides } : {}) },
+    locationId: week.locationId, weekId: week.id, shiftId: cur.id, action: "shift_moved", reason: o.reason, before: shiftSnap(cur),
+    after: { ...shiftSnap(row), ...(o.extra ?? {}), ...(gate.overrides.length ? { overrides: gate.overrides } : {}) },
   })
   const told = await tellPeople(tx, ctx, env, week, [cur.userId, row.userId])
-  await auditRoster(tx, ctx, { action: "roster.shift_moved", entity: "roster_shift", entityId: cur.id, before: shiftSnap(cur), after: { ...shiftSnap(row), ...reasonIf(week, reason) } })
-  await announce(tx, ctx, week, { action: "moved", shiftIds: [cur.id], userIds: told })
-  return { shift: shiftDto(row), violations: gate.violations }
+  await auditRoster(tx, ctx, { action: "roster.shift_moved", entity: "roster_shift", entityId: cur.id, before: shiftSnap(cur), after: { ...shiftSnap(row), ...(o.extra ?? {}), ...reasonIf(week, o.reason) } })
+  return { shift: shiftDto(row), violations: gate.violations, changed: true, done: () => announce(tx, ctx, week, { action: "moved", shiftIds: [cur.id], userIds: told }) }
+}
+
+/**
+ * PATCH /v1/roster/shifts/{id} (`{ version, patch, reason? }`): move, retime, reassign, retype or re-role one shift inside its week. A stale version is 409 version_conflict; a date outside the
+ * week is 422 cannot_move_week; a new person or type or date re-runs eligibility (422 ineligible); a block the change causes is 422 rule_blocked unless an office role gives a reason.
+ * A patch that changes nothing writes nothing. Changing the type copies the new type's times, break and role unless the patch gives them.
+ */
+export async function patchShift(tx: TenantTx, ctx: RosterCtx, env: RosterEnv, id: string, input: { version: number; patch: Record<string, unknown>; reason?: string; overrideRuleIds?: string[] }): Promise<{ shift: ShiftDto; violations: RuleViolation[] }> {
+  const { shift: cur, loaded } = await loadShift(tx, ctx, id)
+  editableWeek(ctx, loaded, input.reason)
+  if (cur.version !== input.version) throw Conflict("version_conflict")
+  const reason = cleanReason(input.reason)
+  const p = parsePatch(input.patch)
+  const out = await applyShiftPatch(tx, ctx, env, cur, loaded, p, { reason, gateReason: input.reason, overrideRuleIds: input.overrideRuleIds })
+  await out.done()
+  return { shift: out.shift, violations: out.violations }
 }
 
 // ------------------------------------------------------------------ remove
