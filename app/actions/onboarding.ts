@@ -13,7 +13,7 @@ import { EXPIRED_PATH } from "@/lib/session"
 import { writeTenantSlug } from "@/lib/tenant-cookie"
 
 type Defaults = { countries: { timezone: string; currency?: string; locale?: string }[] }
-export type OnboardingResult = { ok: true; slug: string; invited: number; failedInvites: number } | { ok: false; error: "invalid" | "slug_taken" | "failed" }
+export type OnboardingResult = { ok: true; slug: string; invited: number; failedInvites: number } | { ok: false; error: "invalid" | "slug_taken" | "limit" | "mfa" | "failed" }
 
 // First-run set-up (FR-SAAS-04): creates the company the signed-in person owns (POST /v1/tenants), then its first settings, teams and invites.
 // Everything the browser sends is re-validated (lib/onboarding.ts) and again by the API. od-tenant is written only AFTER the API confirmed the
@@ -46,6 +46,9 @@ export async function completeOnboarding(raw: OnboardingInput): Promise<Onboardi
         taken = true
         continue
       }
+      // A second company needs a second-factor session and one user can only create so many; neither means the session expired.
+      if (e instanceof ApiError && e.status === 401 && (e.code === "mfa_enrolment_required" || e.code === "mfa_challenge")) return { ok: false, error: "mfa" }
+      if (e instanceof ApiError && e.status === 403 && e.code === "tenant_limit_reached") return { ok: false, error: "limit" }
       if (e instanceof ApiError && e.status === 401) return redirect(EXPIRED_PATH)
       return { ok: false, error: "failed" }
     }

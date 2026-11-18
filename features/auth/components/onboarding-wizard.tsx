@@ -110,9 +110,10 @@ export function OnboardingWizard({ defaults, roles }: { defaults: OnboardingDefa
         invites: invites.map((i) => ({ email: i.email, roleKey: i.role })),
       })
       if (!r.ok) {
-        toast.error(r.error === "slug_taken" ? "That company name is taken. Choose another." : r.error === "invalid" ? "Check the company name, timezone and deadline." : "Could not set up the workspace. Try again.")
+        const msg = { slug_taken: "That company name is taken. Choose another.", invalid: "Check the company name, timezone and deadline.", limit: "Company limit reached. Contact support.", mfa: "Verify with two-factor to add another company.", failed: "Could not set up the workspace. Try again." }
+        toast.error(msg[r.error])
         if (r.error === "slug_taken") setNameTaken(true)
-        if (r.error !== "failed") go(1)
+        if (r.error === "slug_taken" || r.error === "invalid") go(1)
         return
       }
       try {

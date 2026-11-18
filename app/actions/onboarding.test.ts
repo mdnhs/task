@@ -17,7 +17,7 @@ const API = "http://api.internal:3001"
 const input = { company: "Northgate Facility Services", timezone: "Europe/London", deadline: "18:00", departments: ["Security", "Cleaning"], invites: [{ email: "Ana@x.ie", roleKey: "manager" }, { email: "", roleKey: "manager" }] }
 let calls: { method: string; path: string; tenant: string | null; body: unknown }[]
 let fetchMock: ReturnType<typeof vi.fn>
-type S = { me?: number; taken?: number; teamFails?: boolean; inviteFails?: boolean; tenantFails?: boolean }
+type S = { me?: number; taken?: number; teamFails?: boolean; inviteFails?: boolean; tenantFails?: boolean; tenantRefusal?: [number, string] }
 const script = (s: S = {}) => {
   calls = []
   let attempts = 0
@@ -32,6 +32,7 @@ const script = (s: S = {}) => {
     if (path === "/v1/tenants") {
       attempts += 1
       if (s.tenantFails) return no(500, "internal")
+      if (s.tenantRefusal) return no(...s.tenantRefusal)
       if (attempts <= (s.taken ?? 0)) return no(409, "slug_taken")
       return ok({ id: "t-1", slug: (body as { slug: string }).slug }, 201)
     }
@@ -50,6 +51,20 @@ beforeEach(() => {
   script()
 })
 afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals() })
+
+describe("B7 T5 company cap and MFA answers", () => {
+  test("403 tenant_limit_reached is 'limit' and 401 mfa_* is 'mfa' (neither is an expired session); nothing else is created", async () => {
+    script({ tenantRefusal: [403, "tenant_limit_reached"] })
+    expect(await completeOnboarding(input)).toEqual({ ok: false, error: "limit" })
+    script({ tenantRefusal: [401, "mfa_challenge"] })
+    expect(await completeOnboarding(input)).toEqual({ ok: false, error: "mfa" })
+    script({ tenantRefusal: [401, "mfa_enrolment_required"] })
+    expect(await completeOnboarding(input)).toEqual({ ok: false, error: "mfa" })
+    expect(calls.map((c) => c.path)).toEqual(["/v1/me", "/v1/tenants"])
+    script({ tenantRefusal: [401, "session_expired"] })
+    await expect(completeOnboarding(input)).rejects.toThrow("NEXT_REDIRECT")
+  })
+})
 
 describe("T6.3 completeOnboarding: POST /v1/tenants, then the company's first settings, teams and invites", () => {
   test("creates the tenant with the wizard's values, sets the deadline, makes a team per department, invites, and only then sets od-tenant", async () => {
