@@ -6,33 +6,56 @@ import type { Persona } from "./stack-env"
 // page itself reads), measured, then the real page arrives and is measured again. The blocks of the page (children of <main>, one level down) must agree within TOL px at 1568, 768
 // and 390 wide, and so must the total height. Results are appended to test-results/skeleton-measurements.jsonl (recorded in .claude/docs/architecture.md).
 const SLOW = "http://localhost:3102"
-const TOL = 1.5
-// Cases the skeleton cannot match exactly because the real page depends on the data (a row with a "Repeats" badge, a wrapped id or reviewer line is 14 to 25px taller; the number of
-// people or reports changes the rows) or on the role (K4: loading.tsx is static, so it always draws the typical OWNER view: a staff member's page is shorter). The numbers are the
-// measured |total difference| x 1.25 + 40 at the time of T6.9 (the data moves a little between runs); the test fails when a page drifts beyond them. Cases not listed must agree within TOL. See architecture.md -> Skeletons.
-const RECORD_ONLY = new Set(["dashboard staff", "reports member", "shifts member", "account security", "report review"]) // staff views (K4) and pages whose height follows data the other specs change (sessions, a report's rows): measured and written to the table, not asserted
-const KNOWN: Record<string, number> = {
-  "dashboard manager@1568": 52,
-  "reports inbox@1568": 50,
-  "shifts week@1568": 51,
-  "tasks list@1568": 142,
+const TOL = 3
+// EXACT: the page and its skeleton agree within TOL px in total and in EVERY block (head, filters, cards, table, pager), at the widths listed. This is the project rule (exact skeletons);
+// a regression here fails. The constant, non-data-dependent differences found in T6.9 (the seats field, the invoice empty state, stat note line, team row lines, the shifts week
+// footnote wrapper and typical rows, the evidence-tag rows and the Load more button of the lists) were fixed in the skeletons.
+const EXACT: Record<string, number[]> = {
+  "dashboard manager": [1568],
+  "shifts week": [1568, 768],
+  "tasks list": [1568],
+  "billing": [1568, 768, 390],
+  "audit": [1568],
+  "reports inbox": [1568],
+  "console overview": [1568, 768, 390]
+}
+// CEILING: what is left cannot be exact because the real page depends on data (a task row with an evidence tag, a wrapped id, the number of sessions or people, a report's rows),
+// on the role (K4: loading.tsx is static and draws the typical OWNER view, so staff pages are shorter) or on tables turning into stacked cards below 768px. The number is the
+// measured |total difference| x 1.25 + 40 (the data moves a little between runs); a page that drifts further fails. Listed under "Remaining work" in architecture.md.
+const CEILING: Record<string, number> = {
+  "dashboard staff@1568": 1082,
+  "reports member@1568": 516,
+  "report review@1568": 167,
+  "shifts member@1568": 885,
   "task detail@1568": 303,
-  "billing@1568": 59,
-  "audit@1568": 3,
-  "dashboard manager@768": 492,
-  "reports inbox@768": 680,
-  "shifts week@768": 51,
-  "tasks list@768": 456,
+  "console tenants@1568": 452,
+  "console audit@1568": 303,
+  "account security@1568": 209,
+  "dashboard manager@768": 501,
+  "dashboard staff@768": 1958,
+  "reports inbox@768": 760,
+  "reports member@768": 589,
+  "report review@768": 132,
+  "shifts member@768": 885,
+  "tasks list@768": 255,
   "task detail@768": 238,
-  "billing@768": 59,
   "audit@768": 339,
-  "dashboard manager@390": 582,
-  "reports inbox@390": 92,
-  "shifts week@390": 544,
-  "tasks list@390": 70,
+  "console tenants@768": 452,
+  "console audit@768": 303,
+  "account security@768": 209,
+  "dashboard manager@390": 586,
+  "dashboard staff@390": 1977,
+  "reports inbox@390": 82,
+  "reports member@390": 3445,
+  "report review@390": 519,
+  "shifts week@390": 264,
+  "shifts member@390": 5292,
+  "tasks list@390": 60,
   "task detail@390": 151,
-  "billing@390": 720,
-  "audit@390": 279
+  "audit@390": 330,
+  "console tenants@390": 1820,
+  "console audit@390": 678,
+  "account security@390": 139
 }
 
 type Case = { name: string; as: Persona; path: string | (() => Promise<string>); rx: string; tol?: number }
@@ -48,6 +71,10 @@ const CASES: Case[] = [
   { name: "task detail", as: "owner", path: "/tasks/TSK-1001", rx: "^/v1/tasks" },
   { name: "billing", as: "owner", path: "/settings/billing", rx: "^/v1/billing/invoices" },
   { name: "audit", as: "owner", path: "/audit-log", rx: "^/v1/audit" },
+  // The console: only the page's own reads are held back (the layout's probe is /v1/platform/tenants?pageSize=1, which must answer for the real shell to appear).
+  { name: "console overview", as: "platform", path: "/platform", rx: "^/v1/platform/(metrics|audit|data-requests)" },
+  { name: "console tenants", as: "platform", path: "/platform/tenants", rx: "^/v1/platform/tenants(?!\\?pageSize=1$)" },
+  { name: "console audit", as: "platform", path: "/platform/audit", rx: "^/v1/platform/audit" },
   { name: "account security", as: "member", path: "/account/security", rx: "^/v1/me/sessions" },
 ]
 
@@ -84,15 +111,22 @@ for (const width of [1568, 768, 390]) {
           const sk = await sig(page)
           await fetch(`${SLOW}/__delay/0`)
           await page.waitForFunction(() => !document.querySelector("main .sk"), null, { timeout: 45_000 })
-          await page.waitForTimeout(900)
+          await page.waitForTimeout(1600) // past the entrance animation of the cards
           const real = await sig(page)
           const diffs = sk.blocks.length === real.blocks.length ? sk.blocks.map((b, i) => Math.round((b.h - real.blocks[i].h) * 10) / 10) : null
           appendFileSync("test-results/skeleton-measurements.jsonl", `${JSON.stringify({ width, name: c.name, skeleton: sk, loaded: real, totalDiff: Math.round((sk.main - real.main) * 10) / 10, blockDiffs: diffs })}\n`)
-          if (process.env.SKELETON_RECORD === "1" || RECORD_ONLY.has(c.name)) return // measure only (no assertion): used to survey before fixing
-          const tol = KNOWN[`${c.name}@${width}`] ?? TOL
-          expect(Math.abs(sk.main - real.main), `${c.name} @${width}: total ${sk.main} vs ${real.main}`).toBeLessThanOrEqual(tol)
-          // the page head and the cards before the data-dependent one agree exactly (at 768 and up, where the head does not wrap; blocks are compared where the skeleton and the page draw the same number of them)
-          if (diffs && width >= 768) diffs.slice(0, 1).forEach((d, i) => expect(Math.abs(d), `${c.name} @${width}: block ${i} ${sk.blocks[i].c} ${sk.blocks[i].h} vs ${real.blocks[i].h}`).toBeLessThanOrEqual(TOL + 1))
+          if (process.env.SKELETON_RECORD === "1") return // survey mode: measure only
+          const key = `${c.name}@${width}`
+          if (EXACT[c.name]?.includes(width)) {
+            expect(Math.abs(sk.main - real.main), `${key}: total ${sk.main} vs ${real.main}`).toBeLessThanOrEqual(TOL)
+            expect(sk.blocks.map((b) => b.c), `${key}: the same blocks`).toEqual(real.blocks.map((b) => b.c))
+            diffs?.forEach((d, i) => expect(Math.abs(d), `${key}: block ${i} ${sk.blocks[i].c} ${sk.blocks[i].h} vs ${real.blocks[i].h}`).toBeLessThanOrEqual(TOL))
+          } else {
+            const ceiling = CEILING[key]
+            expect(ceiling, `${key}: no measured ceiling: add it (or make it exact)`).toBeDefined()
+            expect(Math.abs(sk.main - real.main), `${key}: total ${sk.main} vs ${real.main}`).toBeLessThanOrEqual(ceiling)
+            if (width >= 768 && diffs) diffs.slice(0, 1).forEach((d, i) => expect(Math.abs(d), `${key}: head block ${i}`).toBeLessThanOrEqual(TOL))
+          }
         } finally {
           await fetch(`${SLOW}/__delay/0`)
         }

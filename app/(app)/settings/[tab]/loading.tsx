@@ -21,7 +21,7 @@ export default async function Loading() {
     <SettingsLoading
       counts={counts}
       canWrite={canWrite(session, "settings")}
-      billing={<BillingSkeleton plans={plans.length} invoices={3} canManage={manage} currentIndex={Math.max(0, plans.indexOf(plan))} modules={planModules(entitlements, plan.id)} planName={plan.name} />}
+      billing={<BillingSkeleton plans={plans.length} invoices={0} subscribed={false} canManage={manage} currentIndex={Math.max(0, plans.indexOf(plan))} modules={planModules(entitlements, plan.id)} planName={plan.name} />}
     />
   )
 }

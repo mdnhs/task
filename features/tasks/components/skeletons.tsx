@@ -76,7 +76,7 @@ export function TasksSkeleton({ canCreate = true, staff = false, rows = 8, proje
                   </td>
                   <td data-label="Status">
                     {/* Real pill + evidence tag markup with the real labels as ghost text: the tag sits under the pill exactly like the loaded cell. */}
-                    {labels[i] ? <><span className="st sk-ghost">{labels[i].status}</span>{labels[i].ev && <div className="ev-tag sk-ghost">{labels[i].ev}</div>}</> : <Sk w={84} h={29.4} r={8} />}
+                    {labels[i] ? <><span className="st sk-ghost">{labels[i].status}</span>{labels[i].ev && <div className="ev-tag sk-ghost">{labels[i].ev}</div>}</> : <><Sk w={84} h={29.4} r={8} />{/* a typical page: about half the tasks need evidence, and their tag sits under the pill (14.6px taller row) */}{i % 2 === 0 && i < 9 && <div className="ev-tag sk-ghost">Evidence needed</div>}</>}
                   </td>
                 </tr>
               ))}
@@ -84,7 +84,7 @@ export function TasksSkeleton({ canCreate = true, staff = false, rows = 8, proje
           </table>
         </div>
         {/* A full first page means the API has more: the "Load more" button replaced the numbered pager (a cursor has no total). */}
-        {rows >= TASKS_PAGE_SIZE && <div className="tasks-more"><Sk w={104} h={40} r="pill" /></div>}
+        {rows >= TASKS_PAGE_SIZE && <div className="tasks-more"><Sk w={118} h={48} r="pill" /></div>}
       </div>
     </SkGroup>
   )

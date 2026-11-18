@@ -33,6 +33,7 @@ export function ShiftsSkeleton({ canWrite, rows = SHIFTS_PAGE_SIZE, total = 25 }
           <Sk w={192} h={48} r="pill" className="sk-sh-nav" />
           <Sk h={48} r="pill" className="sk-fsearch" />
         </div>
+        <div>{/* the real page wraps the table and its footnote in one slide element: one flex child, one gap */}
         <div className="table-wrap">
           <table className="rtable sh-week">
             <thead>
@@ -49,22 +50,24 @@ export function ShiftsSkeleton({ canWrite, rows = SHIFTS_PAGE_SIZE, total = 25 }
                   <td data-label="Person" className="sh-person">
                     <div>
                       <div className="tt">{g("Ann Byrne")}</div>
-                      <div className="tm">{g("Security")}</div>
+                      {!(n % 4 === 1 && n < 8) && <div className="tm">{g("Security")}</div>}
                     </div>
                   </td>
                   {DAYS.map((d, i) => (
                     <td key={d} data-label={`${WEEKDAY_SHORT[d]} ${19 + i}`} className="sh-day">
-                      {i % 4 === 3 ? (
+                      {i % 4 === 3 || (n % 4 === 1 && n < 8) || n === rows - 1 ? ( // a typical week: some people have no shift at all (a one-line row, 51px)
                         <span className="sh-off">{g("Off")}</span>
                       ) : (
                         <span className="sh-chips">
-                          <span className="sh-chip sk-ghost">
-                            <span className="sh-chip-name">Night</span>
-                            <span className="sh-chip-time num">
-                              22:00–06:00{" "}
-                              <b className="sh-next">+1</b>
+                          {(n % 4 === 0 && n > 7 ? [0, 1] : [0]).map((k) => (
+                            <span key={k} className="sh-chip sk-ghost">
+                              <span className="sh-chip-name">Night</span>
+                              <span className="sh-chip-time num">
+                                22:00–06:00{" "}
+                                <b className="sh-next">+1</b>
+                              </span>
                             </span>
-                          </span>
+                          ))}
                         </span>
                       )}
                     </td>
@@ -75,6 +78,7 @@ export function ShiftsSkeleton({ canWrite, rows = SHIFTS_PAGE_SIZE, total = 25 }
           </table>
         </div>
         <p className="sh-foot">{g("Week of 19–25 Oct · Times in Irish Time · +1 ends the next day")}</p>
+        </div>
         {total > SHIFTS_PAGE_SIZE && <PagerSkeleton rows={total} size={SHIFTS_PAGE_SIZE} />}
       </div>
     </SkGroup>

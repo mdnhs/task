@@ -162,8 +162,8 @@ export function ReportsSkeleton({ own = false, prompts = 0, mine = true, rows = 
               </table>
             </div>
             {rows >= REPORT_PAGE_SIZE && (
-              // "Load more" (the API's cursor): the same 104 x 40 pill as the tasks list, 16 px above and 4 below (T6.9: measure)
-              <div className="tasks-more"><Sk w={104} h={40} r="pill" /></div>
+              // "Load more" (the API's cursor): the same 118 x 48 button as the tasks list (measured T6.9)
+              <div className="tasks-more"><Sk w={118} h={48} r="pill" /></div>
             )}
           </>
         )}

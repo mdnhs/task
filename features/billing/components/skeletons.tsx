@@ -74,10 +74,10 @@ export function BillingSkeleton({
         </ul>
         {canManage && (
           <div className="bill-seat-form">
-            {/* browser-measured field (settings): label line 18.1, control 44, hint line 17.4 plus the hint's 6px top margin */}
+            {/* browser-measured field (settings): label line 18.1, control 48, hint line 17.4 plus the hint's 6px top margin */}
             <div className="od-field">
               <label><span className="sk-ghost">Seat cap</span></label>
-              <Sk h={44} r={12} />
+              <Sk h={48} r={12} />
               <div className="od-field-msg"><p className="od-field-hint"><span className="sk-ghost">Between 0 and 0 on the Business plan.</span></p></div>
             </div>
             <span className="btn btn-primary sk-ghost-btn">Save seats</span>
@@ -137,8 +137,9 @@ export function BillingSkeleton({
         {invoices === 0 && (
           <div className="od-empty">
             <Sk w={56} h={56} r="circle" style={{ marginBottom: 6 }} />
-            <Sk w={133} h={18} lh={26} />
-            <Sk w={290} h={14} lh={21} />
+            {/* the real empty state's copy as ghost text, so it wraps exactly like the page at every width */}
+            <h2><span className="sk-ghost">No invoices yet</span></h2>
+            <p><span className="sk-ghost">Your first invoice appears after the trial ends.</span></p>
           </div>
         )}
         {needsPager(invoices, INVOICES_PAGE_SIZE) && <PagerSkeleton rows={invoices} size={INVOICES_PAGE_SIZE} />}

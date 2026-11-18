@@ -138,7 +138,7 @@ export function SectionCardsSkeleton({ wraps = [], notes, count = 4 }: { wraps?:
             </div>
           ) : (
             <span>
-              <Sk w="70%" h={11} lh={17} />
+              <Sk w="70%" h={11} lh={19} />
               {wraps[i] && <Sk w="40%" h={11} lh={18} className="sk-wrap-xl" />}
             </span>
           )}
@@ -334,10 +334,10 @@ export function TeamTasksSkeleton({ canAssign = true, tasks = [], rows = TEAM_TA
                 <td>
                   <div className="pers">
                     <Sk w={34} h={34} r="circle" />
-                    <div><Sk w={96} h={13} lh={20} /><Sk w={72} h={11} lh={17} /></div>
+                    <div><Sk w={96} h={13} lh={18.84} /><Sk w={72} h={11} lh={15.94} /></div>
                   </div>
                 </td>
-                <td><Sk w={170} h={13} lh={20} /><Sk w={58} h={11} lh={17} /></td>
+                <td><Sk w={170} h={13} lh={18.84} /><Sk w={58} h={11} lh={15.94} /></td>
                 <td><Sk w={64} h={22} r={8} /></td>
                 <td><Sk w={16} h={12} r={2} /></td>
                 <td className="num due"><Sk w={96} h={12} lh={20} /></td>
