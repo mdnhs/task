@@ -91,8 +91,7 @@ export function NavUser({ user, session, variant = "app" }: { user: UserData; se
             )}
           </DropdownMenuLabel>
         </DropdownMenuGroup>
-        <DropdownMenuSeparator />
-        <DropdownMenuGroup>
+        <DropdownMenuGroup className="mt-1">
           {!platform && (
             <>
               <DropdownMenuItem render={<Link href="/account/profile" />}>
@@ -120,7 +119,6 @@ export function NavUser({ user, session, variant = "app" }: { user: UserData; se
             <span className="od-switch" data-on={dark || undefined} aria-hidden="true"><i /></span>
           </DropdownMenuItem>
         </DropdownMenuGroup>
-        <DropdownMenuSeparator />
         {menu.companies && (
           <DropdownMenuSub>
             <DropdownMenuSubTrigger>

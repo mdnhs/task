@@ -1,5 +1,7 @@
 /* platform feature styles */
 .pf-card .od-filters{margin-bottom:16px}
+/* Tabs and search share one row, search right after the tabs (normal .od-filters gap, same as every list); the tabs shrink (and scroll) before the row wraps. */
+.pf-card .od-filters .seg.od-seg{flex:0 1 auto;min-width:0}
 .pf-link{display:block;color:var(--ink);text-decoration:none;transition:color var(--dur-fast) var(--ease)}
 .pf-link:hover{color:var(--brand-deep)}
 :root[data-theme="dark"] .pf-link:hover{color:var(--brand-3)}
@@ -145,8 +147,10 @@ button.pf-arrow:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
 @media (max-width:420px){.stats.pf-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.pf-kpis .stat{padding:14px;min-height:128px}.pf-kpis .value{font-size:28px}.pf-kpis .value small{font-size:17px}.pf-kpis .arrow{width:32px;height:32px}}
 /* One gap token for the console's stacked sections and columns (same value as .stats). */
 :root{--pf-gap:calc(16px * var(--space-scale,1))}
-.pf-ov-grid{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:var(--pf-gap);align-items:start}
+.pf-ov-grid{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:var(--pf-gap);align-items:stretch}
 .pf-ov-col{display:flex;flex-direction:column;gap:var(--pf-gap);min-width:0}
+/* Both column stacks end on the same line: the last card of each grows (content stays top-aligned). */
+.pf-ov-col>:last-child{flex:1 1 auto}
 .pf-sample{display:flex;flex-direction:column;gap:var(--pf-gap);min-width:0}
 .pf-sample .pf-note{margin:0}
 @media (max-width:1100px){.pf-ov-grid{grid-template-columns:minmax(0,1fr)}}
@@ -225,13 +229,18 @@ button.pf-arrow:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
 .pf-sort-m{display:none}
 @media (max-width:720px){
   .pf-tenants.rtable,.pf-tenants.pf-no-mrr.rtable{min-width:0}
-  .pf-sort-m{display:contents}
+  /* Sort wraps to its own row under tabs + search (tablet); on phones it shares the row with the search. */
+  .pf-sort-m{display:block;flex:1 1 100%;order:2}
+  .pf-card .od-filters .od-filter-search{order:1}
   .rtable .pf-tname{align-items:flex-end;text-align:right;max-width:none;min-width:0}
   .rtable td.pf-tcell{align-items:flex-start}
   .rtable td.pf-users{flex-wrap:wrap}
   .rtable .pf-users>.num{margin-left:auto}
   .rtable td.pf-users .pf-seat{flex-basis:100%;width:auto;max-width:120px;margin:0 0 0 auto}
   .rtable td.pf-menu-cell{width:100%;justify-content:flex-end;padding-bottom:0}
+}
+@media (max-width:520px){
+  .pf-sort-m{flex:1 1 0;min-width:140px}
 }
 
 /* ---------- Billing ledger (/platform/billing, Task 6) ---------- */
