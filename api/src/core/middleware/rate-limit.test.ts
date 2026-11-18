@@ -18,7 +18,7 @@ function build(hops = 1) {
     c.set("requestId", "rid-1")
     await next()
   })
-  app.onError((err, c) => (err instanceof AppError ? problem(err.status, err.code, err.title, "rid-1", err.extra) : problem(500, "internal", "x", "rid-1")))
+  app.onError((err) => (err instanceof AppError ? problem(err.status, err.code, err.title, "rid-1", err.extra) : problem(500, "internal", "x", "rid-1")))
   const keyOf = (c: Parameters<Parameters<typeof rateLimit>[2]>[0]) => ipBucket(clientIp(c.req.raw.headers, undefined, c.get("deps").env.TRUST_PROXY_HOPS))
   app.get("/read", rateLimit("read", RULE, keyOf), (c) => c.json({ ok: true }))
   app.post("/auth", rateLimit("auth", RULE, keyOf, { failClosed: true }), (c) => c.json({ ok: true }))
