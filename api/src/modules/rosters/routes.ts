@@ -21,6 +21,8 @@ import { ChangeRequestListOut, ChangeRequestQuery, ChangeRequestSchema, CreateCh
 import { createChangeRequest, decideChangeRequest, listChangeRequests } from "./requests"
 import { DecideExchangeBody, DecideExchangeOut, ExchangeListOut, ExchangeQuery, ExchangeSchema, SwapBody } from "./dto"
 import { cancelExchange, claimShift, declineExchange, decideExchange, listExchanges, recommendExchange, swapShift } from "./exchange"
+import { ApplyTemplateBody, ApplyTemplateOut, AutoRepeatBody, RepeatBody, RepeatOut, SaveTemplateBody, TemplateSchema, TemplatesOut, TemplatesQuery } from "./dto"
+import { applyTemplate, deleteTemplate, listTemplates, repeatWeek, saveTemplate, setAutoRepeat } from "./repeat"
 import { rosterGuard } from "./scope"
 import { rosterRead, rosterWrite } from "./write"
 
@@ -223,6 +225,31 @@ const cancelR = createRoute({
   responses: { 200: json(ExchangeSchema, `The requester withdraws their own open exchange (also after the shift started). Someone who can see it but did not ask: 403 forbidden. ${EX_HIDDEN}; 409 already_decided`) },
 })
 
+const repeatR = createRoute({
+  method: "post", path: "/v1/roster/weeks/{id}/repeat", middleware: guard("write"), request: { params: RosterIdParam, body: body(RepeatBody) },
+  responses: { 201: json(RepeatOut, `Copies the week's people and individual times to the next 1..12 weeks as DRAFTS (a supervisor of the site too: the copies are drafts, the publish lock is not touched), all or nothing. Every copied shift is re-checked: a block (approved leave, a clash anywhere, a person who left or lacks a qualification) makes it an OPEN shift with a conflict row (open true), a warning or a public holiday keeps the person with a line (open false); copied = kept + warned + opened. Nobody is notified. ${WEEK_HIDDEN}; 403 forbidden (a role that edits nothing); 409 version_conflict | week_published (a target is published) | week_exists_draft (a target is a draft and replace is not true) | location_archived; 422 invalid_weeks`) },
+})
+const autoRepeatR = createRoute({
+  method: "put", path: "/v1/roster/weeks/{id}/auto-repeat", middleware: guard("write"), request: { params: RosterIdParam, body: body(AutoRepeatBody) },
+  responses: { 200: json(WeekSchema, `Sets how many days before the next week starts the worker creates its draft from this PUBLISHED week and tells the location's supervisors (null: off). A scheduling setting, not a roster edit: a supervisor of the site may set it on a published week; the version does not move; an unchanged value writes nothing. ${WEEK_HIDDEN}; 403 forbidden; 409 location_archived; 422 invalid_days (1..365)`) },
+})
+const saveTemplateR = createRoute({
+  method: "post", path: "/v1/roster/weeks/{id}/save-template", middleware: guard("write"), request: { params: RosterIdParam, body: body(SaveTemplateBody) },
+  responses: { 201: json(TemplateSchema, `A named copy of the week's people and times by weekday (a draft or a published week; the week is untouched). ${WEEK_HIDDEN}; 403 forbidden; 409 template_name_taken | template_limit (50 per location); 422 invalid_template (blank or over 80 characters)`) },
+})
+const templatesR = createRoute({
+  method: "get", path: "/v1/roster/week-templates", middleware: guard("read"), request: { query: TemplatesQuery },
+  responses: { 200: json(TemplatesOut, "The saved week templates of the locations the caller sees (a supervisor: their own sites; staff: none), by name. Counts only, never the people. 404 not_found for a location the caller may not see") },
+})
+const deleteTemplateR = createRoute({
+  method: "delete", path: "/v1/roster/week-templates/{id}", middleware: guard("write"), request: { params: RosterIdParam },
+  responses: { 204: { description: `The template is deleted (office roles only: 403 forbidden for a supervisor who can see it). ${HIDDEN}` } },
+})
+const applyTemplateR = createRoute({
+  method: "post", path: "/v1/roster/week-templates/apply", middleware: guard("write"), request: { body: body(ApplyTemplateBody) },
+  responses: { 201: json(ApplyTemplateOut, `A new DRAFT week at a location from a template (an empty draft week is filled). At another location the shift types are matched by name and people who are not on that site's team become open shifts with a conflict; leave, a clash, a person who left or lacks a qualification are opened as in a repeat. Nobody is notified. ${HIDDEN} (for the template and for the location); 403 forbidden; 409 week_exists (the existing week with shifts, its id in weekId) | week_published | location_archived; 422 invalid_week_start (a real Monday) | no_matching_type (typeNames lists them)`) },
+})
+
 export const rosterRoutes = newRouter()
   .openapi(listR, async (c) => c.json(await rosterRead(c, (tx, ctx) => listLocations(tx, ctx, { includeArchived: c.req.valid("query").includeArchived === "true" })), 200))
   .openapi(createR, async (c) => c.json(await rosterWrite(c, (tx, ctx) => createLocation(tx, ctx, c.req.valid("json"))), 201))
@@ -293,6 +320,15 @@ export const rosterRoutes = newRouter()
   .openapi(decideR, async (c) => c.json(await rosterWrite(c, (tx, ctx, env) => decideExchange(tx, ctx, env, c.req.valid("param").id, c.req.valid("json"))), 200))
   .openapi(declineR, async (c) => c.json(await rosterWrite(c, (tx, ctx, env) => declineExchange(tx, ctx, env, c.req.valid("param").id), "self"), 200))
   .openapi(cancelR, async (c) => c.json(await rosterWrite(c, (tx, ctx) => cancelExchange(tx, ctx, c.req.valid("param").id), "self"), 200))
+  .openapi(repeatR, async (c) => c.json(await rosterWrite(c, (tx, ctx) => repeatWeek(tx, ctx, c.req.valid("param").id, c.req.valid("json"))), 201))
+  .openapi(autoRepeatR, async (c) => c.json(await rosterWrite(c, (tx, ctx) => setAutoRepeat(tx, ctx, c.req.valid("param").id, c.req.valid("json").days)), 200))
+  .openapi(saveTemplateR, async (c) => c.json(await rosterWrite(c, (tx, ctx) => saveTemplate(tx, ctx, c.req.valid("param").id, c.req.valid("json").name)), 201))
+  .openapi(templatesR, async (c) => c.json(await rosterRead(c, (tx, ctx) => listTemplates(tx, ctx, c.req.valid("query"))), 200))
+  .openapi(applyTemplateR, async (c) => c.json(await rosterWrite(c, (tx, ctx) => applyTemplate(tx, ctx, c.req.valid("json"))), 201))
+  .openapi(deleteTemplateR, async (c) => {
+    await rosterWrite(c, (tx, ctx) => deleteTemplate(tx, ctx, c.req.valid("param").id))
+    return c.body(null, 204)
+  })
   .openapi(shiftDeleteR, async (c) => {
     await rosterWrite(c, (tx, ctx, env) => deleteShift(tx, ctx, env, c.req.valid("param").id, c.req.valid("query")))
     return c.body(null, 204)

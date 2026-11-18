@@ -9997,6 +9997,7 @@ export interface paths {
                                 /** Format: uuid */
                                 homeLocationId: string | null;
                             }[];
+                            membersTruncated: boolean;
                         };
                     };
                 };
@@ -10153,6 +10154,7 @@ export interface paths {
                                 /** Format: uuid */
                                 homeLocationId: string | null;
                             }[];
+                            membersTruncated: boolean;
                         };
                     };
                 };
@@ -11405,6 +11407,382 @@ export interface paths {
             };
         };
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/roster/weeks/{id}/repeat": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        version: number;
+                        /** @description How many following weeks to create, 1..12 (422 invalid_weeks otherwise) */
+                        weeks: number;
+                        /** @description Replace an existing DRAFT target week (without it 409 week_exists_draft) */
+                        replace?: boolean;
+                    };
+                };
+            };
+            responses: {
+                /** @description Copies the week's people and individual times to the next 1..12 weeks as DRAFTS (a supervisor of the site too: the copies are drafts, the publish lock is not touched), all or nothing. Every copied shift is re-checked: a block (approved leave, a clash anywhere, a person who left or lacks a qualification) makes it an OPEN shift with a conflict row (open true), a warning or a public holiday keeps the person with a line (open false); copied = kept + warned + opened. Nobody is notified. 404 not_found for a week or shift of a site the caller may not see, a missing or another tenant's one and an id that is not a uuid (all the same answer); 403 forbidden (a role that edits nothing); 409 version_conflict | week_published (a target is published) | week_exists_draft (a target is a draft and replace is not true) | location_archived; 422 invalid_weeks */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            created: {
+                                /** Format: uuid */
+                                id: string;
+                                /** Format: uuid */
+                                locationId: string;
+                                weekStart: string;
+                                /** @enum {string} */
+                                status: "draft" | "published";
+                                publishedAt: string | null;
+                                publishedBy: string | null;
+                                autoRepeatDays: number | null;
+                                version: number;
+                                days: {
+                                    date: string;
+                                    shiftIds: string[];
+                                    count: number;
+                                    target: number;
+                                    short: number;
+                                    over: number;
+                                }[];
+                            }[];
+                            conflicts: {
+                                /** Format: uuid */
+                                weekId: string;
+                                /** Format: uuid */
+                                shiftId: string;
+                                personId: string;
+                                date: string;
+                                /** @enum {string} */
+                                reason: "double_booking" | "approved_leave" | "unavailable" | "daily_rest" | "weekly_rest" | "avg_48h" | "expired_licence" | "left" | "elsewhere" | "public_holiday" | "not_in_location" | "qualification_missing" | "ineligible";
+                                /** @description true: the person was taken off and the copy is an OPEN shift; false: the person stays and the line only informs */
+                                open: boolean;
+                                message: string;
+                            }[];
+                            /** @description copied = kept + warned + opened: nothing is dropped and nothing is invented */
+                            counts: {
+                                copied: number;
+                                kept: number;
+                                warned: number;
+                                opened: number;
+                            };
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/roster/weeks/{id}/auto-repeat": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** @description Days before the next week starts that its draft is created, 1..365; null switches it off (422 invalid_days otherwise) */
+                        days: number | null;
+                    };
+                };
+            };
+            responses: {
+                /** @description Sets how many days before the next week starts the worker creates its draft from this PUBLISHED week and tells the location's supervisors (null: off). A scheduling setting, not a roster edit: a supervisor of the site may set it on a published week; the version does not move; an unchanged value writes nothing. 404 not_found for a week or shift of a site the caller may not see, a missing or another tenant's one and an id that is not a uuid (all the same answer); 403 forbidden; 409 location_archived; 422 invalid_days (1..365) */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** Format: uuid */
+                            id: string;
+                            /** Format: uuid */
+                            locationId: string;
+                            weekStart: string;
+                            /** @enum {string} */
+                            status: "draft" | "published";
+                            publishedAt: string | null;
+                            publishedBy: string | null;
+                            autoRepeatDays: number | null;
+                            version: number;
+                            days: {
+                                date: string;
+                                shiftIds: string[];
+                                count: number;
+                                target: number;
+                                short: number;
+                                over: number;
+                            }[];
+                        };
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/roster/weeks/{id}/save-template": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        name: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description A named copy of the week's people and times by weekday (a draft or a published week; the week is untouched). 404 not_found for a week or shift of a site the caller may not see, a missing or another tenant's one and an id that is not a uuid (all the same answer); 403 forbidden; 409 template_name_taken | template_limit (50 per location); 422 invalid_template (blank or over 80 characters) */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** Format: uuid */
+                            id: string;
+                            /** Format: uuid */
+                            locationId: string;
+                            name: string;
+                            /** @description How many shifts the template holds (the people stay in the template) */
+                            shifts: number;
+                            createdAt: string;
+                            createdBy: string | null;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/roster/week-templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    /** @description One location (404 when the caller may not see it); omitted: every location the caller sees */
+                    locationId?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The saved week templates of the locations the caller sees (a supervisor: their own sites; staff: none), by name. Counts only, never the people. 404 not_found for a location the caller may not see */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            items: {
+                                /** Format: uuid */
+                                id: string;
+                                /** Format: uuid */
+                                locationId: string;
+                                name: string;
+                                /** @description How many shifts the template holds (the people stay in the template) */
+                                shifts: number;
+                                createdAt: string;
+                                createdBy: string | null;
+                            }[];
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/roster/week-templates/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        templateId: string;
+                        locationId: string;
+                        weekStart: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description A new DRAFT week at a location from a template (an empty draft week is filled). At another location the shift types are matched by name and people who are not on that site's team become open shifts with a conflict; leave, a clash, a person who left or lacks a qualification are opened as in a repeat. Nobody is notified. 404 not_found for a location the caller may not see, one that does not exist, another tenant's and an id that is not a uuid (all the same answer) (for the template and for the location); 403 forbidden; 409 week_exists (the existing week with shifts, its id in weekId) | week_published | location_archived; 422 invalid_week_start (a real Monday) | no_matching_type (typeNames lists them) */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            week: {
+                                /** Format: uuid */
+                                id: string;
+                                /** Format: uuid */
+                                locationId: string;
+                                weekStart: string;
+                                /** @enum {string} */
+                                status: "draft" | "published";
+                                publishedAt: string | null;
+                                publishedBy: string | null;
+                                autoRepeatDays: number | null;
+                                version: number;
+                                days: {
+                                    date: string;
+                                    shiftIds: string[];
+                                    count: number;
+                                    target: number;
+                                    short: number;
+                                    over: number;
+                                }[];
+                            };
+                            conflicts: {
+                                /** Format: uuid */
+                                weekId: string;
+                                /** Format: uuid */
+                                shiftId: string;
+                                personId: string;
+                                date: string;
+                                /** @enum {string} */
+                                reason: "double_booking" | "approved_leave" | "unavailable" | "daily_rest" | "weekly_rest" | "avg_48h" | "expired_licence" | "left" | "elsewhere" | "public_holiday" | "not_in_location" | "qualification_missing" | "ineligible";
+                                /** @description true: the person was taken off and the copy is an OPEN shift; false: the person stays and the line only informs */
+                                open: boolean;
+                                message: string;
+                            }[];
+                            /** @description copied = kept + warned + opened: nothing is dropped and nothing is invented */
+                            counts: {
+                                copied: number;
+                                kept: number;
+                                warned: number;
+                                opened: number;
+                            };
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/roster/week-templates/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The template is deleted (office roles only: 403 forbidden for a supervisor who can see it). 404 not_found for a location the caller may not see, one that does not exist, another tenant's and an id that is not a uuid (all the same answer) */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
         options?: never;
         head?: never;
         patch?: never;

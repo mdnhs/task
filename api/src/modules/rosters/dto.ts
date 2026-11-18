@@ -189,8 +189,8 @@ const weekEx = {
 export const WeekSchema = WeekOut.openapi({ example: weekEx })
 const MemberOut = z.object({ userId: z.string(), name: z.string(), active: z.boolean(), homeLocationId: z.uuid().nullable() })
 export const WeeksOut = z
-  .object({ range: z.object({ from: z.string(), to: z.string(), view: z.enum(["day", "week", "fortnight", "month"]) }), weeks: z.array(WeekOut), shifts: z.array(ShiftOut), shiftTypes: z.array(ShiftTypeOut), members: z.array(MemberOut) })
-  .openapi({ example: { range: { from: "2026-11-02", to: "2026-11-08", view: "week" }, weeks: [weekEx], shifts: [shiftEx], shiftTypes: [shiftTypeEx], members: [{ userId: UID, name: "Aoife Byrne", active: true, homeLocationId: LID }] } })
+  .object({ range: z.object({ from: z.string(), to: z.string(), view: z.enum(["day", "week", "fortnight", "month"]) }), weeks: z.array(WeekOut), shifts: z.array(ShiftOut), shiftTypes: z.array(ShiftTypeOut), members: z.array(MemberOut), membersTruncated: z.boolean() })
+  .openapi({ example: { range: { from: "2026-11-02", to: "2026-11-08", view: "week" }, weeks: [weekEx], shifts: [shiftEx], shiftTypes: [shiftTypeEx], members: [{ userId: UID, name: "Aoife Byrne", active: true, homeLocationId: LID }], membersTruncated: false } })
 export type WeeksDto = z.infer<typeof WeeksOut>
 export const WeeksQuery = z.object({
   locationId: z.string().max(64).optional().openapi({ description: "One location (404 when the caller may not see it); omitted: every location the caller sees", example: LID }),
@@ -220,6 +220,34 @@ export const DeleteShiftQuery = z.object({
   version: z.string().max(9).optional().openapi({ description: "The shift version the editor saw; a stale one is 409 version_conflict", example: "1" }),
   reason: z.string().max(2000).optional().openapi({ description: "Why (required from an office role on a published week)", example: "Cover found" }),
 })
+
+// ------------------------------------------------------------------ repeat, week templates, auto-repeat (FR-RS-26..29)
+
+const CONFLICT_REASONS = ["double_booking", "approved_leave", "unavailable", "daily_rest", "weekly_rest", "avg_48h", "expired_licence", "left", "elsewhere", "public_holiday", "not_in_location", "qualification_missing", "ineligible"] as const
+const RepeatConflictOut = z.object({
+  weekId: z.uuid(), shiftId: z.uuid(), personId: z.string(), date: z.string(), reason: z.enum(CONFLICT_REASONS), open: z.boolean().openapi({ description: "true: the person was taken off and the copy is an OPEN shift; false: the person stays and the line only informs" }), message: z.string(),
+})
+const RepeatCountsOut = z.object({ copied: z.number().int(), kept: z.number().int(), warned: z.number().int(), opened: z.number().int() }).openapi({ description: "copied = kept + warned + opened: nothing is dropped and nothing is invented" })
+const conflictEx = { weekId: WEEK_ID, shiftId: SHIFT_ID, personId: UID, date: "2026-11-10", reason: "approved_leave", open: true, message: "Aoife Byrne is on approved leave (2026-11-10 to 2026-11-12) on 2026-11-10" } as const
+const countsEx = { copied: 12, kept: 10, warned: 1, opened: 1 }
+export const RepeatBody = z
+  .object({ version: z.number().int().min(1), weeks: z.number().openapi({ description: "How many following weeks to create, 1..12 (422 invalid_weeks otherwise)" }), replace: z.boolean().optional().openapi({ description: "Replace an existing DRAFT target week (without it 409 week_exists_draft)" }) })
+  .openapi({ example: { version: 3, weeks: 2, replace: false } })
+export const RepeatOut = z
+  .object({ created: z.array(WeekOut), conflicts: z.array(RepeatConflictOut), counts: RepeatCountsOut })
+  .openapi({ example: { created: [{ ...weekEx, weekStart: "2026-11-09" }], conflicts: [conflictEx], counts: countsEx } })
+export type RepeatDto = z.infer<typeof RepeatOut>
+export const AutoRepeatBody = z.object({ days: z.number().nullable().openapi({ description: "Days before the next week starts that its draft is created, 1..365; null switches it off (422 invalid_days otherwise)" }) }).openapi({ example: { days: 7 } })
+const TemplateOut = z.object({ id: z.uuid(), locationId: z.uuid(), name: z.string(), shifts: z.number().int().openapi({ description: "How many shifts the template holds (the people stay in the template)" }), createdAt: z.string(), createdBy: z.string().nullable() })
+const templateEx = { id: "3e8a1d57-9c2b-4f60-8a1e-7b5c3d2f1a09", locationId: LID, name: "Standard week", shifts: 12, createdAt: "2026-11-16T09:00:00.000Z", createdBy: UID }
+export const TemplateSchema = TemplateOut.openapi({ example: templateEx })
+export type TemplateDto = z.infer<typeof TemplateOut>
+export const TemplatesOut = z.object({ items: z.array(TemplateOut) }).openapi({ example: { items: [templateEx] } })
+export const TemplatesQuery = z.object({ locationId: z.string().max(64).optional().openapi({ description: "One location (404 when the caller may not see it); omitted: every location the caller sees", example: LID }) })
+export const SaveTemplateBody = z.object({ name: z.string().max(200) }).openapi({ example: { name: "Standard week" } })
+export const ApplyTemplateBody = z.object({ templateId: z.string().max(64), locationId: z.string().max(64), weekStart: z.string().max(10) }).openapi({ example: { templateId: templateEx.id, locationId: LID, weekStart: "2026-11-23" } })
+export const ApplyTemplateOut = z.object({ week: WeekOut, conflicts: z.array(RepeatConflictOut), counts: RepeatCountsOut }).openapi({ example: { week: { ...weekEx, weekStart: "2026-11-23" }, conflicts: [conflictEx], counts: countsEx } })
+export type ApplyTemplateDto = z.infer<typeof ApplyTemplateOut>
 
 // ------------------------------------------------------------------ publish, history, confirm (FR-RS-23, 24, 35, 37)
 

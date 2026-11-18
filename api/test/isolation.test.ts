@@ -189,6 +189,11 @@ const SPECS: Record<string, Spec> = {
   "POST /v1/roster/weeks/{id}/publish": { actor: "owner", expect: "not_found" },
   "GET /v1/roster/weeks/{id}/history": { actor: "owner", expect: "not_found" },
   "POST /v1/roster/shifts/{id}/confirm": { actor: "owner", expect: "not_found" },
+  // B8 T13: repeat (control: 409 version_conflict for the example's version 3), auto-repeat (control: 200), save-template (control: 201) and a saved week template (control: DELETE 204). One plain 404 not_found for another tenant's, a hidden, a missing and a non-uuid id.
+  "POST /v1/roster/weeks/{id}/repeat": { actor: "owner", expect: "not_found" },
+  "PUT /v1/roster/weeks/{id}/auto-repeat": { actor: "owner", expect: "not_found" },
+  "POST /v1/roster/weeks/{id}/save-template": { actor: "owner", expect: "not_found" },
+  "DELETE /v1/roster/week-templates/{id}": { actor: "owner", expect: "not_found" },
   "GET /v1/locations/{id}/history": { actor: "owner", expect: "not_found" },
   // B8 T11: a change request on a shift (control: 409 use_direct_edit, the fixture shift is on a draft week) and its decision (control: 403 self_decision, the fixture request is the owner's own). A request of another tenant, a hidden or missing one and a non-uuid id are one 404 change_request_not_found.
   "POST /v1/roster/shifts/{id}/change-requests": { actor: "owner", expect: "not_found" },

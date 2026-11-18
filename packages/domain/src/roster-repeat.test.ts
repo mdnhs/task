@@ -120,6 +120,12 @@ describe("repeatWeek", () => {
   it("rejects a target that is not a Monday", () => {
     expect(() => repeatWeek(week(), src, "2026-11-10", null, false, ctx(src), [], idList(4))).toThrow(/Monday/)
   })
+  it("an eligibility hook opens a shift whose person may not work it (left, missing qualification), whatever the rule severities say (B8 T13)", () => {
+    const none: RuleContext["severity"] = { ...SEV, left: "ignore", expired_licence: "ignore" }
+    const r = repeatWeek(week(), src, "2026-11-09", null, false, ctx(src, { severity: none }), [], idList(4), (pid, date) => (pid === "p2" ? { reason: "left", message: `Cannot work on ${date}` } : null))
+    expect(r.shifts.map((s) => s.personId)).toEqual(["p1", null, "p1"])
+    expect(r.conflicts).toEqual([{ shiftId: r.shifts[1].id, personId: "p2", reason: "left", open: true, message: "Cannot work on 2026-11-10" }])
+  })
 })
 
 describe("autoRepeatDue", () => {
@@ -180,5 +186,11 @@ describe("week templates", () => {
     const r = applyWeekTemplate(t, "a", "2026-11-16", ctx(src, { leave }), [], idList(4))
     expect(r.shifts[0].personId).toBeNull()
     expect(r.conflicts).toMatchObject([{ reason: "approved_leave", open: true }])
+  })
+  it("template apply takes the same eligibility hook (a person who is not on the target site's team becomes open)", () => {
+    const t = saveWeekTemplate("Std", wk, src, "wt1")
+    const r = applyWeekTemplate(t, "a", "2026-11-16", ctx(src), [], idList(4), (pid) => (pid === "p1" ? { reason: "not_in_location", message: "Not on this site's team" } : null))
+    expect(r.shifts.map((s) => s.personId)).toEqual([null, "p2", null])
+    expect(r.conflicts.map((c) => [c.personId, c.reason, c.open])).toEqual([["p1", "not_in_location", true], ["p1", "not_in_location", true]])
   })
 })

@@ -6,7 +6,9 @@ import { addDays, weekStart } from "./shifts"
 // shift plus a conflict; a warn-severity break or a public holiday is only an info conflict and the person stays. The check of each copy includes the copies
 // already made in this repeat and the shifts of every other week in ctx, so two copies can clash with each other.
 
-export type RepeatConflict = { shiftId: string; personId: string; reason: ViolationRule | "public_holiday" | "not_in_location"; open: boolean; message: string }
+export type RepeatConflict = { shiftId: string; personId: string; reason: ViolationRule | "public_holiday" | "not_in_location" | "qualification_missing" | "ineligible"; open: boolean; message: string }
+/** Who may not work a copied shift at all (left, a required qualification missing, not on the target site's team): decided by the caller from its own data, whatever the rule severities say. null = may work. */
+export type Eligibility = (personId: string, date: string, templateId: string) => { reason: RepeatConflict["reason"]; message: string } | null
 export type RepeatResult = { week: RosterWeek; shifts: RosterShift[]; conflicts: RepeatConflict[] }
 /** One shift of a template: `day` is days after the week's Monday (0..6). */
 export type WeekTemplateShift = { day: number; personId: string | null; templateId: string; role: string; start: string; end: string; unpaidBreakMin: number }
@@ -19,7 +21,7 @@ const isMonday = (d: string) => weekStart(d) === d
 type Draft = Omit<RosterShift, "id" | "weekId" | "locationId" | "confirmedAt">
 
 /** Checks each draft shift in turn against ctx + the accepted ones; failing ones open. `foreign` names people who may not work this location. */
-function place(week: RosterWeek, drafts: (Draft & { date: string })[], ctx: RuleContext, holidays: string[], ids: string[], base: RosterShift[], foreign: (personId: string) => boolean): RepeatResult {
+function place(week: RosterWeek, drafts: (Draft & { date: string })[], ctx: RuleContext, holidays: string[], ids: string[], base: RosterShift[], foreign: (personId: string) => boolean, eligible?: Eligibility): RepeatResult {
   const shifts: RosterShift[] = []
   const conflicts: RepeatConflict[] = []
   const made: RosterShift[] = []
@@ -29,6 +31,10 @@ function place(week: RosterWeek, drafts: (Draft & { date: string })[], ctx: Rule
       const pid = s.personId
       if (foreign(pid)) {
         conflicts.push({ shiftId: s.id, personId: pid, reason: "not_in_location", open: true, message: `Not on this location's team on ${s.date}` })
+        s.personId = null
+      } else if (eligible && eligible(pid, s.date, s.templateId)) {
+        const no = eligible(pid, s.date, s.templateId)!
+        conflicts.push({ shiftId: s.id, personId: pid, reason: no.reason, open: true, message: no.message })
         s.personId = null
       } else {
         const found = checkShifts([s], { ...ctx, shifts: [...base, ...made, s] })
@@ -55,7 +61,7 @@ function place(week: RosterWeek, drafts: (Draft & { date: string })[], ctx: Rule
  * is given), the rest are shift ids. A published `existing` week throws; a draft one throws unless `replace`, then its old shifts are
  * left out of the check and the caller removes them by week id (the returned shifts are the complete new set).
  */
-export function repeatWeek(source: RosterWeek, shifts: RosterShift[], targetWeekStart: string, existing: RosterWeek | null, replace: boolean, ctx: RuleContext, holidays: string[], ids: string[]): RepeatResult {
+export function repeatWeek(source: RosterWeek, shifts: RosterShift[], targetWeekStart: string, existing: RosterWeek | null, replace: boolean, ctx: RuleContext, holidays: string[], ids: string[], eligible?: Eligibility): RepeatResult {
   if (!isMonday(targetWeekStart)) throw new Error("A roster week starts on a Monday")
   if (existing && existing.status === "published") throw new Error("That week is already published")
   if (existing && !replace) throw new Error("That week already has a draft: choose replace")
@@ -67,7 +73,7 @@ export function repeatWeek(source: RosterWeek, shifts: RosterShift[], targetWeek
     .filter((s) => s.weekId === source.id)
     .map((s) => ({ date: addDays(s.date, offset), personId: s.personId, templateId: s.templateId, role: s.role, start: s.start, end: s.end, unpaidBreakMin: s.unpaidBreakMin }))
   const base = ctx.shifts.filter((s) => s.weekId !== week.id)
-  return place(week, drafts, ctx, holidays, ids, base, () => false)
+  return place(week, drafts, ctx, holidays, ids, base, () => false, eligible)
 }
 
 /** Weeks (one per location: the latest) whose next week is within their `autoRepeatDays` of `today` and doesn't exist yet. */
@@ -104,7 +110,7 @@ export function saveWeekTemplate(name: string, week: RosterWeek, shifts: RosterS
  * FR-RS-28: a new draft week at `locationId` from a template. At another location than the template's, a person whose home location isn't
  * that location becomes an open shift, and the shift takes that location's own shift type with the same times when there is one.
  */
-export function applyWeekTemplate(t: WeekTemplate, locationId: string, weekStart: string, ctx: RuleContext, holidays: string[], ids: string[]): RepeatResult {
+export function applyWeekTemplate(t: WeekTemplate, locationId: string, weekStart: string, ctx: RuleContext, holidays: string[], ids: string[], eligible?: Eligibility): RepeatResult {
   if (!isMonday(weekStart)) throw new Error("A roster week starts on a Monday")
   if (ctx.shifts.some((x) => x.locationId === locationId && weekStartOf(x.date) === weekStart)) throw new Error("That week already has shifts: a template starts a new week only")
   const week: RosterWeek = { id: ids[0], locationId, weekStart, status: "draft", publishedAt: null, publishedBy: null, autoRepeatDays: null }
@@ -114,5 +120,5 @@ export function applyWeekTemplate(t: WeekTemplate, locationId: string, weekStart
     const own = elsewhere ? ctx.templates.find((x) => x.locationId === locationId && x.start === s.start && x.end === s.end) : undefined
     return { date: addDays(weekStart, s.day), personId: s.personId, templateId: own ? own.id : elsewhere ? "" : s.templateId, role: own?.role ?? s.role, start: s.start, end: s.end, unpaidBreakMin: s.unpaidBreakMin }
   })
-  return place(week, drafts, ctx, holidays, ids, ctx.shifts.filter((s) => s.weekId !== week.id), (pid) => elsewhere && homes.get(pid) !== locationId)
+  return place(week, drafts, ctx, holidays, ids, ctx.shifts.filter((s) => s.weekId !== week.id), (pid) => elsewhere && homes.get(pid) !== locationId, eligible)
 }

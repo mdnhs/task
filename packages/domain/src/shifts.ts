@@ -149,6 +149,21 @@ function wallUtc(wall: string): number {
  * the transition instant itself: 01:30 in Dublin's 01:00-02:00 gap is 02:00 (01:00Z), in a 30 minute gap 02:15 is 02:30.
  */
 export function wallToEpoch(wall: string, tz: string): number {
+  const key = `${tz}|${wall}`
+  const hit = WALL_CACHE.get(key)
+  if (hit !== undefined) return hit
+  const ms = wallToEpochUncached(wall, tz)
+  if (WALL_CACHE.size >= WALL_CACHE_MAX) WALL_CACHE.clear()
+  WALL_CACHE.set(key, ms)
+  return ms
+}
+
+// A rule check or a repeat asks for the same few thousand wall times again and again (every copied shift is checked against every other shift of the person): the answer is a pure function of
+// (wall, zone), so it is remembered. Bounded (cleared when full), never keyed by anything but the two strings.
+const WALL_CACHE = new Map<string, number>()
+const WALL_CACHE_MAX = 100_000
+
+function wallToEpochUncached(wall: string, tz: string): number {
   const naive = wallUtc(wall)
   const before = offsetAt(naive - DAY_MS, tz)
   const after = offsetAt(naive + DAY_MS, tz)

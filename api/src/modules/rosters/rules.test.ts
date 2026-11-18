@@ -425,6 +425,29 @@ describe("the context loader", () => {
     expect(await w.rows("select count(*)::int n from roster_shifts")).toEqual([{ n: 3 }])
   })
 
+  test("loader row bound (B8 T13 carry): with the 52-week averaging window the shift rows are bounded to the window plus its rest margin (older shifts are never read) and the context stays at 6 queries or fewer", async () => {
+    const w = await sites()
+    await w.ok("PUT", "/v1/roster/rules", w.p.admin, { severity: { ...DEFAULT_SEVERITY }, avgWeekReferenceWeeks: 52 })
+    const staff = w.p.employee
+    const inside = await w.shift({ loc: w.a, type: w.ta, user: staff.userId, date: "2025-11-17", start: "08:00", end: "16:00", weekStart: "2025-11-17" }) // 50 weeks before MON: inside the 52-week window
+    const outside = await w.shift({ loc: w.a, type: w.ta, user: staff.userId, date: "2025-09-01", start: "08:00", end: "16:00", weekStart: "2025-09-01" }) // 62 weeks before: older than the window and its margin
+    await w.shift({ loc: w.a, type: w.ta, user: staff.userId, date: MON, start: "08:00", end: "16:00", weekStart: MON })
+    const wk = await w.week(w.a, MON)
+    let queries = 0
+    const counted = (tx: TenantTx): TenantTx =>
+      new Proxy(tx, {
+        get(target, prop, recv) {
+          const v = Reflect.get(target, prop, recv)
+          return typeof v === "function" && ["select", "execute", "insert", "update", "delete"].includes(String(prop)) ? (...a: unknown[]) => (queries++, v.apply(target, a)) : typeof v === "function" ? v.bind(target) : v
+        },
+      })
+    const c = await w.ctxOf(w.p.admin, (tx, rc) => loadRuleContext(tx, rc, { weekIds: [wk], from: MON, to: "2026-11-08" }), { wrap: counted })
+    expect(c.avgWeekReferenceWeeks).toBe(52)
+    expect(c.shifts.map((s) => s.id)).toContain(inside)
+    expect(c.shifts.map((s) => s.id)).not.toContain(outside)
+    expect(queries).toBeLessThanOrEqual(6)
+  })
+
   test("context loader is bounded: a 4-week window with 1 000 shifts runs 6 queries or fewer (query counter)", async () => {
     const w = await sites()
     const people = [w.p.employee, w.staff2, w.p.manager, w.p.admin, w.p["roster-manager"], w.p.owner]

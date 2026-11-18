@@ -228,9 +228,9 @@ export async function checkWeek(tx: TenantTx, ctx: RosterCtx, weekId: string, ex
   return genericFor(c.opaque, checkShifts(target, { ...c, shifts: all, templates, zones: { ...c.zones, [week.locationId]: week.zone ?? ctx.tz } }))
 }
 
-const HIDDEN_LINE = "Already rostered elsewhere"
+export const HIDDEN_LINE = "Already rostered elsewhere"
 /** What says something private about a person: their leave, availability, qualifications, departure and shifts elsewhere. For a person the caller cannot see (a cross-site loan) all of it is ONE generic line per shift. */
-const PRIVATE_RULES: readonly string[] = ["approved_leave", "unavailable", "expired_licence", "left", "elsewhere"]
+export const PRIVATE_RULES: readonly string[] = ["approved_leave", "unavailable", "expired_licence", "left", "elsewhere"]
 function genericFor(opaque: Set<string>, found: RuleViolation[]): RuleViolation[] {
   if (opaque.size === 0) return found
   const out: RuleViolation[] = []

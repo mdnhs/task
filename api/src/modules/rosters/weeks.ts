@@ -1,4 +1,4 @@
-import { and, asc, between, eq, inArray, or, sql } from "drizzle-orm"
+import { and, asc, between, eq, inArray, notInArray, sql, type SQL } from "drizzle-orm"
 import { dayColumns, rosterRange, type RosterShift, type RosterWeek, type ShiftTemplate, type StaffingTarget } from "@opsdesk/domain/rosters"
 import { addDays, weekdayOf, weekStart as mondayOf, type Weekday } from "@opsdesk/domain/shifts"
 import { AppError, Conflict, Forbidden, NotFound } from "../../core/errors"
@@ -88,7 +88,8 @@ function weekDto(w: WeekRow, shifts: ShiftRow[], types: { id: string; locationId
  * Members: active people homed at a visible location (a role that sees every site also those homed nowhere) and everyone on a shown shift; a supervisor never gets a home
  * location, anyone else only a visible one.
  */
-async function payload(tx: TenantTx, ctx: RosterCtx, weeks: WeekRow[], range: WeeksDto["range"]): Promise<WeeksDto> {
+/** What the weeks of a read need: their shifts, the shift types of their locations with targets. One statement each, however many weeks. */
+async function loadWeekData(tx: TenantTx, ctx: RosterCtx, weeks: WeekRow[]) {
   const weekIds = weeks.map((w) => w.id)
   const locationIds = [...new Set(weeks.map((w) => w.locationId))]
   const shifts = weekIds.length
@@ -99,15 +100,40 @@ async function payload(tx: TenantTx, ctx: RosterCtx, weeks: WeekRow[], range: We
     : []
   const targetRows = types.length ? await tx.select().from(shiftTypeTargets).where(and(eq(shiftTypeTargets.tenantId, ctx.tenantId), inArray(shiftTypeTargets.shiftTypeId, types.map((t) => t.id)))).orderBy(asc(shiftTypeTargets.weekday)) : []
   const flat = types.map((t) => ({ id: t.id, locationId: t.locationId, name: t.name, start: t.startTime, end: t.endTime, unpaidBreakMin: t.unpaidBreakMin, role: t.role, requires: t.requires }))
-  const targets = targetsOf(targetRows, flat)
-  const onShifts = [...new Set(shifts.map((s) => s.userId).filter((u): u is string => u !== null))]
+  return { shifts, types, targetRows, flat, targets: targetsOf(targetRows, flat) }
+}
+
+/** The weeks as the API shows them (7 day columns each), for a caller that does not need the members or shift types (repeat, template apply). */
+export async function weekDtos(tx: TenantTx, ctx: RosterCtx, weeks: WeekRow[]): Promise<WeekDto[]> {
+  const d = await loadWeekData(tx, ctx, weeks)
+  return weeks.map((w) => weekDto(w, d.shifts.filter((s) => s.weekId === w.id), d.flat.filter((t) => t.locationId === w.locationId), d.targets.filter((t) => t.locationId === w.locationId)))
+}
+
+/** The member list of a read is bounded (the picker pages later): everyone on a shown shift, then at most this many other people. `membersTruncated` says more exist. */
+export const MEMBERS_CAP = 500
+
+/**
+ * The read payload of a set of weeks: weeks with their seven day columns (the domain `dayColumns`), their shifts, the shift types of their locations with targets,
+ * and the members the caller may pick from. Everything is cut by `inScopeSql` / the weeks' own locations, so another location never appears in any array.
+ * Members: active people homed at a visible location (a role that sees every site also those homed nowhere) and everyone on a shown shift; a supervisor never gets a home
+ * location, anyone else only a visible one. The pick list is capped at MEMBERS_CAP (`membersTruncated`); the people ON a shown shift are always included.
+ */
+async function payload(tx: TenantTx, ctx: RosterCtx, weeks: WeekRow[], range: WeeksDto["range"]): Promise<WeeksDto> {
+  const { shifts, types, targetRows, flat, targets } = await loadWeekData(tx, ctx, weeks)
+  const onShifts = [...new Set(shifts.map((s) => s.userId).filter((u): u is string => u !== null))].sort()
   const homeCut = ctx.access.scope === "all" ? sql`(${memberships.homeLocationId} is null or ${inScopeSql(ctx, memberships.homeLocationId)})` : inScopeSql(ctx, memberships.homeLocationId)
-  const members = await tx
-    .select({ userId: memberships.userId, name: user.name, erased: user.erasedAt, status: memberships.status, home: memberships.homeLocationId })
-    .from(memberships)
-    .innerJoin(user, eq(user.id, memberships.userId))
-    .where(and(eq(memberships.tenantId, ctx.tenantId), or(and(eq(memberships.status, "active"), homeCut), onShifts.length ? inArray(memberships.userId, onShifts) : undefined)))
-    .orderBy(asc(memberships.userId))
+  const pick = (extra: SQL | undefined, limit: number) =>
+    tx
+      .select({ userId: memberships.userId, name: user.name, erased: user.erasedAt, status: memberships.status, home: memberships.homeLocationId })
+      .from(memberships)
+      .innerJoin(user, eq(user.id, memberships.userId))
+      .where(and(eq(memberships.tenantId, ctx.tenantId), extra))
+      .orderBy(asc(memberships.userId))
+      .limit(limit)
+  const shown = onShifts.length ? await pick(inArray(memberships.userId, onShifts), onShifts.length) : []
+  const others = await pick(and(eq(memberships.status, "active"), homeCut, onShifts.length ? notInArray(memberships.userId, onShifts) : undefined), MEMBERS_CAP + 1)
+  const membersTruncated = others.length > MEMBERS_CAP
+  const members = [...shown, ...others.slice(0, MEMBERS_CAP)].sort((a, b) => (a.userId < b.userId ? -1 : a.userId > b.userId ? 1 : 0))
   const seesHome = ctx.access.scope === "all"
   const typeDtos: ShiftTypeDto[] = types.map((t) => ({
     id: t.id, locationId: t.locationId, name: t.name, start: t.startTime, end: t.endTime, unpaidBreakMin: t.unpaidBreakMin, role: t.role, requires: t.requires,
@@ -119,6 +145,7 @@ async function payload(tx: TenantTx, ctx: RosterCtx, weeks: WeekRow[], range: We
     shifts: shifts.map(shiftDto),
     shiftTypes: typeDtos,
     members: members.map((m) => ({ userId: m.userId, name: !canSeePerson(ctx, m.userId, m.home) ? "Member" : m.erased ? "Erased user" : m.name, active: !canSeePerson(ctx, m.userId, m.home) || m.status === "active", homeLocationId: seesHome && m.home && ctx.access.locationIds?.includes(m.home) ? m.home : null })),
+    membersTruncated,
   }
 }
 

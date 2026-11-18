@@ -8,7 +8,7 @@ import { sites, type Json, type Who } from "./testkit"
 type W = Awaited<ReturnType<typeof sites>>
 type Cell = { weekId: string; start: string; shiftId: string; shiftVersion: number }
 type Role = "supervisor" | "office" | "manager" | "staff"
-type Action = "add" | "move" | "remove" | "publish" | "confirm" | "check" | "changeRequest" | "claim" | "swap"
+type Action = "add" | "move" | "remove" | "publish" | "confirm" | "check" | "changeRequest" | "claim" | "swap" | "repeat" | "autoRepeat" | "saveTemplate"
 
 /** The one request of each action, as a function of the caller and the cell (`reason` goes where the route takes one). */
 const RUN: Record<Action, (w: W, who: Who, c: Cell, reason?: string) => Promise<Response>> = {
@@ -20,6 +20,9 @@ const RUN: Record<Action, (w: W, who: Who, c: Cell, reason?: string) => Promise<
   check: (w, who, c) => w.req("POST", `/v1/roster/weeks/${c.weekId}/check`, who),
   claim: (w, who, c) => w.req("POST", `/v1/roster/shifts/${c.shiftId}/claim`, who),
   swap: (w, who, c) => w.req("POST", `/v1/roster/shifts/${c.shiftId}/swap`, who, { toUserId: w.staff2.userId }),
+  repeat: async (w, who, c) => w.req("POST", `/v1/roster/weeks/${c.weekId}/repeat`, who, { version: Number((await w.rows("select version from roster_weeks where id = $1", [c.weekId]))[0].version), weeks: 1 }),
+  autoRepeat: (w, who, c) => w.req("PUT", `/v1/roster/weeks/${c.weekId}/auto-repeat`, who, { days: 7 }),
+  saveTemplate: (w, who, c) => w.req("POST", `/v1/roster/weeks/${c.weekId}/save-template`, who, { name: `Template ${c.weekId}` }),
   changeRequest: (w, who, c, reason) => w.req("POST", `/v1/roster/shifts/${c.shiftId}/change-requests`, who, { patch: { start: "09:00", end: "17:00" }, ...(reason ? { reason } : {}) }),
 }
 
@@ -33,6 +36,9 @@ const ROUTE_ACTION: Record<string, Action> = {
   "POST /v1/roster/weeks/{id}/check": "check", // a dry run: writes nothing
   "POST /v1/roster/shifts/{id}/claim": "claim", // never an edit: a request that needs an approver (Task 12)
   "POST /v1/roster/shifts/{id}/swap": "swap",
+  "POST /v1/roster/weeks/{id}/repeat": "repeat", // the SOURCE of a repeat may be published (the copies are drafts); a published TARGET is 409 week_published for everybody (repeat.test.ts)
+  "PUT /v1/roster/weeks/{id}/auto-repeat": "autoRepeat", // a scheduling setting, not a roster edit: allowed on a published week (the copy is a draft)
+  "POST /v1/roster/weeks/{id}/save-template": "saveTemplate", // reads the week into a template; the week is untouched
   "POST /v1/roster/shifts/{id}/change-requests": "changeRequest", // the supervisor's way into a published week: a request, never an edit (Task 11)
 }
 
@@ -46,11 +52,15 @@ const EXPECT: Record<Action, Record<Role, [number, number | null, number | null]
   check: { supervisor: [200, 200, null], office: [200, 200, null], manager: [403, 403, null], staff: [403, 403, null] },
   claim: { supervisor: [409, 409, null], office: [409, 409, null], manager: [404, 409, null], staff: [404, 409, null] }, // staff do not know a draft week exists (AF1); the cell's shift is assigned (not open), or the week is a draft: a claim is never accepted here
   swap: { supervisor: [403, 403, null], office: [403, 403, null], manager: [403, 403, null], staff: [404, 404, null] }, // only the person on the shift may hand it over, and only to a colleague they know
+  repeat: { supervisor: [201, 201, 201], office: [201, 201, 201], manager: [403, 403, 403], staff: [403, 403, 403] },
+  autoRepeat: { supervisor: [200, 200, 200], office: [200, 200, 200], manager: [403, 403, 403], staff: [403, 403, 403] },
+  saveTemplate: { supervisor: [201, 201, 201], office: [201, 201, 201], manager: [403, 403, 403], staff: [403, 403, 403] },
   changeRequest: { supervisor: [409, 422, 201], office: [409, 422, 201], manager: [403, 403, 403], staff: [403, 403, 403] }, // a draft week is edited directly; a request always needs its reason
 }
 
 let n = 0
-const MONDAYS = Array.from({ length: 260 }, (_, i) => new Date(Date.UTC(2027, 1, 1 + i * 7)).toISOString().slice(0, 10))
+// two weeks apart: a repeat of one cell writes into the week after it, which must stay free for the next cell
+const MONDAYS = Array.from({ length: 520 }, (_, i) => new Date(Date.UTC(2027, 1, 1 + i * 14)).toISOString().slice(0, 10))
 
 beforeEach(resetDb)
 

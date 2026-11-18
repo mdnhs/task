@@ -151,3 +151,27 @@ describe("read weeks (FR-RS-10, 11)", () => {
     expect((await call(w.app, "POST", "/v1/roster/weeks", { tenant: "acme", body: { locationId: w.a, weekStart: MON } })).status).toBe(401)
   })
 })
+
+describe("the member list is bounded (B8 T13 carry)", () => {
+  test("an office read caps the pick list at 500 with membersTruncated; people ON a shown shift are always included; a small tenant is not truncated", async () => {
+    const w = await sites()
+    const small = await w.ok("GET", `/v1/roster/weeks/${w.wa}`, w.p.owner)
+    expect(small.membersTruncated).toBe(false)
+    await w.addOk(w.p.owner, w.wa, [{ date: MON, userIds: [w.p.employee.userId], shiftTypeId: w.ta }])
+    // 520 more active people homed nowhere (an office role sees them in the pick list)
+    await w.rows(`insert into "user" (id, name, email, email_verified, created_at, updated_at) select 'bulk_' || lpad(g::text, 4, '0'), 'Bulk ' || g, 'bulk' || g || '@example.com', true, now(), now() from generate_series(1, 520) g`)
+    await w.rows(
+      `insert into memberships (tenant_id, user_id, role_id, status, joined_at) select $1, 'bulk_' || lpad(g::text, 4, '0'), (select id from roles where tenant_id = $1 and key = 'employee'), 'active', now() from generate_series(1, 520) g`,
+      [w.tenant.id],
+    )
+    const big = await w.ok("GET", `/v1/roster/weeks/${w.wa}`, w.p.owner)
+    expect(big.membersTruncated).toBe(true)
+    expect(big.members.length).toBeLessThanOrEqual(501) // 500 others plus the one on the shift
+    expect(big.members.map((m: Json) => m.userId)).toContain(w.p.employee.userId) // the person on the shift is always there
+    expect(big.shifts).toHaveLength(1)
+    const list = await w.ok("GET", `/v1/roster/weeks?locationId=${w.a}&from=${MON}`, w.p.owner)
+    expect(list.membersTruncated).toBe(true)
+    // a supervisor's pick list is only people homed at their site: nothing to truncate
+    expect((await w.ok("GET", `/v1/roster/weeks/${w.wa}`, w.p["location-supervisor"])).membersTruncated).toBe(false)
+  })
+})

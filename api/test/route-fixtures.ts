@@ -21,7 +21,7 @@ import { notify, withTenantAfterCommit } from "../src/modules/notifications"
 export type Fixture = { kind: "id" | "static"; value: string }
 export type TenantFixtures = Record<string, Record<string, Fixture>>
 
-type Resource = "rosterWeek" | "rosterShift" | "changeRequest" | "exchange" | "leave" | "role" | "member" | "team" | "device" | "feature" | "notification" | "pushToken" | "file" | "integration" | "dataRequest" | "supportGrant" | "apiKey" | "webhook" | "task" | "checklistItem" | "comment" | "taskFile" | "project" | "milestone" | "template" | "evidence" | "pattern" | "assignment" | "report" | "reportFile" | "reportExport" | "session" | "invite" | "location" | "shiftType" | "lifecycleMember"
+type Resource = "rosterWeek" | "rosterTemplate" | "rosterShift" | "changeRequest" | "exchange" | "leave" | "role" | "member" | "team" | "device" | "feature" | "notification" | "pushToken" | "file" | "integration" | "dataRequest" | "supportGrant" | "apiKey" | "webhook" | "task" | "checklistItem" | "comment" | "taskFile" | "project" | "milestone" | "template" | "evidence" | "pattern" | "assignment" | "report" | "reportFile" | "reportExport" | "session" | "invite" | "location" | "shiftType" | "lifecycleMember"
 
 /** path template -> param -> which resource that param names on that route. */
 export const ROUTE_PARAMS: Record<string, Record<string, Resource>> = {
@@ -113,6 +113,10 @@ export const ROUTE_PARAMS: Record<string, Record<string, Resource>> = {
   "/v1/roster/weeks/{id}/shifts": { id: "rosterWeek" },
   "/v1/roster/weeks/{id}/publish": { id: "rosterWeek" },
   "/v1/roster/weeks/{id}/history": { id: "rosterWeek" },
+  "/v1/roster/weeks/{id}/repeat": { id: "rosterWeek" },
+  "/v1/roster/weeks/{id}/auto-repeat": { id: "rosterWeek" },
+  "/v1/roster/weeks/{id}/save-template": { id: "rosterWeek" },
+  "/v1/roster/week-templates/{id}": { id: "rosterTemplate" },
   "/v1/roster/shifts/{id}/confirm": { id: "rosterShift" },
   "/v1/roster/shifts/{id}/change-requests": { id: "rosterShift" },
   "/v1/roster/change-requests/{id}/decide": { id: "changeRequest" },
@@ -277,6 +281,10 @@ export async function fixtureIds(t: { app: AppType; deps: Deps }, tenant: { id: 
   const shiftRes = await call(t.app, "POST", `/v1/roster/weeks/${rosterWeek.id}/shifts`, { cookie: owner.cookie, tenant: tenant.slug, body: { shifts: [{ date: "2026-11-02", userIds: [null], shiftTypeId: shiftType.id }] } })
   if (shiftRes.status !== 201) throw new Error(`fixture roster shift failed: ${shiftRes.status} ${await shiftRes.text()}`)
   const rosterShift = ((await shiftRes.json()) as { shifts: { id: string }[] }).shifts[0]
+  // B8 T13: a saved week template of that week (control: DELETE 204)
+  const weekTplRes = await call(t.app, "POST", `/v1/roster/weeks/${rosterWeek.id}/save-template`, { cookie: owner.cookie, tenant: tenant.slug, body: { name: `Week template ${uniq}` } })
+  if (weekTplRes.status !== 201) throw new Error(`fixture week template failed: ${weekTplRes.status} ${await weekTplRes.text()}`)
+  const rosterTemplate = (await weekTplRes.json()) as { id: string }
   // B8 T11: a PUBLISHED week of that location with one open shift and the OWNER'S own change request on it (control: decide 403 self_decision, nobody decides their own)
   const [pubWeek] = await ownerTenantQuery(tenant.id, "insert into roster_weeks (tenant_id, location_id, week_start, created_at, updated_at) values ($1, $2, '2026-11-09', now(), now()) returning id, version", [tenant.id, location.id])
   const pubShiftRes = await call(t.app, "POST", `/v1/roster/weeks/${pubWeek.id}/shifts`, { cookie: owner.cookie, tenant: tenant.slug, body: { shifts: [{ date: "2026-11-09", userIds: [null], shiftTypeId: shiftType.id }] } })
@@ -308,7 +316,7 @@ export async function fixtureIds(t: { app: AppType; deps: Deps }, tenant: { id: 
   const leaveRes = await call(t.app, "POST", "/v1/leave", { cookie: owner.cookie, tenant: tenant.slug, body: { from: leaveDay, to: leaveDay, kind: "annual", note: `Leave ${uniq}` } })
   if (leaveRes.status !== 201) throw new Error(`fixture leave failed: ${leaveRes.status} ${await leaveRes.text()}`)
   const leave = (await leaveRes.json()) as { id: string }
-  const resources = { rosterWeek: String(rosterWeek.id), rosterShift: rosterShift.id, changeRequest: changeRequest.id, exchange: exchange.id, leave: leave.id, lifecycleMember: lifecycle.userId, location: location.id, shiftType: shiftType.id, invite: invite.id, session: String(sess.id), pattern: pattern.id, assignment: assignment.id, report: report.id, reportFile: reportFile.fileId, reportExport: reportExport.id, evidence: evItem.id!, template: template.id, project: project.id, milestone: milestone.id, checklistItem: item.id!, comment: comment.id!, taskFile: taskFile.fileId!, task: task.id, apiKey: apiKey.id, webhook: hook.id, supportGrant: String(sg.id), dataRequest: dsr.id, integration: String(integ.id), file: file.fileId, role: await roleIdOf(t.deps, tenant.id, "employee"), member: staff.userId, team: team.id, device: device.id, notification: String(notif.id), pushToken: ((await tokRes.json()) as { id: string }).id }
+  const resources = { rosterWeek: String(rosterWeek.id), rosterTemplate: rosterTemplate.id, rosterShift: rosterShift.id, changeRequest: changeRequest.id, exchange: exchange.id, leave: leave.id, lifecycleMember: lifecycle.userId, location: location.id, shiftType: shiftType.id, invite: invite.id, session: String(sess.id), pattern: pattern.id, assignment: assignment.id, report: report.id, reportFile: reportFile.fileId, reportExport: reportExport.id, evidence: evItem.id!, template: template.id, project: project.id, milestone: milestone.id, checklistItem: item.id!, comment: comment.id!, taskFile: taskFile.fileId!, task: task.id, apiKey: apiKey.id, webhook: hook.id, supportGrant: String(sg.id), dataRequest: dsr.id, integration: String(integ.id), file: file.fileId, role: await roleIdOf(t.deps, tenant.id, "employee"), member: staff.userId, team: team.id, device: device.id, notification: String(notif.id), pushToken: ((await tokRes.json()) as { id: string }).id }
   const fixtures: TenantFixtures = {}
   for (const [path, params] of Object.entries(ROUTE_PARAMS)) {
     fixtures[path] = {}
@@ -316,7 +324,7 @@ export async function fixtureIds(t: { app: AppType; deps: Deps }, tenant: { id: 
       fixtures[path][param] = res === "feature" ? { kind: "static", value: "drive" } : { kind: "id", value: resources[res] }
     }
   }
-  return { fixtures, resources, marks: [String(rosterWeek.id), rosterShift.id, String(pubWeek.id), pubShift.id, changeRequest.id, `Change ${uniq}`, String(claimWeek.id), claimShift.id, exchange.id, leave.id, `Leave ${uniq}`, lifecycle.userId, lifecycle.email, location.id, shiftType.id, `Location ${uniq}`, `Address ${uniq}`, `Shift type ${uniq}`, `Role ${uniq}`, tenant.id, tenant.slug, String(integ.id), `drive-${uniq}@example.com`, team.id, device.id, file.fileId, dsr.id, `Fix ${uniq}`, `Support ${uniq}`, String(sg.id), `File ${uniq}.pdf`, staff.userId, owner.userId, `Team ${uniq}`, `Device ${uniq}`, apiKey.id, apiKey.prefix, `Key ${uniq}`, hook.id, `hooks-${uniq}.example.com`, task.id, `Task ${uniq}`, `Desc ${uniq}`, item.id!, comment.id!, taskFile.fileId!, `Item ${uniq}`, `Comment ${uniq}`, `Attach ${uniq}.pdf`, project.id, milestone.id, template.id, `Template ${uniq}`, `Blueprint ${uniq}`, `Steps ${uniq}`, evItem.id!, evFile.fileId!, `Evid ${uniq}.pdf`, `Project ${uniq}`, `Plan ${uniq}`, pattern.id, assignment.id, `Pattern ${uniq}`, rpat.id, `Report pattern ${uniq}`, report.id, reportFile.fileId, reportExport.id, `Shot ${uniq}.pdf`, `Milestone ${uniq}`, String(sess.id), invite.id, invite.email] }
+  return { fixtures, resources, marks: [String(rosterWeek.id), rosterTemplate.id, `Week template ${uniq}`, rosterShift.id, String(pubWeek.id), pubShift.id, changeRequest.id, `Change ${uniq}`, String(claimWeek.id), claimShift.id, exchange.id, leave.id, `Leave ${uniq}`, lifecycle.userId, lifecycle.email, location.id, shiftType.id, `Location ${uniq}`, `Address ${uniq}`, `Shift type ${uniq}`, `Role ${uniq}`, tenant.id, tenant.slug, String(integ.id), `drive-${uniq}@example.com`, team.id, device.id, file.fileId, dsr.id, `Fix ${uniq}`, `Support ${uniq}`, String(sg.id), `File ${uniq}.pdf`, staff.userId, owner.userId, `Team ${uniq}`, `Device ${uniq}`, apiKey.id, apiKey.prefix, `Key ${uniq}`, hook.id, `hooks-${uniq}.example.com`, task.id, `Task ${uniq}`, `Desc ${uniq}`, item.id!, comment.id!, taskFile.fileId!, `Item ${uniq}`, `Comment ${uniq}`, `Attach ${uniq}.pdf`, project.id, milestone.id, template.id, `Template ${uniq}`, `Blueprint ${uniq}`, `Steps ${uniq}`, evItem.id!, evFile.fileId!, `Evid ${uniq}.pdf`, `Project ${uniq}`, `Plan ${uniq}`, pattern.id, assignment.id, `Pattern ${uniq}`, rpat.id, `Report pattern ${uniq}`, report.id, reportFile.fileId, reportExport.id, `Shot ${uniq}.pdf`, `Milestone ${uniq}`, String(sess.id), invite.id, invite.email] }
 }
 
 // ---- B7 Task 14: the route inventory ----
