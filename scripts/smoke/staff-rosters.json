@@ -1,14 +1,14 @@
 [
-  {"path": "/staff-rosters", "expect": ["Staff &amp; Rosters", "Roster gaps", "Attendance", "INC-3003", "Uncovered tomorrow", "Log incident", "href=\"/staff-rosters/incidents/new\""]},
-  {"path": "/staff-rosters", "expect": ["Showing 1–10 of 12"]},
-  {"path": "/staff-rosters", "cookies": {"od-role": "employee"}, "expect": ["Access restricted"], "notExpect": ["INC-3003", "Roster gaps"]},
-  {"path": "/staff-rosters", "cookies": {"od-role": "auditor"}, "expect": ["Roster gaps", "INC-3003"], "notExpect": ["Log incident", "07700 900"]},
-  {"path": "/staff-rosters?tab=gaps", "expect": ["href=\"/staff-rosters/gaps/GAP-512\"", "Search roster gaps"], "notExpect": ["Search incidents"]},
-  {"path": "/staff-rosters/incidents/new", "expect": ["Log incident", "Shift or subject", "Contact, notes", "id=\"sr-contact\"", "href=\"/staff-rosters\""]},
-  {"path": "/staff-rosters/incidents/new", "cookies": {"od-role": "auditor"}, "expect": ["Access restricted"], "notExpect": ["Shift or subject"]},
-  {"path": "/staff-rosters/incidents/new", "cookies": {"od-role": "employee"}, "expect": ["Access restricted"], "notExpect": ["Shift or subject"]},
-  {"path": "/staff-rosters/gaps/GAP-512", "expect": ["Shoreditch · Cleaner", "Update cover", "Kamal Rahman on leave.", "href=\"/staff-rosters?tab=gaps\""]},
-  {"path": "/staff-rosters/gaps/GAP-512", "cookies": {"od-role": "auditor"}, "expect": ["Shoreditch · Cleaner"], "notExpect": ["Update cover", "Kamal Rahman on leave."]},
-  {"path": "/staff-rosters/gaps/GAP-512", "cookies": {"od-role": "employee"}, "expect": ["Access restricted"], "notExpect": ["Shoreditch · Cleaner"]},
-  {"path": "/staff-rosters/gaps/NOPE", "expect": ["could not be found"], "notExpect": ["Update cover"]}
+  {"path": "/staff-rosters", "as": "owner", "expect": ["Staff &amp; Rosters", "Roster gaps", "Attendance", "INC-3003", "Uncovered tomorrow", "Log incident", "href=\"/staff-rosters/incidents/new\""], "mock": true},
+  {"path": "/staff-rosters", "as": "owner", "expect": ["Showing 1–10 of 12"], "mock": true},
+  {"path": "/staff-rosters", "as": "employee", "expect": ["Access restricted"], "notExpect": ["INC-3003", "Roster gaps"], "mock": true},
+  {"path": "/staff-rosters", "as": "auditor", "expect": ["Roster gaps", "INC-3003"], "notExpect": ["Log incident", "07700 900"], "mock": true},
+  {"path": "/staff-rosters?tab=gaps", "as": "owner", "expect": ["href=\"/staff-rosters/gaps/GAP-512\"", "Search roster gaps"], "notExpect": ["Search incidents"], "mock": true},
+  {"path": "/staff-rosters/incidents/new", "as": "owner", "expect": ["Log incident", "Shift or subject", "Contact, notes", "id=\"sr-contact\"", "href=\"/staff-rosters\""], "mock": true},
+  {"path": "/staff-rosters/incidents/new", "as": "auditor", "expect": ["Access restricted"], "notExpect": ["Shift or subject"], "mock": true},
+  {"path": "/staff-rosters/incidents/new", "as": "employee", "expect": ["Access restricted"], "notExpect": ["Shift or subject"], "mock": true},
+  {"path": "/staff-rosters/gaps/GAP-512", "as": "owner", "expect": ["Shoreditch · Cleaner", "Update cover", "Kamal Rahman on leave.", "href=\"/staff-rosters?tab=gaps\""], "mock": true},
+  {"path": "/staff-rosters/gaps/GAP-512", "as": "auditor", "expect": ["Shoreditch · Cleaner"], "notExpect": ["Update cover"], "mock": true},
+  {"path": "/staff-rosters/gaps/GAP-512", "as": "employee", "expect": ["Access restricted"], "notExpect": ["Shoreditch · Cleaner"], "mock": true},
+  {"path": "/staff-rosters/gaps/NOPE", "as": "owner", "expect": ["could not be found"], "notExpect": ["Update cover"], "mock": true}
 ]

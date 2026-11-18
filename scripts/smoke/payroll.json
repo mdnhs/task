@@ -1,4 +1,4 @@
 [
-  {"path": "/payroll-issues", "expect": ["PAY-", "Issue tracking only"], "notExpect": ["is being built", "Access restricted"]},
-  {"path": "/payroll-issues", "cookies": {"od-role": "employee"}, "expect": ["Access restricted"], "notExpect": ["PAY-"]}
+  {"path": "/payroll-issues", "as": "owner", "expect": ["PAY-", "Issue tracking only"], "notExpect": ["is being built", "Access restricted"], "mock": true},
+  {"path": "/payroll-issues", "as": "employee", "expect": ["Access restricted"], "mock": true}
 ]

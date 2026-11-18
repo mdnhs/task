@@ -108,8 +108,10 @@ describe("4. mock routes exist only behind ENABLE_MOCK_MODULES=1", () => {
     expect(mockHrefs.length).toBeGreaterThanOrEqual(MOCK_ROUTES.length) // every mock route has a nav entry
     vi.stubEnv("ENABLE_MOCK_MODULES", "")
     expect(hideMockNav(all).map((n) => n.href)).toEqual(["/", "/tasks", "/daily-reports", "/shifts", "/settings", "/audit-log"])
+    expect(hideMockNav(all).some((n) => "badge" in n)).toBe(false) // the seed's badge counts are mock numbers
     vi.stubEnv("ENABLE_MOCK_MODULES", "1")
     expect(hideMockNav(all).map((n) => n.href)).toEqual(all.map((n) => n.href))
+    expect(hideMockNav(all).some((n) => "badge" in n)).toBe(true)
   })
   test("the shell layout filters the nav and the assistant through the registry", () => {
     const layout = strip(read("app/(app)/layout.tsx"))

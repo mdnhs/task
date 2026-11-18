@@ -18,8 +18,12 @@ export const MOCK_MODULES: readonly string[] = ["attention", "roster", "staff", 
 
 export const isMockRoute = (href: string): boolean => MOCK_ROUTES.some((r) => href === r.prefix || href.startsWith(`${r.prefix}/`) || href.startsWith(`${r.prefix}?`))
 
-/** The navigation without the mock-only entries (everything when the flag is on). */
-export const hideMockNav = <T extends { href: string }>(items: readonly T[]): T[] => (mockEnabled() ? [...items] : items.filter((i) => !isMockRoute(i.href)))
+/**
+ * The navigation without the mock-only entries (everything when the flag is on). The seed's badge counts ("Tasks 14", "Manager Attention 4") are mock numbers with no
+ * API behind them (found in the T6.9 browser walk), so without the flag no entry carries one.
+ */
+export const hideMockNav = <T extends { href: string }>(items: readonly T[]): T[] =>
+  mockEnabled() ? [...items] : items.filter((i) => !isMockRoute(i.href)).map((i) => Object.fromEntries(Object.entries(i).filter(([k]) => k !== "badge")) as T)
 
 export type ReaderKind =
   | "mock" //      a feature that has no backend yet: its whole data is the seed (shown only behind mockGate / mockEnabled)
