@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, test } from "vitest"
 import { resetDb, testApp } from "../../../test/harness"
 import { ownerDb, ownerQuery, testDb } from "../../../test/db"
 import { makeTenant, makeUser } from "../../../test/factories"
-import { assertSeedAllowed, DEMO_SLUGS, SeedRefused } from "./guards"
+import { assertSeedAllowed, DEMO_SLUGS, lockTimeoutMs, SEED_LOCK_KEY, SeedRefused } from "./guards"
 import { seedDemo } from "./seed"
 import { countAll, demoOptions } from "../../../test/seed-support"
 
@@ -147,5 +147,28 @@ describe("seed guards", () => {
     const env = { ALLOW_DEMO_SEED: "1" }
     expect(await refusal(assertSeedAllowed(ownerDb(), { env, emailDomain: "demo.example" }))).toBe("other_tenants")
     expect(await refusal(assertSeedAllowed(testDb(), { env, emailDomain: "demo.example" }))).toBe("other_tenants")
+  })
+})
+
+describe("seed lock timeout (a stuck seed cannot hold the lock forever)", () => {
+  test("a held advisory lock makes the seed refuse with lock_timeout within the timeout, writing nothing; once released a seed runs", async () => {
+    const holder = await ownerDb().$client.connect()
+    await holder.query("select pg_advisory_lock($1)", [SEED_LOCK_KEY])
+    try {
+      const started = Date.now()
+      expect(await refusal(seedDemo(testDb(), await demoOptions({ lockTimeoutMs: 400 })))).toBe("lock_timeout")
+      expect(Date.now() - started).toBeLessThan(20_000)
+      expect(Number((await ownerQuery("select count(*)::int as n from tenants"))[0].n)).toBe(0)
+      expect(Number((await ownerQuery('select count(*)::int as n from "user"'))[0].n)).toBe(0)
+    } finally {
+      await holder.query("select pg_advisory_unlock($1)", [SEED_LOCK_KEY])
+      holder.release()
+    }
+  }, 60_000)
+
+  test("the default wait is 30 s and SEED_LOCK_TIMEOUT_MS overrides it; junk falls back to the default", () => {
+    expect(lockTimeoutMs(undefined)).toBe(30_000)
+    expect(lockTimeoutMs("1500")).toBe(1500)
+    for (const bad of ["", "abc", "-5", "0", "1e9"]) expect(lockTimeoutMs(bad), bad).toBe(30_000)
   })
 })

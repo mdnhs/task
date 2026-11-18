@@ -5,8 +5,9 @@ import { relayOnce, resetSubscribers } from "../../core/events"
 import { registerSearchIndexers } from "../../modules/search/subscribers"
 import type { Db } from "../../db/client"
 import type { Clock, Deps } from "../../deps"
-import { makeAnchor, todayIn, weekOffset } from "./anchor"
-import { assertPassword, assertSameDatabase, assertSeedAllowed, DEMO_SLUGS, existingDemoTenants, SeedRefused, takeSeedLock } from "./guards"
+import type { Storage } from "../../core/storage/storage"
+import { latestReportOffset, makeAnchor, todayIn, weekOffset } from "./anchor"
+import { assertPassword, assertSameDatabase, assertSeedAllowed, DEMO_SLUGS, existingDemoTenants, lockTimeoutMs, SeedRefused, takeSeedLock } from "./guards"
 import { buildPeople, indirectPairs } from "./people"
 import { loadSource, NOT_SEEDED } from "./source"
 import { seedTenant } from "./tenant"
@@ -19,8 +20,15 @@ export type SeedOptions = {
   password: string
   /** The directory holding the mock JSON (public/data). */
   sourceDir: string
-  /** YYYY-MM-DD the mock's frozen "today" becomes; default: today in the tenant timezone, read from `clock`. */
-  anchor?: string
+  /**
+   * YYYY-MM-DD the mock's frozen "today" becomes; default: today in the tenant timezone, read from `clock`. `"latest-report"`: tasks anchor on today as usual and the newest
+   * mock report day (and the shift dates with it) lands exactly on today, even when that moves a date to another weekday than its pattern.
+   */
+  anchor?: string | "latest-report"
+  /** How long to wait for the seed lock before refusing with `lock_timeout`; default SEED_LOCK_TIMEOUT_MS or 30000. */
+  lockTimeoutMs?: number
+  /** Where `--reset` removes the demo files' objects. Injected, never built here (tests pass a fake; the script passes the real one only when asked). Without it objects are left and counted in a warning. */
+  storage?: Pick<Storage, "delete">
   /** Default `demo.example` (reserved, never a real mailbox). Must end in a reserved name (.example, .test, .invalid, .localhost). */
   emailDomain?: string
   /**
@@ -83,11 +91,15 @@ export async function seedDemoInternal(db: Db, o: SeedOptions, hooks: { beforeLo
   let anchor: ReturnType<typeof makeAnchor>
   let weekAnchor: ReturnType<typeof makeAnchor>
   let shiftOffsetDays: number
+  let latestReportMode = false
   try {
-    anchor = makeAnchor({ mockToday: src.org.today, anchor: o.anchor ?? todayIn(now, tz), tz })
+    const latestReport = o.anchor === "latest-report"
+    anchor = makeAnchor({ mockToday: src.org.today, anchor: latestReport || o.anchor === undefined ? todayIn(now, tz) : o.anchor, tz })
     // Weekday-bound dates (assignments, report shift dates) move by whole weeks so every report stays on a day its pattern runs, and never past the anchor day.
+    // `latest-report` moves them by the exact offset instead, so the newest report is today.
     const latest = src.reports.reduce((m, r) => (r.date > m ? r.date : m), "0000-00-00")
-    shiftOffsetDays = weekOffset({ mockToday: src.org.today, anchor: anchor.today, latestMockDay: latest })
+    shiftOffsetDays = latestReport ? latestReportOffset({ anchor: anchor.today, latestMockDay: latest }) : weekOffset({ mockToday: src.org.today, anchor: anchor.today, latestMockDay: latest })
+    if (latestReport) latestReportMode = true
     weekAnchor = makeAnchor({ mockToday: src.org.today, anchor: anchor.today, tz, offsetDays: shiftOffsetDays })
   } catch {
     throw new SeedRefused("bad_anchor") // before anything is written or deleted
@@ -97,7 +109,7 @@ export async function seedDemoInternal(db: Db, o: SeedOptions, hooks: { beforeLo
 
   // ---- from here on the seed writes: take the seed lock and re-run the guard under it, immediately before the first write ----
   await hooks.beforeLock?.()
-  const unlock = await takeSeedLock(o.owner ?? db)
+  const unlock = await takeSeedLock(o.owner ?? db, { timeoutMs: o.lockTimeoutMs ?? lockTimeoutMs(process.env.SEED_LOCK_TIMEOUT_MS) })
   try {
     await check()
     return await writeAll()
@@ -108,8 +120,11 @@ export async function seedDemoInternal(db: Db, o: SeedOptions, hooks: { beforeLo
   async function writeAll(): Promise<SeedReport> {
     const { people, byMock, byName } = buildPeople(src, emailDomain)
     const platformEmail = `platform.owner@${emailDomain}`
+    const resetWarnings: string[] = []
     if (o.reset && o.owner) {
-      await deleteDemoTenants(o.owner)
+      const wiped = await deleteDemoTenants(o.owner, { storage: o.storage })
+      if (wiped.objectFailures > 0) resetWarnings.push(`${wiped.objectFailures} storage objects of the reset tenants could not be deleted (the rows are gone; remove them by key prefix t/<tenant>/ and u/<tenant>/)`)
+      else if (!o.storage && wiped.objectsLeft > 0) resetWarnings.push(`${wiped.objectsLeft} files of the reset tenants may still have an object in storage (no storage was given; see SEED_CLEAN_STORAGE in the demo-seed doc)`)
       await deleteUsers(o.owner, [...people.map((p) => p.email), platformEmail])
     }
     const mailer = noopMailer()
@@ -122,8 +137,9 @@ export async function seedDemoInternal(db: Db, o: SeedOptions, hooks: { beforeLo
     const queue = fakeQueue()
     const deps = { db, clock: o.clock, queue, billing: fakeBilling(), logger: pino({ level: "silent" }), mailer, auth } as unknown as Deps
     const counts: Record<string, number> = {}
-    const warnings: string[] = []
-    if (shiftOffsetDays !== anchor.offsetDays) warnings.push(`shift dates moved by ${shiftOffsetDays} days (not ${anchor.offsetDays}) to keep weekdays`)
+    const warnings: string[] = [...resetWarnings]
+    if (latestReportMode) warnings.push("latest-report: the newest report is today; shift and report dates keep the exact offset, so a weekday can differ from its pattern")
+    if (!latestReportMode && shiftOffsetDays !== anchor.offsetDays) warnings.push(`shift dates moved by ${shiftOffsetDays} days (not ${anchor.offsetDays}) to keep weekdays`)
     const slugs: string[] = []
     for (const slug of DEMO_SLUGS) {
       const mock = src.tenants.find((t) => t.slug === slug)

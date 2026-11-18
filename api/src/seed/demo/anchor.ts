@@ -44,3 +44,12 @@ export function weekOffset(o: { mockToday: string; anchor: string; latestMockDay
   const room = dayNumber(o.anchor) - dayNumber(o.latestMockDay)
   return 7 * Math.floor(room / 7)
 }
+
+/**
+ * `--anchor latest-report`: the offset that puts the newest mock report day EXACTLY on the anchor day (today), for the weekday-bound dates (shift assignments, report shift
+ * dates). weekOffset keeps weekdays and so can leave the newest report up to 6 days before the anchor; this one keeps the day and may move a date to another weekday than its
+ * pattern runs on (the seed says so in a warning). Tasks and subscription dates keep the normal exact offset from the mock's today.
+ */
+export function latestReportOffset(o: { anchor: string; latestMockDay: string }): number {
+  return dayNumber(o.anchor) - dayNumber(o.latestMockDay)
+}

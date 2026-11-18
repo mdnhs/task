@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest"
-import { makeAnchor, todayIn } from "./anchor"
+import { latestReportOffset, makeAnchor, todayIn, weekOffset } from "./anchor"
 
 const TZ = "Europe/Dublin"
 
@@ -31,5 +31,20 @@ describe("re-anchoring the mock dates", () => {
     // 23:30 UTC on 30 Jun is already 1 Jul in Dublin (IST)
     expect(todayIn(new Date("2026-06-30T23:30:00Z"), TZ)).toBe("2026-07-01")
     expect(todayIn(new Date("2026-06-30T23:30:00Z"), "UTC")).toBe("2026-06-30")
+  })
+})
+
+describe("--anchor latest-report", () => {
+  test("the weekday-bound offset puts the newest mock report day exactly on the anchor day (the default only keeps it on or before, in whole weeks)", () => {
+    const o = { mockToday: "2026-10-20T09:00:00", anchor: "2026-12-04", latestMockDay: "2026-10-19" }
+    const exact = latestReportOffset(o)
+    expect(exact).toBe(46)
+    expect(makeAnchor({ mockToday: o.mockToday, anchor: o.anchor, tz: TZ, offsetDays: exact }).day("2026-10-19")).toBe("2026-12-04")
+    // the default is a whole number of weeks, so the newest report can sit up to 6 days before the anchor day
+    expect(weekOffset(o)).toBe(42)
+    expect(weekOffset(o)).not.toBe(exact)
+  })
+  test("a newest report after the anchor day gives a negative offset (still lands on the anchor day)", () => {
+    expect(latestReportOffset({ anchor: "2026-10-01", latestMockDay: "2026-10-19" })).toBe(-18)
   })
 })

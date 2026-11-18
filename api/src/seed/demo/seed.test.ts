@@ -2,12 +2,14 @@ import { readFileSync } from "node:fs"
 import { createOTP } from "@better-auth/utils/otp"
 import { afterAll, beforeAll, beforeEach, describe, expect, test, vi } from "vitest"
 import { call, resetDb, tenantGetRoutes, testApp } from "../../../test/harness"
-import { ownerQuery, ownerTenantQuery, testDb } from "../../../test/db"
+import { ownerDb, ownerQuery, ownerTenantQuery, testDb } from "../../../test/db"
 import { cookieFrom, signIn } from "../../../test/factories"
 import { countAll, DEMO_PASSWORD, demoOptions, PUBLIC_DATA } from "../../../test/seed-support"
 import { verifyChain } from "../../modules/audit"
 import { withTenant } from "../../db/tenant-tx"
 import { seedDemo, type SeedReport } from "./index"
+import { deleteDemoTenants, tenantTableNames } from "./wipe"
+import type { Storage } from "../../core/storage/storage"
 import { sourcePath } from "./source"
 
 type Json = Record<string, any> // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -314,4 +316,97 @@ describe("demo seed: options and platform owner", () => {
     expect(await n("select count(*)::int as n from tenants")).toBe(1)
     expect(await n(`select count(*)::int as n from "user" where email = 'boss@real-customer.ie'`)).toBe(1)
   })
+})
+
+/** In-memory object storage: never a live bucket. Only `delete` is used by the seed. */
+function fakeObjects(keys: string[]) {
+  const objects = new Set(keys)
+  const deleted: string[] = []
+  const storage = { delete: async (k: string) => { deleted.push(k); objects.delete(k) } } as unknown as Storage
+  return { storage, objects, deleted }
+}
+
+describe("B7 T13 --reset: no orphans", () => {
+  beforeEach(resetDb)
+
+  test("reset leaves no row for any tenant_id table (catalogue-driven, every table information_schema lists)", async () => {
+    await seedDemo(testDb(), await demoOptions({ anchor: ANCHOR }))
+    const ids = (await ownerQuery("select id from tenants")).map((r) => String(r.id))
+    expect(ids).toHaveLength(3)
+    const catalogue = await tenantTableNames(ownerDb())
+    expect(catalogue.length).toBeGreaterThan(40) // the real schema, not an empty or hand-picked list
+    for (const must of ["tasks", "audit_events", "files", "shift_reports", "domain_events"]) expect(catalogue).toContain(must)
+    await deleteDemoTenants(ownerDb())
+    const left: string[] = []
+    for (const id of ids) for (const t of catalogue) if (Number((await ownerTenantQuery(id, `select count(*)::int as n from "${t}" where tenant_id = $1`, [id]))[0].n) > 0) left.push(t)
+    expect(left).toEqual([])
+    expect(await n("select count(*)::int as n from tenants")).toBe(0)
+  }, 300_000)
+
+  test("a tenant_id table that has no foreign key to tenants (a new table nobody listed) is swept too", async () => {
+    await seedDemo(testDb(), await demoOptions({ anchor: ANCHOR }))
+    const [t] = await ownerQuery("select id from tenants where slug = 'northgate'")
+    const id = String(t.id)
+    // rls_probe is the test schema's table with tenant_id and the standard RLS template and NO foreign key: exactly what a table added after B6 might look like
+    await ownerTenantQuery(id, "insert into rls_probe (tenant_id, label) values ($1, 'late table')", [id])
+    expect(await tenantTableNames(ownerDb())).toContain("rls_probe")
+    await deleteDemoTenants(ownerDb())
+    expect(Number((await ownerTenantQuery(id, "select count(*)::int as n from rls_probe where tenant_id = $1", [id]))[0].n)).toBe(0)
+  }, 300_000)
+
+  test("reset deletes the storage objects of the demo tenants' files (final and staging keys) through the injected storage, and nobody else's", async () => {
+    await seedDemo(testDb(), await demoOptions({ anchor: ANCHOR }))
+    const [t] = await ownerQuery("select id from tenants where slug = 'northgate'")
+    const tid = String(t.id)
+    const fid = "11111111-1111-4111-8111-111111111111"
+    await ownerTenantQuery(tid, "insert into files (id, tenant_id, key, name, mime, size_bytes, status, created_at) values ($1, $2, $3, 'a.pdf', 'application/pdf', 10, 'clean', now())", [fid, tid, `t/${tid}/${fid}`])
+    const other = "t/99999999-9999-4999-8999-999999999999/keep"
+    const fake = fakeObjects([`t/${tid}/${fid}`, `u/${tid}/${fid}`, other])
+    const res = await deleteDemoTenants(ownerDb(), { storage: fake.storage })
+    expect(res.tenants).toBe(3)
+    expect(res.objectsRemoved).toBeGreaterThanOrEqual(2)
+    expect([...fake.objects]).toEqual([other])
+    expect(fake.deleted).toContain(`t/${tid}/${fid}`)
+    expect(fake.deleted).toContain(`u/${tid}/${fid}`)
+    expect(fake.deleted).not.toContain(other)
+  }, 300_000)
+
+  test("a storage failure does not undo the reset: the database is clean and the failure is counted for the report", async () => {
+    await seedDemo(testDb(), await demoOptions({ anchor: ANCHOR }))
+    const [t] = await ownerQuery("select id from tenants where slug = 'northgate'")
+    const tid = String(t.id)
+    const fid = "22222222-2222-4222-8222-222222222222"
+    await ownerTenantQuery(tid, "insert into files (id, tenant_id, key, name, mime, size_bytes, status, created_at) values ($1, $2, $3, 'b.pdf', 'application/pdf', 10, 'clean', now())", [fid, tid, `t/${tid}/${fid}`])
+    const broken = { delete: async () => { throw new Error("bucket unreachable") } } as unknown as Storage
+    const res = await deleteDemoTenants(ownerDb(), { storage: broken })
+    expect(res.objectFailures).toBeGreaterThanOrEqual(1)
+    expect(await n("select count(*)::int as n from tenants")).toBe(0)
+  }, 300_000)
+
+  test("without a storage the reset still works and says how many objects it could not remove", async () => {
+    await seedDemo(testDb(), await demoOptions({ anchor: ANCHOR }))
+    const [t] = await ownerQuery("select id from tenants where slug = 'northgate'")
+    const tid = String(t.id)
+    const fid = "33333333-3333-4333-8333-333333333333"
+    await ownerTenantQuery(tid, "insert into files (id, tenant_id, key, name, mime, size_bytes, status, created_at) values ($1, $2, $3, 'c.pdf', 'application/pdf', 10, 'clean', now())", [fid, tid, `t/${tid}/${fid}`])
+    const res = await deleteDemoTenants(ownerDb())
+    expect(res.objectsLeft).toBeGreaterThanOrEqual(1)
+    expect(res.objectsRemoved).toBe(0)
+  }, 300_000)
+})
+
+describe("B7 T13 --anchor latest-report", () => {
+  beforeEach(resetDb)
+  test("latest-report anchor makes the newest report date equal today (tasks keep today as their anchor)", async () => {
+    const r = await seedDemo(testDb(), await demoOptions({ anchor: "latest-report" })) // the clock is 2026-12-01 in Dublin
+    expect(r.anchor).toBe("2026-12-01")
+    const dates = await ownerTenantQuery(String((await ownerQuery("select id from tenants where slug = 'northgate'"))[0].id), "select max(shift_date)::text as d from shift_reports")
+    expect(dates[0].d).toBe("2026-12-01")
+    expect(r.warnings.some((w) => /latest-report/.test(w))).toBe(true) // weekdays may differ from the patterns: said out loud
+  }, 300_000)
+  test("the default anchor still never puts a report after the anchor day (whole weeks)", async () => {
+    const r = await seedDemo(testDb(), await demoOptions({ anchor: ANCHOR }))
+    const max = (await ownerTenantQuery(String((await ownerQuery("select id from tenants where slug = 'northgate'"))[0].id), "select max(shift_date)::text as d from shift_reports"))[0].d as string
+    expect(max <= r.anchor).toBe(true)
+  }, 300_000)
 })

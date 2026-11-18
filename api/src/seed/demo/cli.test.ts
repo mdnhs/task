@@ -4,7 +4,8 @@ import { fileURLToPath } from "node:url"
 import { promisify } from "node:util"
 import { beforeEach, describe, expect, test } from "vitest"
 import { resetDb, testApp, testEnv } from "../../../test/harness"
-import { ownerQuery } from "../../../test/db"
+import { ownerDb, ownerQuery } from "../../../test/db"
+import { SEED_LOCK_KEY } from "./guards"
 import { makeTenant } from "../../../test/factories"
 import { countAll, DEMO_PASSWORD } from "../../../test/seed-support"
 
@@ -75,4 +76,19 @@ describe("scripts/seed-demo.ts", () => {
     }
     expect(await users()).toBe(21) // 20 people + the platform owner
   }, 300_000)
+
+  test("--anchor latest-report is accepted; a held seed lock makes the script exit 1 with refused: lock_timeout within SEED_LOCK_TIMEOUT_MS", async () => {
+    const holder = await ownerDb().$client.connect()
+    await holder.query("select pg_advisory_lock($1)", [SEED_LOCK_KEY])
+    try {
+      const started = Date.now()
+      const out = await seed({ ...OPT_IN, SEED_LOCK_TIMEOUT_MS: "500" }, ["--anchor", "latest-report"])
+      expect([out.code, out.stderr.trim().split("\n").pop()]).toEqual([1, "refused: lock_timeout"])
+      expect(Date.now() - started).toBeLessThan(60_000)
+    } finally {
+      await holder.query("select pg_advisory_unlock($1)", [SEED_LOCK_KEY])
+      holder.release()
+    }
+    expect(await users()).toBe(0)
+  }, 180_000)
 })

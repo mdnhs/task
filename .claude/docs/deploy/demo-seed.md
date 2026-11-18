@@ -28,7 +28,10 @@ npm -w api run seed:demo -- [--reset] [--anchor 2026-12-01]
 | `SEED_EMAIL_DOMAIN` | Default `demo.example`. Must end in a reserved name (`.example`, `.test`, `.invalid`, `.localhost`, or `example.com/net/org`), so no demo address is a real mailbox. |
 | `SEED_PLATFORM_TOTP_SECRET` | Optional. Creates `platform.owner@<domain>` (verified, 2FA enrolled with this secret, platform owner). The value is the raw TOTP key string, 16+ characters of `A-Za-z0-9`; your authenticator needs its base32 form (`echo -n "$SEED_PLATFORM_TOTP_SECRET" \| base32`). Without it no platform owner is created (use `npm -w api run platform:owner` as before). |
 | `--anchor YYYY-MM-DD` | The day the mock's frozen "today" (2026-10-20) becomes. Default: today in the tenant timezone. |
-| `--reset` | Deletes the three demo tenants and the demo users first (new ids), then seeds. Never touches any other tenant (see the guards: a database with another tenant is refused before anything is deleted). |
+| `--anchor latest-report` | Tasks anchor on today as usual, and the **newest mock report day lands exactly on today** (shift and report dates keep the exact offset, so a weekday can differ from its pattern; the run prints a warning). The default keeps weekdays instead and can leave the newest report up to 6 days before today. |
+| `SEED_LOCK_TIMEOUT_MS` | Optional, default `30000` (1 to 600000). How long the seed waits for the seed lock; then `refused: lock_timeout` and nothing is written. A stuck or killed seed on another connection can never make a new one hang. |
+| `SEED_CLEAN_STORAGE=1` | Optional. With the usual `S3_*` variables (`S3_BUCKET`, `S3_REGION`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, optional `S3_ENDPOINT`, `S3_FORCE_PATH_STYLE`), `--reset` also deletes the demo files' objects (`t/<tenant>/<file>` and `u/<tenant>/<file>`) from that bucket. Off by default: a reset never touches a bucket you did not name, it prints a warning with the number of files that may still have an object. |
+| `--reset` | Deletes the three demo tenants and the demo users first (new ids), then seeds. Everything that carries a demo `tenant_id` goes, including tables without a foreign key to `tenants` (the sweep reads `information_schema`, so a table added later is covered; `api/src/seed/demo/seed.test.ts` fails otherwise). Never touches any other tenant (see the guards: a database with another tenant is refused before anything is deleted). |
 
 ## Guards (checked before any write and again under a lock; there is no flag that skips them)
 
@@ -95,3 +98,19 @@ Also not loaded: `platform/*` (platform plans, invoices and tenants are platform
 
 `api/src/seed/demo/*.test.ts` (Testcontainers): guards (empty database, demo-only database, another tenant, production with and without the opt-in, missing opt-in, foreign users, no bypass argument, nothing written on a refusal),
 row counts equal the JSON, re-anchoring and DST, refs and the counter, sign-in of the personas, platform owner with TOTP, idempotency, `--reset`, the real routes reading the seeded data, and the CLI as a child process.
+
+## The seed as a container image (a separate target, never the API)
+
+`api/Dockerfile` has four stages: `deps`, `app` (shared code, no `CMD`), `seed` and `run`. **`run` is the last stage**, so a plain `docker build -f api/Dockerfile .` (and CI, and Dokploy without a target) builds the API. The
+demo seed is built only on purpose:
+
+```bash
+docker build -f api/Dockerfile --target seed -t opsdesk-seed:local .
+docker run --rm --network host \
+  -e ALLOW_DEMO_SEED=1 -e SEED_DEMO_PASSWORD=... -e DATABASE_URL=... -e DATABASE_OWNER_URL=... -e BETTER_AUTH_SECRET=... -e APP_URL=... \
+  opsdesk-seed:local                      # add flags by a full command: ../node_modules/.bin/tsx scripts/seed-demo.ts --reset
+```
+
+- The image is labelled `com.opsdesk.purpose=demo-seed` and `opsdesk-demo-seed`; its `CMD` is the seed script (`api/test/docker-targets.test.ts` pins: run is last and starts `src/server.ts`, seed starts `scripts/seed-demo.ts`, `app` has no `CMD`, nothing builds on `seed`).
+- It sets **no** opt-in, password or database URL: the operator passes them at run time, and every guard above still applies. Do not deploy it as a service; it is a one-shot job. In compose use `build: { context: ., dockerfile: api/Dockerfile, target: seed }` and `restart: "no"`, never in a production compose file.
+- The seed image holds the same code and dependencies as the API image; it is not a smaller or different build. Keep it out of production registries' deploy tags (tag it `opsdesk-seed:*`).

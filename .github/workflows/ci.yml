@@ -118,3 +118,11 @@ jobs:
           push: false
           cache-from: type=gha
           cache-to: type=gha,mode=max
+      # The demo-seed target must keep building (it is never the default: `run` is the last stage). Not pushed.
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: api/Dockerfile
+          target: seed
+          push: false
+          cache-from: type=gha

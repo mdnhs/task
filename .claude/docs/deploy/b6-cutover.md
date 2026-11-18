@@ -59,7 +59,7 @@ R2: set it in the bucket's CORS policy. MinIO (local, e2e): `MINIO_API_CORS_ALLO
 Separate environment, separate database from the first client's.
 
 - `ENABLE_MOCK_MODULES=1` on the web.
-- Seed: `ALLOW_DEMO_SEED=1 SEED_DEMO_PASSWORD=<12+ characters> npm -w api run seed:demo` (see `demo-seed.md`). The password is set by the owner in Dokploy and never committed. The seed refuses a database with any tenant outside the three demo tenants, but it cannot tell a demo host from a production host by name: keep the environments apart.
+- Seed: `ALLOW_DEMO_SEED=1 SEED_DEMO_PASSWORD=<12+ characters> npm -w api run seed:demo` (see `demo-seed.md`). The password is set by the owner in Dokploy and never committed. The seed refuses a database with any tenant outside the three demo tenants, but it cannot tell a demo host from a production host by name: keep the environments apart. As a container it is the separate image target `seed` (`docker build --target seed`, see `demo-seed.md`); a build without `--target` is always the API.
 - TOTP QR: the second-factor set-up shows the secret and the `otpauth://` link (Decision 1, no QR library). Add `qrcode` (pinned) if the client wants a scannable code.
 
 ## 7. Checks before and after

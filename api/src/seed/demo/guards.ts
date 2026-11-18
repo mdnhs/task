@@ -5,7 +5,7 @@ import { tenants, user } from "../../db/schema"
 /** The only tenants the seed may ever write to or delete: the demo set from shell/tenants.json. A database holding anything else is refused. */
 export const DEMO_SLUGS = ["northgate", "harbourline", "millbrook"] as const
 
-export type SeedRefusal = "password_required" | "opt_in_required" | "other_tenants" | "foreign_users" | "auth_env_missing" | "owner_required" | "bad_source" | "email_domain" | "bad_anchor" | "totp_secret_invalid" | "connections_differ"
+export type SeedRefusal = "password_required" | "opt_in_required" | "other_tenants" | "foreign_users" | "auth_env_missing" | "owner_required" | "bad_source" | "email_domain" | "bad_anchor" | "totp_secret_invalid" | "connections_differ" | "lock_timeout"
 
 /** A refusal. `code` is safe to print; the message never carries a value (no password, no address, no URL). */
 export class SeedRefused extends Error {
@@ -69,18 +69,39 @@ export async function assertSameDatabase(a: Db, b: Db): Promise<void> {
 }
 
 /** Session-level advisory lock key for "a demo seed is running" (two seeds never interleave). */
-const SEED_LOCK_KEY = 0x64656d6f
+export const SEED_LOCK_KEY = 0x64656d6f
+
+export const DEFAULT_LOCK_TIMEOUT_MS = 30_000
+const MAX_LOCK_TIMEOUT_MS = 10 * 60_000
+
+/** SEED_LOCK_TIMEOUT_MS: a whole number of milliseconds, 1 to 10 minutes. Anything else (empty, text, zero, negative, huge) is the default, never "wait forever". */
+export function lockTimeoutMs(raw: string | undefined): number {
+  if (raw === undefined || !/^\d{1,7}$/.test(raw)) return DEFAULT_LOCK_TIMEOUT_MS
+  const v = Number(raw)
+  return v >= 1 && v <= MAX_LOCK_TIMEOUT_MS ? v : DEFAULT_LOCK_TIMEOUT_MS
+}
+
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
 
 /**
  * Takes the seed lock on a dedicated connection, to be called IMMEDIATELY before the first write. The caller re-runs the guard after it returns. Covered: two seeds
  * (or a seed and a reset) never run at once, and the re-check sits milliseconds before the first write. NOT covered: a non-seed process creating a foreign tenant after the
  * re-check (tenant creation takes no such lock, and holding a table lock would block the seed's own writes). That residual window is harmless to foreign data: every delete the seed
  * issues names the demo slugs (wipe.ts) and every write goes to a demo-slug tenant or a demo-domain user.
+ *
+ * It WAITS at most `timeoutMs` (try-lock polling, so a seed that is stuck or was killed mid-run on another connection can never make this one hang): then `SeedRefused("lock_timeout")`.
  */
-export async function takeSeedLock(db: Db): Promise<() => Promise<void>> {
+export async function takeSeedLock(db: Db, o: { timeoutMs?: number } = {}): Promise<() => Promise<void>> {
+  const timeoutMs = o.timeoutMs ?? DEFAULT_LOCK_TIMEOUT_MS
   const client = await db.$client.connect()
   try {
-    await client.query("select pg_advisory_lock($1)", [SEED_LOCK_KEY])
+    const deadline = Date.now() + timeoutMs
+    for (;;) {
+      const r = await client.query("select pg_try_advisory_lock($1) as got", [SEED_LOCK_KEY])
+      if (r.rows[0]?.got === true) break
+      if (Date.now() >= deadline) throw new SeedRefused("lock_timeout")
+      await sleep(Math.min(100, Math.max(1, deadline - Date.now())))
+    }
   } catch (e) {
     client.release()
     throw e
