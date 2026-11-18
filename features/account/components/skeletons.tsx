@@ -216,7 +216,7 @@ function Notifications({ counts }: { counts: AccountCounts }) {
   )
 }
 
-export function AccountSkeleton({ tab, counts }: { tab: AccountTabId; counts: AccountCounts }) {
+export function AccountSkeleton({ tab, counts, extras }: { tab: AccountTabId; counts: AccountCounts; extras?: { notifications?: React.ReactNode } }) {
   return (
     <SkGroup label="Loading account" className="sk-page">
       <PageHeadSkeleton wrap />
@@ -232,7 +232,7 @@ export function AccountSkeleton({ tab, counts }: { tab: AccountTabId; counts: Ac
         <div className="set-body">
           {tab === "profile" && <Profile />}
           {tab === "security" && <Security counts={counts} />}
-          {tab === "notifications" && <Notifications counts={counts} />}
+          {tab === "notifications" && <><Notifications counts={counts} />{extras?.notifications}</>}
         </div>
       </div>
     </SkGroup>

@@ -208,7 +208,7 @@ function Departments({ departments, canWrite }: { departments: number; canWrite:
 }
 
 // Users: role filter + search, table (User, Role select when the member can write, Department) and the pending invites table (Email, Role, Expires, Resend and Revoke).
-function Users({ users, invites, canWrite }: { users: number; invites: number; canWrite: boolean }) {
+function Users({ users, invites, canWrite, wa = false }: { users: number; invites: number; canWrite: boolean; wa?: boolean }) {
   const head = (ws: number[]) => <thead><tr>{ws.map((w, i) => <th key={i}><Sk w={w} h={10} lh={15.94} /></th>)}</tr></thead>
   return (
     <>
@@ -220,13 +220,14 @@ function Users({ users, invites, canWrite }: { users: number; invites: number; c
         </div>
         <div className="table-wrap">
           <table className="rtable set-table">
-            {head([36, 36, 70])}
+            {head([36, 36, 70, ...(wa ? [60] : [])])}
             <tbody>
               {Array.from({ length: pageRows(users, USERS_PAGE_SIZE) }, (_, i) => (
                 <tr key={i}>
                   <td data-label="User"><Sk w={120} h={13} lh={19} /><Sk w={160} h={10} lh={16} /></td>
                   <td data-label="Role">{canWrite ? <div className="od-filters set-access"><Sk w={140} h={48} r="pill" /></div> : <Sk w={90} h={13} lh={19} />}</td>
                   <td data-label="Department"><Sk w={80} h={13} lh={19} /></td>
+                  {wa && <td data-label="WhatsApp"><span className="wa-user-cell"><Sk w={92} h={29.4} r={8} />{canWrite && <Sk w={57} h={48} r={12} />}</span></td>}
                 </tr>
               ))}
             </tbody>
@@ -436,7 +437,7 @@ function Notifications({ canWrite, data, deadline, tzLabel, today, log }: { canW
 }
 
 // One card with Google Drive, the only integration the API has (not connected, the typical new company).
-function Integrations({ canWrite }: { canWrite: boolean }) {
+function Integrations({ canWrite, extra }: { canWrite: boolean; extra?: React.ReactNode }) {
   return (
     <section className="card set-card">
       <CardHead title={110} sub={120} />
@@ -446,11 +447,12 @@ function Integrations({ canWrite }: { canWrite: boolean }) {
             <Sk w={44} h={44} r="circle" />
             <div className="set-int-name"><Sk w={100} h={16} lh={22} /><Sk w={96} h={29.4} r={8} /></div>
           </div>
-          <Sk w={260} h={11} lh={20} />
-          <Sk w={190} h={11} lh={20} />
-          <Sk w={280} h={11} lh={20} />
+          <p className="set-int-desc"><span className="sk-ghost">Opens Drive files from tasks and reports. Read-only.</span></p>
+          <p className="set-int-event"><span className="sk-ghost">Last event: Never connected</span></p>
+          <p className="set-int-policy"><span className="sk-ghost">Drive links only open on devices your policy allows.</span></p>
           {canWrite && <div className="set-int-foot"><Sk w={110} h={48} r={14} /></div>}
         </li>
+        {extra}
       </ul>
     </section>
   )
@@ -609,11 +611,14 @@ export function SettingsBodySkeleton({
   counts,
   canWrite,
   billing,
+  extras,
 }: {
   tab: SettingsTabId
   counts: SettingsCounts
   canWrite: boolean
   billing?: React.ReactNode
+  /** More cards the route composes in (a feature does not import another feature): the mock WhatsApp card of the Integrations grid. */
+  extras?: { integrations?: React.ReactNode; usersWhatsApp?: boolean }
 }) {
   switch (tab) {
     case "organisation":
@@ -622,7 +627,7 @@ export function SettingsBodySkeleton({
       return <Departments departments={counts.departments} canWrite={canWrite} />
     case "users":
       return (
-        <Users users={counts.users} invites={counts.invites} canWrite={canWrite} />
+        <Users users={counts.users} invites={counts.invites} canWrite={canWrite} wa={extras?.usersWhatsApp} />
       )
     case "roles":
       return (
@@ -642,7 +647,7 @@ export function SettingsBodySkeleton({
     case "integrations":
       return (
         <>
-          <Integrations canWrite={canWrite} />
+          <Integrations canWrite={canWrite} extra={extras?.integrations} />
           <DevicePolicies canWrite={canWrite} policies={counts.data?.devicePolicies ?? []} />
         </>
       )
@@ -662,11 +667,13 @@ export function SettingsSkeleton({
   counts,
   canWrite = true,
   billing,
+  extras,
 }: {
   tab: SettingsTabId
   counts: SettingsCounts
   canWrite?: boolean
   billing?: React.ReactNode
+  extras?: { integrations?: React.ReactNode; usersWhatsApp?: boolean }
 }) {
   return (
     <SkGroup label="Loading settings" className="sk-page">
@@ -686,6 +693,7 @@ export function SettingsSkeleton({
             counts={counts}
             canWrite={canWrite}
             billing={billing}
+            extras={extras}
           />
         </div>
       </div>

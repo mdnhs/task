@@ -7,7 +7,7 @@ import { AccountSkeleton } from "./skeletons"
 import type { AccountCounts } from "./skeletons"
 
 // loading.tsx gets no params, so the skeleton reads the target tab from the pathname (falls back to Profile).
-export function AccountLoading({ counts }: { counts: AccountCounts }) {
+export function AccountLoading({ counts, extras }: { counts: AccountCounts; extras?: { notifications?: React.ReactNode } }) {
   const last = usePathname().split("/").filter(Boolean).pop() ?? ""
-  return <AccountSkeleton tab={isTab(last) ? last : "profile"} counts={counts} />
+  return <AccountSkeleton tab={isTab(last) ? last : "profile"} counts={counts} extras={extras} />
 }
