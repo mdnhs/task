@@ -140,7 +140,12 @@ button.pf-arrow:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
 @media (max-width:1240px){.stats.pf-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}.pf-kpis .value{font-size:46px}}
 @media (max-width:640px){.pf-kpis .value{font-size:34px}}
 @media (max-width:420px){.stats.pf-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.pf-kpis .stat{padding:14px;min-height:128px}.pf-kpis .value{font-size:28px}.pf-kpis .value small{font-size:17px}.pf-kpis .arrow{width:32px;height:32px}}
-.pf-ov-grid{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:16px;align-items:start}
+/* One gap token for the console's stacked sections and columns (same value as .stats). */
+:root{--pf-gap:calc(16px * var(--space-scale,1))}
+.pf-ov-grid{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:var(--pf-gap);align-items:start}
+.pf-ov-col{display:flex;flex-direction:column;gap:var(--pf-gap);min-width:0}
+.pf-sample{display:flex;flex-direction:column;gap:var(--pf-gap);min-width:0}
+.pf-sample .pf-note{margin:0}
 @media (max-width:1100px){.pf-ov-grid{grid-template-columns:minmax(0,1fr)}}
 
 .pf-legend{gap:12px}
@@ -186,7 +191,6 @@ button.pf-arrow:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
 /* Without billing.read (no revenue): 3 count cards; attention beside a stacked plan mix + activity column. */
 .stats.pf-kpis.pf-kpis-3{grid-template-columns:repeat(3,minmax(0,1fr))}
 @media (max-width:420px){.stats.pf-kpis.pf-kpis-3{grid-template-columns:repeat(2,minmax(0,1fr))}.pf-kpis-3 .stat:first-child{grid-column:span 2}}
-.pf-ov-side{display:flex;flex-direction:column;gap:16px;min-width:0}
 
 /* Tenants list (/platform/tenants, Task 4) */
 .pf-tenants{min-width:1080px}

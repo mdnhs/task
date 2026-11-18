@@ -64,21 +64,21 @@ export function OverviewDashboard({ data, today, tzLabel, skeleton = false, samp
       </section>}
 
       {data.revenue ? (
-        <>
-          <div className="pf-ov-grid">
+        <div className="pf-ov-grid">
+          <div className="pf-ov-col">
             <MrrChart series={data.revenue.series} currency={data.revenue.currency} skeleton={skeleton} />
-            <PlanMix rows={data.planMix} revenue />
-          </div>
-          <div className={data.activity ? "pf-ov-grid" : undefined}>
             <Attention items={data.attention} />
+          </div>
+          <div className="pf-ov-col">
+            <PlanMix rows={data.planMix} revenue />
             {data.activity && <Activity lines={data.activity} today={today} tzLabel={tzLabel} />}
           </div>
-        </>
+        </div>
       ) : (
         // No billing.read: no revenue in the payload. Attention leads; plan mix (by tenants) and activity stack beside it.
         <div className="pf-ov-grid">
           <Attention items={data.attention} />
-          <div className="pf-ov-side">
+          <div className="pf-ov-col">
             <PlanMix rows={data.planMix} revenue={false} />
             {data.activity && <Activity lines={data.activity} today={today} tzLabel={tzLabel} />}
           </div>
