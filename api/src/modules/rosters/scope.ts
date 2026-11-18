@@ -19,12 +19,20 @@ import { lockActor } from "../rbac"
  */
 export const ROSTER_LOCK_NS = 0x726f7374
 
-export const lockRoster = (tx: TenantTx, tenantId: string) => tx.execute(sql`select pg_advisory_xact_lock(${ROSTER_LOCK_NS}::int, hashtext(${tenantId}::text))`)
+/** How long a roster writer waits for the tenant lock before giving up (55P03 -> 409 retry), so a slow or stuck writer cannot hang every roster write. */
+export const ROSTER_LOCK_TIMEOUT_MS = 5000
 
-/** True when THIS transaction holds the tenant's roster lock (pg_locks of our own backend). */
-async function holdsRosterLock(tx: TenantTx, tenantId: string): Promise<boolean> {
-  const r = await tx.execute(sql`select 1 as held from pg_locks where locktype = 'advisory' and granted and pid = pg_backend_pid() and classid = ${ROSTER_LOCK_NS}::oid and objsubid = 2 and objid::text = (hashtext(${tenantId}::text)::bigint & 4294967295)::text`)
-  return r.rows.length > 0
+/** The transactions that took the roster lock (and for which tenant): the order rule is checked in memory, no pg_locks scan. */
+const lockedTx = new WeakMap<TenantTx, string>()
+
+/**
+ * Takes the tenant's roster lock. `set local lock_timeout` applies to the rest of this transaction (later row and actor locks too): any lock wait
+ * longer than 5 s fails with 55P03, which app.ts answers as 409 `retry` like a deadlock.
+ */
+export async function lockRoster(tx: TenantTx, tenantId: string): Promise<void> {
+  await tx.execute(sql.raw(`set local lock_timeout = ${ROSTER_LOCK_TIMEOUT_MS}`))
+  await tx.execute(sql`select pg_advisory_xact_lock(${ROSTER_LOCK_NS}::int, hashtext(${tenantId}::text))`)
+  lockedTx.set(tx, tenantId)
 }
 
 /**
@@ -42,7 +50,7 @@ export type RosterCtx = { tenantId: string; tz: string; me: string; actorId: str
 export async function loadRosterCtx(c: Context<AppEnv>, tx: TenantTx, need: "read" | "write" = "read"): Promise<RosterCtx> {
   const tenant = c.get("tenant")!
   const actorId = actorIdOf(c)
-  if (need === "write" && !(await holdsRosterLock(tx, tenant.id))) throw new Error("loadRosterCtx(write) requires lockRoster first (R8-5 lock order)")
+  if (need === "write" && lockedTx.get(tx) !== tenant.id) throw new Error("loadRosterCtx(write) requires lockRoster first (R8-5 lock order)")
   const role = need === "write" ? await lockActor(tx, tenant.id, actorId, "roster", "write") : c.get("role")!
   if (!can(role, "roster", need)) throw Forbidden("forbidden") // the route guard already answered; fail closed
   const me = subjectUserId(c)

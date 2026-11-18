@@ -141,6 +141,25 @@ describe("migration 0044 tables", () => {
     })
   })
 
+  test("a change request carries the shift version it was made against (NOT NULL); a shift cannot name another location than its week's (composite FK)", async () => {
+    const a = await seedTenant("A")
+    await expect(tx(owner, a.id, (c) => c.query("insert into roster_change_requests (tenant_id, shift_id, requested_by, patch, reason, created_at, updated_at) values ($1, $2, $3, '{}', 'x', now(), now())", [a.id, a.shift, a.user]))).rejects.toMatchObject({ code: "23502" })
+    await tx(owner, a.id, async (c) => {
+      const other = randomUUID() // a second site of the SAME tenant, with its own shift type
+      await c.query("insert into locations (id, tenant_id, name, created_at, updated_at) values ($1, $2, 'Other', now(), now())", [other, a.id])
+      await c.query("savepoint s")
+      await expect(insertShift(c, { ...a, location: other }, randomUUID(), null)).rejects.toMatchObject({ code: "23503" }) // week is Site's, shift says Other
+      await c.query("rollback to savepoint s")
+      await insertShift(c, a, randomUUID(), null) // week and location agree
+    })
+  })
+
+  test("the added lookup indexes exist", async () => {
+    const names = ["roster_exchanges_from_idx", "roster_exchanges_to_idx", "roster_change_requests_user_idx", "leave_requests_status_idx"]
+    const rows = (await owner.query("select indexname from pg_indexes where indexname = any($1)", [names])).rows.map((r) => r.indexname)
+    expect(rows.sort()).toEqual([...names].sort())
+  })
+
   test("a second open exchange for the same shift and requester is refused, a decided one does not block a new one", async () => {
     const a = await seedTenant("A")
     const ins = (c: pg.PoolClient, kind = "claim", from = a.user, status = "requested") => c.query("insert into roster_exchanges (tenant_id, kind, shift_id, from_user_id, status, created_at, updated_at) values ($1, $2, $3, $4, $5, now(), now())", [a.id, kind, a.shift, from, status])
@@ -163,7 +182,7 @@ describe("migration 0044 tables", () => {
   test("change requests, leave and availability checks; a shift delete takes its requests and exchanges with it", async () => {
     const a = await seedTenant("A")
     await tx(owner, a.id, async (c) => {
-      await c.query("insert into roster_change_requests (tenant_id, shift_id, requested_by, patch, reason, created_at, updated_at) values ($1, $2, $3, '{\"startTime\":\"09:00\"}', 'dentist', now(), now())", [a.id, a.shift, a.user])
+      await c.query("insert into roster_change_requests (tenant_id, shift_id, shift_version, requested_by, patch, reason, created_at, updated_at) values ($1, $2, 1, $3, '{\"startTime\":\"09:00\"}', 'dentist', now(), now())", [a.id, a.shift, a.user])
       await expect(c.query("savepoint s").then(() => c.query("update roster_change_requests set status = 'maybe'"))).rejects.toMatchObject({ code: "23514" })
       await c.query("rollback to savepoint s")
       await c.query("delete from roster_shifts where id = $1", [a.shift])

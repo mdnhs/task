@@ -1,3 +1,4 @@
+-- roster_shifts_week_fk is composite (tenant, week, location): a shift cannot name a location other than its week's. A shift date inside its week stays a service-level rule.
 CREATE TABLE "leave_requests" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"tenant_id" uuid NOT NULL,
@@ -55,6 +56,7 @@ CREATE TABLE "roster_change_requests" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"tenant_id" uuid NOT NULL,
 	"shift_id" uuid NOT NULL,
+	"shift_version" integer NOT NULL,
 	"requested_by" text NOT NULL,
 	"patch" jsonb NOT NULL,
 	"reason" text NOT NULL,
@@ -159,6 +161,7 @@ CREATE TABLE "roster_weeks" (
 	"created_at" timestamp with time zone NOT NULL,
 	"updated_at" timestamp with time zone NOT NULL,
 	CONSTRAINT "roster_weeks_tenant_id_id" UNIQUE("tenant_id","id"),
+	CONSTRAINT "roster_weeks_id_location_uq" UNIQUE("tenant_id","id","location_id"),
 	CONSTRAINT "roster_weeks_location_start_uq" UNIQUE("tenant_id","location_id","week_start"),
 	CONSTRAINT "roster_weeks_monday_check" CHECK (extract(isodow from "roster_weeks"."week_start") = 1),
 	CONSTRAINT "roster_weeks_status_check" CHECK ("roster_weeks"."status" in ('draft','published')),
@@ -185,7 +188,7 @@ ALTER TABLE "roster_exchanges" ADD CONSTRAINT "roster_exchanges_to_fk" FOREIGN K
 ALTER TABLE "roster_history" ADD CONSTRAINT "roster_history_tenant_id_tenants_id_fk" FOREIGN KEY ("tenant_id") REFERENCES "public"."tenants"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "roster_history" ADD CONSTRAINT "roster_history_location_fk" FOREIGN KEY ("tenant_id","location_id") REFERENCES "public"."locations"("tenant_id","id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "roster_shifts" ADD CONSTRAINT "roster_shifts_tenant_id_tenants_id_fk" FOREIGN KEY ("tenant_id") REFERENCES "public"."tenants"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "roster_shifts" ADD CONSTRAINT "roster_shifts_week_fk" FOREIGN KEY ("tenant_id","week_id") REFERENCES "public"."roster_weeks"("tenant_id","id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "roster_shifts" ADD CONSTRAINT "roster_shifts_week_fk" FOREIGN KEY ("tenant_id","week_id","location_id") REFERENCES "public"."roster_weeks"("tenant_id","id","location_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "roster_shifts" ADD CONSTRAINT "roster_shifts_location_fk" FOREIGN KEY ("tenant_id","location_id") REFERENCES "public"."locations"("tenant_id","id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "roster_shifts" ADD CONSTRAINT "roster_shifts_type_fk" FOREIGN KEY ("tenant_id","shift_type_id") REFERENCES "public"."shift_types"("tenant_id","id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "roster_shifts" ADD CONSTRAINT "roster_shifts_member_fk" FOREIGN KEY ("tenant_id","user_id") REFERENCES "public"."memberships"("tenant_id","user_id") ON DELETE SET NULL ("user_id") ON UPDATE no action;--> statement-breakpoint
@@ -195,10 +198,14 @@ ALTER TABLE "roster_week_templates" ADD CONSTRAINT "roster_week_templates_locati
 ALTER TABLE "roster_weeks" ADD CONSTRAINT "roster_weeks_tenant_id_tenants_id_fk" FOREIGN KEY ("tenant_id") REFERENCES "public"."tenants"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "roster_weeks" ADD CONSTRAINT "roster_weeks_location_fk" FOREIGN KEY ("tenant_id","location_id") REFERENCES "public"."locations"("tenant_id","id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 CREATE INDEX "leave_requests_user_idx" ON "leave_requests" USING btree ("tenant_id","user_id","from_date");--> statement-breakpoint
+CREATE INDEX "leave_requests_status_idx" ON "leave_requests" USING btree ("tenant_id","status");--> statement-breakpoint
 CREATE INDEX "roster_change_requests_shift_idx" ON "roster_change_requests" USING btree ("tenant_id","shift_id");--> statement-breakpoint
+CREATE INDEX "roster_change_requests_user_idx" ON "roster_change_requests" USING btree ("tenant_id","requested_by");--> statement-breakpoint
 CREATE INDEX "roster_change_requests_open_idx" ON "roster_change_requests" USING btree ("tenant_id","created_at") WHERE "roster_change_requests"."status" = 'requested';--> statement-breakpoint
 CREATE UNIQUE INDEX "roster_exchanges_open_uq" ON "roster_exchanges" USING btree ("tenant_id","shift_id","from_user_id","kind") WHERE "roster_exchanges"."status" in ('requested','recommended');--> statement-breakpoint
 CREATE INDEX "roster_exchanges_shift_idx" ON "roster_exchanges" USING btree ("tenant_id","shift_id");--> statement-breakpoint
+CREATE INDEX "roster_exchanges_from_idx" ON "roster_exchanges" USING btree ("tenant_id","from_user_id");--> statement-breakpoint
+CREATE INDEX "roster_exchanges_to_idx" ON "roster_exchanges" USING btree ("tenant_id","to_user_id");--> statement-breakpoint
 CREATE INDEX "roster_history_location_idx" ON "roster_history" USING btree ("tenant_id","location_id","created_at" DESC NULLS LAST,"id" DESC NULLS LAST);--> statement-breakpoint
 CREATE INDEX "roster_shifts_user_idx" ON "roster_shifts" USING btree ("tenant_id","user_id","start_at");--> statement-breakpoint
 CREATE INDEX "roster_shifts_location_date_idx" ON "roster_shifts" USING btree ("tenant_id","location_id","date");--> statement-breakpoint

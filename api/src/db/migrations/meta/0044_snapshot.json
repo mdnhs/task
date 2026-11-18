@@ -1,5 +1,5 @@
 {
-  "id": "7c8501ad-e8b4-41ca-b5d4-f634bd29b4e2",
+  "id": "2f95c9fe-a48f-449e-abfb-de8e78a8b09c",
   "prevId": "5eb038d8-2c52-4bc7-8b6e-4e78e218d1de",
   "version": "7",
   "dialect": "postgresql",
@@ -9716,6 +9716,27 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "leave_requests_status_idx": {
+          "name": "leave_requests_status_idx",
+          "columns": [
+            {
+              "expression": "tenant_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
@@ -10600,6 +10621,12 @@
           "primaryKey": false,
           "notNull": true
         },
+        "shift_version": {
+          "name": "shift_version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
         "requested_by": {
           "name": "requested_by",
           "type": "text",
@@ -10668,6 +10695,27 @@
             },
             {
               "expression": "shift_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "roster_change_requests_user_idx": {
+          "name": "roster_change_requests_user_idx",
+          "columns": [
+            {
+              "expression": "tenant_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "requested_by",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -10894,6 +10942,48 @@
             },
             {
               "expression": "shift_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "roster_exchanges_from_idx": {
+          "name": "roster_exchanges_from_idx",
+          "columns": [
+            {
+              "expression": "tenant_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "from_user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "roster_exchanges_to_idx": {
+          "name": "roster_exchanges_to_idx",
+          "columns": [
+            {
+              "expression": "tenant_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "to_user_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -11464,11 +11554,13 @@
           "tableTo": "roster_weeks",
           "columnsFrom": [
             "tenant_id",
-            "week_id"
+            "week_id",
+            "location_id"
           ],
           "columnsTo": [
             "tenant_id",
-            "id"
+            "id",
+            "location_id"
           ],
           "onDelete": "no action",
           "onUpdate": "no action"
@@ -11816,6 +11908,15 @@
           "columns": [
             "tenant_id",
             "id"
+          ]
+        },
+        "roster_weeks_id_location_uq": {
+          "name": "roster_weeks_id_location_uq",
+          "nullsNotDistinct": false,
+          "columns": [
+            "tenant_id",
+            "id",
+            "location_id"
           ]
         },
         "roster_weeks_location_start_uq": {

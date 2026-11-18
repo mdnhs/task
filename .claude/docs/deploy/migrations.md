@@ -2,6 +2,8 @@
 
 Migrations are numbered SQL files in `api/src/db/migrations/` (drizzle; 45 at the time of writing, 0000 to 0044), applied as `app_owner`. The API connects as `app_user`, which cannot create or alter anything and has no BYPASSRLS.
 
+Note on 0044: it swaps the `shift_types` name unique index to `lower(name)`; on a database that already has case-variant duplicate active shift type names in one location (e.g. "Day" and "day") it fails, so rename them first. 0043 and 0044 were unreleased (never applied outside tests) when 0044 was last edited in place.
+
 ## Rules
 
 1. **Additive and backward compatible for one release (expand, then contract).** A migration in release N must leave release N-1's image working: add columns nullable or with a default, add tables and indexes, widen constraints. Dropping, renaming or tightening happens in release N+1, when no running image reads the old shape, with a two-step plan written in that task. This is what makes an image rollback safe ([rollback.md](rollback.md)).

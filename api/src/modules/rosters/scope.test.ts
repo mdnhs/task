@@ -15,7 +15,7 @@ import { loadRole } from "../../core/middleware/permission"
 import { locations } from "../../db/schema"
 import { withTenant } from "../../db/tenant-tx"
 import { SHIFT_LOCK_NS } from "../shifts"
-import { ROSTER_LOCK_NS, assertLocation, inScopeSql, loadRosterCtx, lockRoster, weekEditGate, type RosterCtx } from "."
+import { ROSTER_LOCK_NS, ROSTER_LOCK_TIMEOUT_MS, assertLocation, inScopeSql, loadRosterCtx, lockRoster, weekEditGate, type RosterCtx } from "."
 
 // B8 Task 4: the roster access boundary (R8-3, R8-4, R8-5, R8-8). A location the caller cannot see is a 404 with no oracle.
 
@@ -198,7 +198,8 @@ describe("guarded routes (HTTP)", () => {
     const body = async (id: string, who = w.people["roster-manager"]) => {
       const r = await w.req("GET", `/v1/_probe/roster/locations/${id}`, who)
       const j = (await r.json()) as Json
-      return { status: r.status, body: { ...j, requestId: "x" } }
+      const headers = Object.fromEntries([...r.headers.entries()].filter(([k]) => !/^(x-request-id|x-response-time|server-timing|date)$/i.test(k)))
+      return { status: r.status, body: { ...j, requestId: "x" }, headers }
     }
     const hidden = await body(w.l3) // excepted for this roster manager, exists in this tenant
     expect(hidden.status).toBe(404)
@@ -216,6 +217,28 @@ describe("guarded routes (HTTP)", () => {
     expect(list.locationIds.sort()).toEqual([w.l1, w.l2].sort())
     expect(Object.keys(list).sort()).toEqual(["approve", "editDraft", "editPublished", "locationIds", "scope"])
   })
+
+  test("a writer that waits longer than the lock timeout gets 409 retry, not a hang", async () => {
+    const w = await world()
+    let release!: () => void
+    const gate = new Promise<void>((r) => (release = r))
+    let held!: () => void
+    const ready = new Promise<void>((r) => (held = r))
+    const holder = withTenant(w.deps.db, w.tenant.id, async (tx) => { await lockRoster(tx, w.tenant.id); held(); await gate })
+    await ready
+    try {
+      const t0 = Date.now()
+      const r = await w.req("POST", "/v1/_probe/roster-write", w.people.owner)
+      expect(r.status).toBe(409)
+      expect(((await r.json()) as Json).code).toBe("retry")
+      expect(Date.now() - t0).toBeGreaterThanOrEqual(ROSTER_LOCK_TIMEOUT_MS - 500)
+      expect(Date.now() - t0).toBeLessThan(ROSTER_LOCK_TIMEOUT_MS + 4000)
+    } finally {
+      release()
+      await holder
+    }
+    expect((await w.req("POST", "/v1/_probe/roster-write", w.people.owner)).status).toBe(200) // free again
+  }, 30_000)
 
   test("the write path re-reads the actor in the tx: a demoted caller is refused on the very next write even with a live session", async () => {
     const w = await world()

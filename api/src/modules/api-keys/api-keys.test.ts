@@ -48,7 +48,7 @@ describe("create / list / revoke", () => {
     expect(k.scopes).toEqual(["settings:read"])
     const [row] = await ownerTenantQuery(w.tenant.id, "select * from api_keys")
     expect(row.key_hash).toBe(sha256(k.key))
-    expect(JSON.stringify(row)).not.toContain(k.key.split("_")[2]) // the secret is nowhere in the row
+    expect(JSON.stringify(row)).not.toContain(k.key.slice(`odk_${k.prefix}_`.length)) // the secret is nowhere in the row
     expect(row.created_by).toBe(w.owner.userId)
     const idx = await ownerQuery("select prefix, target_tenant_id, key_id from api_key_index")
     expect(idx).toEqual([{ prefix: k.prefix, target_tenant_id: w.tenant.id, key_id: k.id }])

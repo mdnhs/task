@@ -176,6 +176,7 @@ export const rosterWeeks = pgTable(
   },
   (t) => [
     unique("roster_weeks_tenant_id_id").on(t.tenantId, t.id),
+    unique("roster_weeks_id_location_uq").on(t.tenantId, t.id, t.locationId), // target of roster_shifts_week_fk: a shift's location is its week's location
     unique("roster_weeks_location_start_uq").on(t.tenantId, t.locationId, t.weekStart),
     foreignKey({ columns: [t.tenantId, t.locationId], foreignColumns: [locations.tenantId, locations.id], name: "roster_weeks_location_fk" }),
     check("roster_weeks_monday_check", sql`extract(isodow from ${t.weekStart}) = 1`),
@@ -214,7 +215,8 @@ export const rosterShifts = pgTable(
   },
   (t) => [
     unique("roster_shifts_tenant_id_id").on(t.tenantId, t.id),
-    foreignKey({ columns: [t.tenantId, t.weekId], foreignColumns: [rosterWeeks.tenantId, rosterWeeks.id], name: "roster_shifts_week_fk" }),
+    // the shift's week AND location must be one pair of roster_weeks (date-within-week stays a service-level rule)
+    foreignKey({ columns: [t.tenantId, t.weekId, t.locationId], foreignColumns: [rosterWeeks.tenantId, rosterWeeks.id, rosterWeeks.locationId], name: "roster_shifts_week_fk" }),
     foreignKey({ columns: [t.tenantId, t.locationId], foreignColumns: [locations.tenantId, locations.id], name: "roster_shifts_location_fk" }),
     foreignKey({ columns: [t.tenantId, t.shiftTypeId], foreignColumns: [shiftTypes.tenantId, shiftTypes.id], name: "roster_shifts_type_fk" }),
     foreignKey({ columns: [t.tenantId, t.userId], foreignColumns: [memberships.tenantId, memberships.userId], name: "roster_shifts_member_fk" }).onDelete("set null"), // column list added by hand in the SQL
@@ -265,6 +267,7 @@ export const rosterChangeRequests = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     tenantId: uuid("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
     shiftId: uuid("shift_id").notNull(),
+    shiftVersion: integer("shift_version").notNull(), // roster_shifts.version at request time (stale_request check)
     requestedBy: text("requested_by").notNull(),
     patch: jsonb("patch").$type<Record<string, unknown>>().notNull(),
     reason: text("reason").notNull(),
@@ -280,6 +283,7 @@ export const rosterChangeRequests = pgTable(
     foreignKey({ columns: [t.tenantId, t.requestedBy], foreignColumns: [memberships.tenantId, memberships.userId], name: "roster_change_requests_member_fk" }).onDelete("cascade"),
     check("roster_change_requests_status_check", sql`${t.status} in ('requested','approved','rejected')`),
     index("roster_change_requests_shift_idx").on(t.tenantId, t.shiftId),
+    index("roster_change_requests_user_idx").on(t.tenantId, t.requestedBy),
     index("roster_change_requests_open_idx").on(t.tenantId, t.createdAt).where(sql`${t.status} = 'requested'`),
     tenantPolicy(),
   ],
@@ -310,6 +314,8 @@ export const rosterExchanges = pgTable(
     check("roster_exchanges_status_check", sql`${t.status} in ('requested','recommended','approved','rejected','cancelled')`),
     uniqueIndex("roster_exchanges_open_uq").on(t.tenantId, t.shiftId, t.fromUserId, t.kind).where(sql`${t.status} in ('requested','recommended')`),
     index("roster_exchanges_shift_idx").on(t.tenantId, t.shiftId),
+    index("roster_exchanges_from_idx").on(t.tenantId, t.fromUserId),
+    index("roster_exchanges_to_idx").on(t.tenantId, t.toUserId),
     tenantPolicy(),
   ],
 ).enableRLS()
@@ -337,6 +343,7 @@ export const leaveRequests = pgTable(
     check("leave_requests_status_check", sql`${t.status} in ('requested','approved','rejected','cancelled')`),
     check("leave_requests_kind_check", sql`char_length(${t.kind}) BETWEEN 1 AND 40`),
     index("leave_requests_user_idx").on(t.tenantId, t.userId, t.fromDate),
+    index("leave_requests_status_idx").on(t.tenantId, t.status),
     tenantPolicy(),
   ],
 ).enableRLS()

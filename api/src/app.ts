@@ -76,7 +76,8 @@ export function createApp(deps: Deps) {
     }
     // Postgres 40P01 (deadlock detected) and 40001 (serialisation failure) roll the transaction back and are transient: 409 `retry`, the client repeats the request (R9: the SQLSTATE is read from .cause.code).
     const info = errorInfo(err)
-    if (info.code === "40P01" || info.code === "40001") {
+    // 55P03 (lock_not_available) is the same kind of transient: the roster lock waited past its lock_timeout (lockRoster).
+    if (info.code === "40P01" || info.code === "40001" || info.code === "55P03") {
       logger.warn({ ...info, requestId: rid }, "transient database conflict")
       return problem(409, "retry", "Conflict", rid)
     }
