@@ -3,12 +3,12 @@
 /* ---------- Shell: tab list + content ---------- */
 .set-layout{display:grid;grid-template-columns:230px minmax(0,1fr);gap:18px;align-items:start}
 .set-tabs{display:flex;flex-direction:column;gap:2px;background:var(--card);border-radius:var(--r-lg);padding:10px;position:sticky;top:18px}
-.set-tab{position:relative;display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:var(--r-pill);color:var(--ink-2);font-size:13.5px;font-weight:600;white-space:nowrap;transition:color var(--dur-fast) var(--ease)}
+.set-tab{position:relative;display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:var(--r-md);color:var(--ink-2);font-size:13.5px;font-weight:600;white-space:nowrap;transition:color var(--dur-fast) var(--ease)}
 .set-tab .ico{width:18px;height:18px;flex:none}
 .set-tab:hover{color:var(--brand-deep)}
 .set-tab[aria-current="page"]{color:var(--brand-deep)}
 /* Active pill is a <StretchIndicator> in the nav (components/stretch-indicator.tsx): it stretches between tabs. */
-.set-tab-bg{position:absolute;inset:0;border-radius:var(--r-pill);background:var(--brand-soft)}
+.set-tab-bg{position:absolute;inset:0;border-radius:var(--r-md);background:var(--brand-soft)}
 .set-tabs:not([data-st]) .set-tab[aria-current="page"]{background:var(--brand-soft)}
 .set-tab>:not(.set-tab-bg){position:relative}
 :root[data-theme="dark"] .set-tab:is(:hover,[aria-current="page"]){color:var(--brand-3)}
