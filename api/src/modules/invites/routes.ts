@@ -4,6 +4,7 @@ import { and, desc, eq, isNull } from "drizzle-orm"
 import { AppError, Conflict, Forbidden, NotFound } from "../../core/errors"
 import type { Deps } from "../../deps"
 import { requirePermission } from "../../core/middleware/permission"
+import { RATE, assertRateLimit, hashKey } from "../../core/middleware/rate-limit"
 import { requireSession } from "../../core/middleware/session"
 import { requireTenant } from "../../core/middleware/tenant"
 import { newRouter } from "../../core/router"
@@ -143,6 +144,8 @@ export const inviteRoutes = newRouter()
     const tenant = c.get("tenant")!
     const actorId = c.get("member")!.userId
     const { email, roleId } = c.req.valid("json")
+    // S4: one address cannot be mail-bombed by invites from any tenant (the limiter is shared; its store being down does not stop admins inviting)
+    await assertRateLimit(c, "invite-mail", RATE.inviteMailAddress, hashKey(email))
     const now = deps.clock.now()
     const token = mintToken(tenant.id)
 

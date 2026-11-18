@@ -1,6 +1,10 @@
 import { Hono } from "hono"
+import { getConnInfo } from "@hono/node-server/conninfo"
 import type { AppEnv } from "../../core/context"
 import { problem, statusCode, statusTitle } from "../../core/errors"
+import { enforceRateLimit, hashKey, RATE } from "../../core/middleware/rate-limit"
+import { clientIp, ipBucket } from "../../core/net/client-ip"
+import { CLIENT_IP_HEADER } from "./auth"
 import { authenticateSession } from "../../core/middleware/session"
 import { strictestIdleHours } from "../../core/session-policy"
 
@@ -45,6 +49,10 @@ export const MFA_PROTECTED_AUTH_PATHS: readonly string[] = [
   "/update-user",
 ]
 
+/** POST paths under /api/auth that are guessable or send mail: limited per caller IP (all) and per target address (the mail senders). Sign-out, session reads and the rest stay free. */
+const LIMITED_PREFIXES = ["/sign-in", "/sign-up", "/forget-password", "/request-password-reset", "/reset-password", "/send-verification-email", "/two-factor/verify"]
+const MAIL_PATHS = ["/sign-up/email", "/forget-password", "/request-password-reset", "/send-verification-email"]
+
 export const authRoutes = new Hono<AppEnv>()
 
 // Better Auth owns everything under /api/auth/* (sign-up, sign-in, 2FA, OAuth callbacks, ...).
@@ -58,7 +66,28 @@ authRoutes.on(["GET", "POST"], "/api/auth/*", async (c) => {
   if (found && found.user.twoFactorEnabled === true && found.session.mfaPassed !== true && MFA_PROTECTED_AUTH_PATHS.includes(sub)) {
     return problem(403, "mfa_required", "Forbidden", c.get("requestId"))
   }
-  const res = await deps.auth.handler(c.req.raw)
+  // S3/S4: the one resolved caller address. Whatever the caller sent in our header is overwritten; Better Auth reads only this header.
+  let socket: string | undefined
+  try {
+    socket = getConnInfo(c).remote.address
+  } catch {
+    socket = undefined // not on a node socket (tests)
+  }
+  const ip = clientIp(c.req.raw.headers, socket, deps.env.TRUST_PROXY_HOPS)
+  if (c.req.method === "POST" && LIMITED_PREFIXES.some((p) => sub === p || sub.startsWith(`${p}/`))) {
+    const blocked = await enforceRateLimit(c, "auth-ip", { limit: deps.env.AUTH_RATE_LIMIT_PER_MIN, windowSec: 60 }, ipBucket(ip), { failClosed: true })
+    if (blocked) return blocked
+    if (MAIL_PATHS.includes(sub)) {
+      const email = ((await c.req.raw.clone().json().catch(() => null)) as { email?: unknown } | null)?.email
+      if (typeof email === "string" && email) {
+        const mailBlocked = await enforceRateLimit(c, "auth-mail", RATE.authMailAddress, hashKey(email), { failClosed: true })
+        if (mailBlocked) return mailBlocked
+      }
+    }
+  }
+  const headers = new Headers(c.req.raw.headers)
+  headers.set(CLIENT_IP_HEADER, ip)
+  const res = await deps.auth.handler(new Request(c.req.raw, { headers }))
   // "Sign out other devices": logged like DELETE /v1/me/sessions/{id} (no tenant context, so no audit row; ids and outcome only, never a token or an IP).
   if (sub === "/revoke-other-sessions" && found) deps.logger.info({ userId: found.user.id, sessionId: found.session.id, requestId: c.get("requestId"), outcome: res.status < 400 ? "ok" : "failed" }, "other sessions revoked")
   // One place maps every Better Auth error to our problem+json shape. Its own error code (lower-cased,

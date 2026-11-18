@@ -60,7 +60,11 @@ export function createApp(deps: Deps) {
 
   app.onError((err, c) => {
     const rid = c.get("requestId") ?? crypto.randomUUID()
-    if (err instanceof AppError) return problem(err.status, err.code, err.title, rid, err.extra)
+    if (err instanceof AppError) {
+      const res = problem(err.status, err.code, err.title, rid, err.extra)
+      for (const [k, v] of Object.entries(err.headers ?? {})) res.headers.set(k, v)
+      return res
+    }
     if (err instanceof HTTPException) {
       return problem(err.status, statusCode(err.status), statusTitle(err.status), rid)
     }

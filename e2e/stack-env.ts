@@ -52,6 +52,7 @@ export const apiEnv = {
   S3_FORCE_PATH_STYLE: "true",
   CLAMD_HOST: "localhost",
   CLAMD_PORT: "53310",
+  AUTH_RATE_LIMIT_PER_MIN: "1000", // every e2e persona signs in from one address
   // Keep any developer credentials out of this tree.
   RESEND_API_KEY: "",
   STRIPE_SECRET_KEY: "",

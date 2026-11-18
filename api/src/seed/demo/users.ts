@@ -5,6 +5,7 @@ import type { Db } from "../../db/client"
 import { account, platformStaff, session, twoFactor, user } from "../../db/schema"
 import { buildAuth } from "../../modules/auth/auth"
 import { createPlatformOwner } from "../../modules/platform-staff/bootstrap"
+import { noopRateLimiter } from "../../core/middleware/rate-limit"
 import type { Env } from "../../env"
 import type { Mailer } from "../../deps"
 import type { Person } from "./people"
@@ -19,7 +20,7 @@ export function noopMailer(): Mailer & { suppressed: number } {
 
 /** Better Auth with the seed's own settings. Only the secret, the app URL and the environment name matter here (hashing, sealing a TOTP secret). */
 export function buildSeedAuth(db: Db, env: { BETTER_AUTH_SECRET: string; APP_URL: string; NODE_ENV?: string }, mailer: Mailer, clock: { now(): Date }): SeedAuth {
-  return buildAuth({ env: { BETTER_AUTH_SECRET: env.BETTER_AUTH_SECRET, APP_URL: env.APP_URL, NODE_ENV: env.NODE_ENV ?? "development" } as Env, db, clock, mailer, logger: pino({ level: "silent" }) })
+  return buildAuth({ env: { BETTER_AUTH_SECRET: env.BETTER_AUTH_SECRET, APP_URL: env.APP_URL, NODE_ENV: env.NODE_ENV ?? "development" } as Env, db, clock, mailer, logger: pino({ level: "silent" }), rateLimiter: noopRateLimiter })
 }
 
 /**

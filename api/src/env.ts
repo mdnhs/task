@@ -60,6 +60,11 @@ const schema = z.object({
   TASK_EVIDENCE_MAX_BYTES: z.preprocess(unsetIfEmpty, z.coerce.number().int().min(1).default(26214400)),
   TASK_VIDEO_MAX_BYTES: z.preprocess(unsetIfEmpty, z.coerce.number().int().min(1).default(104857600)),
   TASK_VOICE_MAX_BYTES: z.preprocess(unsetIfEmpty, z.coerce.number().int().min(1).default(3145728)),
+  // Reverse proxies in front of the API that APPEND the caller address to x-forwarded-for (ruling S3). The client is the entry this many from the right;
+  // 0 ignores the header and uses the socket address. Default: 1 in production, 0 elsewhere.
+  // Auth endpoints (sign-in, sign-up, password reset, TOTP verify) per client IP per minute, shared across instances in Redis. Not a switch to turn limiting off.
+  AUTH_RATE_LIMIT_PER_MIN: z.preprocess(unsetIfEmpty, z.coerce.number().int().min(1).max(100000).default(30)),
+  TRUST_PROXY_HOPS: z.preprocess(unsetIfEmpty, z.coerce.number().int().min(0).max(10).optional()),
 }).superRefine((e, ctx) => {
   if (e.SECRETS_KEYS) {
     try {
@@ -82,7 +87,7 @@ const schema = z.object({
       if (!e[k]) ctx.addIssue({ code: "custom", path: [k], message: "required in production" })
     }
   }
-})
+}).transform((e) => ({ ...e, TRUST_PROXY_HOPS: e.TRUST_PROXY_HOPS ?? (e.NODE_ENV === "production" ? 1 : 0) }))
 
 export type Env = z.infer<typeof schema>
 

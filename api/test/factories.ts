@@ -136,9 +136,21 @@ export async function enrollTotp(deps: Deps, email: string, password: string) {
   return { secret, backupCodes: enable.backupCodes, cookie: cookieOf(verified.headers) }
 }
 
-/** A valid TOTP for `secret` (base32) as of `msAgo` milliseconds ago (Better Auth accepts +-1 step of 30 s). */
-export async function totpCode(secret: string, msAgo = 0): Promise<string> {
-  const counter = Math.floor((Date.now() - msAgo) / 30_000)
+// The API refuses a TOTP code that was already used (replay guard, B7 T3), so a helper that hands out "the current code" would collide
+// with the code an earlier step of the same test used. Codes handed out without an explicit age are therefore never repeated per secret.
+const usedSteps = new Map<string, Set<number>>()
+
+/**
+ * A valid TOTP for `secret` (base32). With `msAgo` it is exactly the code of that moment (Better Auth accepts +-1 step of 30 s).
+ * Without it, it is the first of the current, previous and next step that no earlier call for this secret handed out.
+ */
+export async function totpCode(secret: string, msAgo?: number): Promise<string> {
+  const used = usedSteps.get(secret) ?? new Set<number>()
+  usedSteps.set(secret, used)
+  const now = Math.floor(Date.now() / 30_000)
+  const counter = msAgo !== undefined ? Math.floor((Date.now() - msAgo) / 30_000) : [now, now - 1, now + 1].find((c) => !used.has(c))
+  if (counter === undefined) throw new Error("no unused TOTP step left for this secret within the accepted window; use a new user or pass msAgo")
+  used.add(counter)
   return createOTP(base32.decode(secret), { digits: 6, period: 30 }).hotp(counter)
 }
 

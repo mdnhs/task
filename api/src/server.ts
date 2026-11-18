@@ -14,6 +14,7 @@ import { makeStorage } from "./modules/platform-storage"
 import { makeOAuthClient } from "./core/oauth/google-oauth"
 import { makeBullQueue } from "./core/queue/bull-queue"
 import { makeNet } from "./core/net/net"
+import { makeRedisRateLimiter } from "./core/middleware/rate-limit"
 import { parseEnv, type Env } from "./env"
 
 export function makeDeps(env: Env): Deps {
@@ -21,7 +22,8 @@ export function makeDeps(env: Env): Deps {
   const clock = { now: () => new Date() }
   const logger = pino({ level: "info" })
   const mailer = makeMailer({ env, db, logger })
-  return { env, db, auth: buildAuth({ env, db, clock, mailer, logger }), clock, mailer, logger, queue: makeBullQueue(env.REDIS_URL), push: makeLoggingPush(logger), storage: makeStorage({ env, db }), scanner: clamdFromEnv(env) ?? unconfiguredScanner(), oauth: makeOAuthClient(env), billing: makeBilling({ env, db }), net: makeNet() }
+  const rateLimiter = makeRedisRateLimiter(env.REDIS_URL)
+  return { env, db, auth: buildAuth({ env, db, clock, mailer, logger, rateLimiter }), rateLimiter, clock, mailer, logger, queue: makeBullQueue(env.REDIS_URL), push: makeLoggingPush(logger), storage: makeStorage({ env, db }), scanner: clamdFromEnv(env) ?? unconfiguredScanner(), oauth: makeOAuthClient(env), billing: makeBilling({ env, db }), net: makeNet() }
 }
 
 export function start(env: Env = parseEnv(process.env)) {

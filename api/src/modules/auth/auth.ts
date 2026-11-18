@@ -9,10 +9,16 @@ import type { Logger } from "pino"
 import { sanitizeMailError } from "../../core/mail/sanitize"
 import type { Clock, Mailer } from "../../deps"
 import type { Env } from "../../env"
+import { RATE, TOTP_REPLAY_TTL_SEC, hashKey, type RateLimiter } from "../../core/middleware/rate-limit"
+import { errorInfo } from "../../core/safe-error"
 
 const DAY = 24 * 60 * 60
 
-type AuthDeps = { env: Env; db: Db; clock: Clock; mailer: Mailer; logger: Logger }
+type AuthDeps = { env: Env; db: Db; clock: Clock; mailer: Mailer; logger: Logger; rateLimiter: RateLimiter }
+
+/** The header our own /api/auth wrapper sets (overwriting anything the caller sent) to the address resolved by core/net/client-ip. Better Auth reads the client address from nowhere else. */
+export const CLIENT_IP_HEADER = "x-opsdesk-client-ip"
+const TOTP_PATHS = ["/two-factor/verify-totp", "/two-factor/verify-backup-code"]
 // Verification links live 24 hours (NFR/T1.1b). The override exists only so a test can expire one quickly.
 type AuthOpts = { verificationTtlSeconds?: number }
 
@@ -21,7 +27,7 @@ type AuthOpts = { verificationTtlSeconds?: number }
  * Better Auth's absolute `expiresIn` is 30 days with a daily rolling refresh, so it never
  * fires first. It uses real time internally, which is why the idle clock is ours (deps.clock).
  */
-export function buildAuth({ env, db, clock, mailer, logger }: AuthDeps, opts: AuthOpts = {}) {
+export function buildAuth({ env, db, clock, mailer, logger, rateLimiter }: AuthDeps, opts: AuthOpts = {}) {
   const socialProviders: Record<string, { clientId: string; clientSecret: string }> = {}
   // Both id and secret must be non-empty; empty strings never register a provider.
   if (env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET) {
@@ -95,8 +101,41 @@ export function buildAuth({ env, db, clock, mailer, logger }: AuthDeps, opts: Au
       disableCSRFCheck: false,
       useSecureCookies: env.NODE_ENV === "production",
       defaultCookieAttributes: { httpOnly: true, sameSite: "lax" },
+      // Never x-forwarded-for: the wrapper in routes.ts resolves the caller with TRUST_PROXY_HOPS and sets this single-value header (S3).
+      ipAddress: { ipAddressHeaders: [CLIENT_IP_HEADER], ipv6Subnet: 64 },
     },
     hooks: {
+      // S4: TOTP attempt cap (per user) and used-code replay guard, BEFORE Better Auth looks at the code. Every attempt counts; a success clears the
+      // counter (after hook). The store being down fails CLOSED. The user is the session's, or on the sign-in challenge the one the two_factor cookie names.
+      before: createAuthMiddleware(async (ctx) => {
+        if (!TOTP_PATHS.includes(ctx.path)) return
+        let userId: string | undefined
+        try {
+          userId = (await getSessionFromCtx(ctx))?.user.id
+          if (!userId) {
+            const cookie = ctx.context.createAuthCookie("two_factor")
+            const signed = await ctx.getSignedCookie(cookie.name, ctx.context.secret)
+            if (signed) userId = (await ctx.context.internalAdapter.findVerificationValue(signed))?.value
+          }
+        } catch {
+          return // unresolvable: Better Auth answers its own 401 for a missing session or challenge
+        }
+        if (!userId) return
+        try {
+          const r = await rateLimiter.hit(`totp-fail:${userId}`, RATE.totpFailures)
+          if (!r.allowed) {
+            throw new APIError("TOO_MANY_REQUESTS", { message: "Too many attempts", code: "MFA_ATTEMPTS_EXCEEDED" }, new Headers({ "retry-after": String(r.retryAfterSec) }))
+          }
+          const code = (ctx.body as { code?: unknown } | undefined)?.code
+          if (typeof code === "string" && ctx.path === "/two-factor/verify-totp" && !(await rateLimiter.once(`totp-used:${userId}:${hashKey(code)}`, TOTP_REPLAY_TTL_SEC))) {
+            throw new APIError("UNAUTHORIZED", { message: "Invalid code", code: "INVALID_CODE" })
+          }
+        } catch (err) {
+          if (err instanceof APIError) throw err
+          logger.warn({ ...errorInfo(err), limiter: "totp", failClosed: true }, "rate limiter store unavailable")
+          throw new APIError("SERVICE_UNAVAILABLE", { message: "Try again shortly", code: "RATE_LIMIT_UNAVAILABLE" })
+        }
+      }),
       // R14: a session is MFA-passed only if it completed a TOTP or backup-code verification through Better Auth.
       // Sign-in with a second factor creates the session inside verify-*, and a pre-existing session (enrolment,
       // step-up after another device enrolled) is the one the request carries. OAuth callbacks and plain sign-ins
@@ -106,6 +145,9 @@ export function buildAuth({ env, db, clock, mailer, logger }: AuthDeps, opts: Au
         if (ctx.context.returned instanceof APIError || ctx.context.returned instanceof Error) return // failed attempt
         const sessionId = ctx.context.newSession?.session.id ?? (await getSessionFromCtx(ctx))?.session.id
         if (sessionId) await db.update(schema.session).set({ mfaPassed: true }).where(eq(schema.session.id, sessionId))
+        // a verified second factor clears the failure counter (best effort: the next failure window is bounded by its TTL anyway)
+        const verifiedUser = ctx.context.newSession?.user.id ?? (await getSessionFromCtx(ctx))?.user.id
+        if (verifiedUser) await rateLimiter.reset(`totp-fail:${verifiedUser}`).catch(() => {})
       }),
     },
     databaseHooks: {

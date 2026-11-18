@@ -1,6 +1,7 @@
 import { createRoute, z } from "@hono/zod-openapi"
 import { newRouter } from "../../core/router"
 import { requireSession } from "../../core/middleware/session"
+import { RATE, rateLimit } from "../../core/middleware/rate-limit"
 import { requireTenant } from "../../core/middleware/tenant"
 import { UNREGISTERED_ID } from "@opsdesk/domain/devices"
 import { driveAllowed } from "../../core/middleware/device"
@@ -39,7 +40,7 @@ const CreateTenant = z
 const createTenantRoute = createRoute({
   method: "post",
   path: "/v1/tenants",
-  middleware: [requireSession] as const,
+  middleware: [requireSession, rateLimit("tenant-create", RATE.tenantCreateUser, (c) => c.get("user")!.id)] as const,
   request: { body: { content: { "application/json": { schema: CreateTenant } }, required: true } },
   responses: {
     201: { description: "Tenant created; the caller is its owner", content: { "application/json": { schema: z.object({ id: z.string(), slug: z.string() }) } } },

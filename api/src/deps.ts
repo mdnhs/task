@@ -9,6 +9,7 @@ import type { Env } from "./env"
 import type { Auth } from "./modules/auth/auth"
 import type { BillingProvider } from "./modules/billing/provider"
 import type { Net } from "./core/net/net"
+import type { RateLimiter } from "./core/middleware/rate-limit"
 
 export type { Db }
 
@@ -19,4 +20,4 @@ export type Mailer = {
   invalidate?(): void
 }
 export type { Auth }
-export type Deps = { env: Env; db: Db; auth: Auth; clock: Clock; mailer: Mailer; logger: Logger; queue: Queue; push: PushSender; storage: Storage; scanner: MalwareScanner; oauth: OAuthClient; billing: BillingProvider; net: Net }
+export type Deps = { env: Env; db: Db; auth: Auth; clock: Clock; mailer: Mailer; logger: Logger; queue: Queue; push: PushSender; storage: Storage; scanner: MalwareScanner; oauth: OAuthClient; billing: BillingProvider; net: Net; rateLimiter: RateLimiter }

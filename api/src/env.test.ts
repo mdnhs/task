@@ -78,3 +78,18 @@ test("file env: production requires the clamd host; S3_* are optional (R2 settin
     expect(() => parseEnv({ ...prodBase, ...prodFiles, [k]: "" }), k).toThrow(new RegExp(k))
   }
 })
+
+test("TRUST_PROXY_HOPS defaults to 1 in production and 0 elsewhere, and is validated", () => {
+  expect(parseEnv(base).TRUST_PROXY_HOPS).toBe(0)
+  expect(parseEnv({ ...base, NODE_ENV: "test" }).TRUST_PROXY_HOPS).toBe(0)
+  expect(parseEnv({ ...base, NODE_ENV: "production", ...prodFiles, SECRETS_KEY: Buffer.alloc(32, 1).toString("base64") }).TRUST_PROXY_HOPS).toBe(1)
+  expect(parseEnv({ ...base, TRUST_PROXY_HOPS: "2" }).TRUST_PROXY_HOPS).toBe(2)
+  expect(parseEnv({ ...base, TRUST_PROXY_HOPS: "" }).TRUST_PROXY_HOPS).toBe(0)
+  expect(() => parseEnv({ ...base, TRUST_PROXY_HOPS: "-1" })).toThrow(/TRUST_PROXY_HOPS/)
+  expect(() => parseEnv({ ...base, TRUST_PROXY_HOPS: "x" })).toThrow(/TRUST_PROXY_HOPS/)
+})
+test("AUTH_RATE_LIMIT_PER_MIN defaults to 30 and must be a positive integer", () => {
+  expect(parseEnv(base).AUTH_RATE_LIMIT_PER_MIN).toBe(30)
+  expect(parseEnv({ ...base, AUTH_RATE_LIMIT_PER_MIN: "600" }).AUTH_RATE_LIMIT_PER_MIN).toBe(600)
+  expect(() => parseEnv({ ...base, AUTH_RATE_LIMIT_PER_MIN: "0" })).toThrow(/AUTH_RATE_LIMIT_PER_MIN/)
+})

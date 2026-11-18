@@ -221,3 +221,71 @@ test("R27: a user without 2FA can still enrol via /two-factor/enable", async () 
   expect(r.status).toBe(200)
   expect(((await r.json()) as Json).totpURI).toContain("otpauth://")
 })
+
+// ---- B7 T3: attempt cap, replay guard, fail-closed store ----
+const verifyTotp = (w: Awaited<ReturnType<typeof world>>, cookie: string, code: string) =>
+  call(w.app, "POST", "/api/auth/two-factor/verify-totp", { cookie, body: { code }, headers: ORIGIN })
+
+test("totp verify locks after 5 failures with 429 mfa_attempts_exceeded and resets on success", async () => {
+  const w = await world()
+  const m = await w.who("manager")
+  const stale = (await signIn(w.app, m.email, m.password)).cookie
+  const { secret } = await enrollTotp(w.deps, m.email, m.password)
+  for (let i = 0; i < 5; i++) expect((await verifyTotp(w, stale, "000000")).status).toBe(401)
+  const locked = await verifyTotp(w, stale, await totpCode(secret, 30_000)) // even the right code is refused while locked
+  expect([locked.status, await codeOf(locked)]).toEqual([429, "mfa_attempts_exceeded"])
+  expect(Number(locked.headers.get("retry-after"))).toBeGreaterThan(0)
+  expect(await w.mfaPassed(stale)).toBe(false)
+  w.clock.advance({ minutes: 16 })
+  expect((await verifyTotp(w, stale, await totpCode(secret, 30_000))).status).toBe(200) // window over
+  // success resets the counter: 4 failures, a success, 4 more failures are all plain 401s
+  const stale2 = (await signIn(w.app, m.email, m.password)).cookie
+  for (let i = 0; i < 4; i++) expect((await verifyTotp(w, stale2, "000000")).status).toBe(401)
+  expect((await verifyTotp(w, stale2, await totpCode(secret))).status).toBe(200)
+  for (let i = 0; i < 4; i++) expect((await verifyTotp(w, stale2, "000000")).status).toBe(401)
+})
+test("the cap also holds on the sign-in challenge (no session yet) and is per user", async () => {
+  const w = await world()
+  const a = await w.who("manager", { totp: true })
+  const b = await w.who("employee", { totp: true })
+  const first = await call(w.app, "POST", "/api/auth/sign-in/email", { body: { email: a.email, password: a.password }, headers: ORIGIN })
+  const challenge = first.headers.getSetCookie().map((c) => c.split(";")[0]).join("; ")
+  for (let i = 0; i < 5; i++) expect((await verifyTotp(w, challenge, "000000")).status).toBe(401)
+  const locked = await verifyTotp(w, challenge, "000000")
+  expect([locked.status, await codeOf(locked)]).toEqual([429, "mfa_attempts_exceeded"])
+  // a fresh challenge for the SAME user is locked too (the counter is the user's, not the cookie's)
+  const again = await call(w.app, "POST", "/api/auth/sign-in/email", { body: { email: a.email, password: a.password }, headers: ORIGIN })
+  const c2 = again.headers.getSetCookie().map((c) => c.split(";")[0]).join("; ")
+  expect((await verifyTotp(w, c2, await totpCode(a.totpSecret!, 30_000))).status).toBe(429)
+  // another user is unaffected
+  expect((await signInWithTotp(w.app, b.email, b.password, b.totpSecret!)).cookie).toBeTruthy()
+})
+test("a totp code used once cannot be replayed inside its step", async () => {
+  const w = await world()
+  const m = await w.who("manager")
+  const stale = (await signIn(w.app, m.email, m.password)).cookie
+  const stale2 = (await signIn(w.app, m.email, m.password)).cookie // both sessions predate enrolment
+  const { secret } = await enrollTotp(w.deps, m.email, m.password) // enrolment used the current-step code
+  const code = await totpCode(secret, 30_000)
+  expect((await verifyTotp(w, stale, code)).status).toBe(200)
+  const replay = await verifyTotp(w, stale2, code)
+  expect([replay.status, await codeOf(replay)]).toEqual([401, "invalid_code"])
+  expect(await w.mfaPassed(stale2)).toBe(false)
+  // the code the enrolment used is burned as well
+  expect((await verifyTotp(w, stale2, await totpCode(secret, 0))).status).toBe(401)
+  expect(await w.mfaPassed(stale2)).toBe(false)
+})
+test("limiter store down: auth and totp fail closed", async () => {
+  const w = await world()
+  const m = await w.who("manager")
+  const stale = (await signIn(w.app, m.email, m.password)).cookie
+  const { secret } = await enrollTotp(w.deps, m.email, m.password)
+  ;(w.deps.rateLimiter as unknown as { down: boolean }).down = true
+  const v = await verifyTotp(w, stale, await totpCode(secret, 30_000))
+  expect([v.status, await codeOf(v)]).toEqual([503, "rate_limit_unavailable"])
+  expect(await w.mfaPassed(stale)).toBe(false)
+  const s = await call(w.app, "POST", "/api/auth/sign-in/email", { body: { email: m.email, password: m.password }, headers: ORIGIN })
+  expect([s.status, await codeOf(s)]).toEqual([503, "rate_limit_unavailable"])
+  ;(w.deps.rateLimiter as unknown as { down: boolean }).down = false
+  expect((await verifyTotp(w, stale, await totpCode(secret, 30_000))).status).toBe(200)
+})

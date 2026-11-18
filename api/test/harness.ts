@@ -11,7 +11,7 @@ import { fakeQueue, type FakeQueue } from "../src/core/queue/fake-queue"
 import { fakeBilling, type FakeBillingProvider } from "../src/modules/billing"
 import { fakeOAuth, type FakeOAuth } from "../src/core/oauth/fake-oauth"
 import { fakeNet, type FakeNet } from "../src/core/net/fake-net"
-import { fakeClock, fakeMailer, type FakeClock, type FakeMailer } from "./fakes"
+import { fakeClock, fakeMailer, fakeRateLimiter, type FakeClock, type FakeMailer, type FakeRateLimiter } from "./fakes"
 
 export { fakeClock, fakeMailer }
 export { resetDb } from "./db"
@@ -39,12 +39,14 @@ export const testEnv: Deps["env"] = {
   TASK_EVIDENCE_MAX_BYTES: 26214400,
   TASK_VIDEO_MAX_BYTES: 104857600,
   TASK_VOICE_MAX_BYTES: 3145728,
+  TRUST_PROXY_HOPS: 0,
+  AUTH_RATE_LIMIT_PER_MIN: 30,
 }
 
 // Lets helpers (factories.ts) find an app's fake mailer from the app alone.
 export const mailerOf = new WeakMap<object, FakeMailer>()
 
-export function testApp(over: Partial<Deps> = {}): { app: AppType; deps: Deps; mailer: FakeMailer; clock: FakeClock; queue: FakeQueue; push: FakePush; oauth: FakeOAuth; billing: FakeBillingProvider; net: FakeNet } {
+export function testApp(over: Partial<Deps> = {}): { app: AppType; deps: Deps; mailer: FakeMailer; clock: FakeClock; queue: FakeQueue; push: FakePush; oauth: FakeOAuth; billing: FakeBillingProvider; net: FakeNet; rateLimiter: FakeRateLimiter } {
   const clock = fakeClock()
   const env = over.env ?? testEnv
   // Real (lazy-connecting) Testcontainers db when global setup provided one; inert fake otherwise.
@@ -57,12 +59,13 @@ export function testApp(over: Partial<Deps> = {}): { app: AppType; deps: Deps; m
   const oauth = (over.oauth ?? fakeOAuth()) as FakeOAuth
   const billing = (over.billing ?? fakeBilling()) as FakeBillingProvider
   const net = (over.net ?? fakeNet()) as FakeNet
+  const rateLimiter = (over.rateLimiter ?? fakeRateLimiter(usedClock)) as FakeRateLimiter
   const storage = over.storage ?? makeStorage({ env, db })
   const scanner = over.scanner ?? fakeScanner() // auto: flags EICAR, everything else clean
-  const deps: Deps = { env, db, clock: usedClock, mailer, logger, queue, push, storage, scanner, oauth, billing, net, auth: over.auth ?? buildAuth({ env, db, clock: usedClock, mailer, logger }) }
+  const deps: Deps = { env, db, clock: usedClock, mailer, logger, queue, push, storage, scanner, oauth, billing, net, rateLimiter, auth: over.auth ?? buildAuth({ env, db, clock: usedClock, mailer, logger, rateLimiter }) }
   const app = createApp(deps)
   mailerOf.set(app, mailer)
-  return { app, deps, mailer, clock: usedClock as FakeClock, queue, push, oauth, billing, net }
+  return { app, deps, mailer, clock: usedClock as FakeClock, queue, push, oauth, billing, net, rateLimiter }
 }
 
 export function call(
