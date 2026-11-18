@@ -41,6 +41,7 @@ export const testEnv: Deps["env"] = {
   TASK_VOICE_MAX_BYTES: 3145728,
   TRUST_PROXY_HOPS: 0,
   AUTH_RATE_LIMIT_PER_MIN: 30,
+  TENANT_CREATE_MAX_PER_USER: 5,
 }
 
 // Lets helpers (factories.ts) find an app's fake mailer from the app alone.

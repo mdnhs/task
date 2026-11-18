@@ -1,7 +1,7 @@
 import { beforeEach, expect, test } from "vitest"
-import { call, resetDb, testApp } from "../../../test/harness"
+import { call, resetDb, testApp, testEnv } from "../../../test/harness"
 import { ownerQuery, ownerTenantQuery, testDb } from "../../../test/db"
-import { makeMember, makeStaff, makeTenant, signIn, signUp } from "../../../test/factories"
+import { makeMember, makeStaff, makeTenant, signIn, signInWithTotp, signUp } from "../../../test/factories"
 import { withTenant } from "../../db/tenant-tx"
 import { memberships } from "../../db/schema"
 import { readFileSync } from "node:fs"
@@ -52,7 +52,7 @@ test("creating a tenant needs a session", async () => {
 test("duplicate slug is 409 slug_taken", async () => {
   const t = testApp()
   const { cookie } = await newUser(t)
-  expect((await call(t.app, "POST", "/v1/tenants", { cookie, body: { name: "A", slug: "dup" } })).status).toBe(201)
+  await makeTenant(t.deps, { slug: "dup" })
   const r = await call(t.app, "POST", "/v1/tenants", { cookie, body: { name: "A2", slug: "dup" } })
   expect(r.status).toBe(409)
   expect(((await r.json()) as Json).code).toBe("slug_taken")
@@ -317,4 +317,71 @@ test("T6.3: /v1/me/tenant carries the caller's own role (label, home, access) so
   expect(Object.keys(s.member.role).sort()).toEqual(["access", "description", "home", "label"])
   // the matrix is the caller's own: staff never see another role's rows
   expect(JSON.stringify(s)).not.toContain('"settings":"write"')
+})
+
+// ---- B7 Task 5: per-user cap and MFA for the second tenant (ruling S5) ----
+async function founder(t: ReturnType<typeof testApp>, email: string, totp: boolean) {
+  const m = await makeMember(t.deps, (await makeTenant(t.deps)).id, "employee", { email, totp })
+  const cookie = totp ? (await signInWithTotp(t.app, email, m.password, m.totpSecret!)).cookie : (await signIn(t.app, email, m.password)).cookie
+  return { cookie, ...m }
+}
+const mkTenant = (t: ReturnType<typeof testApp>, cookie: string, n: number) => call(t.app, "POST", "/v1/tenants", { cookie, body: { name: `T${n}`, slug: `cap-${n}-${Math.random().toString(36).slice(2, 7)}` } })
+
+test("a user's first tenant is created without MFA; the second needs an MFA-verified session", async () => {
+  const t = testApp()
+  const { cookie } = await newUser(t)
+  expect((await mkTenant(t, cookie, 1)).status).toBe(201)
+  const r = await mkTenant(t, cookie, 2)
+  expect(r.status).toBe(401)
+  expect(((await r.json()) as Json).code).toBe("mfa_enrolment_required")
+  expect(await ownerQuery("select 1 from tenants where slug like 'cap-2-%'")).toEqual([])
+})
+
+test("an enrolled user with a session that has not passed the second factor gets mfa_challenge", async () => {
+  const t = testApp()
+  const f = await founder(t, "enrolled@x.ie", true)
+  expect((await mkTenant(t, f.cookie, 1)).status).toBe(201)
+  await ownerQuery("update session set mfa_passed = false where user_id = $1", [f.userId])
+  const r = await mkTenant(t, f.cookie, 2)
+  expect([r.status, ((await r.json()) as Json).code]).toEqual([401, "mfa_challenge"])
+})
+
+test("with an MFA-verified session creation works up to the cap, then 403 tenant_limit_reached; the env lowers the cap", async () => {
+  const t = testApp()
+  const f = await founder(t, "mfa@x.ie", true)
+  for (let i = 0; i < 5; i++) expect((await mkTenant(t, f.cookie, i)).status).toBe(201)
+  const over = await mkTenant(t, f.cookie, 99)
+  expect(over.status).toBe(403)
+  expect(((await over.json()) as Json).code).toBe("tenant_limit_reached")
+
+  const low = testApp({ env: { ...testEnv, TENANT_CREATE_MAX_PER_USER: 2 } })
+  const g = await founder(low, "mfa2@x.ie", true)
+  expect((await mkTenant(low, g.cookie, 1)).status).toBe(201)
+  expect((await mkTenant(low, g.cookie, 2)).status).toBe(201)
+  expect((await mkTenant(low, g.cookie, 3)).status).toBe(403)
+})
+
+test("tenants made by another user, and suspended-or-removed ones aside, count correctly; the body never names other tenants", async () => {
+  const t = testApp()
+  const a = await founder(t, "a@x.ie", true)
+  const b = await founder(t, "b@x.ie", true)
+  const low = testApp({ env: { ...testEnv, TENANT_CREATE_MAX_PER_USER: 1 } })
+  expect((await mkTenant(low, a.cookie, 1)).status).toBe(201)
+  expect((await mkTenant(low, b.cookie, 1)).status).toBe(201) // a's tenant does not count for b
+  const over = await mkTenant(low, a.cookie, 2)
+  expect(over.status).toBe(403)
+  const text = await over.text()
+  expect(text).not.toMatch(/cap-1-/)
+  // a tenant marked deleted no longer counts
+  await ownerQuery("update tenants set status = 'deleted' where created_by = $1", [a.userId])
+  expect((await mkTenant(low, a.cookie, 3)).status).toBe(201)
+})
+
+test("two concurrent creates by one user cannot both pass the cap", async () => {
+  const t = testApp({ env: { ...testEnv, TENANT_CREATE_MAX_PER_USER: 1 } })
+  const { cookie } = await newUser(t)
+  const rs = await Promise.all([mkTenant(t, cookie, 1), mkTenant(t, cookie, 2), mkTenant(t, cookie, 3)])
+  const codes = rs.map((r) => r.status).sort()
+  expect(codes.filter((c) => c === 201)).toHaveLength(1)
+  expect(await ownerQuery("select 1 from tenants where created_by = (select id from \"user\" where email = 'owner@x.ie')")).toHaveLength(1)
 })

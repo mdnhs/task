@@ -16,8 +16,10 @@ export const tenants = pgTable("tenants", {
   status: text("status").notNull().default("active"),
   // Role KEYS when mode is "roles" (see @opsdesk/domain/mfa). FR-M0-04.
   mfaPolicy: jsonb("mfa_policy").$type<MfaPolicy>().notNull().default({ mode: "off", roles: [] }),
+  // The user who created it (counted for TENANT_CREATE_MAX_PER_USER, ruling S5). Null for rows from before B7 with no owner, and after the user row is removed.
+  createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-})
+}, (t) => [index("tenants_created_by_idx").on(t.createdBy)])
 
 // ---- Tenant-scoped tables. Standard RLS template (R8); FORCE is appended by hand in the migration. ----
 const tenantMatch = sql`tenant_id = nullif(current_setting('app.tenant_id', true), '')::uuid`

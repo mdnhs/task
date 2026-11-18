@@ -65,6 +65,8 @@ const schema = z.object({
   // Auth endpoints (sign-in, sign-up, password reset, TOTP verify) per client IP per minute, shared across instances in Redis. Not a switch to turn limiting off.
   AUTH_RATE_LIMIT_PER_MIN: z.preprocess(unsetIfEmpty, z.coerce.number().int().min(1).max(100000).default(30)),
   TRUST_PROXY_HOPS: z.preprocess(unsetIfEmpty, z.coerce.number().int().min(0).max(10).optional()),
+  // Most tenants one user may create (POST /v1/tenants; ruling S5). A user's second and later tenant also needs an MFA-verified session.
+  TENANT_CREATE_MAX_PER_USER: z.preprocess(unsetIfEmpty, z.coerce.number().int().min(1).max(1000).default(5)),
 }).superRefine((e, ctx) => {
   if (e.SECRETS_KEYS) {
     try {

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test } from "vitest"
 import { call, resetDb, testApp, testEnv } from "../../../test/harness"
-import { makeApiKey, makeMember, makeTenant, signIn } from "../../../test/factories"
+import { makeApiKey, makeMember, makeTenant, signInWithTotp } from "../../../test/factories"
 
 type Json = Record<string, any> // eslint-disable-line @typescript-eslint/no-explicit-any
 beforeEach(resetDb)
@@ -8,8 +8,8 @@ beforeEach(resetDb)
 async function world() {
   const t = testApp()
   const tenant = await makeTenant(t.deps, { slug: "acme" })
-  const owner = await makeMember(t.deps, tenant.id, "owner")
-  const { cookie } = await signIn(t.app, owner.email, owner.password)
+  const owner = await makeMember(t.deps, tenant.id, "owner", { totp: true })
+  const { cookie } = await signInWithTotp(t.app, owner.email, owner.password, owner.totpSecret!) // POST /v1/tenants is repeated below; a second tenant needs an MFA-verified session
   let n = 0
   /** A cookie-bearing state-changing request (POST /v1/tenants with a fresh slug each time) with the given headers. */
   const post = (headers: Record<string, string>, over: { cookie?: string | null } = {}) =>

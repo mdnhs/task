@@ -215,7 +215,7 @@ export interface paths {
                 };
             };
             responses: {
-                /** @description Tenant created; the caller is its owner */
+                /** @description Tenant created; the caller is its owner. The caller's first tenant needs no second factor; later ones need an MFA-verified session (401 mfa_enrolment_required / mfa_challenge). 403 tenant_limit_reached over TENANT_CREATE_MAX_PER_USER */
                 201: {
                     headers: {
                         [name: string]: unknown;

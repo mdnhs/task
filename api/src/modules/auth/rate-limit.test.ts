@@ -59,8 +59,10 @@ test("invites are limited per target address across tenants; tenant creation per
 
   await signUp(t.app, "founder@x.ie", "Passw0rd!long", "F")
   const founder = (await signIn(t.app, "founder@x.ie", "Passw0rd!long")).cookie
+  const me = (await (await call(t.app, "GET", "/v1/me", { cookie: founder })).json()) as Json
   const mk = (n: number) => call(t.app, "POST", "/v1/tenants", { cookie: founder, body: { name: `T${n}`, slug: `t-${n}` } })
-  for (let i = 0; i < RATE.tenantCreateUser.limit; i++) expect((await mk(i)).status).toBe(201)
+  expect((await mk(0)).status).toBe(201) // the first tenant needs no MFA; later ones are gated by the cap and MFA (tenants.test.ts), so the rest of the window is filled directly
+  for (let i = 1; i < RATE.tenantCreateUser.limit; i++) await t.rateLimiter.hit(`tenant-create:${me.user.id}`, RATE.tenantCreateUser)
   expect((await mk(99)).status).toBe(429)
 })
 test("limiter store down: sign-in fails closed with 503", async () => {

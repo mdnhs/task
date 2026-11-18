@@ -1,7 +1,7 @@
-import { eq, sql } from "drizzle-orm"
+import { and, count, eq, notInArray, sql } from "drizzle-orm"
 import { memberships, subscriptions, tenants, tenantSettings } from "../../db/schema"
 import type { Deps } from "../../deps"
-import { Conflict } from "../../core/errors"
+import { Conflict, Forbidden, Unauthorized } from "../../core/errors"
 import { publish } from "../../core/events"
 import { recordAudit } from "../audit"
 import { entitlementsData, planFacts } from "../entitlements/data"
@@ -11,18 +11,36 @@ import { seedRoleTemplates } from "./seed"
 export const DEFAULT_INVITE_TTL_DAYS = 7
 const DAY_MS = 86_400_000
 
+const TENANT_CREATE_LOCK_NS = 0x74637265 // "tcre": serialises one user's tenant creations so the cap cannot be raced past
+/** Tenants in these states no longer count towards a user's cap. */
+const GONE = ["deleted", "erased"]
+
 export type NewTenant = { name: string; slug: string; timezone?: string; currency?: string; locale?: string }
+/** The caller's second-factor state. Omitted only by trusted internal callers (the demo seed), which skip the cap and the MFA rule. */
+export type CreateGate = { twoFactorEnabled: boolean; mfaPassed: boolean }
 
 /** Creates the tenant, its role templates, the caller's owner membership, default settings and the audit entry in ONE transaction. */
-export async function createTenant(deps: Deps, userId: string, input: NewTenant): Promise<{ id: string; slug: string }> {
+export async function createTenant(deps: Deps, userId: string, input: NewTenant, gate?: CreateGate): Promise<{ id: string; slug: string }> {
   const d = onboardingDefaults()
   try {
     return await deps.db.transaction(async (tx) => {
+      if (gate) {
+        // Per-user lock first: the count and the insert are one critical section, so two concurrent creates cannot both pass the cap.
+        await tx.execute(sql`select pg_advisory_xact_lock(${TENANT_CREATE_LOCK_NS}::int, hashtext(${userId}::text))`)
+        const [{ n }] = await tx.select({ n: count() }).from(tenants).where(and(eq(tenants.createdBy, userId), notInArray(tenants.status, GONE)))
+        // The first tenant is exempt from MFA (sign-up has nothing to enrol into yet); every later one needs a second-factor session (same codes as enforceMfa).
+        if (n >= 1) {
+          if (!gate.twoFactorEnabled) throw Unauthorized("mfa_enrolment_required")
+          if (!gate.mfaPassed) throw Unauthorized("mfa_challenge")
+        }
+        if (n >= deps.env.TENANT_CREATE_MAX_PER_USER) throw Forbidden("tenant_limit_reached")
+      }
       const [t] = await tx
         .insert(tenants)
         .values({
           slug: input.slug,
           name: input.name,
+          createdBy: userId,
           timezone: input.timezone ?? d.timezone,
           locale: input.locale ?? d.locale,
           // currency: the column default (EUR, R7) unless given

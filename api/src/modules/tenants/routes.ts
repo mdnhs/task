@@ -43,7 +43,7 @@ const createTenantRoute = createRoute({
   middleware: [requireSession, rateLimit("tenant-create", RATE.tenantCreateUser, (c) => c.get("user")!.id)] as const,
   request: { body: { content: { "application/json": { schema: CreateTenant } }, required: true } },
   responses: {
-    201: { description: "Tenant created; the caller is its owner", content: { "application/json": { schema: z.object({ id: z.string(), slug: z.string() }) } } },
+    201: { description: "Tenant created; the caller is its owner. The caller's first tenant needs no second factor; later ones need an MFA-verified session (401 mfa_enrolment_required / mfa_challenge). 403 tenant_limit_reached over TENANT_CREATE_MAX_PER_USER", content: { "application/json": { schema: z.object({ id: z.string(), slug: z.string() }) } } },
   },
 })
 
@@ -108,7 +108,8 @@ export const tenantRoutes = newRouter()
     return c.json({ user: { id: user.id, email: user.email, name: me.name, emailVerified: me.emailVerified, twoFactorEnabled: me.twoFactorEnabled }, platformRole: me.platformRole, tenants }, 200)
   })
   .openapi(createTenantRoute, async (c) => {
-    const res = await createTenant(c.get("deps"), c.get("user")!.id, c.req.valid("json"))
+    const user = c.get("user")!
+    const res = await createTenant(c.get("deps"), user.id, c.req.valid("json"), { twoFactorEnabled: user.twoFactorEnabled, mfaPassed: c.get("session")!.mfaPassed })
     return c.json(res, 201)
   })
   .openapi(meTenantRoute, async (c) => {
