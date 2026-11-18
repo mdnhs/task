@@ -4,7 +4,7 @@ import { useMemo, useState } from "react"
 
 import { EmptyState } from "@/components/empty-state"
 import { FilterBar, FilterSelect } from "@/components/filter-bar"
-import { Icon } from "@/components/icons"
+import { Icon } from "@/components/icon"
 import { PageHead } from "@/components/page-head"
 import type { LiveAuditLine } from "../adapters"
 import { dateTimeUtc } from "../format"

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react"
 
-import { Icon } from "@/components/icons"
+import { Icon } from "@/components/icon"
 import { Input } from "@/components/ui/input"
 
 type Props = Omit<React.ComponentProps<"input">, "type"> & {

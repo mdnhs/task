@@ -1,4 +1,4 @@
-import { Icon } from "@/components/icons"
+import { Icon } from "@/components/icon"
 import { formatDateYear, formatTime } from "@/lib/dates"
 import type { TodayCounts } from "@/lib/today"
 import type { TodayData } from "../types"

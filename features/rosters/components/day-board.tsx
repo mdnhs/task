@@ -1,12 +1,12 @@
 "use client"
 
 import { useState } from "react"
-import { Plus } from "lucide-react"
 
 import { RollNumber } from "@/components/roll-number"
 import { formatDate } from "@/lib/dates"
 import { numDir } from "@/lib/motion"
 import type { RosterViewKind, ViewBlock, ViewDay, ViewShift } from "../view"
+import { Icon } from "@/components/icon"
 
 // By location (FR-RS-10): one card per day, laid out as the seven-day columns (a single column at 640px and under). A card shows the
 // day's count against its target (the shortfall is highlighted), then each person with their own times and role.
@@ -139,7 +139,7 @@ function Day({ day, today, locationId, editor, dragId, setDragId }: { day: ViewD
         )}
         {canEdit && (
           <button type="button" className="ros-add" aria-label={`Add shift on ${formatDate(day.date)}`} onClick={() => editor?.onAdd(locationId, day.date)}>
-            <Plus aria-hidden="true" />
+            <Icon name="plus" size={24} />
           </button>
         )}
       </header>

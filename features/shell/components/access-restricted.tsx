@@ -1,6 +1,6 @@
 import Link from "next/link"
 
-import { Icon } from "@/components/icons"
+import { Icon } from "@/components/icon"
 import { hasModule } from "@/lib/entitlements"
 import { can, moduleForHref } from "@/lib/permissions"
 import { getPlatformSession, peekSession } from "@/lib/session"

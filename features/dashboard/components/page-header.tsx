@@ -1,7 +1,7 @@
 import type { ReactNode } from "react"
 import Link from "next/link"
 
-import { Icon } from "@/components/icons"
+import { Icon } from "@/components/icon"
 import type { DashboardPerms, HeaderData } from "../types"
 
 export function PageHeader({ data, perms, newTask }: { data: HeaderData; perms: DashboardPerms; newTask: ReactNode }) {

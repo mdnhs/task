@@ -1,3 +1,4 @@
+import type { IconName } from "@/components/icon"
 import { formatDate } from "@/lib/dates"
 
 import { SEARCH_TYPES } from "./types"
@@ -24,7 +25,7 @@ export const TYPE_LABELS: Record<SearchType, string> = {
   action: "Actions",
 }
 
-export const TYPE_ICONS: Record<SearchType, string> = {
+export const TYPE_ICONS: Record<SearchType, IconName> = {
   task: "task",
   report: "report",
   issue: "flag",

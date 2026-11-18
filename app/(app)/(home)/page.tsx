@@ -1,6 +1,6 @@
 import { cookies } from "next/headers"
 
-import { Icon } from "@/components/icons"
+import { Icon } from "@/components/icon"
 import { DashboardView, StaffDashboardView, dashboardScreenData, getCoverage, getDashboardPerms, loadManagerHome, loadStaffHome, loadToday } from "@/features/dashboard"
 import { AccessRestricted, apiFailureView } from "@/features/shell"
 import { NewTaskButton } from "@/features/tasks"

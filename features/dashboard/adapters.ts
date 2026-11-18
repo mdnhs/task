@@ -114,7 +114,7 @@ export function toDashboard(dto: unknown, ctx: { tz: string; nowAt?: string; tzL
           const t = team as Record<string, unknown>
           const missing = R.int(t, "missing")
           return [{
-            title: "Shift Reports", icon: "report", ariaLabel: "View shift reports", href: "/daily-reports", value: String(R.int(t, "awaitingReview")),
+            title: "Shift Reports", icon: "report" as const, ariaLabel: "View shift reports", href: "/daily-reports", value: String(R.int(t, "awaitingReview")),
             note: missing > 0 ? { tone: "down" as const, highlight: `${missing} missing`, text: "" } : { text: "to review" },
           }]
         })()

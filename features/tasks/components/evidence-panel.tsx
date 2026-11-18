@@ -2,13 +2,12 @@
 
 import { useEffect, useRef, useState } from "react"
 import { AnimatePresence, motion } from "motion/react"
-import { Camera, Link2, ListChecks, PenLine, StickyNote, Upload } from "lucide-react"
 import { toast } from "sonner"
 import { z } from "zod"
 
 import { DriveLink } from "@/components/drive-link"
 import { Field } from "@/components/field"
-import { Icon } from "@/components/icons"
+import { Icon } from "@/components/icon"
 import { StatusPill } from "@/components/status-pill"
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
@@ -145,7 +144,7 @@ export function EvidenceAdder({ task, me, driveAllowed, adds }: { task: Task; me
           onDrop={(e) => { e.preventDefault(); setDrag(false); pickFiles(e.dataTransfer.files) }}
         >
           <input type="file" multiple accept={accept} className="sr-only" onChange={(e) => { pickFiles(e.target.files); e.target.value = "" }} />
-          <strong><Upload aria-hidden="true" />Drop files here or browse</strong>
+          <strong><Icon name="upload" size={24} />Drop files here or browse</strong>
           <span>{fileTypes.map((t) => EVIDENCE_TYPE_LABEL[t]).join(", ")}. Files are scanned before they count.</span>
         </label>
       )}
@@ -153,18 +152,18 @@ export function EvidenceAdder({ task, me, driveAllowed, adds }: { task: Task; me
         {allowed("photo") && (
           <label className="btn btn-outline ev-cam">
             <input type="file" accept="image/*" capture="environment" className="sr-only" onChange={(e) => { pickFiles(e.target.files, true); e.target.value = "" }} />
-            <Camera aria-hidden="true" />
+            <Icon name="camera" size={24} />
             Take photo
           </label>
         )}
-        {allowed("note") && <button type="button" className="btn btn-outline" aria-pressed={mode === "note"} onClick={() => toggleMode("note")}><StickyNote aria-hidden="true" />Add note</button>}
+        {allowed("note") && <button type="button" className="btn btn-outline" aria-pressed={mode === "note"} onClick={() => toggleMode("note")}><Icon name="sticky-note" size={24} />Add note</button>}
         {allowed("drive") && (
           <button type="button" className="btn btn-outline" aria-pressed={mode === "drive"} disabled={!driveAllowed} title={driveAllowed ? undefined : "Available on your work PC"} onClick={() => toggleMode("drive")}>
-            <Link2 aria-hidden="true" />
+            <Icon name="link" size={24} />
             Drive link <span className="er-pc">· PC only</span>
           </button>
         )}
-        {allowed("signature") && <button type="button" className="btn btn-outline" onClick={() => setSigning(true)}><PenLine aria-hidden="true" />Sign</button>}
+        {allowed("signature") && <button type="button" className="btn btn-outline" onClick={() => setSigning(true)}><Icon name="edit" size={24} />Sign</button>}
         {allowed("checklist") && (
           <button
             type="button"
@@ -178,7 +177,7 @@ export function EvidenceAdder({ task, me, driveAllowed, adds }: { task: Task; me
               if (ok) toast.success("Checklist attached")
             }}
           >
-            <ListChecks aria-hidden="true" />
+            <Icon name="list-checks" size={24} />
             Attach checklist
           </button>
         )}

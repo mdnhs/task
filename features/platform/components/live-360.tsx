@@ -7,7 +7,7 @@ import { usePathname, useRouter } from "next/navigation"
 
 import { CopyId } from "@/components/copy-id"
 import { Field } from "@/components/field"
-import { Icon } from "@/components/icons"
+import { Icon, type IconName } from "@/components/icon"
 import { StatusPill } from "@/components/status-pill"
 import { StretchIndicator } from "@/components/stretch-indicator"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
@@ -52,7 +52,7 @@ export function Live360Header({ t, can, tabs }: { t: Live360; can: Live360Can; t
   const items = [
     can.support && !t.suspended && { key: "support", icon: "help", label: "Request support access", go: () => router.push(`/platform/support?request=${encodeURIComponent(t.id)}`) },
     can.suspend && trialing && !t.suspended && { key: "trial", icon: "clock", label: "Extend trial", go: () => router.push(tenantPath(t.id, "extend-trial")) },
-  ].filter(Boolean) as { key: string; icon: string; label: string; go(): void }[]
+  ].filter(Boolean) as { key: string; icon: IconName; label: string; go(): void }[]
 
   return (
     <>
@@ -107,7 +107,7 @@ export function Live360Header({ t, can, tabs }: { t: Live360; can: Live360Can; t
 }
 
 const Row = ({ label, children }: { label: string; children: React.ReactNode }) => <div className="pf-dl-row"><dt>{label}</dt><dd className="num">{children}</dd></div>
-const Group = ({ title, icon, children }: { title: string; icon: string; children: React.ReactNode }) => (
+const Group = ({ title, icon, children }: { title: string; icon: IconName; children: React.ReactNode }) => (
   <section className="pf-dl-group" aria-label={title}>
     <h3><Icon name={icon} />{title}</h3>
     <dl className="pf-dl">{children}</dl>

@@ -2,7 +2,6 @@
 
 import { ActionButton } from "@/components/action-button"
 import { useState } from "react"
-import { Plane } from "lucide-react"
 import { toast } from "sonner"
 
 import { DatePicker } from "@/components/date-picker"
@@ -34,7 +33,7 @@ export function LeaveForm({ me, today, scopeKey, data, queue }: { me: string; to
   }
 
   return (
-    <FormSection icon={Plane} title="Request leave">
+    <FormSection icon="plane" title="Request leave">
       <form className="mr-form" onSubmit={submit} noValidate>
         <div className="od-row2">
           <Field label="From" htmlFor="lv-from" error={errors.from} required>

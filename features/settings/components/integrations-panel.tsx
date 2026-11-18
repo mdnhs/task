@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import { toast } from "sonner"
 
 import { ConfirmDialog } from "@/components/confirm-dialog"
-import { Icon } from "@/components/icons"
+import { Icon, iconName } from "@/components/icon"
 import { StatusPill } from "@/components/status-pill"
 import { When } from "@/components/when"
 import { useApiAction } from "@/hooks/use-api-action"
@@ -47,7 +47,7 @@ export function IntegrationsPanel({ integrations, flash, today, tzLabel, canWrit
         {stored.map((i) => (
           <li key={i.id} className="set-int">
             <div className="set-int-top">
-              <span className="set-int-ico" aria-hidden="true"><Icon name={i.icon} /></span>
+              <span className="set-int-ico" aria-hidden="true"><Icon name={iconName(i.icon)} /></span>
               <div className="set-int-name">
                 <h3>{i.name}</h3>
                 <StatusPill status={STATUS[i.status]} />

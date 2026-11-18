@@ -4,13 +4,12 @@ import { useEffect, useRef, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { ListPlus, NotebookPen, Paperclip, X, Zap } from "lucide-react"
 
 import { ActionButton } from "@/components/action-button"
 import { Field } from "@/components/field"
 import { FilterSelect } from "@/components/filter-bar"
 import { FormSection } from "@/components/form-section"
-import { Icon } from "@/components/icons"
+import { Icon } from "@/components/icon"
 import { PageHead } from "@/components/page-head"
 import { Textarea } from "@/components/ui/textarea"
 import { When } from "@/components/when"
@@ -177,7 +176,7 @@ export function ReportEditor({
   // Notes and the template's extra sections on the left; unplanned work and attachments on the right (ui-rules.md → Forms).
   const left = [
     (sectionOn(template, "summary") || sectionOn(template, "blockers")) && (
-      <FormSection key="notes" icon={NotebookPen} title="Notes">
+      <FormSection key="notes" icon="note-pen" title="Notes">
         {sectionOn(template, "summary") && (
           <Field label="Summary" htmlFor="sr-summary" error={err("summary")} required={isRequired(template, "summary", "summary")}>
             <Textarea id="sr-summary" value={r.summary} placeholder="e.g. Quiet shift, all patrols done" onChange={(e) => touch("summary", (x) => ({ ...x, summary: e.target.value }))} />
@@ -191,7 +190,7 @@ export function ReportEditor({
       </FormSection>
     ),
     ...extraSections(template).map((s) => (
-      <FormSection key={s.id} icon={ListPlus} title={s.title}>
+      <FormSection key={s.id} icon="list-plus" title={s.title}>
         {s.fields.map((f) => {
           const k = `${s.id}.${f.id}`
           return (
@@ -205,7 +204,7 @@ export function ReportEditor({
   ].filter(Boolean)
   const right = [
     sectionOn(template, "unplanned") && (
-      <FormSection key="unplanned" icon={Zap} title="Unplanned work" note={optional("unplanned")}>
+      <FormSection key="unplanned" icon="zap" title="Unplanned work" note={optional("unplanned")}>
         <fieldset className="sr-set" aria-describedby={err("unplanned") ? "sr-unplanned-e" : undefined}>
           <legend className="sr-only">Unplanned work</legend>
           {r.unplanned.map((u, n) => (
@@ -215,7 +214,7 @@ export function ReportEditor({
               <input className="sr-in sr-min num" type="number" inputMode="numeric" min={0} step={5} aria-label={`Unplanned work ${n + 1}, minutes`} placeholder="Min" value={u.minutes || ""}
                 onChange={(e) => touch("unplanned", (x) => ({ ...x, unplanned: x.unplanned.map((y) => (y.id === u.id ? { ...y, minutes: Math.max(0, Math.round(Number(e.target.value) || 0)) } : y)) }))} />
               <button type="button" className="rf-entry-x" aria-label={`Remove unplanned work ${n + 1}`} onClick={() => touch("unplanned", (x) => ({ ...x, unplanned: x.unplanned.filter((y) => y.id !== u.id) }))}>
-                <X aria-hidden="true" />
+                <Icon name="close" size={24} />
               </button>
             </div>
           ))}
@@ -227,7 +226,7 @@ export function ReportEditor({
       </FormSection>
     ),
     sectionOn(template, "attachments") && (
-      <FormSection key="attachments" icon={Paperclip} title="Attachments" note={optional("attachments")}>
+      <FormSection key="attachments" icon="paperclip" title="Attachments" note={optional("attachments")}>
         <fieldset className="sr-set" aria-describedby={err("attachments") ? "sr-att-e" : undefined}>
           <legend className="sr-only">Attachments</legend>
           {r.attachments.length > 0 && (
@@ -239,7 +238,7 @@ export function ReportEditor({
                   reportId={r.reportId}
                   action={
                     <button type="button" className="rf-entry-x" aria-label={`Remove ${a.name}`} onClick={() => touch("attachments", (x) => ({ ...x, attachments: x.attachments.filter((y) => y.id !== a.id) }))}>
-                      <X aria-hidden="true" />
+                      <Icon name="close" size={24} />
                     </button>
                   }
                 />

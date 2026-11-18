@@ -4,7 +4,7 @@ import { useRef, useState } from "react"
 
 import { useSlideDir } from "@/components/data-pagination"
 import { Field } from "@/components/field"
-import { Icon } from "@/components/icons"
+import { Icon } from "@/components/icon"
 import { PageHead } from "@/components/page-head"
 import { StretchIndicator } from "@/components/stretch-indicator"
 import { SecretInput } from "@/components/secret-input"

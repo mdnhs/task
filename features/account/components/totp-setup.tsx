@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useTransition } from "react"
-import { Copy, Smartphone } from "lucide-react"
 import { toast } from "sonner"
 
 import { Field } from "@/components/field"
@@ -10,6 +9,7 @@ import { Input } from "@/components/ui/input"
 import { enableTotp, verifyTotp } from "@/lib/auth-client"
 import { copyText } from "@/lib/clipboard"
 import { confirmEnrolment, otpauthHref, startEnrolment } from "../totp-flow"
+import { Icon } from "@/components/icon"
 
 type Step = "password" | "scan" | "codes"
 
@@ -89,8 +89,8 @@ export function TotpSetup({ account, onDone }: { account: string; onDone(): void
         <p>Add {account} to your authenticator app: type this key, or open the link on your phone.</p>
         <span className="mfa-secret" aria-label="Setup key">{secret}</span>
         <div className="mfa-actions">
-          <button type="button" className="btn btn-outline set-sm" onClick={() => copy(secret)}><Copy aria-hidden="true" /> Copy key</button>
-          {href && <a className="btn btn-outline set-sm" href={href}><Smartphone aria-hidden="true" /> Open in app</a>}
+          <button type="button" className="btn btn-outline set-sm" onClick={() => copy(secret)}><Icon name="copy" size={24} /> Copy key</button>
+          {href && <a className="btn btn-outline set-sm" href={href}><Icon name="phone" size={24} /> Open in app</a>}
         </div>
         <Field label="6-digit code" htmlFor="mfa-code" error={error} required>
           <Input

@@ -1,7 +1,6 @@
 "use client"
 
 import * as React from "react"
-import { CalendarIcon } from "lucide-react"
 
 import { Field } from "@/components/field"
 import { Calendar } from "@/components/ui/calendar"
@@ -12,6 +11,7 @@ import { formatDate } from "@/lib/dates"
 import { LAYER_ATTR } from "../containment"
 import { TYPE_LABELS, countFilters, humanStatus } from "../match"
 import type { FilterKey, SearchFilters, SearchType } from "../types"
+import { Icon } from "@/components/icon"
 
 // Nested popups (Select, date range) are portalled to <body>. They carry LAYER_ATTR so the search popover's
 // outside-press and focus-out checks (isInsideSearch) treat them as inside.
@@ -92,7 +92,7 @@ function DateRange({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger render={<button type="button" id={id} className="od-datepick od-search-ctl" aria-haspopup="dialog" />}>
-        <CalendarIcon aria-hidden="true" />
+        <Icon name="calendar" size={24} />
         <span className={label ? undefined : "od-datepick-ph"}>{label || "Any date"}</span>
       </PopoverTrigger>
       <PopoverContent className="od-pop" align="start" sideOffset={6} {...{ [LAYER_ATTR]: "" }}>

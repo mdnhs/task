@@ -1,6 +1,6 @@
 import Link from "next/link"
 
-import { Icon } from "@/components/icons"
+import { Icon } from "@/components/icon"
 import type { StaffEvidenceData } from "../types"
 
 // Evidence waiting for review (a count, the API gives no rows for it) and the items a reviewer returned, each with the reason.

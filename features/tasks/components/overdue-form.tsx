@@ -1,7 +1,6 @@
 "use client"
 
 import { useState } from "react"
-import { AlarmClock } from "lucide-react"
 import { toast } from "sonner"
 import { z } from "zod"
 
@@ -12,6 +11,7 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { formatDate, formatTime } from "@/lib/dates"
 import type { Person, Task } from "../types"
+import { Icon } from "@/components/icon"
 
 type Overdue = NonNullable<Task["overdue"]>
 
@@ -89,7 +89,7 @@ export function OverdueForm({
   return (
     <section className="card td-overdue" aria-labelledby="td-overdue-h">
       <h2 id="td-overdue-h" className="td-h td-overdue-h">
-        <span className="fs-sec-i td-overdue-i" aria-hidden="true"><AlarmClock /></span>
+        <span className="fs-sec-i td-overdue-i" aria-hidden="true"><Icon name="alarm" size={24} /></span>
         This task is overdue
       </h2>
       <form className="td-form" onSubmit={submit} noValidate>

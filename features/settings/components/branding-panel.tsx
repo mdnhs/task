@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import { ImageIcon, Palette } from "lucide-react"
 import { toast } from "sonner"
 import { z } from "zod"
 
@@ -88,7 +87,7 @@ export function BrandingPanel({ name, color, logoFileId, presets, canWrite, canU
       <div className="set-brand">
         <form className="od-form set-form" noValidate onSubmit={(e) => { e.preventDefault(); document.getElementById("brand-save")?.click() }}>
           {LOGO_UPLOAD_ENABLED && (
-          <FormSection icon={ImageIcon} title="Logo">
+          <FormSection icon="image" title="Logo">
             {canUpload ? (
               <Field label="Logo" htmlFor="brand-logo" error={errors.logo} hint="PNG, JPG, SVG or WebP, up to 512 KB">
                 <span className="set-upload">
@@ -115,7 +114,7 @@ export function BrandingPanel({ name, color, logoFileId, presets, canWrite, canU
             )}
           </FormSection>
           )}
-          <FormSection icon={Palette} title="Colour">
+          <FormSection icon="palette" title="Colour">
             <Field label="Brand colour" htmlFor="brand-color" error={errors.color} required>
               <ColorPicker id="brand-color" aria-label="Brand colour" value={value} presets={presets} disabled={!canWrite} readOnly={!canWrite} invalid={!!errors.color} onValueChange={(hex) => { setValue(hex); setErrors((x) => ({ ...x, color: undefined })) }} />
             </Field>

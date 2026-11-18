@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 
-import { Icon } from "@/components/icons"
+import { Icon } from "@/components/icon"
 
 // Static sidebar pieces, shared by AppShell and AppShellSkeleton so the skeleton matches exactly.
 

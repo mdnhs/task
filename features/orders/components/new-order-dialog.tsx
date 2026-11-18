@@ -1,7 +1,6 @@
 "use client"
 
 import { useState } from "react"
-import { Package, Truck } from "lucide-react"
 import { toast } from "sonner"
 import { z } from "zod"
 
@@ -100,7 +99,7 @@ export function NewOrderDialog({
           <DialogDescription>An approver signs it off before anything is ordered.</DialogDescription>
         </DialogHeader>
         <form className="od-form" onSubmit={submit} noValidate>
-          <FormSection icon={Package} title="Item">
+          <FormSection icon="box" title="Item">
             <div className="od-row2">
               <Field label="Item" htmlFor="no-item" error={errors.item} required>
                 <Input id="no-item" placeholder="e.g. Floor cleaner 5L" value={form.item} onChange={(e) => set("item", e.target.value)} />
@@ -118,7 +117,7 @@ export function NewOrderDialog({
               </Field>
             </div>
           </FormSection>
-          <FormSection icon={Truck} title="Delivery">
+          <FormSection icon="truck" title="Delivery">
             <div className="od-row2">
               <Field label="Supplier" htmlFor="no-supplier" error={errors.supplier} required>
                 <Input id="no-supplier" value={form.supplier} onChange={(e) => set("supplier", e.target.value)} />

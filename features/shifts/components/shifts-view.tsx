@@ -1,14 +1,13 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { ChevronLeft, ChevronRight } from "lucide-react"
 import { toast } from "sonner"
 
 import { ConfirmDialog } from "@/components/confirm-dialog"
 import { DataPagination, useSlideDir } from "@/components/data-pagination"
 import { EmptyState } from "@/components/empty-state"
 import { FilterBar, FilterSearch, FilterSeg } from "@/components/filter-bar"
-import { Icon } from "@/components/icons"
+import { Icon } from "@/components/icon"
 import { PageHead } from "@/components/page-head"
 import { useDept } from "@/hooks/use-dept"
 import { apiBrowser } from "@/lib/api/browser"
@@ -198,13 +197,13 @@ export function ShiftsView({
           {tab === "week" && (
             <div className="sh-weeknav" role="group" aria-label="Week">
               <button type="button" className="sh-nav-btn" aria-label="Previous week" onClick={() => void goWeek(offset - 1)}>
-                <ChevronLeft aria-hidden="true" />
+                <Icon name="chevron-left" size={24} />
               </button>
               <button type="button" className="sh-nav-label num" onClick={() => void goWeek(0)} disabled={offset === 0} title={offset === 0 ? "This week" : "Back to this week"}>
                 {offset === 0 ? "This week" : weekLabel(start)}
               </button>
               <button type="button" className="sh-nav-btn" aria-label="Next week" onClick={() => void goWeek(offset + 1)}>
-                <ChevronRight aria-hidden="true" />
+                <Icon name="chevron-right" size={24} />
               </button>
             </div>
           )}

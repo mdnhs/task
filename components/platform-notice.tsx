@@ -1,10 +1,10 @@
 "use client"
 
 import { useSyncExternalStore } from "react"
-import { Info, Wrench, X } from "lucide-react"
 
 import { formatDue, formatTime } from "@/lib/dates"
 import { noticeKey, type PlatformNotice } from "@/lib/platform-notice"
+import { Icon } from "@/components/icon"
 
 // D10: the platform announcement as a banner. The tenant app shell shows it above every page (app/(app)/layout.tsx);
 // the console's Settings page shows the same banner as a preview. Dismissing hides that one announcement for the
@@ -51,7 +51,7 @@ export function PlatformNoticeBanner({ notice, today, tzLabel, preview = false }
   const maintenance = notice.kind === "maintenance"
   return (
     <div className="od-notice" data-kind={notice.kind} role={preview ? undefined : "status"}>
-      {maintenance ? <Wrench aria-hidden="true" /> : <Info aria-hidden="true" />}
+      {maintenance ? <Icon name="wrench" size={24} /> : <Icon name="info" size={24} />}
       <p>
         <span className="sr-only">{maintenance ? "Maintenance notice: " : "Notice: "}</span>
         {notice.message}
@@ -63,7 +63,7 @@ export function PlatformNoticeBanner({ notice, today, tzLabel, preview = false }
       </p>
       {!preview && (
         <button type="button" className="od-notice-x" aria-label="Dismiss notice" onClick={() => dismiss(key)}>
-          <X aria-hidden="true" />
+          <Icon name="close" size={24} />
         </button>
       )}
     </div>
