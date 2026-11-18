@@ -11,7 +11,7 @@ import { newRouter } from "../../core/router"
 import { tasks } from "../../db/schema"
 import { withTenant, type TenantTx } from "../../db/tenant-tx"
 import { applyTaskUpdate, mutate, taskScopeWhere, TaskNotFound, wallOf } from "../tasks"
-import { cached, readModelKey, readModelTtl } from "./cache"
+import { readModelKey, readModelTtl } from "./cache"
 import { localDay } from "./days"
 import { AttentionOut, AttentionQuery, DashboardOut, StaffOut, TeamTasksOut, TeamTasksQuery, TodayOut, TodayQuery, TodayUpdateBody, TodayUpdateOut } from "./dto"
 import { attentionPage, loadAttention, loadDashboard, loadStaff, loadToday, loadTeamTasks } from "./service"
@@ -29,7 +29,7 @@ async function readModel<T>(c: Context<AppEnv>, model: string | null, personal: 
   return withTenant(deps.db, c.get("tenant")!.id, async (tx) => {
     const s = await rmScope(c, tx)
     if (model === null) return load(tx, s)
-    return cached(readModelKey(c, model, scopeKeyOf(s, personal), s.drive, localDay(s.now, s.tz)), readModelTtl(s.support), () => load(tx, s), s.now)
+    return deps.readModelCache.cached(readModelKey(c, model, scopeKeyOf(s, personal), s.drive, localDay(s.now, s.tz)), readModelTtl(s.support), () => load(tx, s), s.now)
   })
 }
 

@@ -13,6 +13,7 @@ import { fakeOAuth, type FakeOAuth } from "../src/core/oauth/fake-oauth"
 import { fakeNet, type FakeNet } from "../src/core/net/fake-net"
 import { makeLogErrorReporter, type ErrorReporter } from "../src/core/observability/error-reporter"
 import { makeMetrics, type Metrics } from "../src/core/observability/metrics"
+import { defaultReadModelCache } from "../src/modules/read-models/cache"
 import { fakeClock, fakeMailer, fakeRateLimiter, type FakeClock, type FakeMailer, type FakeRateLimiter } from "./fakes"
 
 export { fakeClock, fakeMailer }
@@ -66,10 +67,11 @@ export function testApp(over: Partial<Deps> = {}): { app: AppType; deps: Deps; m
   const net = (over.net ?? fakeNet()) as FakeNet
   const rateLimiter = (over.rateLimiter ?? fakeRateLimiter(usedClock)) as FakeRateLimiter
   const errorReporter = over.errorReporter ?? makeLogErrorReporter(logger) // the server default; tests that assert on reports inject fakeErrorReporter()
+  const readModelCache = over.readModelCache ?? defaultReadModelCache
   const metrics = over.metrics ?? makeMetrics()
   const storage = over.storage ?? makeStorage({ env, db })
   const scanner = over.scanner ?? fakeScanner() // auto: flags EICAR, everything else clean
-  const deps: Deps = { env, db, clock: usedClock, mailer, logger, queue, push, storage, scanner, oauth, billing, net, rateLimiter, errorReporter, metrics, auth: over.auth ?? buildAuth({ env, db, clock: usedClock, mailer, logger, rateLimiter }) }
+  const deps: Deps = { env, db, clock: usedClock, mailer, logger, queue, push, storage, scanner, oauth, billing, net, rateLimiter, errorReporter, metrics, readModelCache, auth: over.auth ?? buildAuth({ env, db, clock: usedClock, mailer, logger, rateLimiter }) }
   const app = createApp(deps)
   mailerOf.set(app, mailer)
   return { app, deps, mailer, clock: usedClock as FakeClock, queue, push, oauth, billing, net, rateLimiter, metrics, errorReporter }

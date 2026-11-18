@@ -38,7 +38,7 @@ import { projectRoutes } from "./modules/projects"
 import { templateRoutes } from "./modules/task-templates"
 import { shiftRoutes } from "./modules/shifts"
 import { shiftReportRoutes } from "./modules/shift-reports"
-import { bustReadModels, readModelRoutes } from "./modules/read-models"
+import { readModelRoutes } from "./modules/read-models"
 import { teamRoutes } from "./modules/teams"
 import { tenantRoutes } from "./modules/tenants"
 
@@ -54,13 +54,13 @@ export function createApp(deps: Deps) {
   app.use("*", accessLog()) // request context, one access-log line per request, http metrics; after the request id, before the security headers
   app.use("*", secureHeaders()) // sets headers after next(), so error and 404 responses are covered
   app.use("/v1/*", requireSameOrigin) // CSRF layer 2 (B6 I6): a foreign Origin on a non-GET call is 403 bad_origin, before any auth
-  // F18: a write that succeeded through THIS instance drops that tenant's read-model cache (a read model is derived from tasks, shifts, reports and settings; other instances catch up within the 30 s TTL).
+  // F18: a write that succeeded through THIS instance drops that tenant's read-model cache (a read model is derived from tasks, shifts, reports and settings) and bumps the shared Redis stamp so the other instances drop theirs at once (B7 S11; Redis down: they catch up within the 30 s TTL).
   // Conservative on purpose: any successful non-GET request of a tenant busts it, the tenant is the one the request resolved.
   app.use("/v1/*", async (c, next) => {
     await next()
     const m = c.req.method
     const tenant = c.get("tenant")
-    if (tenant && m !== "GET" && m !== "HEAD" && m !== "OPTIONS" && c.res.status < 400) bustReadModels(tenant.id)
+    if (tenant && m !== "GET" && m !== "HEAD" && m !== "OPTIONS" && c.res.status < 400) await deps.readModelCache.bust(tenant.id)
   })
 
   app.onError((err, c) => {

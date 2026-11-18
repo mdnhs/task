@@ -74,3 +74,9 @@ Separate environment, separate database from the first client's.
 - Every API response carries `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`, `Cross-Origin-Resource-Policy: same-site`, `Content-Security-Policy: default-src 'none'; frame-ancestors 'none'`, and authenticated JSON carries `Cache-Control: no-store` (`api/src/core/middleware/secure-headers.ts`). No new env.
 - File downloads are 302 redirects to a presigned bucket URL. The API signs `response-content-type` (the stored mime) and `response-content-disposition: attachment` for every file; `inline` is only possible for image/png, jpeg, webp, gif and application/pdf, never svg or html.
 - A presigned bucket URL cannot carry `nosniff` (S3 and R2 limit). Mandatory at deploy: a Cloudflare Transform Rule (response header modification) on the bucket domain that sets `X-Content-Type-Options: nosniff` (and `Content-Security-Policy: default-src 'none'; sandbox`). The full runbook is Task 19.
+
+## Read-model cache across instances (B7 Task 16)
+
+- With two or more API instances the read-model cache shares one per-tenant version stamp in the queue Redis (`rm:v:<tenantId>`, a bare integer, expires an hour after the last bust). A successful write, the recurrence and retention sweeps, and the `file.scan` and `dsr.erase` jobs bump it; every read costs one `GET`. No new env.
+- Redis down: reads fall back to the 30 s TTL, writes still drop the local entries, nothing errors.
+- Sweep sizing (S12): each tenant-looping sweep sets `sweep_tenants_processed{job}`; the run time is `queue_job_duration_seconds{name}`. Shard a sweep when a run exceeds 60 s or 250 tenants (a warning is logged then).

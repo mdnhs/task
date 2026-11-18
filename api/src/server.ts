@@ -13,6 +13,7 @@ import { makeStorage } from "./modules/platform-storage"
 import { makeOAuthClient } from "./core/oauth/google-oauth"
 import { makeBullQueue } from "./core/queue/bull-queue"
 import { makeNet } from "./core/net/net"
+import { makeReadModelCache, makeRedisCacheStamp } from "./modules/read-models"
 import { makeRedisRateLimiter } from "./core/middleware/rate-limit"
 import { makeLogErrorReporter } from "./core/observability/error-reporter"
 import { makeLogger } from "./core/observability/logger"
@@ -29,7 +30,7 @@ export function makeDeps(env: Env, o: { service?: "api" | "worker" } = {}): Deps
   const errorReporter = makeLogErrorReporter(logger) // a Sentry / OpenTelemetry adapter replaces this line at go-live (ErrorReporter, ruling S10)
   const mailer = makeMailer({ env, db, logger })
   const rateLimiter = makeRedisRateLimiter(env.REDIS_URL)
-  return { env, db, auth: buildAuth({ env, db, clock, mailer, logger, rateLimiter }), rateLimiter, clock, mailer, logger, queue: makeBullQueue(env.REDIS_URL), push: makeLoggingPush(logger), storage: makeStorage({ env, db }), scanner: clamdFromEnv(env) ?? unconfiguredScanner(), oauth: makeOAuthClient(env), billing: makeBilling({ env, db }), net: makeNet(), metrics, errorReporter }
+  return { env, db, auth: buildAuth({ env, db, clock, mailer, logger, rateLimiter }), rateLimiter, clock, mailer, logger, queue: makeBullQueue(env.REDIS_URL), push: makeLoggingPush(logger), storage: makeStorage({ env, db }), scanner: clamdFromEnv(env) ?? unconfiguredScanner(), oauth: makeOAuthClient(env), billing: makeBilling({ env, db }), net: makeNet(), metrics, errorReporter, readModelCache: makeReadModelCache(makeRedisCacheStamp(env.REDIS_URL)) }
 }
 
 /** The internal metrics listener (ruling S10); a no-op when `port` is unset. The pool gauge is read at scrape time. */

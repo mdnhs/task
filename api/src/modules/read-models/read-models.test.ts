@@ -15,7 +15,13 @@ import { registerTasks } from "../tasks"
 import { registerShiftReports, type ReportCtx } from "../shift-reports"
 import { withTenant } from "../../db/tenant-tx"
 import { DRIVE, REQUIRED, world, type Json, type W, type Who } from "../shift-reports/world"
-import { cacheKeys, cached, bustReadModels, readModelTtl, READ_MODEL_MAX, READ_MODEL_TTL_MS, resetReadModelCache } from "./cache"
+import { createApp } from "../../app"
+import { bustAfterJob } from "../../core/queue/bull-queue"
+import { runArchivePurge } from "../tasks"
+import { fakeCacheStamp } from "../../../test/fakes"
+import { Redis } from "ioredis"
+import { makeRedisCacheStamp, STAMP_TTL_SEC } from "./stamp"
+import { cacheKeys, cached, bustReadModels, makeReadModelCache, readModelTtl, READ_MODEL_MAX, READ_MODEL_TTL_MS, resetReadModelCache } from "./cache"
 import { dayBounds, localDay, lastDays } from "./days"
 import { attentionQuery, awaitingReportsQuery, dashboardSummaryQuery, openReportsQuery, pendingEvidenceQuery, teamTasksQuery, tasksClosedQuery, awaitingReviewQuery } from "./queries"
 import { SUPPORT_DENIED_ROUTES } from "../../core/middleware/support"
@@ -850,5 +856,119 @@ describe("route walker and the API surface", () => {
       expect(src, f).not.toMatch(/new Date\(\)|Date\.now\(\)|\bnow\(\)\s*::/)
       expect(src, f).not.toMatch(/logger\.(info|warn|error)\([^)]*title/)
     }
+  })
+})
+
+// B7 Task 16 (ruling S11): the multi-instance cache. Two cache instances over one stamp store stand for two API processes over one Redis.
+describe("read-model cache: Redis version stamp (S11)", () => {
+  const now = new Date("2026-10-26T12:00:00.000Z")
+  const as = (w: W, cache: ReturnType<typeof makeReadModelCache>) => createApp({ ...w.deps, readModelCache: cache })
+  const read = async (w: W, app: ReturnType<typeof createApp>, who: Who) => {
+    const r = await call(app, "GET", "/v1/dashboard", { cookie: who.cookie, tenant: "acme" })
+    expect(r.status).toBe(200)
+    return ((await r.json()) as Json).summary.open as number
+  }
+  const create = (w: W, app: ReturnType<typeof createApp>, title: string) =>
+    call(app, "POST", "/v1/tasks", { cookie: w.ops.cookie, tenant: "acme", body: { title, description: "x", priority: 2, start: "2026-11-20T09:00:00", due: "2026-11-20T17:00:00", primary: w.staff.userId } })
+
+  test("a write through instance A is visible to a read on instance B immediately; without the stamp B would serve the old number for the TTL", async () => {
+    const w = await world({ now: NOW })
+    const stamp = fakeCacheStamp()
+    const a = as(w, makeReadModelCache(stamp))
+    const b = as(w, makeReadModelCache(stamp))
+    expect(await read(w, b, w.ops)).toBe(0)
+    expect((await create(w, a, "From A")).status).toBe(201)
+    expect(await read(w, b, w.ops)).toBe(1) // B's entry was cached; A's bust moved the stamp
+    // control: two unlinked instances keep the old number inside the TTL
+    const c = as(w, makeReadModelCache())
+    const d = as(w, makeReadModelCache())
+    expect(await read(w, d, w.ops)).toBe(1)
+    expect((await create(w, c, "From C")).status).toBe(201)
+    expect(await read(w, d, w.ops)).toBe(1)
+  })
+
+  test("a worker job write invalidates the cache of that tenant (and only for the jobs that change read-model data)", async () => {
+    const w = await world({ now: NOW })
+    const stamp = fakeCacheStamp()
+    const api = makeReadModelCache(stamp)
+    const worker = makeReadModelCache(stamp)
+    const a = as(w, api)
+    expect(await read(w, a, w.ops)).toBe(0)
+    await w.q(
+      `insert into tasks (tenant_id, ref_no, title, evidence_rule, start_at, due_at, created_at, updated_at, creator_id) values ($1, 901, 'By a job', $2::jsonb, $3, $4, now(), now(), $5)`,
+      [w.tenant.id, JSON.stringify({ mode: "none", types: [], min: 0, instruction: "", review: "manager" }), at(8), at(20), w.ops.userId],
+    )
+    await bustAfterJob({ readModelCache: worker }, { name: "notification.send", data: { tenantId: w.tenant.id } })
+    expect(await read(w, a, w.ops)).toBe(0) // a notification job does not touch read models
+    await bustAfterJob({ readModelCache: worker }, { name: "file.scan", data: { tenantId: w.tenant.id } })
+    expect(await read(w, a, w.ops)).toBe(1)
+    await bustAfterJob({ readModelCache: worker }, { name: "file.scan", data: {} }) // no tenant in the data: nothing to bust, no throw
+  })
+
+  test("the retention sweep reports how many tenants it handled", async () => {
+    const w = await world({ now: NOW })
+    await runArchivePurge({}, w.deps)
+    expect(w.deps.metrics.render()).toMatch(/sweep_tenants_processed\{job="tasks.archive-purge"\} [1-9]/)
+  })
+
+  test("Redis down: reads fall back to the 30 s TTL and never throw; a bust still drops this instance", async () => {
+    const stamp = fakeCacheStamp()
+    const cache = makeReadModelCache(stamp)
+    let n = 0
+    const load = async () => ++n
+    const k = "rm:t1:m:all:drive0:d"
+    expect(await cache.cached(k, 30_000, load, now)).toBe(1)
+    stamp.down = true
+    expect(await cache.cached(k, 30_000, load, new Date(now.getTime() + 29_999))).toBe(1) // served on the TTL
+    expect(await cache.cached(k, 30_000, load, new Date(now.getTime() + 30_000))).toBe(2) // reloaded after it
+    await expect(cache.bust("t1")).resolves.toBeUndefined()
+    expect(cache.keys()).toEqual([])
+    stamp.down = false
+    stamp.values.set("t1", 9)
+    expect(await cache.cached(k, 30_000, load, now)).toBe(3) // stored while Redis was unreachable has no stamp, so it is not trusted once Redis is back
+    expect(await cache.cached(k, 30_000, load, now)).toBe(3)
+  })
+
+  test("a bust for tenant A does not evict tenant B", async () => {
+    const stamp = fakeCacheStamp()
+    const cache = makeReadModelCache(stamp)
+    let n = 0
+    const load = async () => ++n
+    await cache.cached("rm:ta:m:all:drive0:d", 30_000, load, now)
+    await cache.cached("rm:tb:m:all:drive0:d", 30_000, load, now)
+    await cache.bust("ta")
+    expect(cache.keys()).toEqual(["rm:tb:m:all:drive0:d"])
+    expect(await cache.cached("rm:tb:m:all:drive0:d", 30_000, load, now)).toBe(2) // still a hit: B's stamp did not move
+    expect(await cache.cached("rm:ta:m:all:drive0:d", 30_000, load, now)).toBe(3)
+    expect([...stamp.values.keys()]).toEqual(["ta"])
+  })
+
+  test("the real Redis stamp: one integer key per tenant with a TTL, no tenant data; an unreachable Redis rejects fast", async () => {
+    const url = process.env.REDIS_URL!
+    const stamp = makeRedisCacheStamp(url)
+    const raw = new Redis(url)
+    try {
+      expect(await stamp.get("t-stamp")).toBe(0)
+      await stamp.incr("t-stamp")
+      await stamp.incr("t-stamp")
+      expect(await stamp.get("t-stamp")).toBe(2)
+      expect(await raw.get("rm:v:t-stamp")).toBe("2")
+      const ttl = await raw.ttl("rm:v:t-stamp")
+      expect(ttl).toBeGreaterThan(0)
+      expect(ttl).toBeLessThanOrEqual(STAMP_TTL_SEC)
+    } finally {
+      await raw.del("rm:v:t-stamp")
+      raw.disconnect()
+      await stamp.close()
+    }
+    const dead = makeRedisCacheStamp("redis://127.0.0.1:1")
+    const t0 = Date.now()
+    await expect(dead.get("t")).rejects.toThrow()
+    await expect(dead.incr("t")).rejects.toThrow()
+    expect(Date.now() - t0).toBeLessThan(2000)
+    await dead.close()
+    const cache = makeReadModelCache(dead)
+    expect(await cache.cached("rm:t:m:all:drive0:d", 30_000, async () => "ok", now)).toBe("ok") // fail-open
+    await expect(cache.bust("t")).resolves.toBeUndefined()
   })
 })

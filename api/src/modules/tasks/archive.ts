@@ -1,3 +1,4 @@
+import { startSweep } from "../../core/observability/sweep"
 import { and, asc, eq, inArray, sql, type SQL } from "drizzle-orm"
 import { z } from "@hono/zod-openapi"
 import type { Context } from "hono"
@@ -297,8 +298,11 @@ async function requeueObjects(deps: Deps, tenantId: string): Promise<void> {
  */
 export async function runArchivePurge(_data: unknown, deps: Deps): Promise<void> {
   const rows = await deps.db.select({ id: tenants.id }).from(tenants).where(eq(tenants.status, "active")) // `tenants` has no RLS
+  const sweep = startSweep(deps, ARCHIVE_PURGE_JOB)
+  try {
   for (const { id: tenantId } of rows) {
     try {
+      sweep.tenant()
       const now = deps.clock.now()
       const ent = await tenantEntitlements(deps.db, tenantId, now)
       if (!ent.allowed.includes("M1") || ent.billingState === "blocked") continue
@@ -314,6 +318,7 @@ export async function runArchivePurge(_data: unknown, deps: Deps): Promise<void>
             deps.logger.error({ tenantId, taskId: t.id, errCode: safeCode(err) }, "task purge failed; it stays archived")
           }
         }
+        if (page.length > 0) await deps.readModelCache.bust(tenantId) // purged tasks leave the read models of every API instance
         if (page.length < PURGE_BATCH) break
         const last = page[page.length - 1]
         after = { at: last.at!, id: last.id }
@@ -321,5 +326,8 @@ export async function runArchivePurge(_data: unknown, deps: Deps): Promise<void>
     } catch (err) {
       deps.logger.error({ tenantId, errCode: safeCode(err) }, "task retention failed for a tenant")
     }
+  }
+  } finally {
+    sweep.done()
   }
 }

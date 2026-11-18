@@ -1,3 +1,4 @@
+import { startSweep } from "../../core/observability/sweep"
 import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm"
 import { addDays, occurrenceInstants, wallToEpoch } from "@opsdesk/domain/shifts"
 import { diffFields } from "@opsdesk/domain/task-history"
@@ -156,8 +157,11 @@ export function planShiftOccurrences(rule: RepeatRule, pattern: Pick<PatternRow,
  */
 export async function runRecurrence(_data: unknown, deps: Deps): Promise<void> {
   const rows = await deps.db.select({ id: tenants.id, tz: tenants.timezone }).from(tenants).where(eq(tenants.status, "active")) // `tenants` has no RLS
+  const sweep = startSweep(deps, RECURRENCE_JOB)
+  try {
   for (const { id: tenantId, tz } of rows) {
     try {
+      sweep.tenant()
       const now = deps.clock.now()
       const ent = await tenantEntitlements(deps.db, tenantId, now)
       if (!ent.allowed.includes("M1") || ent.billingState === "blocked") continue
@@ -184,9 +188,13 @@ export async function runRecurrence(_data: unknown, deps: Deps): Promise<void> {
           deps.logger.error({ tenantId, seriesId: s.id, errCode: safeCode(err) }, "recurrence failed for a series")
         }
       }
+      if (live.length > 0) await deps.readModelCache.bust(tenantId) // instances may have been created: every API instance drops this tenant's read models
     } catch (err) {
       deps.logger.error({ tenantId, errCode: safeCode(err) }, "recurrence failed for a tenant")
     }
+  }
+  } finally {
+    sweep.done()
   }
 }
 

@@ -29,6 +29,15 @@ const jobRequestId = (job: JobLike | undefined): string | undefined => {
   return typeof id === "string" && REQUEST_ID.test(id) ? id : undefined
 }
 
+/** Tenant-scoped jobs that change what a read model shows (the tenant id is in the job data). The sweeps that do (recurrence, archive purge) bust per tenant themselves. Others (notification, webhook, export) are left out on purpose: busting for them would only thrash the cache. */
+export const READ_MODEL_JOBS = new Set(["file.scan", "dsr.erase"])
+
+/** After a worker job that wrote tenant data: bust that tenant's read-model cache (this process and, through the Redis stamp, every API instance). Never throws. */
+export async function bustAfterJob(d: Pick<Deps, "readModelCache">, job: JobLike): Promise<void> {
+  const tenantId = (job.data as { tenantId?: unknown } | null | undefined)?.tenantId
+  if (job.name && READ_MODEL_JOBS.has(job.name) && typeof tenantId === "string" && tenantId.length > 0) await d.readModelCache.bust(tenantId)
+}
+
 /** Worker `failed` log: job name, job id, request id (when present), error class and a safe code only. Never err.message (Drizzle messages contain query params) and never the payload. */
 export function logJobFailure(logger: Logger, job: JobLike | undefined, err: unknown): void {
   const requestId = jobRequestId(job)
@@ -82,7 +91,13 @@ export function makeBullQueue(redisUrl: string, name: string = QUEUE_NAME): Queu
 /** Starts a BullMQ worker that dispatches by job name to registerJob handlers. */
 export function startWorker(deps: Deps, redisUrl: string, name: string = QUEUE_NAME): { close(): Promise<void> } {
   const connection = connect(redisUrl)
-  const worker = new Worker(name, (job) => instrumentJob(deps, job, () => runJob(job.name, job.data, deps)), { connection })
+  const worker = new Worker(name, (job) => instrumentJob(deps, job, async () => {
+      try {
+        await runJob(job.name, job.data, deps)
+      } finally {
+        await bustAfterJob(deps, job) // a failed job may have committed part of its work
+      }
+    }), { connection })
   worker.on("failed", (job, err) => logJobFailure(deps.logger, job, err))
   return {
     close: async () => {

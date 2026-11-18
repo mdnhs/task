@@ -66,3 +66,22 @@ export function fakeRateLimiter(clock: { now(): Date }): FakeRateLimiter {
   }
   return f
 }
+
+import type { CacheStamp } from "../src/modules/read-models/cache"
+export type FakeCacheStamp = CacheStamp & { down: boolean; values: Map<string, number> }
+/** In-memory stand-in for the Redis version stamp, shareable between two cache instances. `down = true` makes every call reject. */
+export function fakeCacheStamp(): FakeCacheStamp {
+  const f: FakeCacheStamp = {
+    down: false,
+    values: new Map(),
+    incr: async (t) => {
+      if (f.down) throw new Error("redis down")
+      f.values.set(t, (f.values.get(t) ?? 0) + 1)
+    },
+    get: async (t) => {
+      if (f.down) throw new Error("redis down")
+      return f.values.get(t) ?? 0
+    },
+  }
+  return f
+}

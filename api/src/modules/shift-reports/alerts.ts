@@ -1,3 +1,4 @@
+import { startSweep } from "../../core/observability/sweep"
 import { and, eq, gte, inArray, isNotNull, lte } from "drizzle-orm"
 import { withholdDriveText } from "@opsdesk/domain/devices"
 import { addDays, dueInstant, epochToWall } from "@opsdesk/domain/shifts"
@@ -63,15 +64,21 @@ const order = (a: Pending, b: Pending): number => (a.occ.shiftDate < b.occ.shift
 
 export async function runDeadlineJob(_data: unknown, deps: Deps): Promise<void> {
   const rows = await deps.db.select({ id: tenants.id, tz: tenants.timezone }).from(tenants).where(eq(tenants.status, "active")) // `tenants` has no RLS
-  for (const { id: tenantId, tz } of rows) {
-    try {
-      const now = deps.clock.now()
-      const ent = await tenantEntitlements(deps.db, tenantId, now)
-      if (!ent.allowed.includes("M1") || ent.billingState === "blocked") continue
-      await alertTenant(deps, tenantId, tz, now)
-    } catch (err) {
-      deps.logger.error({ tenantId, errCode: safeCode(err) }, "report deadline job failed for a tenant")
+  const sweep = startSweep(deps, DEADLINE_JOB)
+  try {
+    for (const { id: tenantId, tz } of rows) {
+      try {
+        sweep.tenant()
+        const now = deps.clock.now()
+        const ent = await tenantEntitlements(deps.db, tenantId, now)
+        if (!ent.allowed.includes("M1") || ent.billingState === "blocked") continue
+        await alertTenant(deps, tenantId, tz, now)
+      } catch (err) {
+        deps.logger.error({ tenantId, errCode: safeCode(err) }, "report deadline job failed for a tenant")
+      }
     }
+  } finally {
+    sweep.done()
   }
 }
 
