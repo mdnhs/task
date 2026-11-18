@@ -5,6 +5,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 
+import { personOf } from "../person"
 import { ConfirmDialog } from "@/components/confirm-dialog"
 import { EmptyState } from "@/components/empty-state"
 import { PageHead } from "@/components/page-head"
@@ -129,7 +130,7 @@ export function TaskDetail({
   const w = <T,>(key: string, request: (c: typeof client) => Promise<T>, predict?: (t: Task) => Task, success?: string) => write(task, key, { request, predict, success })
   const copyOf = (e: unknown) => userMessage(e)
 
-  const people$ = assigneesOf(task).map((id) => byId.get(id) ?? { id, name: id, initials: "?", avatar: "av1" as const, role: "", dept: "" })
+  const people$ = assigneesOf(task).map((id) => personOf(byId, id))
   const creator = name(task.creator)
   const open = isOpen(task) && !task.archivedAt
   const late = isLateAt(task, now, nowAt)
