@@ -194,6 +194,19 @@ describe("archive and restore", () => {
     expect((await w.q("select archived_at from tasks where id = $1", [b.id]))[0].archived_at).not.toBeNull() // still archived until the job purges it
   })
 
+  test("removing (archiving) a member's task tells the assignees and the creator, never the manager who did it, and the history line lists them (AC-M1-04; found in the T6.9 e2e)", async () => {
+    const w = await world()
+    const t = await w.mk(w.ops, { title: "Mop the lobby", primary: w.staff.userId, others: [w.staff2.userId] })
+    await w.q("delete from notifications")
+    expect((await archive(w, t.id, w.ops)).status).toBe(200)
+    const notes = await w.q("select user_id, kind, title, body from notifications order by user_id")
+    expect(notes.map((n) => n.user_id).sort()).toEqual([w.staff.userId, w.staff2.userId].sort()) // the creator is the actor: not told
+    expect(notes.every((n) => n.kind === "task" && n.title === "Task removed")).toBe(true)
+    expect(notes[0].body).toContain("Mop the lobby")
+    const [h] = await w.q("select notified from task_history where task_id = $1 and kind = 'archived'", [t.id])
+    expect([...h.notified].sort()).toEqual([w.staff.userId, w.staff2.userId].sort())
+  })
+
   test("only managers archive or restore (D6), scope applies (404), version is checked, archived twice is 409, a live task cannot be restored", async () => {
     const w = await world()
     await w.manages(w.manager, w.staff)

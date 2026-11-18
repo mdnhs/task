@@ -20,6 +20,7 @@ import { lockTaskGraph } from "./graph"
 import { writeHistory } from "./history"
 import { allAssignees, assigneesOf } from "./repo"
 import { canManage, getTask, loadTaskCtx, type TaskCtx, type TaskRow } from "./scope"
+import { changeRecipients, notifyTask, type TaskEnv } from "./notify"
 import { indexTask } from "./search"
 import { lockTaskPurge, TASK_PURGE_LOCK_NS, voiceHolders } from "./voice-refs"
 import { staleVersion, taskDetailDto } from "./service"
@@ -86,7 +87,7 @@ type Env = { enqueue: Enqueue }
 // ---------- archive ----------
 
 /** POST /v1/tasks/{id}/archive: managers only (D6). Row lock → permission → archived? → version → cascade → history → search → audit → publish. */
-export async function archiveTask(tx: TenantTx, _env: Env, ctx: TaskCtx, id: string, input: { version: number }): Promise<TaskDto> {
+export async function archiveTask(tx: TenantTx, env: TaskEnv, ctx: TaskCtx, id: string, input: { version: number }): Promise<TaskDto> {
   await getTask(tx, ctx, id, { includeArchived: true }) // 404 for another tenant, unknown and out of scope, before anything is locked
   await lockTaskSet(tx, ctx.tenantId, () => idsWhere(tx, ctx.tenantId, sql`(${tasks.id} = ${id} or ${tasks.parentId} = ${id})`)) // the task and its subtasks, in id order
   const row = await getTask(tx, ctx, id, { forUpdate: true, includeArchived: true }) // re-checked on the locked row
@@ -106,11 +107,14 @@ export async function archiveTask(tx: TenantTx, _env: Env, ctx: TaskCtx, id: str
     .update(tasks)
     .set({ archivedAt: ctx.now, archivedBy: ctx.actorId, archiveBatchId: batch, version: sql`${tasks.version} + 1`, updatedAt: ctx.now })
     .where(and(eq(tasks.tenantId, ctx.tenantId), inArray(tasks.id, members.map((m) => m.id))))
+  // Removing a task is a change like any other: its assignees and creator are told (AC-M1-04), never the manager who did it. The open subtasks go with it quietly.
+  const recipients = changeRecipients(ctx, row, assignees)
   for (const m of members) {
-    await writeHistory(tx, ctx, m.id, { kind: "archived", text: m.id === row.id ? "Archived" : `Archived with ${ref(row.refNo)}` })
+    await writeHistory(tx, ctx, m.id, { kind: "archived", text: m.id === row.id ? "Archived" : `Archived with ${ref(row.refNo)}`, ...(m.id === row.id ? { notified: recipients } : {}) })
     await removeDocument(tx, ctx.tenantId, "task", m.id) // gone from search at once, not when the relay catches up
   }
   const [next] = await tx.select().from(tasks).where(and(eq(tasks.id, row.id), eq(tasks.tenantId, ctx.tenantId)))
+  await notifyTask(tx, env, ctx, next, recipients, "Task removed")
   const dto = await taskDetailDto(tx, ctx, next)
   for (const m of members) {
     await recordAudit(tx, ctx.tenantId, {
