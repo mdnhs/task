@@ -4,7 +4,7 @@ import Link from "next/link"
 
 import { CountUp } from "@/components/count-up"
 import { EmptyState } from "@/components/empty-state"
-import { Icon } from "@/components/icons"
+import { Icon, type IconName } from "@/components/icon"
 import { PageHead } from "@/components/page-head"
 import { When } from "@/components/when"
 import type { AttentionItem, AttentionKind } from "../attention"
@@ -17,7 +17,7 @@ import { MrrChart } from "./mrr-chart"
 // this component only renders it. `skeleton` swaps the charts for plain blocks, for the SkMask loading state.
 
 const TONE_CLASS: Record<DeltaTone, string> = { good: "up", bad: "down", flat: "pf-flat" }
-const KIND: Record<AttentionKind, { icon: string; tone: string; label: string }> = {
+const KIND: Record<AttentionKind, { icon: IconName; tone: string; label: string }> = {
   past_due: { icon: "wallet", tone: "red", label: "Payment past due" },
   trial_ending: { icon: "clock", tone: "blue", label: "Trial ending" },
   limit: { icon: "layers", tone: "amber", label: "Near plan limit" },
@@ -25,15 +25,16 @@ const KIND: Record<AttentionKind, { icon: string; tone: string; label: string }>
   data_request: { icon: "download", tone: "amber", label: "Data request" },
 }
 
-type Props = { data: OverviewData; today: string; tzLabel: string; skeleton?: boolean }
+// `sample`: only the sections the API has no data for (charts, plan mix, attention, activity), under the live overview: no header and no mock KPI row (they would contradict the API numbers above).
+type Props = { data: OverviewData; today: string; tzLabel: string; skeleton?: boolean; sample?: boolean }
 
-export function OverviewDashboard({ data, today, tzLabel, skeleton = false }: Props) {
+export function OverviewDashboard({ data, today, tzLabel, skeleton = false, sample = false }: Props) {
   const { title, subtitle } = PAGE_HEADS.overview
   return (
     <>
-      <PageHead title={title} subtitle={`${data.revenue ? subtitle : "Tenant growth and what needs attention across the platform"} · ${data.monthLabel}`} />
+      {!sample && <PageHead title={title} subtitle={`${data.revenue ? subtitle : "Tenant growth and what needs attention across the platform"} · ${data.monthLabel}`} />}
 
-      <section className={data.revenue ? "stats pf-kpis" : "stats pf-kpis pf-kpis-3"} aria-label="Platform numbers">
+      {!sample && <section className={data.revenue ? "stats pf-kpis" : "stats pf-kpis pf-kpis-3"} aria-label="Platform numbers">
         {data.kpis.map((k, i) => (
           <article key={k.key} className="stat">
             <div className="stat-top">
@@ -60,24 +61,24 @@ export function OverviewDashboard({ data, today, tzLabel, skeleton = false }: Pr
             </div>
           </article>
         ))}
-      </section>
+      </section>}
 
       {data.revenue ? (
-        <>
-          <div className="pf-ov-grid">
+        <div className="pf-ov-grid">
+          <div className="pf-ov-col">
             <MrrChart series={data.revenue.series} currency={data.revenue.currency} skeleton={skeleton} />
-            <PlanMix rows={data.planMix} revenue />
-          </div>
-          <div className={data.activity ? "pf-ov-grid" : undefined}>
             <Attention items={data.attention} />
+          </div>
+          <div className="pf-ov-col">
+            <PlanMix rows={data.planMix} revenue />
             {data.activity && <Activity lines={data.activity} today={today} tzLabel={tzLabel} />}
           </div>
-        </>
+        </div>
       ) : (
         // No billing.read: no revenue in the payload. Attention leads; plan mix (by tenants) and activity stack beside it.
         <div className="pf-ov-grid">
           <Attention items={data.attention} />
-          <div className="pf-ov-side">
+          <div className="pf-ov-col">
             <PlanMix rows={data.planMix} revenue={false} />
             {data.activity && <Activity lines={data.activity} today={today} tzLabel={tzLabel} />}
           </div>

@@ -4,7 +4,7 @@ import Link from "next/link"
 import { useMemo, useState, useSyncExternalStore } from "react"
 import { toast } from "sonner"
 
-import { Icon } from "@/components/icons"
+import { Icon } from "@/components/icon"
 import { PageHead } from "@/components/page-head"
 import { PLATFORM_LOCALE, PLAN_NEW_PATH, planEditPath } from "../constants"
 import { archiveBlock, planStats, type PlansData } from "../plans"

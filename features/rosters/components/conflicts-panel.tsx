@@ -2,11 +2,11 @@
 
 import { AnimatePresence, motion } from "motion/react"
 import { listItem } from "@/lib/motion"
-import { Info, TriangleAlert, X } from "lucide-react"
 
 import { formatDate } from "@/lib/dates"
 import type { RepeatConflict } from "@/lib/roster-repeat"
 import type { RosterShift } from "../types"
+import { Icon } from "@/components/icon"
 
 // What a repeat or template apply changed (FR-RS-26/28, D10): open shifts (a rule stopped the person) and info (public holiday, person kept).
 // Each row opens its shift; assigning someone to an open shift is done from there.
@@ -24,7 +24,7 @@ export function ConflictsPanel({ conflicts, shiftOf, nameOf, onOpen, onDismiss }
       <div className="ros-panel-head">
         <h2>Repeat conflicts</h2>
         <span className="ros-sum num">{open} open{conflicts.length - open > 0 ? ` · ${conflicts.length - open} info` : ""}</span>
-        <button type="button" className="ros-nav-btn ros-panel-x" aria-label="Dismiss conflicts" onClick={onDismiss}><X aria-hidden="true" /></button>
+        <button type="button" className="ros-nav-btn ros-panel-x" aria-label="Dismiss conflicts" onClick={onDismiss}><Icon name="close" size={24} /></button>
       </div>
       <ul className="ros-viol">
         <AnimatePresence initial={false}>
@@ -32,7 +32,7 @@ export function ConflictsPanel({ conflicts, shiftOf, nameOf, onOpen, onDismiss }
           const s = shiftOf(c.shiftId)
           return (
             <motion.li key={`${c.shiftId}-${c.reason}`} className="ros-viol-row" data-kind={c.open ? "block" : "warn"} {...listItem}>
-              {c.open ? <TriangleAlert aria-hidden="true" /> : <Info aria-hidden="true" />}
+              {c.open ? <Icon name="warning" size={24} /> : <Icon name="info" size={24} />}
               <span>
                 <b>{nameOf(c.personId)}</b> {c.message}
                 {s && <> · <button type="button" className="ros-req-btn ros-conf-link num" onClick={() => onOpen(c.shiftId)}>{formatDate(s.date)} {s.start}–{s.end}{c.open ? ", open shift" : ""}</button></>}

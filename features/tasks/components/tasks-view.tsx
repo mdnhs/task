@@ -5,7 +5,7 @@ import Link from "next/link"
 
 import { EmptyState } from "@/components/empty-state"
 import { FilterBar, FilterSearch, FilterSelect, FilterSeg } from "@/components/filter-bar"
-import { Icon } from "@/components/icons"
+import { Icon } from "@/components/icon"
 import { PageHead } from "@/components/page-head"
 import { useDept } from "@/hooks/use-dept"
 import { apiBrowser } from "@/lib/api/browser"

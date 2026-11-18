@@ -1,9 +1,9 @@
 "use client"
 
 import Link from "next/link"
+import { BackLink } from "@/components/back-link"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
-import { Banknote, Blocks, FileText, Gauge, Tag } from "lucide-react"
 import { toast } from "sonner"
 import { z } from "zod"
 
@@ -60,7 +60,7 @@ export function PlanEditView({ data, planId, operator, today }: { data: PlanForm
   if (!plan) return null // the route already 404s unknown ids
   return (
     <>
-      <Link href={PLANS_PATH} className="pf-back">← Plans</Link>
+      <BackLink href={PLANS_PATH}>Plans</BackLink>
       <PageHead title={`Edit ${plan.name} plan`} subtitle={PLAN_EDIT_SUBTITLE} />
       <PlanForm key={plan.id} plan={plan} entitlements={entitlements} operator={operator} today={today} />
     </>
@@ -131,7 +131,7 @@ function PlanForm({ plan, entitlements, operator, today }: { plan: Plan; entitle
     <form className="card pf-form od-form" onSubmit={submit} noValidate aria-label={`Edit ${plan.name} plan`}>
       <div className="od-form-cols">
         <div className="od-form-col">
-          <FormSection icon={Banknote} title="Price">
+          <FormSection icon="cash" title="Price">
             <Field label={priceLabel(plan.currency)} htmlFor="pf-price" error={errors.price} required>
               <Input id="pf-price" inputMode="decimal" placeholder="e.g. 149.50" value={form.price} onChange={(e) => setField("price", e.target.value)} />
             </Field>
@@ -146,7 +146,7 @@ function PlanForm({ plan, entitlements, operator, today }: { plan: Plan; entitle
               </>
             )}
           </FormSection>
-          <FormSection icon={Gauge} title="Limits">
+          <FormSection icon="gauge" title="Limits">
             <LimitFields values={form} errors={errors} onChange={setField} />
           </FormSection>
         </div>
@@ -173,7 +173,7 @@ function PlanForm({ plan, entitlements, operator, today }: { plan: Plan; entitle
 // `error` shows inline under the switches (no toast), so it reads with the other field errors and clears on a change.
 function ModuleSet({ entitlements, modules, error, onChange }: { entitlements: EntitlementsData; modules: string[]; error?: string; onChange(m: string[]): void }) {
   return (
-    <FormSection icon={Blocks} title="Modules">
+    <FormSection icon="blocks" title="Modules">
     <fieldset className="pf-modset" aria-describedby={error ? "pf-modset-msg" : undefined} aria-invalid={error ? true : undefined} data-invalid={error ? "" : undefined}>
       <legend className="sr-only">Modules</legend>
       {entitlements.productModules.map(({ id: m, label }) => {
@@ -216,7 +216,7 @@ export function PlanNewView({ data, operator, today, defaultTrialDays }: { data:
   const { plans, entitlements } = usePlanCatalogue(data)
   return (
     <>
-      <Link href={PLANS_PATH} className="pf-back">← Plans</Link>
+      <BackLink href={PLANS_PATH}>Plans</BackLink>
       <PageHead title="New plan" subtitle={PLAN_NEW_SUBTITLE} />
       <NewPlanForm plans={plans} entitlements={entitlements} operator={operator} today={today} defaultTrialDays={defaultTrialDays} />
     </>
@@ -272,7 +272,7 @@ function NewPlanForm({ plans, entitlements, operator, today, defaultTrialDays }:
     <form className="card pf-form od-form" onSubmit={submit} noValidate aria-label="New plan">
       <div className="od-form-cols">
         <div className="od-form-col">
-          <FormSection icon={Tag} title="Plan">
+          <FormSection icon="tag" title="Plan">
             <div className="od-row2">
               <Field label="Plan ID" htmlFor="pf-id" error={errors.id} required>
                 <Input id="pf-id" value={form.id} placeholder="e.g. team-plus" autoComplete="off" spellCheck={false} maxLength={40} onChange={(e) => setField("id", e.target.value)} />
@@ -290,7 +290,7 @@ function NewPlanForm({ plans, entitlements, operator, today, defaultTrialDays }:
               </Field>
             </div>
           </FormSection>
-          <FormSection icon={Gauge} title="Limits">
+          <FormSection icon="gauge" title="Limits">
             <LimitFields values={form} errors={errors} onChange={setField} />
           </FormSection>
         </div>
@@ -304,7 +304,7 @@ function NewPlanForm({ plans, entitlements, operator, today, defaultTrialDays }:
               setModulesError(undefined)
             }}
           />
-          <FormSection icon={FileText} title="Note" action={<FoldToggle open={showNote} onToggle={() => setShowNote((v) => !v)} controls="pf-new-note" label="Add a reason" />}>
+          <FormSection icon="report" title="Note" action={<FoldToggle open={showNote} onToggle={() => setShowNote((v) => !v)} controls="pf-new-note" label="Add a reason" />}>
             <FormFold id="pf-new-note" open={showNote}>
               <Field label="Reason" htmlFor="pf-new-reason" hint="Saved in the audit trail">
                 <Textarea id="pf-new-reason" value={reason} rows={2} maxLength={300} onChange={(e) => setReason(e.target.value)} />

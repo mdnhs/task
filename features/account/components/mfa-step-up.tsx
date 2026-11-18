@@ -4,7 +4,7 @@ import { useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 
 import { Field } from "@/components/field"
-import { Icon } from "@/components/icons"
+import { Icon } from "@/components/icon"
 import { Input } from "@/components/ui/input"
 import { verifyBackupCode, verifyTotp } from "@/lib/auth-client"
 import { secondFactorStep, type CodeMode } from "@/lib/auth-flow"

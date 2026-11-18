@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 
-import { Icon } from "@/components/icons"
+import { Icon } from "@/components/icon"
 import { useSlideDir } from "@/components/data-pagination"
 import { PageHead } from "@/components/page-head"
 import { StretchIndicator } from "@/components/stretch-indicator"

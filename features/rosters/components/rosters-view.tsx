@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { ChevronLeft, ChevronRight, MapPin, Repeat, Send } from "lucide-react"
 import { toast } from "sonner"
 
 import { FilterBar, FilterSelect, FilterSeg } from "@/components/filter-bar"
@@ -35,6 +34,7 @@ import { ReasonDialog } from "./reason-dialog"
 import { OpenShiftsPanel } from "./open-shifts-panel"
 import { RequestsPanel } from "./requests-panel"
 import { ShiftDialog, type ShiftSave } from "./shift-dialog"
+import { Icon } from "@/components/icon"
 
 const STATUS: Record<"draft" | "published" | "none", Status> = {
   published: { tone: "ok", label: "Published" },
@@ -216,7 +216,7 @@ function RostersLiveBody({ data: served, edit }: { data: RosterViewData; edit: R
   const bannerNode = due && (
     <div className="ros-banner" role="status">
       <span>{data.location === "all" ? `${nameOfLocation(due.locationId)}: next` : "Next"} week is not drafted yet</span>
-      <button type="button" className="btn btn-outline" onClick={() => setRepeating({ weekId: due.id, n: (repeating?.n ?? 0) + 1 })}><Repeat aria-hidden="true" />Repeat</button>
+      <button type="button" className="btn btn-outline" onClick={() => setRepeating({ weekId: due.id, n: (repeating?.n ?? 0) + 1 })}><Icon name="repeat" size={24} />Repeat</button>
     </div>
   )
   const repeatWeekObj = repeating ? weeks.find((w) => w.id === repeating.weekId) : undefined
@@ -548,7 +548,7 @@ function RostersBody({ data, editor, banner }: { data: RosterViewData; editor?: 
             )}
           </span>
         }
-        actions={data.manageLocations ? <Link href="/rosters/locations" className="btn btn-outline"><MapPin aria-hidden="true" />Manage locations</Link> : undefined}
+        actions={data.manageLocations ? <Link href="/rosters/locations" className="btn btn-outline"><Icon name="pin" size={24} />Manage locations</Link> : undefined}
       />
       {banner}
       <div className="card ros-card" data-pending={pending || undefined}>
@@ -570,13 +570,13 @@ function RostersBody({ data, editor, banner }: { data: RosterViewData; editor?: 
           />
           <div className="ros-nav" role="group" aria-label="Range">
             <button type="button" className="ros-nav-btn" aria-label="Previous" onClick={() => go({ week: data.prev })}>
-              <ChevronLeft aria-hidden="true" />
+              <Icon name="chevron-left" size={24} />
             </button>
             <button type="button" className="ros-nav-label num" onClick={() => go({ week: data.today })} title="Back to today">
               {range(data)}
             </button>
             <button type="button" className="ros-nav-btn" aria-label="Next" onClick={() => go({ week: data.next })}>
-              <ChevronRight aria-hidden="true" />
+              <Icon name="chevron-right" size={24} />
             </button>
           </div>
         </FilterBar>
@@ -595,12 +595,12 @@ function RostersBody({ data, editor, banner }: { data: RosterViewData; editor?: 
                   )}
                   {editor?.canRepeat(b.locationId) && (
                     <button type="button" className="btn btn-outline ros-repeat" onClick={() => editor.onRepeat(b.locationId)}>
-                      <Repeat aria-hidden="true" />Repeat
+                      <Icon name="repeat" size={24} />Repeat
                     </button>
                   )}
                   {editor?.canPublish(b.locationId) && (
                     <button type="button" className="btn btn-primary ros-publish" onClick={() => editor.onPublish(b.locationId)}>
-                      <Send aria-hidden="true" />{editor.publishLabel(b.locationId)}
+                      <Icon name="send" size={24} />{editor.publishLabel(b.locationId)}
                     </button>
                   )}
                 </div>

@@ -1,7 +1,6 @@
 "use client"
 
 import { useState } from "react"
-import { Building2, CalendarClock, ShieldCheck } from "lucide-react"
 import { toast } from "sonner"
 import { z } from "zod"
 
@@ -75,7 +74,7 @@ export function OrganisationForm({ options, org, tzLabel, sessionIdleHours, canW
       <form className="od-form set-form" onSubmit={(e) => { e.preventDefault(); document.getElementById("org-save")?.click() }} noValidate>
         <div className="od-form-cols">
           <div className="od-form-col">
-            <FormSection icon={Building2} title="Company">
+            <FormSection icon="building" title="Company">
               <Field label="Company name" htmlFor="set-name" error={errors.name} required>
                 <Input id="set-name" value={form.name} readOnly={!canWrite} onChange={(e) => set("name", e.target.value)} />
               </Field>
@@ -83,14 +82,14 @@ export function OrganisationForm({ options, org, tzLabel, sessionIdleHours, canW
                 <Input id="set-slug" value={org.slug} readOnly />
               </Field>
             </FormSection>
-            <FormSection icon={ShieldCheck} title="Security">
+            <FormSection icon="shield" title="Security">
               <Field label="Session timeout" htmlFor="set-timeout" hint="Idle time before sign-out. Set by the platform for now.">
                 <Input id="set-timeout" readOnly value={sessionIdleHours === null ? "—" : idleLabel(sessionIdleHours)} />
               </Field>
             </FormSection>
           </div>
           <div className="od-form-col">
-            <FormSection icon={CalendarClock} title="Daily report">
+            <FormSection icon="calendar-clock" title="Daily report">
               <Field label="Timezone" htmlFor="set-tz" error={errors.timezone}>
                 {canWrite ? (
                   <FilterSelect label="Timezone" value={form.timezone} options={zones} onChange={(v) => set("timezone", v)} />

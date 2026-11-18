@@ -2,13 +2,13 @@
 
 import { Children, isValidElement, useRef, useState } from "react"
 import Link from "next/link"
-import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Pagination, PaginationContent, PaginationEllipsis, PaginationItem } from "@/components/ui/pagination"
 import { slideDir } from "@/lib/motion"
 import type { SlideDir } from "@/lib/motion"
 import { pageList } from "@/lib/paginate"
+import { Icon } from "@/components/icon"
 
 export type DataPaginationProps = {
   page: number
@@ -89,7 +89,7 @@ export function DataPagination({ page, pageCount, total, from, to, label, onPage
           <PaginationItem>
             {item(page - 1, "Go to previous page", (
               <>
-                <ChevronLeftIcon aria-hidden />
+                <Icon name="chevron-left" size={24} />
                 <span className="od-pager-txt">Previous</span>
               </>
             ), { disabled: page <= 1, className: "od-pager-step" })}
@@ -107,7 +107,7 @@ export function DataPagination({ page, pageCount, total, from, to, label, onPage
             {item(page + 1, "Go to next page", (
               <>
                 <span className="od-pager-txt">Next</span>
-                <ChevronRightIcon aria-hidden />
+                <Icon name="chevron-right" size={24} />
               </>
             ), { disabled: page >= pageCount, className: "od-pager-step" })}
           </PaginationItem>

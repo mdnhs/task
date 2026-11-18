@@ -3,15 +3,14 @@
 import { useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { AlertDialog as AlertDialogPrimitive } from "@base-ui/react/alert-dialog"
-import { Monitor } from "lucide-react"
 import { toast } from "sonner"
 
 import { ConfirmDialog } from "@/components/confirm-dialog"
 import { DataPagination } from "@/components/data-pagination"
 import { Field } from "@/components/field"
-import { Icon } from "@/components/icons"
+import { Icon } from "@/components/icon"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
+import { SecretInput } from "@/components/secret-input"
 import { Switch } from "@/components/ui/switch"
 import { When } from "@/components/when"
 import { AlertDialog, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
@@ -150,7 +149,7 @@ export function SecurityPanel({
         <ul className="set-list">
           {sessions.map((s) => (
             <li key={s.id} className="acc-sess">
-              <span className="acc-sess-ico">{s.kind === "phone" ? <Icon name="phone" /> : <Monitor className="ico" strokeWidth={1.8} aria-hidden="true" />}</span>
+              <span className="acc-sess-ico">{s.kind === "phone" ? <Icon name="phone" /> : <Icon name="monitor" strokeWidth={1.8} />}</span>
               <div className="acc-sess-main">
                 <span className="acc-sess-top">
                   <b>{s.device}</b>
@@ -223,7 +222,7 @@ export function SecurityPanel({
           </DialogHeader>
           <form className="mfa-steps" onSubmit={(e) => { e.preventDefault(); applyMfaOff() }} noValidate>
             <Field label="Password" htmlFor="mfa-off-pw" error={disableError} required>
-              <Input id="mfa-off-pw" type="password" autoComplete="current-password" value={disablePw} onChange={(e) => { setDisablePw(e.target.value); setDisableError(undefined) }} />
+              <SecretInput noun="password" id="mfa-off-pw" autoComplete="current-password" value={disablePw} onChange={(e) => { setDisablePw(e.target.value); setDisableError(undefined) }} />
             </Field>
             <div><button type="submit" className="btn btn-danger" disabled={pending}>Turn off</button></div>
           </form>

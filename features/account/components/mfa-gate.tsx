@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation"
 
-import { Icon } from "@/components/icons"
+import { Icon } from "@/components/icon"
 import { TotpSetup } from "./totp-setup"
 
 // AC-M0-02: shown instead of every page while the workspace requires two-step verification and this person has not set it up.

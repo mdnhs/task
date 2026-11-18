@@ -1,17 +1,17 @@
 "use client"
 
-import { ChevronDown, X, type LucideIcon } from "lucide-react"
 
 import { FilterSelect } from "@/components/filter-bar"
+import { Icon, type IconName } from "@/components/icon"
 
 // Shared form building blocks (ui-rules.md → Forms). The New task page is the reference layout.
 
 /** One titled group of a form: a small icon chip and a heading (with an optional note or action on the right), then its fields. */
-export function FormSection({ icon: Icon, title, note, action, className, children }: { icon: LucideIcon; title: string; note?: string; action?: React.ReactNode; className?: string; children: React.ReactNode }) {
+export function FormSection({ icon, title, note, action, className, children }: { icon: IconName; title: string; note?: string; action?: React.ReactNode; className?: string; children: React.ReactNode }) {
   return (
     <section className={className ? `fs-sec ${className}` : "fs-sec"} aria-label={title}>
       <h3 className="fs-sec-h">
-        <span className="fs-sec-i" aria-hidden="true"><Icon /></span>
+        <span className="fs-sec-i" aria-hidden="true"><Icon name={icon} size={24} /></span>
         {title}
         {note && <span className="fs-opt">{note}</span>}
         {action}
@@ -29,7 +29,7 @@ export function FoldToggle({ open, onToggle, controls, label }: { open: boolean;
   return (
     <button type="button" className="fs-act" aria-expanded={open} aria-controls={controls} onClick={onToggle}>
       {open ? "Hide" : label}
-      <ChevronDown aria-hidden="true" className="fs-chev" />
+      <Icon name="chevron-down" className="fs-chev" size={24} />
     </button>
   )
 }
@@ -62,7 +62,7 @@ export function PeoplePicker({ people, value, onChange, label, exclude = [] }: {
             <li key={p.id}>
               {p.name}
               <button type="button" aria-label={`Remove ${p.name}`} onClick={() => onChange(value.filter((x) => x !== p.id))}>
-                <X aria-hidden="true" />
+                <Icon name="close" size={24} />
               </button>
             </li>
           ))}

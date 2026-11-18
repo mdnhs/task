@@ -5,7 +5,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { MotionConfig, motion } from "motion/react"
 
-import { Icon, IconSprite } from "@/components/icons"
+import { Icon, iconName } from "@/components/icon"
 import { RevealObserver } from "@/components/reveal-observer"
 import { Button } from "@/components/ui/button"
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel"
@@ -46,7 +46,7 @@ function Nav({ items, active, onNavigate, label }: { items: NavItemData[]; activ
           aria-label={n.badge ? `${n.label}, ${n.badge.text}` : undefined}
           onClick={onNavigate}
         >
-          <Icon name={n.icon} />
+          <Icon name={iconName(n.icon)} />
           <span className="lbl">{n.label}</span>
           {n.badge && (
             <span className={cn("badge num", n.badge.alert && "alert")}>{n.badge.text}</span>
@@ -177,7 +177,6 @@ export function AppShell({
     // reducedMotion="user": motion-library animations follow the OS setting, like the CSS rule in opsdesk.css
     <MotionConfig reducedMotion="user">
     <DeptContext.Provider value={dep}>
-      <IconSprite />
       <RevealObserver />
       <div className={cn("app", collapsed && "collapsed")}>
         <aside className={cn("sidebar", open && "open")} id="sidebar" aria-label="Main navigation">

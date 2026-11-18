@@ -1,4 +1,3 @@
-import { IconSprite } from "@/components/icons"
 import { Sk, SkGroup } from "@/components/sk"
 
 import { SEG_MAX } from "../constants"
@@ -87,7 +86,6 @@ export function AppShellSkeleton({
 }) {
   return (
     <>
-      <IconSprite />
       <div className="app">
         <aside className="sidebar" aria-hidden="true">
           <Logo />

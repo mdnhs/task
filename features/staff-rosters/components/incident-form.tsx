@@ -3,7 +3,6 @@
 import { useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { ClipboardList, MapPin, Siren } from "lucide-react"
 import { toast } from "sonner"
 
 import { Field } from "@/components/field"
@@ -79,7 +78,7 @@ export function IncidentForm({
         <form className="od-form sr-form" onSubmit={submit} noValidate>
           <div className="od-form-cols">
             <div className="od-form-col">
-              <FormSection icon={Siren} title="Incident">
+              <FormSection icon="siren" title="Incident">
                 <div className="od-field sr-seg">
                   <span className="fs-label">Type</span>
                   <FilterSeg label="Type" value={form.type} options={TYPES} onChange={(v) => set("type", v)} />
@@ -98,7 +97,7 @@ export function IncidentForm({
                   </Field>
                 </div>
               </FormSection>
-              <FormSection icon={MapPin} title="Where">
+              <FormSection icon="pin" title="Where">
                 <div className="od-row2">
                   <Field label="Site" htmlFor="sr-site" error={errors.site} required>
                     <Input id="sr-site" value={form.site} onChange={(e) => set("site", e.target.value)} />
@@ -111,7 +110,7 @@ export function IncidentForm({
             </div>
             <div className="od-form-col">
               <FormSection
-                icon={ClipboardList}
+                icon="clipboard-list"
                 title="Follow-up"
                 action={<FoldToggle open={moreOpen} onToggle={() => setShowMore((v) => !v)} controls="sr-more" label="Contact, notes" />}
               >

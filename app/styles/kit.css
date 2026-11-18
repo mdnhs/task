@@ -87,6 +87,17 @@
 .od-field[data-invalid] :is(input,select,textarea,[data-slot="select-trigger"]){box-shadow:0 0 0 2px var(--bad)}
 .od-field-hint{margin:0;font-size:12px;color:var(--ink-3)}
 .od-field-err{margin:0;font-size:12px;font-weight:600;color:var(--bad)}
+/* Secret input (components/secret-input.tsx): eye toggle inside the field's right edge; the field box keeps its normal size. */
+.od-secret{position:relative;display:block;min-width:0}
+.od-field .od-secret input{padding-right:48px}
+.od-secret-btn{position:absolute;top:50%;right:6px;transform:translateY(-50%);width:34px;height:34px;display:inline-flex;align-items:center;justify-content:center;border-radius:calc(10px * var(--radius-scale,1));color:var(--ink-3);background:transparent;cursor:pointer;transition:color var(--dur-fast) var(--ease),background-color var(--dur-fast) var(--ease)}
+.od-secret-btn .ico{width:18px;height:18px}
+.od-secret-btn:hover:not(:disabled){color:var(--brand-deep);background:var(--card)}
+.od-secret-btn[aria-pressed="true"]{color:var(--brand-deep)}
+.od-secret-btn:focus-visible{outline:2px solid var(--brand);outline-offset:1px}
+.od-secret-btn:disabled{cursor:not-allowed;opacity:.5}
+:root[data-theme="dark"] .od-secret-btn:is(:hover:not(:disabled),[aria-pressed="true"]){color:var(--brand-3)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .od-secret-btn:is(:hover:not(:disabled),[aria-pressed="true"]){color:var(--brand-3)}}
 
 /* ---------- Toast (sonner) ---------- */
 .od-toast{background:var(--card);color:var(--ink);border:0;border-radius:var(--r-lg);box-shadow:var(--shadow),0 16px 40px rgba(16,40,24,.12);padding:14px 16px;gap:10px;font-family:var(--font);font-size:13.5px;font-weight:600}

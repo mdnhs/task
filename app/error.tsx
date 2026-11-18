@@ -2,7 +2,7 @@
 
 import { useEffect } from "react"
 
-import { Icon } from "@/components/icons"
+import { Icon } from "@/components/icon"
 import { errorView } from "@/lib/error-view"
 
 // The route-segment error page (Next 16 error.js). It sits inside the root layout, so it has the OpsDesk theme; it catches a failed page AND a failed

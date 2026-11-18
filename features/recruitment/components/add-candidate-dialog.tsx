@@ -1,7 +1,6 @@
 "use client"
 
 import { useState } from "react"
-import { Phone, UserRound } from "lucide-react"
 import { z } from "zod"
 
 import { Field } from "@/components/field"
@@ -84,7 +83,7 @@ export function AddCandidateDialog({
         </DialogHeader>
         <form className="od-form" onSubmit={submit} noValidate>
           <FormSection
-            icon={UserRound}
+            icon="user"
             title="Candidate"
             action={<FoldToggle open={nextOpen} onToggle={() => setShowNext((v) => !v)} controls="rc-next-fold" label="Next action" />}
           >
@@ -110,7 +109,7 @@ export function AddCandidateDialog({
               </Field>
             </FormFold>
           </FormSection>
-          <FormSection icon={Phone} title="Contact" note="Recruitment & managers only">
+          <FormSection icon="call" title="Contact" note="Recruitment & managers only">
             <div className="od-row2">
               <Field label="Email" htmlFor="rc-email" error={errors.email} required>
                 <Input id="rc-email" type="email" value={form.email} onChange={(e) => set("email", e.target.value)} />

@@ -5,7 +5,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { AnimatePresence, animate, motion } from "motion/react"
 
-import { Icon } from "@/components/icons"
+import { Icon, iconName } from "@/components/icon"
 import { RollNumber } from "@/components/roll-number"
 import { Sk, SkGroup } from "@/components/sk"
 import { apiBrowser } from "@/lib/api/browser"
@@ -661,7 +661,7 @@ export function GlobalSearch({
                           >
                             {i === cur && <motion.span layoutId="od-search-pill" className="od-search-pill" aria-hidden="true" transition={layoutTransition} />}
                             <span className="od-search-ico" aria-hidden="true">
-                              <Icon name={a.icon} />
+                              <Icon name={iconName(a.icon)} />
                             </span>
                             <span className="od-search-main">
                               <span className="od-search-title">{a.label}</span>

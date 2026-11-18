@@ -3,7 +3,6 @@
 import { useSyncExternalStore, useTransition, type MouseEvent } from "react"
 import Link from "next/link"
 import { flushSync } from "react-dom"
-import { BadgeCheck, Bell, Building2, Check, ChevronsUpDown, CircleHelp, LogOut, Moon, MonitorSmartphone, Settings } from "lucide-react"
 import { useTheme } from "next-themes"
 import { toast } from "sonner"
 
@@ -23,6 +22,7 @@ import { signOutAction, switchTenant } from "@/app/actions/session"
 import { clearClientStores } from "@/lib/client-stores"
 import { userMenu } from "../menu"
 import type { ShellSession, UserData } from "../types"
+import { Icon } from "@/components/icon"
 
 const noop = () => () => {}
 
@@ -71,7 +71,7 @@ export function NavUser({ user, session, variant = "app" }: { user: UserData; se
           <b>{user.name}</b>
           <small>{roleLine}</small>
         </span>
-        <ChevronsUpDown className="user-chevron" />
+        <Icon name="chevrons-updown" className="user-chevron" size={24} />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" sideOffset={10} className="od-menu min-w-60">
         <DropdownMenuGroup>
@@ -85,28 +85,27 @@ export function NavUser({ user, session, variant = "app" }: { user: UserData; se
             </div>
             {menu.device && (
               <div className="od-menu-device" data-registered={menu.device.registered || undefined} title="The device this session is using">
-                <MonitorSmartphone aria-hidden="true" />
+                <Icon name="devices" size={24} />
                 <span className="truncate">{menu.device.label}</span>
               </div>
             )}
           </DropdownMenuLabel>
         </DropdownMenuGroup>
-        <DropdownMenuSeparator />
-        <DropdownMenuGroup>
+        <DropdownMenuGroup className="mt-1">
           {!platform && (
             <>
               <DropdownMenuItem render={<Link href="/account/profile" />}>
-                <BadgeCheck />
+                <Icon name="verified" size={24} />
                 Account
               </DropdownMenuItem>
               <DropdownMenuItem render={<Link href="/account/notifications" />}>
-                <Bell />
+                <Icon name="bell" size={24} />
                 Notifications
               </DropdownMenuItem>
             </>
           )}
           <DropdownMenuItem render={<Link href={platform ? "/platform/settings" : "/settings"} />}>
-            <Settings />
+            <Icon name="gear" size={24} />
             Settings
           </DropdownMenuItem>
           <DropdownMenuItem
@@ -115,23 +114,22 @@ export function NavUser({ user, session, variant = "app" }: { user: UserData; se
             aria-checked={dark}
             onClick={toggleTheme}
           >
-            <Moon />
+            <Icon name="moon" size={24} />
             Dark mode
             <span className="od-switch" data-on={dark || undefined} aria-hidden="true"><i /></span>
           </DropdownMenuItem>
         </DropdownMenuGroup>
-        <DropdownMenuSeparator />
         {menu.companies && (
           <DropdownMenuSub>
             <DropdownMenuSubTrigger>
-              <Building2 />
+              <Icon name="building" size={24} />
               Switch company
             </DropdownMenuSubTrigger>
             <DropdownMenuSubContent className="od-menu min-w-56">
               {menu.companies.map((c) => (
                 <DropdownMenuItem key={c.slug} onClick={() => startTransition(async () => { if (c.current) return; if ((await switchTenant(c.slug)).ok) clearClientStores("tenant_switch"); else toast.error("Could not switch company.") })}>
                   {c.name}
-                  {c.current && <Check className="od-check" />}
+                  {c.current && <Icon name="check" className="od-check" size={24} />}
                 </DropdownMenuItem>
               ))}
             </DropdownMenuSubContent>
@@ -139,11 +137,11 @@ export function NavUser({ user, session, variant = "app" }: { user: UserData; se
         )}
         <DropdownMenuSeparator />
         <DropdownMenuItem>
-          <CircleHelp />
+          <Icon name="help" size={24} />
           Help
         </DropdownMenuItem>
         <DropdownMenuItem onClick={() => startTransition(() => { clearClientStores("sign_out"); return signOutAction() })}>
-          <LogOut />
+          <Icon name="logout" size={24} />
           Log out
         </DropdownMenuItem>
       </DropdownMenuContent>

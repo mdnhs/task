@@ -2,7 +2,7 @@
 
 import { useState, useSyncExternalStore } from "react"
 import Link from "next/link"
-import { ArrowLeftRight, CalendarCheck, CalendarPlus, Layers, ShieldCheck, Trash2 } from "lucide-react"
+import { BackLink } from "@/components/back-link"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 
@@ -30,7 +30,7 @@ import { commitTenant, subIds, useLiveTenant, type T360Ctx } from "./live"
 const num = (n: number) => n.toLocaleString(PLATFORM_LOCALE)
 
 function Back({ t, to, label }: { t: PlatformTenant; to: Parameters<typeof tenantPath>[1]; label: string }) {
-  return <Link href={tenantPath(t.id, to)} className="pf-back">← {label}</Link>
+  return <BackLink href={tenantPath(t.id, to)}>{label}</BackLink>
 }
 
 function ReasonField({ value, onChange, error }: { value: string; onChange(v: string): void; error?: string }) {
@@ -94,7 +94,7 @@ export function ChangePlanView({ head, modules, ctx }: { head: T360Head; modules
       <form className="card pf-form od-form" onSubmit={submit} noValidate aria-label="Change plan">
         <div className="od-form-cols">
           <div className="od-form-col">
-            <FormSection icon={Layers} title="New plan">
+            <FormSection icon="layers" title="New plan">
             <fieldset className="pf-plan-pick">
               <legend className="sr-only">New plan</legend>
               {choices.map((p) => {
@@ -116,7 +116,7 @@ export function ChangePlanView({ head, modules, ctx }: { head: T360Head; modules
             </FormSection>
           </div>
           <div className="od-form-col">
-            <FormSection icon={ArrowLeftRight} title="What changes">
+            <FormSection icon="swap" title="What changes">
             <div className="pf-form-sum" aria-live="polite">
               <dl className="pf-meta pf-meta-1">
                 <div>
@@ -138,7 +138,7 @@ export function ChangePlanView({ head, modules, ctx }: { head: T360Head; modules
               </dl>
             </div>
             </FormSection>
-            <FormSection icon={ShieldCheck} title="Confirm">
+            <FormSection icon="shield" title="Confirm">
               <ReasonField value={reason} onChange={(v) => { setReason(v); if (errors.reason) setErrors({}) }} error={errors.reason} />
             </FormSection>
           </div>
@@ -193,7 +193,7 @@ export function ExtendTrialView({ head, ctx }: { head: T360Head; ctx: T360Ctx })
       <form className="card pf-form od-form" onSubmit={submit} noValidate aria-label="Extend trial">
         <div className="od-form-cols">
           <div className="od-form-col">
-            <FormSection icon={CalendarPlus} title="Extend by">
+            <FormSection icon="calendar-plus" title="Extend by">
               <FilterSeg
                 label="Extend by"
                 value={(PRESETS as readonly string[]).includes(days) ? (days as (typeof PRESETS)[number]) : ("" as (typeof PRESETS)[number])}
@@ -206,12 +206,12 @@ export function ExtendTrialView({ head, ctx }: { head: T360Head; ctx: T360Ctx })
             </FormSection>
           </div>
           <div className="od-form-col">
-            <FormSection icon={CalendarCheck} title="New trial end">
+            <FormSection icon="calendar-check" title="New trial end">
               <div className="pf-form-sum" aria-live="polite">
                 <p className="pf-form-big num">{daysOk ? `${dateY(addDaysToDate(end, n))} ${ctx.tzLabel}` : "—"}</p>
               </div>
             </FormSection>
-            <FormSection icon={ShieldCheck} title="Confirm">
+            <FormSection icon="shield" title="Confirm">
               <ReasonField value={reason} onChange={(v) => { setReason(v); if (errors.reason) setErrors((x) => ({ ...x, reason: undefined })) }} error={errors.reason} />
             </FormSection>
           </div>
@@ -263,7 +263,7 @@ export function ScheduleDeletionView({ head, ctx, retentionDays }: { head: T360H
       <form className="card pf-form od-form" onSubmit={submit} noValidate aria-label="Schedule deletion">
         <div className="od-form-cols">
           <div className="od-form-col">
-            <FormSection icon={Trash2} title={`Deleted on ${dateY(on)}`} className="pf-sec-danger">
+            <FormSection icon="trash" title={`Deleted on ${dateY(on)}`} className="pf-sec-danger">
             <div className="pf-form-sum pf-form-danger">
               <ul className="pf-form-list">
                 <li>The workspace <span className="num">{t.subdomain}</span> and its settings</li>
@@ -275,7 +275,7 @@ export function ScheduleDeletionView({ head, ctx, retentionDays }: { head: T360H
             </FormSection>
           </div>
           <div className="od-form-col">
-            <FormSection icon={ShieldCheck} title="Confirm">
+            <FormSection icon="shield" title="Confirm">
               <ReasonField value={reason} onChange={(v) => { setReason(v); if (errors.reason) setErrors((x) => ({ ...x, reason: undefined })) }} error={errors.reason} />
               <Field label={`Type ${t.slug} to confirm`} htmlFor="pf-del-slug" error={errors.slug} required>
                 <Input id="pf-del-slug" value={typed} autoComplete="off" spellCheck={false} onChange={(e) => { setTyped(e.target.value); if (errors.slug) setErrors((x) => ({ ...x, slug: undefined })) }} />

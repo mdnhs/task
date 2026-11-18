@@ -2,7 +2,6 @@
 
 import { useState, useSyncExternalStore, useTransition } from "react"
 import { useRouter } from "next/navigation"
-import { Building2, CalendarClock, ClipboardList, UserPlus } from "lucide-react"
 import { toast } from "sonner"
 
 import { completeOnboarding } from "@/app/actions/onboarding"
@@ -150,7 +149,7 @@ export function OnboardingWizard({ defaults, roles }: { defaults: OnboardingDefa
 
       {step === 0 && (
         <div className="auth-form od-slide" data-slide={dir}>
-          <FormSection icon={Building2} title="Departments">
+          <FormSection icon="building" title="Departments">
             {errors.form && <p className="od-field-err" role="alert">{errors.form}</p>}
             <ul className="auth-list">
               {depts.map((d) => (
@@ -185,7 +184,7 @@ export function OnboardingWizard({ defaults, roles }: { defaults: OnboardingDefa
 
       {step === 1 && (
         <div className="auth-form od-slide" data-slide={dir}>
-          <FormSection icon={CalendarClock} title="Timezone and deadline">
+          <FormSection icon="calendar-clock" title="Timezone and deadline">
             {(companyKnown === false || nameTaken) && (
               <Field label="Company name" htmlFor="ob-company" error={errors.company} required>
                 <Input id="ob-company" autoComplete="organization" value={company} onChange={(e) => { setCompany(e.target.value); setErrors({}) }} />
@@ -209,7 +208,7 @@ export function OnboardingWizard({ defaults, roles }: { defaults: OnboardingDefa
 
       {step === 2 && (
         <div className="auth-form od-slide" data-slide={dir}>
-          <FormSection icon={ClipboardList} title="Report template" note={`${defaults.reportSections.length} sections`}>
+          <FormSection icon="clipboard-list" title="Report template" note={`${defaults.reportSections.length} sections`}>
             <div className="auth-matrix" role="group" aria-label="Report sections by department" style={{ "--auth-cols": names.length } as React.CSSProperties}>
               <div className="auth-matrix-head" aria-hidden="true">
                 <span>Section</span>
@@ -239,7 +238,7 @@ export function OnboardingWizard({ defaults, roles }: { defaults: OnboardingDefa
 
       {step === 3 && (
         <div className="auth-form od-slide" data-slide={dir}>
-          <FormSection icon={UserPlus} title="Invite users" action={<OptionalTag />}>
+          <FormSection icon="userplus" title="Invite users" action={<OptionalTag />}>
             <ul className="auth-list">
               {invites.map((inv, idx) => (
                 <li key={inv.id} className="auth-invite">

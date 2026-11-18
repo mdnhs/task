@@ -1,4 +1,4 @@
-import { Icon } from "@/components/icons"
+import { Icon } from "@/components/icon"
 import { PagerSkeleton } from "@/components/pager-skeleton"
 import { Sk, SkGroup } from "@/components/sk"
 import { WEEKDAY_SHORT } from "@/lib/shifts"

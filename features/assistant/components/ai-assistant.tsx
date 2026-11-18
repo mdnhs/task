@@ -1,12 +1,12 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState, type ClipboardEvent, type DragEvent, type FormEvent } from "react"
-import { ArrowUp, ImagePlus, Sparkles, X } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet"
 import { growInset } from "@/lib/motion"
 import type { AssistantData } from "../types"
+import { Icon } from "@/components/icon"
 
 type Img = { url: string; name: string }
 type Msg = { from: "ai" | "me"; text: string; images?: Img[] }
@@ -119,7 +119,7 @@ export function AiAssistant({ data }: { data: AssistantData }) {
         aria-expanded={open}
         onClick={() => setOpen(true)}
       >
-        <Sparkles className="ico" />
+        <Icon name="sparkles" />
       </Button>
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetContent
@@ -140,18 +140,18 @@ export function AiAssistant({ data }: { data: AssistantData }) {
         >
           {dragging && (
             <div className="ai-drop" aria-hidden="true">
-              <ImagePlus />
+              <Icon name="image-plus" size={24} />
               Drop images here
             </div>
           )}
           <div className="ai-head">
-            <span className="ai-mark"><Sparkles /></span>
+            <span className="ai-mark"><Icon name="sparkles" size={24} /></span>
             <div className="ai-head-tx">
               <SheetTitle className="ai-title">{data.title}</SheetTitle>
               <SheetDescription className="ai-sub">{data.subtitle}</SheetDescription>
             </div>
             <SheetClose render={<Button variant="ghost" size="icon" className="ai-close" aria-label="Close assistant" />}>
-              <X />
+              <Icon name="close" size={24} />
             </SheetClose>
           </div>
 
@@ -192,7 +192,7 @@ export function AiAssistant({ data }: { data: AssistantData }) {
                     {/* eslint-disable-next-line @next/next/no-img-element -- local blob URL */}
                     <img src={img.url} alt={img.name} />
                     <button type="button" onClick={() => removePending(img.url)} aria-label={`Remove ${img.name}`}>
-                      <X />
+                      <Icon name="close" size={24} />
                     </button>
                   </span>
                 ))}
@@ -220,7 +220,7 @@ export function AiAssistant({ data }: { data: AssistantData }) {
                 disabled={pending.length >= MAX_IMAGES}
                 onClick={() => fileInput.current?.click()}
               >
-                <ImagePlus />
+                <Icon name="image-plus" size={24} />
               </Button>
               <input
                 value={input}
@@ -236,7 +236,7 @@ export function AiAssistant({ data }: { data: AssistantData }) {
                 disabled={(!input.trim() && !pending.length) || typing}
                 aria-label="Send"
               >
-                <ArrowUp />
+                <Icon name="arrow-up" size={24} />
               </Button>
             </div>
           </form>

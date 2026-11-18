@@ -8,6 +8,7 @@ import { afterSignIn } from "@/app/actions/session"
 import { useSlideDir } from "@/components/data-pagination"
 import { Field } from "@/components/field"
 import { FilterSelect } from "@/components/filter-bar"
+import { SecretInput } from "@/components/secret-input"
 import { Input } from "@/components/ui/input"
 import { resendVerification, signInEmail, signUpEmail } from "@/lib/auth-client"
 import { signInStep, signUpStep } from "@/lib/auth-flow"
@@ -151,7 +152,7 @@ export function SignUpWizard({ defaults, plans }: { defaults: OnboardingDefaults
             <Input id="su-email" type="email" autoComplete="username" value={owner.email} placeholder="name@company.com" onChange={(e) => { setOwner({ ...owner, email: e.target.value }); setVerified(false); setErrors({}) }} />
           </Field>
           <Field label="Password" htmlFor="su-password" error={errors.password} required>
-            <Input id="su-password" type="password" autoComplete="new-password" value={owner.password} onChange={(e) => { setOwner({ ...owner, password: e.target.value }); setVerified(false); setErrors({}) }} />
+            <SecretInput noun="password" id="su-password" autoComplete="new-password" value={owner.password} onChange={(e) => { setOwner({ ...owner, password: e.target.value }); setVerified(false); setErrors({}) }} />
           </Field>
           <div className="auth-strength">
             <div suppressHydrationWarning className="progress" role="progressbar" aria-label="Password strength" aria-valuemin={0} aria-valuemax={PASSWORD_RULES.length} aria-valuenow={score} data-score={score}>

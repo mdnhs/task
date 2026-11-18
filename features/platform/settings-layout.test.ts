@@ -31,3 +31,13 @@ describe("platform form layout", () => {
     expect(rule(".pf-set")).toMatch(/max-width:\d+px/)
   })
 })
+
+// UI-fix regression: the shared vertical tab list (.set-tab and its sliding indicator .set-tab-bg, used by platform, tenant Settings and Account) was a full pill.
+describe("vertical tab radius", () => {
+  const settings = readFileSync(path.join(__dirname, "../../app/styles/settings.css"), "utf8")
+  const line = (sel: string) => settings.split("\n").find((l) => l.startsWith(`${sel}{`)) ?? ""
+  test.each([".set-tab", ".set-tab-bg"])("%s is a rounded rectangle, not a pill", (sel) => {
+    expect(line(sel)).toContain("border-radius:var(--r-md)")
+    expect(line(sel)).not.toContain("--r-pill")
+  })
+})

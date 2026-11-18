@@ -1,9 +1,9 @@
 "use client"
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react"
-import { Mic, Pause, Play, RotateCcw, Square, Trash2 } from "lucide-react"
 
 import { VOICE_MAX_SEC, atVoiceLimit, clampVoiceSec, formatClock, pickVoiceMime, voiceTotal } from "@/lib/task-voice"
+import { Icon } from "@/components/icon"
 
 // Voice instructions (lib/task-voice.ts): a recorder for forms and a player for real audio. Round brand play button,
 // quiet track; classes are .vn-* in app/styles/kit.css.
@@ -143,7 +143,7 @@ export function VoiceRecorder({ id, value, onChange, max = VOICE_MAX_SEC, hint }
         </span>
         <span className="vn-meter" aria-hidden="true"><i style={{ transform: `scaleX(${elapsed / max})` }} /></span>
         <button type="button" className="vn-stop" onClick={() => stop()} aria-label="Stop recording">
-          <Square aria-hidden="true" />
+          <Icon name="stop" size={24} />
           <span>Stop</span>
         </button>
       </div>
@@ -155,8 +155,8 @@ export function VoiceRecorder({ id, value, onChange, max = VOICE_MAX_SEC, hint }
         <VoiceNotePlayer url={value.url} durationSec={value.durationSec} label="voice instructions" />
         <div className="vn-row">
           {capped && <span className="vn-cap" role="status">Maximum 2 minutes</span>}
-          <button type="button" className="vn-link" onClick={again}><RotateCcw aria-hidden="true" />Record again</button>
-          <button type="button" className="vn-link bad" onClick={remove}><Trash2 aria-hidden="true" />Remove</button>
+          <button type="button" className="vn-link" onClick={again}><Icon name="reset" size={24} />Record again</button>
+          <button type="button" className="vn-link bad" onClick={remove}><Icon name="trash" size={24} />Remove</button>
         </div>
       </div>
     )
@@ -165,7 +165,7 @@ export function VoiceRecorder({ id, value, onChange, max = VOICE_MAX_SEC, hint }
     <div className="vn-idle">
       {/* One tap target: the round mic plus what it does and the limit. */}
       <button type="button" id={id} className="vn-tile" onClick={() => void start()} disabled={state === "asking"} aria-describedby={MSG[state] ? `${id}-hint` : undefined}>
-        <span className="vn-tile-ic" aria-hidden="true"><Mic /></span>
+        <span className="vn-tile-ic" aria-hidden="true"><Icon name="mic" size={24} /></span>
         <span className="vn-tile-tx">
           <b>{state === "asking" ? "Waiting for the microphone…" : "Record voice instructions"}</b>
           {hint && <small>{hint}</small>}
@@ -256,7 +256,7 @@ export function VoiceNotePlayer({ url, fresh, onFail, durationSec, rate = 1, lab
         onDurationChange={(e) => setMedia(e.currentTarget.duration)}
       />
       <button type="button" className="vn-play" aria-label={playing ? `Pause ${label}` : `Play ${label}`} aria-pressed={playing} onClick={toggle}>
-        {playing ? <Pause aria-hidden="true" /> : <Play aria-hidden="true" />}
+        {playing ? <Icon name="pause" size={24} /> : <Icon name="play" size={24} />}
       </button>
       <div className="vn-track">
         <span className="vn-bar" aria-hidden="true"><i style={{ transform: `scaleX(${played})` }} /></span>

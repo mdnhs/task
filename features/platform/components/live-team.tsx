@@ -4,7 +4,7 @@ import { useState } from "react"
 
 import { Field } from "@/components/field"
 import { FilterSelect } from "@/components/filter-bar"
-import { Icon } from "@/components/icons"
+import { Icon } from "@/components/icon"
 import { PageHead } from "@/components/page-head"
 import { StatusPill } from "@/components/status-pill"
 import { Input } from "@/components/ui/input"

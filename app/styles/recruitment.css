@@ -52,10 +52,7 @@
 .rec-note{display:block;margin-top:2px;font-size:13px;color:var(--ink-2);overflow-wrap:anywhere}
 
 /* Drag and drop (write access only) */
-.rec-card-drag{cursor:grab;touch-action:manipulation}
-.rec-card-drag:active{cursor:grabbing}
-.rec-card-drag[data-dragging]{opacity:.4}
-.rec-card-overlay{cursor:grabbing;box-shadow:0 14px 34px rgba(0,0,0,.22),0 3px 8px rgba(0,0,0,.12);pointer-events:none}
+/* The card grab/ghost/lift styles are shared: app/styles/drag.css (.dnd-card, .dnd-lifted) */
 .rec-col{transition:background var(--dur-fast) var(--ease)}
 .rec-col[data-over]{background:var(--brand-soft)}
 .rec-col[data-over] .rec-col-head h3{color:var(--brand-deep)}

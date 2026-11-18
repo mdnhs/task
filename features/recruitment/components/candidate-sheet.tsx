@@ -3,7 +3,7 @@
 import { DetailSheet } from "@/components/detail-sheet"
 import { Field } from "@/components/field"
 import { FilterSelect } from "@/components/filter-bar"
-import { Icon } from "@/components/icons"
+import { Icon } from "@/components/icon"
 import { StatusPill } from "@/components/status-pill"
 import { When } from "@/components/when"
 import { STAGE, STAGE_ORDER } from "../types"

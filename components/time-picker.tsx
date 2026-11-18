@@ -1,10 +1,10 @@
 "use client"
 
 import { useEffect, useId, useRef, useState } from "react"
-import { Clock } from "lucide-react"
 
 import { useField } from "@/components/field"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Icon } from "@/components/icon"
 
 // Time picker: hour / minute / AM-PM columns in a Popover, styled like DatePicker (shadcn has no time picker,
 // and the native <input type="time"> popup ignores the theme). Value is a plain 24h "HH:mm" string, "" when unset.
@@ -92,7 +92,7 @@ export function TimePicker({
           />
         }
       >
-        <Clock aria-hidden="true" />
+        <Icon name="clock" size={24} />
         <span className={value ? undefined : "od-datepick-ph"}>{value ? formatTime(value) : placeholder}</span>
       </PopoverTrigger>
       <PopoverContent id={popId} className="od-pop" align="start" sideOffset={6}>

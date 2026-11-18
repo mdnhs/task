@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { toast } from "sonner"
 
-import { Icon } from "@/components/icons"
+import { Icon } from "@/components/icon"
 
 // Mock reminder: confirms with a toast, then stays disabled so the lead isn't nudged twice from the same view.
 export function RemindButton({ label }: { label: string }) {

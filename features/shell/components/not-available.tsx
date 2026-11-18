@@ -1,6 +1,6 @@
 import Link from "next/link"
 
-import { Icon } from "@/components/icons"
+import { Icon } from "@/components/icon"
 import { mockEnabled } from "@/lib/mock-registry"
 
 /** First line of every mock page: `const off = mockGate("Orders & Stock"); if (off) return off`. The unavailable state unless the demo flag is on; the page then loads no data. */

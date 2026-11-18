@@ -1,7 +1,6 @@
 "use client"
 
 import { useState } from "react"
-import { Ban, Plus, Trash2 } from "lucide-react"
 
 import { Field } from "@/components/field"
 import { FormSection } from "@/components/form-section"
@@ -10,6 +9,7 @@ import type { Weekday } from "@/lib/shifts"
 import { availabilityStore } from "../store"
 import type { MyRosterData } from "../types"
 import { splitAvailability, validateAvailability } from "../self-service"
+import { Icon } from "@/components/icon"
 
 const DAYS: { day: Weekday; label: string }[] = [{ day: 1, label: "Mon" }, { day: 2, label: "Tue" }, { day: 3, label: "Wed" }, { day: 4, label: "Thu" }, { day: 5, label: "Fri" }, { day: 6, label: "Sat" }, { day: 0, label: "Sun" }]
 
@@ -32,7 +32,7 @@ export function AvailabilityForm({ me, scopeKey, data }: { me: string; scopeKey:
 
   const shown = [...mine].sort((a, b) => ((a.weekday + 6) % 7) - ((b.weekday + 6) % 7) || a.from.localeCompare(b.from))
   return (
-    <FormSection icon={Ban} title="Not available">
+    <FormSection icon="ban" title="Not available">
       <form className="mr-form" onSubmit={add} noValidate>
         <div className="od-field">
           <span className="fs-label">Day</span>
@@ -51,7 +51,7 @@ export function AvailabilityForm({ me, scopeKey, data }: { me: string; scopeKey:
           </Field>
         </div>
         {error && <p className="rl-err" role="alert">{error}</p>}
-        <button type="submit" className="btn btn-outline mr-add"><Plus aria-hidden="true" />Add window</button>
+        <button type="submit" className="btn btn-outline mr-add"><Icon name="plus" size={24} />Add window</button>
       </form>
       {shown.length === 0 ? (
         <p className="rl-empty">No windows set.</p>
@@ -61,7 +61,7 @@ export function AvailabilityForm({ me, scopeKey, data }: { me: string; scopeKey:
             <li key={`${a.weekday}-${a.from}-${a.to}-${i}`} className="mr-chip">
               <span><b>{DAYS.find((d) => d.day === a.weekday)?.label}</b> <span className="num">{formatTime(a.from)} to {formatTime(a.to)}</span></span>
               <button type="button" className="fs-act bad" aria-label={`Remove ${DAYS.find((d) => d.day === a.weekday)?.label} window`} onClick={() => setAll((p) => p.filter((x) => x !== a))}>
-                <Trash2 aria-hidden="true" />
+                <Icon name="trash" size={24} />
               </button>
             </li>
           ))}

@@ -1,46 +1,26 @@
 "use client"
 
-import { useMemo, useRef, useState, useSyncExternalStore } from "react"
-import { createPortal } from "react-dom"
+import { useMemo, useRef, useState } from "react"
 import {
   DndContext,
-  DragOverlay,
-  KeyboardSensor,
   MeasuringStrategy,
-  MouseSensor,
-  TouchSensor,
   closestCorners,
-  defaultDropAnimationSideEffects,
-  useDndMonitor,
   useDroppable,
-  useSensor,
-  useSensors,
 } from "@dnd-kit/core"
-import type { Announcements, DragEndEvent, DragOverEvent, DragStartEvent, DropAnimation, Modifier } from "@dnd-kit/core"
+import type { Announcements, DragEndEvent, DragOverEvent, DragStartEvent } from "@dnd-kit/core"
 import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
 
-import { cssZoom, unzoom, unzoomOverlay } from "@/lib/zoom"
-import { motion, useMotionValue, useReducedMotion, useSpring, useTransform, useVelocity } from "motion/react"
+import { cssZoom, unzoom } from "@/lib/zoom"
+import { DRAG_SLIDE, DragLayer, originOf, useDragSensors } from "@/lib/drag-card"
+import { useReducedMotion } from "motion/react"
 
 import { When } from "@/components/when"
 import { STAGE, STAGE_ORDER } from "../types"
 import type { Candidate, Stage } from "../types"
 
 const COL = "col:"
-const EASE = "cubic-bezier(0.22, 1, 0.36, 1)"
-// The overlay settles into the card's new slot; the slot fades back in underneath it.
-// The Text size preset zooms <body>; keep the lifted card under the pointer (lib/zoom.ts).
-const zoomOverlay: Modifier = ({ transform, activeNodeRect }) => (activeNodeRect ? unzoomOverlay(transform, activeNodeRect, cssZoom(document.body)) : transform)
-const DROP: DropAnimation = {
-  duration: 220,
-  easing: EASE,
-  sideEffects: defaultDropAnimationSideEffects({ styles: { active: { opacity: "0.4" } } }),
-}
-
 type Ids = Record<Stage, string[]>
-const noop = () => () => {}
-
 function CardBody({ c }: { c: Candidate }) {
   return (
     <>
@@ -52,20 +32,6 @@ function CardBody({ c }: { c: Candidate }) {
         <span className="rec-card-when">{c.lastContact ? <When iso={c.lastContact} today="" tzLabel="" mode="date" /> : "No contact"}</span>
       </span>
     </>
-  )
-}
-
-// The lifted card leans into the drag like a held sheet of paper: horizontal speed → tilt, pivoting on the grab point.
-// When the pointer stops (or the card is dropped) the speed falls to 0 and the spring settles it upright.
-function Lifted({ c, origin }: { c: Candidate; origin: string }) {
-  const x = useMotionValue(0)
-  const speed = useVelocity(x)
-  const rotate = useSpring(useTransform(speed, [-1800, 0, 1800], [-10, 0, 10], { clamp: true }), { stiffness: 300, damping: 20, mass: 0.6 })
-  useDndMonitor({ onDragMove: ({ delta }) => x.set(delta.x) })
-  return (
-    <motion.div className="rec-card rec-card-overlay" style={{ rotate, transformOrigin: origin }}>
-      <CardBody c={c} />
-    </motion.div>
   )
 }
 
@@ -81,13 +47,13 @@ function StaticCard({ c, onOpen }: { c: Candidate; onOpen(id: string): void }) {
 function DragCard({ c, calm, onOpen }: { c: Candidate; calm: boolean; onOpen(id: string): void }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: c.id,
-    transition: calm ? null : { duration: 220, easing: EASE },
+    transition: calm ? null : DRAG_SLIDE,
   })
   return (
     <button
       type="button"
       ref={setNodeRef}
-      className="rec-card rec-card-drag"
+      className="rec-card dnd-card"
       data-dragging={isDragging ? "" : undefined}
       style={{ transform: CSS.Translate.toString(transform && { ...transform, x: unzoom(transform.x, cssZoom(document.body)), y: unzoom(transform.y, cssZoom(document.body)) }), transition }}
       onClick={() => onOpen(c.id)}
@@ -131,18 +97,11 @@ export function Pipeline({
   onMove(id: string, stage: Stage, overId: string | null): void
 }) {
   const reduce = !!useReducedMotion()
-  const client = useSyncExternalStore(noop, () => true, () => false)
   const [activeId, setActiveId] = useState<string>()
   const [origin, setOrigin] = useState("50% 50%")
   // Column order while a card is held: the card joins the column it hovers, so the other cards slide aside for it.
   const [draft, setDraft] = useState<Ids>()
-  // MouseSensor + TouchSensor (not PointerSensor): a touch-held card drags only after 200ms, so swiping scrolls the board.
-  const sensors = useSensors(
-    useSensor(MouseSensor, { activationConstraint: { distance: 6 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } }),
-    // Space lifts and drops; Enter stays "open the sheet".
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates, keyboardCodes: { start: ["Space"], cancel: ["Escape"], end: ["Space"] } }),
-  )
+  const sensors = useDragSensors(sortableKeyboardCoordinates)
   const all = STAGE_ORDER.flatMap((s) => groups[s])
   const byId = (id: unknown) => all.find((c) => c.id === id)
   const stageOf = (id: unknown): Stage | undefined => {
@@ -176,9 +135,7 @@ export function Pipeline({
   function onDragStart({ active: a, activatorEvent: ev }: DragStartEvent) {
     setActiveId(String(a.id))
     // Pivot the tilt on the grab point (keyboard lifts pivot on the centre).
-    const r = (ev.target as Element | null)?.closest(".rec-card")?.getBoundingClientRect()
-    const p = ev instanceof MouseEvent ? ev : typeof TouchEvent !== "undefined" && ev instanceof TouchEvent ? ev.touches[0] : undefined
-    setOrigin(r && p ? `${((p.clientX - r.left) / r.width) * 100}% ${((p.clientY - r.top) / r.height) * 100}%` : "50% 50%")
+    setOrigin(originOf(ev, ".rec-card"))
   }
 
   function onDragOver({ active: a, over }: DragOverEvent) {
@@ -240,19 +197,9 @@ export function Pipeline({
       onDragEnd={onDragEnd}
     >
       {board}
-      {/* Portalled to <body>: an animated ancestor (page enter transform) would otherwise offset the fixed overlay from the pointer and skew collisions. */}
-      {client && createPortal(
-        <DragOverlay dropAnimation={reduce ? null : DROP} modifiers={[zoomOverlay]}>
-          {active && (reduce ? (
-            <div className="rec-card rec-card-overlay">
-              <CardBody c={active} />
-            </div>
-          ) : (
-            <Lifted c={active} origin={origin} />
-          ))}
-        </DragOverlay>,
-        document.body,
-      )}
+      <DragLayer show={!!active} reduce={reduce} className="rec-card" origin={origin}>
+        {active && <CardBody c={active} />}
+      </DragLayer>
     </DndContext>
   )
 }

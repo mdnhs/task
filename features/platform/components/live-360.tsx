@@ -2,16 +2,18 @@
 
 import { useMemo, useState } from "react"
 import Link from "next/link"
+import { BackLink } from "@/components/back-link"
 import { usePathname, useRouter } from "next/navigation"
 
 import { CopyId } from "@/components/copy-id"
 import { Field } from "@/components/field"
-import { Icon } from "@/components/icons"
+import { Icon, type IconName } from "@/components/icon"
 import { StatusPill } from "@/components/status-pill"
 import { StretchIndicator } from "@/components/stretch-indicator"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
+import type { Status } from "@/lib/types"
 import { planModules, type EntitlementsData, type ProductModule } from "@/lib/entitlements"
 import type { Live360, LiveAuditLine } from "../adapters"
 import { REASON_MAX, TRIAL_DAYS_MAX, type ModuleOverride } from "../client"
@@ -50,11 +52,11 @@ export function Live360Header({ t, can, tabs }: { t: Live360; can: Live360Can; t
   const items = [
     can.support && !t.suspended && { key: "support", icon: "help", label: "Request support access", go: () => router.push(`/platform/support?request=${encodeURIComponent(t.id)}`) },
     can.suspend && trialing && !t.suspended && { key: "trial", icon: "clock", label: "Extend trial", go: () => router.push(tenantPath(t.id, "extend-trial")) },
-  ].filter(Boolean) as { key: string; icon: string; label: string; go(): void }[]
+  ].filter(Boolean) as { key: string; icon: IconName; label: string; go(): void }[]
 
   return (
     <>
-      <Link href="/platform/tenants" className="pf-back">← Tenants</Link>
+      <BackLink href="/platform/tenants">Tenants</BackLink>
       <div className="head pf-360-head">
         <div className="pf-360-id">
           <h1>{t.name}</h1>
@@ -105,25 +107,50 @@ export function Live360Header({ t, can, tabs }: { t: Live360; can: Live360Can; t
 }
 
 const Row = ({ label, children }: { label: string; children: React.ReactNode }) => <div className="pf-dl-row"><dt>{label}</dt><dd className="num">{children}</dd></div>
+const Group = ({ title, icon, children }: { title: string; icon: IconName; children: React.ReactNode }) => (
+  <section className="pf-dl-group" aria-label={title}>
+    <h3><Icon name={icon} />{title}</h3>
+    <dl className="pf-dl">{children}</dl>
+  </section>
+)
 
-/** Overview tab: the API's aggregates only (counts and one date), never a member, a name or an email (D8). */
+/** The subscription state as a pill: the raw API word ("past_due") is humanised ("Past due") and toned like the tenant status pill. */
+const SUBSCRIPTION: Record<string, Status> = {
+  active: { tone: "ok", label: "Active" }, trialing: { tone: "info", label: "Trial" }, past_due: { tone: "warn", label: "Past due" },
+  unpaid: { tone: "bad", label: "Unpaid" }, incomplete: { tone: "warn", label: "Incomplete" }, incomplete_expired: { tone: "mute", label: "Expired" },
+  canceled: { tone: "mute", label: "Canceled" }, paused: { tone: "mute", label: "Paused" },
+}
+export const subscriptionPill = (s: string | null): Status => (s === null ? { tone: "mute", label: "None" } : SUBSCRIPTION[s] ?? { tone: "mute", label: s.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase()) })
+
+/** Overview tab: the API's aggregates only (counts and one date), never a member, a name or an email (D8). Three groups: subscription, usage, tenant. */
 export function LiveOverviewTab({ t }: { t: Live360 }) {
+  const pct = t.seats ? Math.min(100, Math.round((t.seatsUsed / t.seats) * 100)) : 0
   return (
     <section className="card" aria-labelledby="pf-ov-h">
       <div className="card-head"><div><h2 id="pf-ov-h">Overview</h2><div className="sub">Counts only. Member details stay in the tenant.</div></div></div>
-      <dl className="pf-dl">
-        <Row label="Plan">{t.plan || "—"}</Row>
-        <Row label="Subscription">{t.subscriptionStatus ?? "None"}</Row>
-        <Row label="Seats">{t.seats === null ? `${t.seatsUsed} used` : `${t.seatsUsed} of ${t.seats} used`}</Row>
-        <Row label="Members">{t.memberCount}</Row>
-        {t.trialEndsAt && <Row label="Trial ends">{dateUtc(t.trialEndsAt)}</Row>}
-        {t.currentPeriodEnd && <Row label={t.cancelAtPeriodEnd ? "Ends" : "Renews"}>{dateUtc(t.currentPeriodEnd)}</Row>}
-        <Row label="Last activity">{t.lastActivityDate ? dateUtc(t.lastActivityDate) : "None yet"}</Row>
-        <Row label="Open data requests">{t.openDataRequests}</Row>
-        <Row label="Created">{dateUtc(t.createdAt)}</Row>
-        <Row label="Time zone">{t.timezone}</Row>
-        <Row label="Currency">{t.currency}</Row>
-      </dl>
+      <div className="pf-dl-groups">
+        <Group title="Subscription" icon="wallet">
+          <Row label="Plan">{t.plan || "—"}</Row>
+          <Row label="Status"><StatusPill status={subscriptionPill(t.subscriptionStatus)} tick={false} /></Row>
+          {t.trialEndsAt && <Row label="Trial ends">{dateUtc(t.trialEndsAt)}</Row>}
+          {t.currentPeriodEnd && <Row label={t.cancelAtPeriodEnd ? "Ends" : "Renews"}>{dateUtc(t.currentPeriodEnd)}</Row>}
+        </Group>
+        <Group title="Usage" icon="layers">
+          <div className="pf-dl-row pf-dl-seats">
+            <dt>Seats</dt>
+            <dd className="num">{t.seats === null ? `${t.seatsUsed} used` : <>{t.seatsUsed} <span>of {t.seats}</span></>}</dd>
+            {t.seats !== null && <div suppressHydrationWarning className="progress pf-dl-bar" role="img" aria-label={`${t.seatsUsed} of ${t.seats} seats used`}><i style={{ width: `${pct}%` }} /></div>}
+          </div>
+          <Row label="Members">{t.memberCount}</Row>
+          <Row label="Open data requests">{t.openDataRequests}</Row>
+        </Group>
+        <Group title="Tenant" icon="folder">
+          <Row label="Created">{dateUtc(t.createdAt)}</Row>
+          <Row label="Last activity">{t.lastActivityDate ? dateUtc(t.lastActivityDate) : "None yet"}</Row>
+          <Row label="Time zone">{t.timezone}</Row>
+          <Row label="Currency">{t.currency}</Row>
+        </Group>
+      </div>
     </section>
   )
 }
@@ -228,7 +255,7 @@ export function LiveExtendTrial({ t }: { t: Live360 }) {
   const trialing = t.subscriptionStatus === "trialing"
   return (
     <>
-      <Link href={tenantPath(t.id)} className="pf-back">← {t.name}</Link>
+      <BackLink href={tenantPath(t.id)}>{t.name}</BackLink>
       <div className="head"><div><h1>Extend trial</h1><p>{trialing && t.trialEndsAt ? `Ends ${dateTimeUtc(t.trialEndsAt)}. The new end is the later of now and that, plus the days.` : "This tenant is not on a trial."}</p></div></div>
       <form className="card pf-card pf-form" onSubmit={(e) => { e.preventDefault(); void act(`trial:${t.id}`, () => client.extendTrial(t.id, Number(days), reason), "Trial extended").then((r) => r.ok && router.push(tenantPath(t.id))) }}>
         <Field label="Days" htmlFor="pf-trial-days" hint={`1 to ${TRIAL_DAYS_MAX}`} required><Input id="pf-trial-days" type="number" inputMode="numeric" min={1} max={TRIAL_DAYS_MAX} step={1} value={days} disabled={!trialing} onChange={(e) => setDays(e.target.value)} /></Field>

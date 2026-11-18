@@ -1,6 +1,6 @@
 import Link from "next/link"
 
-import { Icon } from "@/components/icons"
+import { Icon } from "@/components/icon"
 import { StatusPill } from "@/components/status-pill"
 import { When } from "@/components/when"
 import type { StaffMyTasksData, StaffTaskState } from "../types"

@@ -64,7 +64,11 @@ body{background:var(--page);color:var(--ink);font-family:var(--font);font-size:1
 button{font:inherit;color:inherit;cursor:pointer;border:0;background:none}
 a{color:inherit;text-decoration:none}
 :focus-visible{outline:2px solid var(--brand);outline-offset:2px;border-radius:calc(8px * var(--radius-scale,1))}
+/* Icon default (components/icon.tsx). In @layer base so Tailwind size-* utilities and context rules (.btn .ico ...) override it. */
+@layer base{
 .ico{width:20px;height:20px;flex:none;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.ico :is(path,circle,rect,line,ellipse,polyline,polygon){stroke-width:inherit}
+}
 .num{font-variant-numeric:tabular-nums}
 
 /* ---------- App shell ---------- */

@@ -5,7 +5,7 @@ import Link from "next/link"
 
 import { CopyId } from "@/components/copy-id"
 import { DetailSheet } from "@/components/detail-sheet"
-import { Icon } from "@/components/icons"
+import { Icon } from "@/components/icon"
 import { StatusPill } from "@/components/status-pill"
 import { formatTime } from "@/lib/dates"
 import { DUNNING_MAX, canMarkPaid, canRefund, canRetry, canVoid, dunning, invoiceHistory, type InvoiceRow } from "../billing"

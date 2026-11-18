@@ -1,6 +1,5 @@
 "use client"
 
-import { Check, ClipboardList, X } from "lucide-react"
 import { toast } from "sonner"
 
 import { FormSection } from "@/components/form-section"
@@ -10,6 +9,7 @@ import type { LeaveRequest } from "@/lib/roster-rules"
 import { leaveStore } from "../store"
 import { decideLeave } from "../self-service"
 import type { LeaveQueue, MyRosterData } from "../types"
+import { Icon } from "@/components/icon"
 
 const TONE = { requested: "warn", approved: "ok", rejected: "bad" } as const
 const LABEL = { requested: "Waiting", approved: "Approved", rejected: "Rejected" } as const
@@ -33,7 +33,7 @@ export function LeavePanel({ me, today, scopeKey, data, queue }: { me: string; t
 
   return (
     <>
-      <FormSection icon={ClipboardList} title="My leave">
+      <FormSection icon="clipboard-list" title="My leave">
         {mine.length === 0 ? (
           <p className="rl-empty">No leave requests.</p>
         ) : (
@@ -48,7 +48,7 @@ export function LeavePanel({ me, today, scopeKey, data, queue }: { me: string; t
         )}
       </FormSection>
       {(queue.leave.length > 0 || waiting.length > 0) && (
-        <FormSection icon={ClipboardList} title="Leave to decide" note={waiting.length ? `${waiting.length}` : undefined}>
+        <FormSection icon="clipboard-list" title="Leave to decide" note={waiting.length ? `${waiting.length}` : undefined}>
           {waiting.length === 0 ? (
             <p className="rl-empty">Nothing waiting.</p>
           ) : (
@@ -57,8 +57,8 @@ export function LeavePanel({ me, today, scopeKey, data, queue }: { me: string; t
                 <li key={l.id} className="mr-chip">
                   <span><b>{queue.names[l.personId]}</b> <span className="rl-note">{span(l)} · {l.kind}</span></span>
                   <span className="mr-decide">
-                    <button type="button" className="btn btn-outline mr-btn" aria-label={`Approve ${queue.names[l.personId]}`} onClick={() => decide(l, true)}><Check aria-hidden="true" />Approve</button>
-                    <button type="button" className="btn btn-outline mr-btn" aria-label={`Reject ${queue.names[l.personId]}`} onClick={() => decide(l, false)}><X aria-hidden="true" />Reject</button>
+                    <button type="button" className="btn btn-outline mr-btn" aria-label={`Approve ${queue.names[l.personId]}`} onClick={() => decide(l, true)}><Icon name="check" size={24} />Approve</button>
+                    <button type="button" className="btn btn-outline mr-btn" aria-label={`Reject ${queue.names[l.personId]}`} onClick={() => decide(l, false)}><Icon name="close" size={24} />Reject</button>
                   </span>
                 </li>
               ))}

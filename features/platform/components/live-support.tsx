@@ -5,7 +5,7 @@ import Link from "next/link"
 
 import { Field } from "@/components/field"
 import { FilterSelect } from "@/components/filter-bar"
-import { Icon } from "@/components/icons"
+import { Icon } from "@/components/icon"
 import { PageHead } from "@/components/page-head"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"

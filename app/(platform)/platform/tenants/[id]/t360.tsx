@@ -1,4 +1,5 @@
 import Link from "next/link"
+import { BackLink } from "@/components/back-link"
 
 import {
   BillingTabView, ChangePlanView, ScheduleDeletionView, SettingsTabView, UsageTabView, billingTab, getPlatformSeed, getPlatformSettings, modulesTab, settingsTab, tenant360Head, tabsFor, usageTab,
@@ -45,7 +46,7 @@ export function MockNotInSeed() {
 export function TenantNotFound() {
   return (
     <>
-      <Link href="/platform/tenants" className="pf-back">← Tenants</Link>
+      <BackLink href="/platform/tenants">Tenants</BackLink>
       <EmptyState icon="folder" title="Tenant not found" text="This company doesn't exist or was removed." action={<Link href="/platform/tenants" className="btn btn-outline">Back to tenants</Link>} />
     </>
   )

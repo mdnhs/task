@@ -1,8 +1,8 @@
 "use client"
 
-import { X } from "lucide-react"
 
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet"
+import { Icon } from "@/components/icon"
 
 // Right-side detail panel (bottom sheet on phones, see .od-sheet in kit.css).
 export function DetailSheet({
@@ -29,7 +29,7 @@ export function DetailSheet({
             {subtitle ? <SheetDescription render={<div />}>{subtitle}</SheetDescription> : <SheetDescription className="sr-only">{title}</SheetDescription>}
           </div>
           <SheetClose className="od-sheet-x" aria-label="Close">
-            <X />
+            <Icon name="close" size={24} />
           </SheetClose>
         </header>
         <div className="od-sheet-body">{children}</div>

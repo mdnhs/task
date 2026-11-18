@@ -4,7 +4,7 @@ import { useState } from "react"
 import Link from "next/link"
 import { AnimatePresence, Reorder } from "motion/react"
 
-import { Icon } from "@/components/icons"
+import { Icon } from "@/components/icon"
 import { RollNumber } from "@/components/roll-number"
 import { layoutTransition, listItem } from "@/lib/motion"
 import type { AttentionRow, ManagerAttentionData } from "../types"

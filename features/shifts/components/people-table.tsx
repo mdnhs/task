@@ -1,6 +1,5 @@
 "use client"
 
-import { X } from "lucide-react"
 
 import { PagedBody } from "@/components/data-pagination"
 import { Switch } from "@/components/ui/switch"
@@ -8,6 +7,7 @@ import { formatDate } from "@/lib/dates"
 import { managerOf, memberOf, reportsFor } from "@/lib/shifts"
 import type { ShiftAssignment, ShiftPattern, ShiftState } from "@/lib/shifts"
 import type { Person } from "@/lib/types"
+import { Icon } from "@/components/icon"
 
 /** Current and upcoming assignments of a person (ended ones are history and stay in the week view only). */
 export function openAssignments(state: ShiftState, personId: string, today: string): { a: ShiftAssignment; p: ShiftPattern }[] {
@@ -80,7 +80,7 @@ export function PeopleTable({
                           {a.from > today && <span className="sh-tag-note"> from {formatDate(a.from)}</span>}
                           {canWrite && (
                             <button type="button" className="sh-tag-x" aria-label={`Remove ${p.name} from ${pat.name}`} onClick={() => onUnassign(p, pat)}>
-                              <X aria-hidden="true" />
+                              <Icon name="close" size={24} />
                             </button>
                           )}
                         </span>

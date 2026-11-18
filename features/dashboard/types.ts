@@ -1,3 +1,4 @@
+import type { IconName } from "@/components/icon"
 import type { ReportDeadline } from "@/lib/report-deadline"
 import type { Dept, Status, Tone } from "@/lib/types"
 
@@ -7,8 +8,8 @@ export type DashboardPerms = { tasks: boolean; reports: boolean; attention: bool
 export type SummaryData = {
   stats: {
     title: string
-    /** Sprite icon name for the chip beside the title (components/icons.tsx). */
-    icon?: string
+    /** Icon name for the chip beside the title (components/icon.tsx). */
+    icon?: IconName
     ariaLabel: string
     href: string
     value: string
@@ -37,7 +38,7 @@ export type TasksClosedData = { title: string; subtitle: string; days: TasksClos
 /** The FR-M1-79 feed (GET /v1/attention) as the card shows it; the decide-and-carry-forward queue is the mock /manager-attention page (G1). */
 export type AttentionRow = {
   kind: "red" | "amber" | "blue"
-  icon: string
+  icon: IconName
   title: string
   by: string
   note: string
