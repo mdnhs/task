@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { dayOrder, daySummary, handledToday, taskSpeech, teamOverdue, todayCounts, todayHasNews, todayMode, todayUpdate, workingDay, dismissedValue, TODAY_SOURCE } from "./today"
+import { todayCookieName, dayOrder, daySummary, handledToday, taskSpeech, teamOverdue, todayCounts, todayHasNews, todayMode, todayUpdate, workingDay, dismissedValue, TODAY_SOURCE } from "./today"
 import type { TodayTask } from "./today"
 import type { ShiftAssignment, ShiftPattern } from "./shifts"
 
@@ -141,5 +141,14 @@ describe("player actions through the tasks hand-off (FR-M1-74)", () => {
     const h = handledToday(ups, "2026-10-20")
     expect([...h.done]).toEqual(["A"])
     expect([...h.snoozed]).toEqual(["B"])
+  })
+})
+
+describe("todayCookieName (the cookie mirror is keyed by tenant and user)", () => {
+  it("two owners never share a cookie; the name is a valid cookie token", () => {
+    expect(todayCookieName("auto", "coppers:usr_1")).toBe("od-today-auto-coppers_usr_1")
+    expect(todayCookieName("auto", "acme:usr_1")).not.toBe(todayCookieName("auto", "coppers:usr_1"))
+    expect(todayCookieName("dismissed", "a:b")).not.toBe(todayCookieName("auto", "a:b"))
+    expect(todayCookieName("auto", "x;y z=1")).toMatch(/^[A-Za-z0-9_-]+$/)
   })
 })

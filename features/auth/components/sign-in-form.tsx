@@ -1,12 +1,13 @@
 "use client"
 
 import Link from "next/link"
-import { useState, useTransition } from "react"
+import { useEffect, useState, useTransition } from "react"
 
 import { afterSignIn } from "@/app/actions/session"
 import { Field } from "@/components/field"
 import { Input } from "@/components/ui/input"
 import { resendVerification, signInEmail, signInSocial, verifyBackupCode, verifyTotp } from "@/lib/auth-client"
+import { clearClientStores } from "@/lib/client-stores"
 import { secondFactorStep, signInStep, type CodeMode } from "@/lib/auth-flow"
 import { signInSchema } from "../schemas"
 import type { AuthProviders } from "../types"
@@ -27,6 +28,11 @@ export function SignInForm({ providers, next, expired = false }: { providers: Au
   const [unverified, setUnverified] = useState(false)
   const [resent, setResent] = useState(false)
   const [pending, start] = useTransition()
+
+  // /api/session/expired cleared the cookies on the server; the browser's own stores (recents, Today mirror) of that dead session go here, once.
+  useEffect(() => {
+    if (expired) clearClientStores("expired")
+  }, [expired])
 
   function credentials(e: React.FormEvent) {
     e.preventDefault()

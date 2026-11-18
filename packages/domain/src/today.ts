@@ -175,8 +175,13 @@ export function teamOverdue(tasks: (TodayTask & { assignee: string })[], meId: s
 
 // ---------- persistence keys (shared by the card and Account → Notifications) ----------
 
-export const TODAY_COOKIE_AUTO = "od-today-auto"
-export const TODAY_COOKIE_DISMISSED = "od-today-dismissed"
+/** Every Today cookie starts with this; sign-out clears them all (lib/client-stores.ts). */
+export const TODAY_COOKIE_PREFIX = "od-today-"
+/**
+ * The cookie mirror is keyed by the owner (tenant AND user, lib/today-prefs todaySubject), so a switch of company or person never paints the previous
+ * owner's card at first paint: `od-today-auto-<tenant>_<user>` and `od-today-dismissed-<tenant>_<user>`. Characters a cookie name cannot hold become "_".
+ */
+export const todayCookieName = (kind: "auto" | "dismissed", subject: string): string => `${TODAY_COOKIE_PREFIX}${kind}-${subject.replace(/[^A-Za-z0-9_-]/g, "_")}`
 
 /** What the home screen shows at first paint: the full card, or just the compact entry that reopens it. */
 export type TodayMode = "card" | "chip"

@@ -2,11 +2,13 @@ import { afterEach, beforeEach, describe, expect, test } from "vitest"
 import { readAuto, readDismissed, readSnoozed, todaySubject, writeAuto, writeDismissed, writeSnoozed } from "./today-prefs"
 
 const store = new Map<string, string>()
+const jar: string[] = []
 beforeEach(() => {
   store.clear()
+  jar.length = 0
   const g = globalThis as Record<string, unknown>
   g.window = { localStorage: { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => void store.set(k, v), removeItem: (k: string) => void store.delete(k) } }
-  g.document = { cookie: "" }
+  g.document = { set cookie(v: string) { jar.push(v) }, get cookie() { return "" } }
 })
 afterEach(() => {
   const g = globalThis as Record<string, unknown>
@@ -35,5 +37,20 @@ describe("T6.7 fix: Today prefs are keyed by tenant AND user (a person in two co
   test("an old key written for the bare user id is simply ignored (no migration)", () => {
     store.set("opsdesk:today:auto:usr_1", "1")
     expect(readAuto(todaySubject("coppers", "usr_1"))).toBe(false)
+  })
+})
+
+describe("B7 T12: the cookie mirror is keyed by tenant and user", () => {
+  test("auto and dismissed write cookies named for their owner, never the shared names", () => {
+    const a = todaySubject("coppers", "usr_1")
+    writeAuto(a, true)
+    writeDismissed(a, "2026-10-24", true)
+    const names = jar.map((c) => c.split("=")[0])
+    expect(names).toEqual(["od-today-auto-coppers_usr_1", "od-today-dismissed-coppers_usr_1"])
+    expect(names).not.toContain("od-today-auto")
+  })
+  test("another tenant's owner writes a different cookie", () => {
+    writeAuto(todaySubject("acme", "usr_1"), true)
+    expect(jar[0]!.split("=")[0]).toBe("od-today-auto-acme_usr_1")
   })
 })

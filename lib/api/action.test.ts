@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest"
 import { makeBrowserClient } from "./browser"
 import { onBillingBlocked } from "./blocked"
 import { makeActionRunner } from "./action"
+import { rearmClientStoresOnce, registerClientStoreReset } from "@/lib/client-stores"
 import { ApiError } from "./problem"
 
 const problemRes = (status: number, code: string) => new Response(JSON.stringify({ status, code, requestId: "r9" }), { status, headers: { "content-type": "application/problem+json" } })
@@ -142,5 +143,28 @@ describe("T6.6 a write refused with 409 retry is repeated ONCE, identically", ()
     release("x")
     await a
     expect(request).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe("B7 T12: the action runner clears the stores when a write answers 401 session_expired (revoked elsewhere)", () => {
+  const reset = vi.fn()
+  registerClientStoreReset(() => reset())
+  beforeEach(() => { rearmClientStoresOnce(); reset.mockReset() })
+  const make = () => makeActionRunner({ notify: vi.fn(), refresh: vi.fn() })
+
+  test("401 session_expired from the request: stores cleared once, the failure is still reported", async () => {
+    const run = make()
+    const err = new ApiError(401, "session_expired", "r")
+    const r1 = await run("a", async () => { throw err })
+    const r2 = await run("b", async () => { throw err })
+    expect(r1).toEqual({ ok: false, kind: "session_expired" })
+    expect(r2.ok).toBe(false)
+    expect(reset).toHaveBeenCalledTimes(1)
+  })
+
+  test("other refusals clear nothing", async () => {
+    const run = make()
+    await run("a", async () => { throw new ApiError(403, "forbidden", "r") })
+    expect(reset).not.toHaveBeenCalled()
   })
 })

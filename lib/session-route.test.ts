@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest"
-import { expireSession, repairTenant } from "@/lib/session-route"
+import { expireSession, repairTenant, repairTenantPage } from "@/lib/session-route"
 
 const APP = "https://app.example.com"
 const API = "http://api.internal:3001"
@@ -31,6 +31,15 @@ const script = (s: Script = {}) => {
   vi.stubGlobal("fetch", fetchMock)
 }
 const get = (path: string, cookie = "") => new Request(`${APP}${path}`, { headers: cookie ? { cookie } : {} })
+const post = (next: string | null, cookie = "", o: { origin?: string | null; site?: string; json?: boolean } = {}) => {
+  const h: Record<string, string> = {}
+  if (cookie) h.cookie = cookie
+  if (o.origin !== null) h.origin = o.origin ?? APP
+  if (o.site) h["sec-fetch-site"] = o.site
+  const body = o.json ? JSON.stringify({ next }) : new URLSearchParams(next === null ? {} : { next }).toString()
+  h["content-type"] = o.json ? "application/json" : "application/x-www-form-urlencoded"
+  return new Request(`${APP}/api/session/tenant`, { method: "POST", headers: h, body })
+}
 const setCookies = (r: Response) => r.headers.getSetCookie()
 const cleared = (r: Response, name: string) => setCookies(r).some((c) => c.startsWith(`${name}=;`) && /max-age=0|expires=thu, 01 jan 1970/i.test(c))
 
@@ -103,7 +112,7 @@ describe("T6.3 /api/session/expired: clears a dead session once, then lands on /
 describe("T6.3 /api/session/tenant: repairs a missing or stale od-tenant from the memberships the API confirms", () => {
   const C = "better-auth.session_token=tok"
   test("a stale cookie is replaced by the first membership (httpOnly, lax, secure in production, path /), then back to next", async () => {
-    const r = await repairTenant(get("/api/session/tenant?next=%2Ftasks%3Fview%3Dboard", `${C}; od-tenant=gone-co`))
+    const r = await repairTenant(post(decodeURIComponent("%2Ftasks%3Fview%3Dboard"), `${C}; od-tenant=gone-co`))
     expect(r.status).toBe(303)
     expect(r.headers.get("location")).toBe(`${APP}/tasks?view=board`)
     const c = setCookies(r).find((x) => x.startsWith("od-tenant="))!
@@ -116,47 +125,93 @@ describe("T6.3 /api/session/tenant: repairs a missing or stale od-tenant from th
   })
 
   test("a missing cookie is set; a good cookie is left alone (no Set-Cookie)", async () => {
-    expect(setCookies(await repairTenant(get("/api/session/tenant?next=%2F", C))).some((c) => c.startsWith("od-tenant=alpha"))).toBe(true)
-    const kept = await repairTenant(get("/api/session/tenant?next=%2Fsettings", `${C}; od-tenant=bravo`))
+    expect(setCookies(await repairTenant(post(decodeURIComponent("%2F"), C))).some((c) => c.startsWith("od-tenant=alpha"))).toBe(true)
+    const kept = await repairTenant(post(decodeURIComponent("%2Fsettings"), `${C}; od-tenant=bravo`))
     expect(setCookies(kept)).toEqual([])
     expect(kept.headers.get("location")).toBe(`${APP}/settings`)
   })
 
   test("it picks exactly what getSession would: a membership that 404s is skipped", async () => {
     script({ gone: ["alpha"] })
-    const r = await repairTenant(get("/api/session/tenant?next=%2F", `${C}; od-tenant=alpha`))
+    const r = await repairTenant(post(decodeURIComponent("%2F"), `${C}; od-tenant=alpha`))
     expect(setCookies(r).find((x) => x.startsWith("od-tenant="))).toMatch(/^od-tenant=bravo;/)
   })
 
   test("next is a same-origin path only: //evil.com, https://evil.com, /\\evil.com and javascript: land on /", async () => {
     for (const bad of ["//evil.com", "https://evil.com", "/\\evil.com", "javascript:alert(1)", "/%2f/evil.com"]) {
-      const r = await repairTenant(get(`/api/session/tenant?next=${encodeURIComponent(bad)}`, `${C}; od-tenant=bravo`))
+      const r = await repairTenant(post(bad, `${C}; od-tenant=bravo`))
       expect(r.headers.get("location"), bad).toBe(`${APP}/`)
     }
   })
 
   test("no membership: staff to /platform, others to /onboarding, and the dead tenant cookie is cleared", async () => {
     script({ me: { ...ME, tenants: [], platformRole: "support" } })
-    const staff = await repairTenant(get("/api/session/tenant?next=%2Ftasks", `${C}; od-tenant=alpha`))
+    const staff = await repairTenant(post(decodeURIComponent("%2Ftasks"), `${C}; od-tenant=alpha`))
     expect(staff.headers.get("location")).toBe(`${APP}/platform`)
     expect(cleared(staff, "od-tenant")).toBe(true)
     script({ me: { ...ME, tenants: [] } })
-    expect((await repairTenant(get("/api/session/tenant?next=%2Ftasks", C))).headers.get("location")).toBe(`${APP}/onboarding`)
+    expect((await repairTenant(post(decodeURIComponent("%2Ftasks"), C))).headers.get("location")).toBe(`${APP}/onboarding`)
   })
 
   test("an expired session clears the cookies and goes to /sign-in?reason=expired; no session goes to /sign-in", async () => {
     script({ me: 401 })
-    const r = await repairTenant(get("/api/session/tenant?next=%2F", `${C}; od-tenant=alpha`))
+    const r = await repairTenant(post(decodeURIComponent("%2F"), `${C}; od-tenant=alpha`))
     expect(r.headers.get("location")).toBe(`${APP}/sign-in?reason=expired`)
     expect(cleared(r, "better-auth.session_token")).toBe(true)
     expect(cleared(r, "od-tenant")).toBe(true)
     script()
-    expect((await repairTenant(get("/api/session/tenant?next=%2F", "od-tenant=alpha"))).headers.get("location")).toBe(`${APP}/sign-in`)
+    expect((await repairTenant(post(decodeURIComponent("%2F"), "od-tenant=alpha"))).headers.get("location")).toBe(`${APP}/sign-in`)
   })
 
   test("the tenant sent upstream is a verified membership slug, never the raw cookie", async () => {
-    await repairTenant(get("/api/session/tenant?next=%2F", `${C}; od-tenant=evil-co`))
+    await repairTenant(post(decodeURIComponent("%2F"), `${C}; od-tenant=evil-co`))
     const tenantCalls = sent.filter((s) => s.path === "/v1/me/tenant").map((s) => s.tenant)
     expect(tenantCalls).toEqual(["alpha"])
+  })
+})
+
+describe("B7 T12: /api/session/tenant is a POST; the GET never writes", () => {
+  const C = "better-auth.session_token=tok"
+  test("GET sets no cookie, calls no API and answers a self-submitting same-origin form (a redirect target cannot POST)", async () => {
+    const r = await repairTenantPage(get("/api/session/tenant?next=%2Ftasks%3Fview%3Dboard", `${C}; od-tenant=gone-co`))
+    expect(r.status).toBe(200)
+    expect(setCookies(r)).toEqual([])
+    expect(fetchMock).not.toHaveBeenCalled()
+    expect(r.headers.get("cache-control")).toMatch(/no-store/)
+    const html = await r.text()
+    expect(html).toMatch(/<form[^>]*method="post"[^>]*action="\/api\/session\/tenant"/i)
+    expect(html).toContain('name="next" value="/tasks?view=board"')
+    expect(html).toMatch(/\.submit\(\)/)
+    expect(html).toMatch(/<noscript>[\s\S]*<button/i)
+  })
+  test("GET with an unsafe next prints / in the form (never the attacker value, and the value is escaped)", async () => {
+    for (const bad of ["//evil.com", "https://evil.com", "/\\evil.com", '/"><script>alert(1)</script>']) {
+      const html = await (await repairTenantPage(get(`/api/session/tenant?next=${encodeURIComponent(bad)}`))).text()
+      expect(html, bad).not.toContain("evil.com")
+      expect(html, bad).not.toContain("<script>alert")
+    }
+    expect(await (await repairTenantPage(get("/api/session/tenant?next=//evil.com"))).text()).toContain('name="next" value="/"')
+  })
+  test("POST sets the cookie for a membership slug only, then 303 to the validated next", async () => {
+    const r = await repairTenant(post("/settings", `${C}; od-tenant=gone-co`))
+    expect(r.status).toBe(303)
+    expect(r.headers.get("location")).toBe(`${APP}/settings`)
+    expect(setCookies(r).find((x) => x.startsWith("od-tenant="))).toMatch(/^od-tenant=alpha;/)
+  })
+  test("POST accepts a JSON body { next } too and rejects an absolute next", async () => {
+    expect((await repairTenant(post("/tasks", `${C}; od-tenant=bravo`, { json: true }))).headers.get("location")).toBe(`${APP}/tasks`)
+    expect((await repairTenant(post("https://evil.com/x", `${C}; od-tenant=bravo`, { json: true }))).headers.get("location")).toBe(`${APP}/`)
+  })
+  test("POST from another origin, with a cross-site fetch or with no Origin is refused 403 and writes nothing", async () => {
+    for (const o of [{ origin: "https://evil.example" }, { site: "cross-site" }, { origin: null }]) {
+      const r = await repairTenant(post("/", `${C}; od-tenant=gone-co`, o))
+      expect(r.status, JSON.stringify(o)).toBe(403)
+      expect(setCookies(r)).toEqual([])
+    }
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+  test("production with no known web origin refuses (fail closed)", async () => {
+    vi.stubEnv("APP_ORIGIN", "")
+    expect((await repairTenant(post("/", C))).status).toBe(403)
   })
 })

@@ -10,7 +10,7 @@ import { getOrg } from "@/lib/org"
 import { can } from "@/lib/permissions"
 import { requireMfaOk } from "@/lib/session"
 import { todaySubject } from "@/lib/today-prefs"
-import { TODAY_COOKIE_AUTO, TODAY_COOKIE_DISMISSED } from "@/lib/today"
+import { todayCookieName } from "@/lib/today"
 
 // The home screen on the API's read models (B6 T6.7, F17, F18): the manager or the staff dashboard, the attention feed and the Today card. The figures are the API's (cached 30 s per user on the
 // server). A caller without the dashboard module sees the restricted state; a support session gets 403 on Today and the staff dashboard, shown as the restricted state / no Today card.
@@ -29,9 +29,9 @@ export default async function Page() {
   if (!can(session.role, "dashboard")) return <AccessRestricted moduleLabel="Dashboard" />
   const loaded = await Promise.all([dashboardScreenData(), getOrg(), cookies()])
     .then(async ([{ api, people }, org, jar]) => {
-      const cookie = { auto: jar.get(TODAY_COOKIE_AUTO)?.value, dismissed: readCookie(jar.get(TODAY_COOKIE_DISMISSED)?.value) }
       const meId = session.user.id
       const subject = todaySubject(session.tenant.slug, meId)
+      const cookie = { auto: jar.get(todayCookieName("auto", subject))?.value, dismissed: readCookie(jar.get(todayCookieName("dismissed", subject))?.value) }
       if (session.role.home === "staff") {
         const [home, todayCard] = await Promise.all([loadStaffHome(api, { org }), loadToday(api, { meId, subject, org, cookies: cookie })])
         return { ok: true as const, org, staff: { home, todayCard } }

@@ -1,4 +1,4 @@
-import { TODAY_COOKIE_AUTO, TODAY_COOKIE_DISMISSED, dismissedValue } from "./today"
+import { dismissedValue, todayCookieName } from "./today"
 
 // Browser-only (localStorage, with a cookie mirror so the server renders the right first paint and skeleton).
 // The Today card reads it on the home screen; Account → Notifications writes the two switches. Every access is guarded:
@@ -36,7 +36,7 @@ function cookie(name: string, value: string | null) {
 export const readAuto = (userId: string) => get(K("auto", userId)) === "1"
 export function writeAuto(userId: string, on: boolean) {
   set(K("auto", userId), on ? "1" : null)
-  cookie(TODAY_COOKIE_AUTO, on ? "1" : null)
+  cookie(todayCookieName("auto", userId), on ? "1" : null)
 }
 
 /** "Your day is ready" at shift start (FR-M1-78). Mock: stored only; the push itself needs the mobile app. */
@@ -47,7 +47,7 @@ export const writeReady = (userId: string, on: boolean) => set(K("ready", userId
 export const readDismissed = (userId: string, dayKey: string) => get(K("dismissed", userId)) === dayKey
 export function writeDismissed(userId: string, dayKey: string, dismissed: boolean) {
   set(K("dismissed", userId), dismissed ? dayKey : null)
-  cookie(TODAY_COOKIE_DISMISSED, dismissed ? dismissedValue(userId, dayKey) : null)
+  cookie(todayCookieName("dismissed", userId), dismissed ? dismissedValue(userId, dayKey) : null)
 }
 
 /** Tasks the user snoozed from the card on this working day (the server keeps only a history line, so the card remembers them in this browser). */

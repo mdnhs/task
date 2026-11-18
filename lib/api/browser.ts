@@ -4,6 +4,7 @@
 // T6.3: a 401 that means "the session is gone" (not an MFA challenge) toasts ONCE and sends the page to /api/session/expired ONCE, however many calls fail together.
 import { toast } from "sonner"
 import { reportBillingBlocked } from "./blocked"
+import { clearClientStoresOnce } from "../client-stores"
 import { makeApiClient, type ApiClient } from "./client"
 import { PAGE_TENANT_HEADER, isTenantSlug } from "./tenant"
 
@@ -18,6 +19,7 @@ export function setPageTenant(slug: string | null): void {
 const EXPIRED = "/api/session/expired"
 
 function defaultSessionExpired(): void {
+  clearClientStoresOnce("revoked") // another device ended this session, or it ran out while the page was open: nothing of this person stays in the browser
   toast.error("Session expired. Sign in again.")
   window.location.assign(EXPIRED)
 }
@@ -42,6 +44,8 @@ export function makeBrowserClient(o: Opts = {}): ApiClient {
       // Check and set with no await in between: parallel failures cannot both pass.
       if (!code.startsWith("mfa_") && !fired) {
         fired = true
+        // Also for a custom handler: whoever reacts, this device's stores belong to a session that no longer exists.
+        clearClientStoresOnce("revoked")
         handler()
       }
     }

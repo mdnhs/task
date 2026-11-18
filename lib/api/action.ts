@@ -2,6 +2,7 @@
 // The UI changes optimistically (React's useOptimistic, or a local state the caller owns). Whatever the answer, the page then re-reads the server record
 // (`refresh`, the router's refresh), so a refused write leaves no lie on screen: `rollback` undoes any local state that outlives the refresh, and the mapped
 // copy plus a "Ref <requestId>" is shown. A 402 additionally lights the billing banner: the browser client announces it (lib/api/blocked.ts) for every write.
+import { clearClientStoresOnce } from "../client-stores"
 import { classifyApiError, userMessage, type ErrorKind } from "./problem"
 
 export type ActionDeps = {
@@ -28,6 +29,8 @@ export function makeActionRunner(deps: ActionDeps) {
       return { ok: true, value }
     } catch (e) {
       opts.rollback?.()
+      // The session is gone (another device revoked it): the stores of this browser belong to it. Once, however many actions fail together.
+      if (classifyApiError(e).kind === "session_expired") clearClientStoresOnce("revoked")
       // `handled`: the caller showed this refusal itself (for example under a form field), so no toast.
       if (!opts.handled?.(e)) deps.notify(userMessage(e))
       deps.refresh()

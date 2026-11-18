@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest"
+import { rearmClientStoresOnce, registerClientStoreReset } from "@/lib/client-stores"
 import { apiBrowser, makeBrowserClient, setPageTenant } from "@/lib/api/browser"
 
 let fetchMock: ReturnType<typeof vi.fn>
@@ -98,5 +99,28 @@ describe("T6.3 a client mutation that gets 401: one toast, one redirect (no pile
     expect(assign).toHaveBeenCalledTimes(1)
     expect(assign).toHaveBeenCalledWith("/api/session/expired")
     spy.mockRestore()
+  })
+})
+
+describe("B7 T12: a session killed on another device clears the stores of this one", () => {
+  const body = (status: number, code: string) => new Response(JSON.stringify({ status, code, requestId: "r" }), { status, headers: { "content-type": "application/problem+json" } })
+  const reset = vi.fn()
+  beforeEach(() => { rearmClientStoresOnce(); reset.mockReset() })
+  registerClientStoreReset(() => reset())
+
+  test("the next call that answers 401 session_expired clears the stores once, however many calls fail together", async () => {
+    const handler = vi.fn()
+    const c = makeBrowserClient({ fetch: (async () => body(401, "session_expired")) as never, onSessionExpired: handler }) as unknown as { get(p: string): Promise<unknown> }
+    await Promise.all([c.get("/v1/a"), c.get("/v1/b"), c.get("/v1/c")].map((p) => p.catch(() => undefined)))
+    expect(reset).toHaveBeenCalledTimes(1)
+    expect(handler).toHaveBeenCalledTimes(1)
+  })
+
+  test("an MFA challenge and a 403 do not clear anything", async () => {
+    for (const [s, code] of [[401, "mfa_challenge"], [403, "forbidden"]] as const) {
+      const c = makeBrowserClient({ fetch: (async () => body(s, code)) as never, onSessionExpired: vi.fn() }) as unknown as { get(p: string): Promise<unknown> }
+      await c.get("/v1/a").catch(() => undefined)
+    }
+    expect(reset).not.toHaveBeenCalled()
   })
 })
