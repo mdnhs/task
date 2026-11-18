@@ -219,3 +219,27 @@ export const DeleteShiftQuery = z.object({
   version: z.string().max(9).optional().openapi({ description: "The shift version the editor saw; a stale one is 409 version_conflict", example: "1" }),
   reason: z.string().max(2000).optional().openapi({ description: "Why (required from an office role on a published week)", example: "Cover found" }),
 })
+
+// ------------------------------------------------------------------ publish, history, confirm (FR-RS-23, 24, 35, 37)
+
+export const PublishBody = z
+  .object({ version: z.number().int().min(1), reason: z.string().max(2000).optional(), overrideRuleIds: z.array(z.string().max(40)).max(20).optional() })
+  .openapi({ example: { version: 2 } })
+export const PublishOut = z.object({ week: WeekOut, violations: z.array(ViolationOut) }).openapi({ example: { week: { ...weekEx, status: "published", publishedAt: "2026-11-16T09:00:00.000Z", publishedBy: UID, version: 3 }, violations: [] } })
+const HistoryItem = z.object({
+  id: z.uuid(), at: z.string(), actorId: z.string(), action: z.string(), locationId: z.uuid(), weekId: z.uuid().nullable(), shiftId: z.uuid().nullable(), reason: z.string().nullable(),
+  before: z.record(z.string(), z.unknown()).nullable(), after: z.record(z.string(), z.unknown()).nullable(),
+})
+export type HistoryDto = z.infer<typeof HistoryItem>
+export const HistoryOut = z
+  .object({ items: z.array(HistoryItem), nextCursor: z.string().nullable() })
+  .openapi({
+    example: {
+      items: [{ id: SHIFT_ID, at: "2026-11-16T09:00:00.000Z", actorId: UID, action: "shift_moved", locationId: LID, weekId: WEEK_ID, shiftId: SHIFT_ID, reason: "Cover for sickness", before: { start: "08:00", end: "16:00" }, after: { start: "09:00", end: "17:00" } }],
+      nextCursor: "MjAyNi0xMS0xNlQwOTowMDowMC4wMDBafDNmMmI4YzFkLTZhNDctNGUwYi05ZDE1LTJjN2U1YTliNGYxMA",
+    },
+  })
+export const HistoryQuery = z.object({
+  limit: z.string().max(5).optional().openapi({ description: "Page size 1..100 (default 50); anything else is 422 invalid_filter", example: "50" }),
+  cursor: z.string().max(200).optional().openapi({ description: "The nextCursor of the previous page (newest first, keyset on creation time and id); garbage is 400 invalid_cursor", example: "MjAyNi0xMS0xNlQwOTowMDowMC4wMDBafDNmMmI4YzFkLTZhNDctNGUwYi05ZDE1LTJjN2U1YTliNGYxMA" }),
+})

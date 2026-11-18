@@ -7,8 +7,8 @@ import { testApp } from "./harness"
  */
 type Schema = Record<string, any> // eslint-disable-line @typescript-eslint/no-explicit-any
 
-/** Free-form values that are DATA by design (audit before/after snapshots): the only allow-list entries. */
-const ALLOWED = [/^GET \/v1\/audit 200 .*\.(before|after)$/, /^GET \/v1\/platform\/audit 200 .*\.(before|after)$/]
+/** Free-form values that are DATA by design (audit before/after snapshots): the only allow-list entries (and roster history before/after). */
+const ALLOWED = [/^GET \/v1\/audit 200 .*\.(before|after)$/, /^GET \/v1\/platform\/audit 200 .*\.(before|after)$/, /^GET \/v1\/(roster\/weeks|locations)\/\{id\}\/history 200 .*\.(before|after)/] // roster history snapshots are data too (ids and wall values, per action)
 
 const STRUCTURAL = ["type", "properties", "$ref", "enum", "const", "oneOf", "anyOf", "allOf", "items", "prefixItems", "format", "not", "if"]
 export const isEmptySchema = (s: Schema): boolean => !STRUCTURAL.some((k) => k in s)

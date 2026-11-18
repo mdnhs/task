@@ -1,6 +1,6 @@
 import type { Context } from "hono"
 import type { AppEnv } from "../../core/context"
-import { Forbidden } from "../../core/errors"
+import { AppError, Forbidden } from "../../core/errors"
 import { publish } from "../../core/events"
 import type { EventType } from "../../core/events/types"
 import { rosterHistory } from "../../db/schema"
@@ -67,3 +67,11 @@ export const publishRoster = async (tx: TenantTx, ctx: Pick<RosterCtx, "tenantId
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 /** True for a uuid. A roster id that is not one answers the SAME 404 as a missing one and never reaches SQL (a uuid column would raise 22P02 and tell a prober the shape). */
 export const isUuid = (v: string): boolean => UUID.test(v)
+
+const CONTROL = /[\u0000-\u001f\u007f]/
+/** The reason an office role gives: trimmed, at most 500 characters, no control characters; blank is none (422 invalid_reason otherwise). */
+export function cleanReason(reason: string | undefined): string | null {
+  const r = (reason ?? "").trim()
+  if (r.length > 500 || CONTROL.test(r.replace(/[\r\n\t]/g, " "))) throw new AppError(422, "invalid_reason", "Unprocessable Entity")
+  return r === "" ? null : r
+}

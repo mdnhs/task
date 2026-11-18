@@ -89,6 +89,8 @@ export const AUDIT_ACTIONS: Record<string, Info> = {
   "roster.shift_added": { label: "Roster shift added", tone: "mute" },
   "roster.shift_moved": { label: "Roster shift changed", tone: "mute" },
   "roster.shift_removed": { label: "Roster shift removed", tone: "mute" },
+  "roster.week_published": { label: "Roster week published", tone: "info" },
+  "roster.shift_confirmed": { label: "Roster shift confirmed", tone: "mute" },
   "roster.rules_changed": { label: "Roster rules changed", tone: "warn", sensitive: S },
   "shift.pattern_created": { label: "Shift pattern added", tone: "mute" },
   "shift.pattern_updated": { label: "Shift pattern changed", tone: "mute" },

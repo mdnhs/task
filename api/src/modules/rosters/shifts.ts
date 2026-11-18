@@ -12,7 +12,8 @@ import { realDate } from "./qualifications"
 import { checkWeek, type NewShift } from "./rules"
 import { assertLocation, weekEditGate, type RosterCtx } from "./scope"
 import { loadWeek, shiftDto, shiftSnap, type LoadedWeek, type ShiftRow } from "./weeks"
-import { auditRoster, isUuid, writeHistory, type RosterEnv } from "./write"
+import { notifyRostered, shiftChangedPayload } from "./events"
+import { auditRoster, cleanReason, isUuid, publishRoster, writeHistory, type RosterEnv } from "./write"
 
 const unprocessable = (code: string, extra?: Record<string, unknown>) => new AppError(422, code, "Unprocessable Entity", extra)
 type TypeRow = typeof shiftTypes.$inferSelect
@@ -26,12 +27,6 @@ const MAX_SHIFTS_PER_REQUEST = 200
 /** An office role with no cut on what it edits may override a block with a reason; a supervisor never. */
 const mayOverride = (ctx: RosterCtx, reason: string | undefined): boolean => ctx.access.scope === "all" && ctx.access.editPublished && !!reason && reason.trim() !== ""
 
-const cleanReason = (reason: string | undefined): string | null => {
-  const r = (reason ?? "").trim()
-  if (r.length > 500 || CTRL.test(r.replace(/[\r\n\t]/g, " "))) throw unprocessable("invalid_reason")
-  return r === "" ? null : r
-}
-
 const cleanRole = (v: string): string => {
   const r = v.trim()
   if (r.length < 1 || r.length > 80 || CTRL.test(r)) throw unprocessable("invalid_shift")
@@ -40,11 +35,10 @@ const cleanRole = (v: string): string => {
 
 /**
  * The one gate every roster shift write passes (never the route, so a new route cannot forget it): who may edit at all (403), the publish lock (R8-8: a supervisor on
- * a published week is 403 roster_locked, an office role needs a reason), and an archived location stays readable but not editable (409). Removing a shift from an archived site is allowed.
+ * a published week is 403 roster_locked, an office role needs a reason, 422 reason_required), and an archived location stays readable but not editable (409). Removing a shift from an archived site is allowed.
  */
 function editableWeek(ctx: RosterCtx, loaded: LoadedWeek, reason: string | undefined, o: { allowArchived?: boolean } = {}): void {
   weekEditGate(ctx, { status: loaded.week.status as "draft" | "published" }, reason)
-  if (loaded.week.status === "published") throw Conflict("week_published") // office edits of a published week arrive with the publish task
   if (loaded.archived && !o.allowArchived) throw Conflict("location_archived")
 }
 
@@ -145,6 +139,16 @@ async function assertNoDuplicate(tx: TenantTx, ctx: RosterCtx, weekId: string, s
 const bumpWeek = (tx: TenantTx, ctx: RosterCtx, w: { id: string; version: number }) =>
   tx.update(rosterWeeks).set({ version: w.version + 1, updatedAt: ctx.now }).where(and(eq(rosterWeeks.tenantId, ctx.tenantId), eq(rosterWeeks.id, w.id)))
 
+/** An office edit of a PUBLISHED week tells the people it touches once each (R8-17); a draft edit tells nobody. */
+const tellPeople = (tx: TenantTx, ctx: RosterCtx, env: RosterEnv, week: { status: string; weekStart: string }, userIds: (string | null)[]): Promise<string[]> =>
+  week.status === "published" ? notifyRostered(tx, ctx, env, userIds, "changed", week.weekStart) : Promise.resolve([])
+/** The reason travels with the audit line of a published-week edit (history has its own `reason` column). */
+const reasonIf = (week: { status: string }, reason: string | null): { reason?: string } => (week.status === "published" && reason ? { reason } : {})
+/** `roster.shift_changed` for an office edit of a published week (ids only); a draft publishes no event. Call LAST. */
+async function announce(tx: TenantTx, ctx: RosterCtx, week: { id: string; locationId: string; weekStart: string; status: string }, a: { action: "added" | "moved" | "removed"; shiftIds: string[]; userIds: string[] }): Promise<void> {
+  if (week.status === "published") await publishRoster(tx, ctx, "roster.shift_changed", shiftChangedPayload(week, a))
+}
+
 // ------------------------------------------------------------------ add (several people at once)
 
 type AddEntry = { date: string; userIds: (string | null)[]; shiftTypeId: string; role?: string; start?: string; end?: string; unpaidBreakMin?: number }
@@ -153,7 +157,7 @@ type AddEntry = { date: string; userIds: (string | null)[]; shiftTypeId: string;
  * POST /v1/roster/weeks/{id}/shifts (FR-RS-20, 22): one entry per date and shift type, one shift per person (null = an open shift). Start, end, break and role default from the shift
  * type and may differ per entry. All or nothing: any ineligible person, bad value or new block fails the whole request and writes nothing. History, audit per shift; no event for a draft.
  */
-export async function addShifts(tx: TenantTx, ctx: RosterCtx, _env: RosterEnv, weekId: string, input: { shifts: AddEntry[]; reason?: string }): Promise<{ shifts: ShiftDto[]; violations: RuleViolation[] }> {
+export async function addShifts(tx: TenantTx, ctx: RosterCtx, env: RosterEnv, weekId: string, input: { shifts: AddEntry[]; reason?: string }): Promise<{ shifts: ShiftDto[]; violations: RuleViolation[] }> {
   const loaded = await loadWeek(tx, ctx, weekId, true)
   const week = loaded.week
   editableWeek(ctx, loaded, input.reason)
@@ -202,8 +206,10 @@ export async function addShifts(tx: TenantTx, ctx: RosterCtx, _env: RosterEnv, w
     // an override is recorded on the new shift it concerns; one that concerns a neighbouring shift rides on the first new shift
     const o = gate.overrides.filter((x) => x.shiftId === r.id || (i === 0 && !mine.has(x.shiftId)))
     await writeHistory(tx, ctx, { locationId: week.locationId, weekId: week.id, shiftId: r.id, action: "shift_added", reason, after: { ...shiftSnap(r), ...(o.length ? { overrides: o } : {}) } })
-    await auditRoster(tx, ctx, { action: "roster.shift_added", entity: "roster_shift", entityId: r.id, before: null, after: shiftSnap(r) })
   }
+  const told = await tellPeople(tx, ctx, env, week, sorted.map((r) => r.userId))
+  for (const r of sorted) await auditRoster(tx, ctx, { action: "roster.shift_added", entity: "roster_shift", entityId: r.id, before: null, after: { ...shiftSnap(r), ...(reasonIf(week, reason)) } })
+  await announce(tx, ctx, week, { action: "added", shiftIds: sorted.map((r) => r.id), userIds: told })
   return { shifts: sorted.map(shiftDto), violations: gate.violations }
 }
 
@@ -241,7 +247,7 @@ function parsePatch(raw: Record<string, unknown>): Patch {
  * week is 422 cannot_move_week; a new person or type or date re-runs eligibility (422 ineligible); a block the change causes is 422 rule_blocked unless an office role gives a reason.
  * A patch that changes nothing writes nothing. Changing the type copies the new type's times, break and role unless the patch gives them.
  */
-export async function patchShift(tx: TenantTx, ctx: RosterCtx, _env: RosterEnv, id: string, input: { version: number; patch: Record<string, unknown>; reason?: string }): Promise<{ shift: ShiftDto; violations: RuleViolation[] }> {
+export async function patchShift(tx: TenantTx, ctx: RosterCtx, env: RosterEnv, id: string, input: { version: number; patch: Record<string, unknown>; reason?: string }): Promise<{ shift: ShiftDto; violations: RuleViolation[] }> {
   const { shift: cur, loaded } = await loadShift(tx, ctx, id)
   const week = loaded.week
   editableWeek(ctx, loaded, input.reason)
@@ -281,7 +287,7 @@ export async function patchShift(tx: TenantTx, ctx: RosterCtx, _env: RosterEnv, 
       .update(rosterShifts)
       .set({
         date: next.date, userId: next.userId, shiftTypeId: next.shiftTypeId, role: next.role, startTime: next.start, endTime: next.end, unpaidBreakMin: next.unpaidBreakMin,
-        startAt: instantSql(inst.startAt) as unknown as Date, endAt: instantSql(inst.endAt) as unknown as Date, version: sql`${rosterShifts.version} + 1`, updatedAt: ctx.now,
+        startAt: instantSql(inst.startAt) as unknown as Date, endAt: instantSql(inst.endAt) as unknown as Date, confirmedAt: null, version: sql`${rosterShifts.version} + 1`, updatedAt: ctx.now, // the person confirms the changed shift again (R8-17)
       })
       .where(and(eq(rosterShifts.tenantId, ctx.tenantId), eq(rosterShifts.id, cur.id)))
       .returning(),
@@ -291,14 +297,16 @@ export async function patchShift(tx: TenantTx, ctx: RosterCtx, _env: RosterEnv, 
     locationId: week.locationId, weekId: week.id, shiftId: cur.id, action: "shift_moved", reason, before: shiftSnap(cur),
     after: { ...shiftSnap(row), ...(gate.overrides.length ? { overrides: gate.overrides } : {}) },
   })
-  await auditRoster(tx, ctx, { action: "roster.shift_moved", entity: "roster_shift", entityId: cur.id, before: shiftSnap(cur), after: shiftSnap(row) })
+  const told = await tellPeople(tx, ctx, env, week, [cur.userId, row.userId])
+  await auditRoster(tx, ctx, { action: "roster.shift_moved", entity: "roster_shift", entityId: cur.id, before: shiftSnap(cur), after: { ...shiftSnap(row), ...reasonIf(week, reason) } })
+  await announce(tx, ctx, week, { action: "moved", shiftIds: [cur.id], userIds: told })
   return { shift: shiftDto(row), violations: gate.violations }
 }
 
 // ------------------------------------------------------------------ remove
 
 /** DELETE /v1/roster/shifts/{id}[?version=&reason=]: removes the shift; history keeps the whole shift as `before`. An archived site's shifts may still be removed. */
-export async function deleteShift(tx: TenantTx, ctx: RosterCtx, _env: RosterEnv, id: string, o: { version?: string; reason?: string }): Promise<void> {
+export async function deleteShift(tx: TenantTx, ctx: RosterCtx, env: RosterEnv, id: string, o: { version?: string; reason?: string }): Promise<void> {
   const { shift: cur, loaded } = await loadShift(tx, ctx, id)
   editableWeek(ctx, loaded, o.reason, { allowArchived: true })
   if (o.version !== undefined && (!/^\d{1,9}$/.test(o.version) || Number(o.version) !== cur.version)) throw Conflict("version_conflict")
@@ -306,5 +314,7 @@ export async function deleteShift(tx: TenantTx, ctx: RosterCtx, _env: RosterEnv,
   await tx.delete(rosterShifts).where(and(eq(rosterShifts.tenantId, ctx.tenantId), eq(rosterShifts.id, cur.id)))
   await bumpWeek(tx, ctx, loaded.week)
   await writeHistory(tx, ctx, { locationId: loaded.week.locationId, weekId: loaded.week.id, shiftId: cur.id, action: "shift_removed", reason, before: shiftSnap(cur), after: null })
-  await auditRoster(tx, ctx, { action: "roster.shift_removed", entity: "roster_shift", entityId: cur.id, before: shiftSnap(cur), after: null })
+  const told = await tellPeople(tx, ctx, env, loaded.week, [cur.userId])
+  await auditRoster(tx, ctx, { action: "roster.shift_removed", entity: "roster_shift", entityId: cur.id, before: shiftSnap(cur), after: reasonIf(loaded.week, reason).reason ? { reason } : null })
+  await announce(tx, ctx, loaded.week, { action: "removed", shiftIds: [cur.id], userIds: told })
 }

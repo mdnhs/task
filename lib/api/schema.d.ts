@@ -10351,6 +10351,267 @@ export interface paths {
         };
         trace?: never;
     };
+    "/v1/roster/weeks/{id}/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        version: number;
+                        reason?: string;
+                        overrideRuleIds?: string[];
+                    };
+                };
+            };
+            responses: {
+                /** @description Publishes the draft week (no unpublish): the week locks for supervisors, every rostered person is told once, `roster.week_published` is published once. Warnings never stop it and come back in violations; a block needs an office role with a reason (overrideRuleIds may name the overridden rules). 404 not_found for a week or shift of a site the caller may not see, a missing or another tenant's one and an id that is not a uuid (all the same answer); 403 rule_blocked_office_required (a supervisor over a block); 409 already_published | version_conflict | location_archived; 422 rule_blocked | invalid_override | invalid_reason */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            week: {
+                                /** Format: uuid */
+                                id: string;
+                                /** Format: uuid */
+                                locationId: string;
+                                weekStart: string;
+                                /** @enum {string} */
+                                status: "draft" | "published";
+                                publishedAt: string | null;
+                                publishedBy: string | null;
+                                autoRepeatDays: number | null;
+                                version: number;
+                                days: {
+                                    date: string;
+                                    shiftIds: string[];
+                                    count: number;
+                                    target: number;
+                                    short: number;
+                                    over: number;
+                                }[];
+                            };
+                            violations: {
+                                /** @enum {string} */
+                                rule: "double_booking" | "approved_leave" | "unavailable" | "daily_rest" | "weekly_rest" | "avg_48h" | "expired_licence" | "left" | "elsewhere";
+                                shiftId: string;
+                                personId: string;
+                                /** @enum {string} */
+                                severity: "block" | "warn";
+                                message: string;
+                                otherShiftIds: string[];
+                            }[];
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/roster/shifts/{id}/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The assigned person confirms their shift on a published week (repeat is a 200 and writes nothing). Someone else who can see the shift: 403 forbidden. 404 not_found for a week or shift of a site the caller may not see, a missing or another tenant's one and an id that is not a uuid (all the same answer); 409 week_not_published */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** Format: uuid */
+                            id: string;
+                            /** Format: uuid */
+                            weekId: string;
+                            /** Format: uuid */
+                            locationId: string;
+                            date: string;
+                            userId: string | null;
+                            /** Format: uuid */
+                            shiftTypeId: string;
+                            role: string;
+                            start: string;
+                            end: string;
+                            unpaidBreakMin: number;
+                            startAt: string;
+                            endAt: string;
+                            confirmedAt: string | null;
+                            version: number;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/roster/weeks/{id}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    /** @description Page size 1..100 (default 50); anything else is 422 invalid_filter */
+                    limit?: string;
+                    /** @description The nextCursor of the previous page (newest first, keyset on creation time and id); garbage is 400 invalid_cursor */
+                    cursor?: string;
+                };
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The week's change lines, newest first, with who, when, before, after and the reason (ids only, never a name; a site id the caller cannot see is masked). 404 not_found for a week or shift of a site the caller may not see, a missing or another tenant's one and an id that is not a uuid (all the same answer); 400 invalid_cursor; 422 invalid_filter */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            items: {
+                                /** Format: uuid */
+                                id: string;
+                                at: string;
+                                actorId: string;
+                                action: string;
+                                /** Format: uuid */
+                                locationId: string;
+                                /** Format: uuid */
+                                weekId: string | null;
+                                /** Format: uuid */
+                                shiftId: string | null;
+                                reason: string | null;
+                                before: {
+                                    [key: string]: unknown;
+                                } | null;
+                                after: {
+                                    [key: string]: unknown;
+                                } | null;
+                            }[];
+                            nextCursor: string | null;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/locations/{id}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    /** @description Page size 1..100 (default 50); anything else is 422 invalid_filter */
+                    limit?: string;
+                    /** @description The nextCursor of the previous page (newest first, keyset on creation time and id); garbage is 400 invalid_cursor */
+                    cursor?: string;
+                };
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Every roster line of the site, newest first. 404 not_found for a location the caller may not see, one that does not exist, another tenant's and an id that is not a uuid (all the same answer); 400 invalid_cursor; 422 invalid_filter */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            items: {
+                                /** Format: uuid */
+                                id: string;
+                                at: string;
+                                actorId: string;
+                                action: string;
+                                /** Format: uuid */
+                                locationId: string;
+                                /** Format: uuid */
+                                weekId: string | null;
+                                /** Format: uuid */
+                                shiftId: string | null;
+                                reason: string | null;
+                                before: {
+                                    [key: string]: unknown;
+                                } | null;
+                                after: {
+                                    [key: string]: unknown;
+                                } | null;
+                            }[];
+                            nextCursor: string | null;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/members/{userId}/deactivate": {
         parameters: {
             query?: never;

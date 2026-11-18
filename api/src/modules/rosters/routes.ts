@@ -8,7 +8,10 @@ import { archiveLocation, archiveShiftType, createLocation, createShiftType, get
 import { AvailabilityBody, AvailabilityOut, CreateLeaveBody, DecideLeaveBody, LeaveListOut, LeaveQuery, LeaveSchema } from "./dto"
 import { CheckOut, RulesBody, RulesHeaders, RulesOut } from "./dto"
 import { checkWeek, putRules, readRules, rulesEtag } from "./rules"
-import { AddShiftsBody, AddShiftsOut, CreateWeekBody, DeleteShiftQuery, PatchShiftBody, PatchShiftOut, WeekSchema, WeeksOut, WeeksQuery } from "./dto"
+import { AddShiftsBody, AddShiftsOut, CreateWeekBody, DeleteShiftQuery, PatchShiftBody, PatchShiftOut, ShiftSchema, WeekSchema, WeeksOut, WeeksQuery } from "./dto"
+import { HistoryOut, HistoryQuery, PublishBody, PublishOut } from "./dto"
+import { locationHistory, weekHistory } from "./history"
+import { confirmShift, publishWeek } from "./publish"
 import { addShifts, deleteShift, patchShift } from "./shifts"
 import { createWeek, getWeek, listWeeks } from "./weeks"
 import { cancelLeave, createLeave, decideLeave, getAvailability, listLeave, putAvailability } from "./leave"
@@ -146,6 +149,22 @@ const shiftPatchR = createRoute({
   method: "patch", path: "/v1/roster/shifts/{id}", middleware: guard("write"), request: { params: RosterIdParam, body: body(PatchShiftBody) },
   responses: { 200: json(PatchShiftOut, `Moves, retimes, reassigns or retypes one shift inside its week (patch keys: date, start, end, unpaidBreakMin, userId, shiftTypeId, role). ${WEEK_HIDDEN}; 403 roster_locked; 409 version_conflict | shift_exists | week_published; 422 cannot_move_week | invalid_patch | invalid_shift | ineligible | rule_blocked | reason_required`) },
 })
+const publishR = createRoute({
+  method: "post", path: "/v1/roster/weeks/{id}/publish", middleware: guard("write"), request: { params: RosterIdParam, body: body(PublishBody) },
+  responses: { 200: json(PublishOut, `Publishes the draft week (no unpublish): the week locks for supervisors, every rostered person is told once, \`roster.week_published\` is published once. Warnings never stop it and come back in violations; a block needs an office role with a reason (overrideRuleIds may name the overridden rules). ${WEEK_HIDDEN}; 403 rule_blocked_office_required (a supervisor over a block); 409 already_published | version_conflict | location_archived; 422 rule_blocked | invalid_override | invalid_reason`) },
+})
+const confirmR = createRoute({
+  method: "post", path: "/v1/roster/shifts/{id}/confirm", middleware: guard("read"), request: { params: RosterIdParam },
+  responses: { 200: json(ShiftSchema, `The assigned person confirms their shift on a published week (repeat is a 200 and writes nothing). Someone else who can see the shift: 403 forbidden. ${WEEK_HIDDEN}; 409 week_not_published`) },
+})
+const weekHistoryR = createRoute({
+  method: "get", path: "/v1/roster/weeks/{id}/history", middleware: guard("read"), request: { params: RosterIdParam, query: HistoryQuery },
+  responses: { 200: json(HistoryOut, `The week's change lines, newest first, with who, when, before, after and the reason (ids only, never a name; a site id the caller cannot see is masked). ${WEEK_HIDDEN}; 400 invalid_cursor; 422 invalid_filter`) },
+})
+const locationHistoryR = createRoute({
+  method: "get", path: "/v1/locations/{id}/history", middleware: guard("read"), request: { params: RosterIdParam, query: HistoryQuery },
+  responses: { 200: json(HistoryOut, `Every roster line of the site, newest first. ${HIDDEN}; 400 invalid_cursor; 422 invalid_filter`) },
+})
 const shiftDeleteR = createRoute({
   method: "delete", path: "/v1/roster/shifts/{id}", middleware: guard("write"), request: { params: RosterIdParam, query: DeleteShiftQuery },
   responses: { 204: { description: `The shift is removed; history keeps it whole. ${WEEK_HIDDEN}; 403 roster_locked; 409 version_conflict | week_published; 422 reason_required` } },
@@ -169,7 +188,7 @@ export const rosterRoutes = newRouter()
   .openapi(qualsR, async (c) => c.json(await rosterRead(c, (tx, ctx) => getQualifications(tx, ctx, c.req.valid("param").userId)), 200))
   .openapi(putQualsR, async (c) => c.json(await rosterWrite(c, (tx, ctx) => setQualifications(tx, ctx, c.req.valid("param").userId, c.req.valid("json").qualifications)), 200))
   .openapi(homeR, async (c) => c.json(await rosterWrite(c, (tx, ctx) => setHomeLocation(tx, ctx, c.req.valid("param").userId, c.req.valid("json").locationId)), 200))
-  .openapi(limitR, async (c) => c.json(await rosterWrite(c, (tx, ctx) => setOfficeLimit(tx, ctx, c.req.valid("param").userId, c.req.valid("json").except)), 200))
+  .openapi(limitR, async (c) => c.json(await rosterWrite(c, (tx, ctx, env) => setOfficeLimit(tx, ctx, env, c.req.valid("param").userId, c.req.valid("json").except)), 200))
   .openapi(leaveListR, async (c) => c.json(await rosterRead(c, (tx, ctx) => listLeave(tx, ctx, c.req.valid("query"))), 200))
   .openapi(leaveCreateR, async (c) => c.json(await rosterWrite(c, (tx, ctx, env) => createLeave(tx, ctx, env, c.req.valid("json")), "self"), 201))
   .openapi(leaveCancelR, async (c) => c.json(await rosterWrite(c, (tx, ctx, env) => cancelLeave(tx, ctx, env, c.req.valid("param").id), "self"), 200))
@@ -201,6 +220,10 @@ export const rosterRoutes = newRouter()
   .openapi(weekGetR, async (c) => c.json(await rosterRead(c, (tx, ctx) => getWeek(tx, ctx, c.req.valid("param").id)), 200))
   .openapi(shiftsAddR, async (c) => c.json(await rosterWrite(c, (tx, ctx, env) => addShifts(tx, ctx, env, c.req.valid("param").id, c.req.valid("json"))), 201))
   .openapi(shiftPatchR, async (c) => c.json(await rosterWrite(c, (tx, ctx, env) => patchShift(tx, ctx, env, c.req.valid("param").id, c.req.valid("json"))), 200))
+  .openapi(publishR, async (c) => c.json(await rosterWrite(c, (tx, ctx, env) => publishWeek(tx, ctx, env, c.req.valid("param").id, c.req.valid("json"))), 200))
+  .openapi(confirmR, async (c) => c.json(await rosterWrite(c, (tx, ctx, env) => confirmShift(tx, ctx, env, c.req.valid("param").id), "self"), 200))
+  .openapi(weekHistoryR, async (c) => c.json(await rosterRead(c, (tx, ctx) => weekHistory(tx, ctx, c.req.valid("param").id, c.req.valid("query"))), 200))
+  .openapi(locationHistoryR, async (c) => c.json(await rosterRead(c, (tx, ctx) => locationHistory(tx, ctx, c.req.valid("param").id, c.req.valid("query"))), 200))
   .openapi(shiftDeleteR, async (c) => {
     await rosterWrite(c, (tx, ctx, env) => deleteShift(tx, ctx, env, c.req.valid("param").id, c.req.valid("query")))
     return c.body(null, 204)

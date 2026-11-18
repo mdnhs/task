@@ -9,8 +9,8 @@ export type Who = { userId: string; email: string; password: string }
 export const TZ = "Europe/Dublin"
 export const MON = "2026-11-02"
 
-export async function world() {
-  const t = testApp()
+export async function world(over: Parameters<typeof testApp>[0] = {}) {
+  const t = testApp(over)
   const tenant = await makeTenant(t.deps, { slug: "acme" })
   const other = await makeTenant(t.deps, { slug: "other" })
   const p: Record<string, Who> = {}
@@ -67,8 +67,8 @@ export async function world() {
 }
 
 /** Alpha (supervised by `location-supervisor`) and Bravo (supervised by sup2), a Day type (08:00-16:00) at each, and a draft week at each for MON. */
-export async function sites() {
-  const w = await world()
+export async function sites(over: Parameters<typeof testApp>[0] = {}) {
+  const w = await world(over)
   const [a, b] = [await w.loc("Alpha"), await w.loc("Bravo")]
   await w.ok("PUT", `/v1/locations/${a}/supervisors`, w.p.owner, { userIds: [w.p["location-supervisor"].userId] })
   await w.ok("PUT", `/v1/locations/${b}/supervisors`, w.p.owner, { userIds: [w.sup2.userId] })

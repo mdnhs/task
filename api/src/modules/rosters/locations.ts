@@ -397,7 +397,7 @@ export async function setTargets(tx: TenantTx, ctx: RosterCtx, id: string, targe
  * (a limited manager cannot lift their own cut). The person must be an active member with office level and roster write (422 not_roster_office
  * otherwise); every site must exist in the tenant (422 invalid_location). The next request of that person is cut by the new list.
  */
-export async function setOfficeLimit(tx: TenantTx, ctx: RosterCtx, userId: string, except: string[]): Promise<{ userId: string; except: string[] }> {
+export async function setOfficeLimit(tx: TenantTx, ctx: RosterCtx, env: RosterEnv, userId: string, except: string[]): Promise<{ userId: string; except: string[] }> {
   const all = (await tx.select({ id: locations.id }).from(locations).where(eq(locations.tenantId, ctx.tenantId))).map((l) => l.id)
   unrestrictedOffice(ctx, all)
   const [m] = await tx
@@ -415,6 +415,8 @@ export async function setOfficeLimit(tx: TenantTx, ctx: RosterCtx, userId: strin
   if (JSON.stringify(old) === JSON.stringify(next)) return { userId, except: next }
   await tx.delete(rosterOfficeLimits).where(and(eq(rosterOfficeLimits.tenantId, ctx.tenantId), eq(rosterOfficeLimits.userId, userId)))
   if (next.length) await tx.insert(rosterOfficeLimits).values(next.map((locationId) => ({ tenantId: ctx.tenantId, userId, locationId })))
+  // the person's next request is cut by the new list: tell them (generic text, no site names; nobody is told about their own change)
+  if (userId !== ctx.actorId) await notify(tx, ctx.tenantId, { userId, kind: "member", title: "Your roster access changed", body: "The locations you manage were updated.", link: "/rosters" }, env.deps, env.enqueue)
   await auditRoster(tx, ctx, { action: "roster.office_limit_changed", entity: "membership", entityId: userId, before: { except: old }, after: { except: next } })
   return { userId, except: next }
 }

@@ -185,6 +185,11 @@ const SPECS: Record<string, Spec> = {
   "POST /v1/roster/weeks/{id}/shifts": { actor: "owner", expect: "not_found" },
   "PATCH /v1/roster/shifts/{id}": { actor: "owner", expect: "not_found" },
   "DELETE /v1/roster/shifts/{id}": { actor: "owner", expect: "not_found" },
+  // B8 T10: publish (control: 200), history of a week and of a site (control: 200), confirm (control: 403 forbidden, the owner is not the assigned person). One plain 404 for anything hidden, missing, another tenant's or not a uuid.
+  "POST /v1/roster/weeks/{id}/publish": { actor: "owner", expect: "not_found" },
+  "GET /v1/roster/weeks/{id}/history": { actor: "owner", expect: "not_found" },
+  "POST /v1/roster/shifts/{id}/confirm": { actor: "owner", expect: "not_found" },
+  "GET /v1/locations/{id}/history": { actor: "owner", expect: "not_found" },
   "PATCH /v1/task-templates/{id}": { actor: "owner", expect: "template_not_found" },
   "DELETE /v1/task-templates/{id}": { actor: "owner", expect: "template_not_found" },
   // T5.1: shift patterns (control: PATCH 200, DELETE 204), assignments (control: PATCH 200 with an end date after the fixture's start, DELETE 204 for the future one),
