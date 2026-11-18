@@ -20,7 +20,7 @@ import { formatDate, formatTime } from "@/lib/dates"
 import { extraSections, isRequired, sectionOn, validateReport, windowLabel } from "@/lib/shift-report"
 import { fieldErrorsOf, forValidation } from "../adapters"
 import { ReportFileRefused, makeReportsClient } from "../client"
-import { makeDraftSession, type SessionSnapshot } from "../session"
+import { isEditable, makeDraftSession, type SessionSnapshot } from "../session"
 import { reportStateAt } from "../time"
 import { ITEM_STATUS, ITEM_STATUS_ORDER } from "../types"
 import type { ItemStatus, ReportItem, ShiftReport, TemplateSection } from "../types"
@@ -57,11 +57,11 @@ export function ReportEditor({
 }) {
   const router = useRouter()
   const client = useState(() => makeReportsClient(apiBrowser, tz))[0]
-  const [snap, setSnap] = useState<SessionSnapshot>({ form: report, conflict: null })
+  const [snap, setSnap] = useState<SessionSnapshot>({ form: report, conflict: null, conflictState: "none" })
   // the session owns the form, the debounced autosave and the idempotent submit; a 409 never discards the user's text (banner: Keep mine / Reload theirs)
   const [session] = useState(() => makeDraftSession({ client, report, onChange: setSnap, onError: (e) => toast.error(`Draft not saved. ${userMessage(e).text}`) }))
   const r = snap.form
-  const conflict = snap.conflict
+  const conflict = snap.conflictState
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [summaryOpen, setSummaryOpen] = useState(false)
   const [uploading, setUploading] = useState<string[]>([])
@@ -91,6 +91,12 @@ export function ReportEditor({
   }
   const setItem = (ref: string, key: string, patch: Partial<ReportItem>) =>
     touch(key, (x) => ({ ...x, items: x.items.map((i) => (i.taskRef === ref ? { ...i, ...patch } : i)) }))
+
+  /** Their version replaces the form; when it is no longer a draft or returned (submitted or accepted elsewhere) the page refreshes so the editor becomes read-only. */
+  const reloadTheirs = async () => {
+    const fresh = await session.reloadTheirs()
+    if (fresh && !isEditable(fresh)) router.refresh()
+  }
 
   const save = async () => {
     if (!(await session.flush())) return false
@@ -291,13 +297,13 @@ export function ReportEditor({
           <span>{Object.values(errors).filter((v, i, a) => a.indexOf(v) === i).join(" · ")}</span>
         </div>
       )}
-      {conflict && (
+      {conflict !== "none" && (
         <div className="td-state warn sr-banner" role="alert">
           <strong>Someone changed this report</strong>
-          <span>Your text is kept.</span>
+          <span>{conflict === "unavailable" ? "Your text is kept. Their version could not be loaded: try again." : "Your text is kept."}</span>
           <div className="sr-banner-actions">
             <button type="button" className="btn btn-primary" onClick={() => void session.keepMine()}>Keep mine</button>
-            <button type="button" className="btn btn-outline" onClick={() => session.reloadTheirs()}>Reload theirs</button>
+            <button type="button" className="btn btn-outline" onClick={() => void reloadTheirs()}>Reload theirs</button>
           </div>
         </div>
       )}

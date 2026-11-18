@@ -114,6 +114,11 @@ describe("T6.7 report scope and writes", () => {
     expect(e).not.toMatch(/crypto\.randomUUID\(\)(?!\.slice)/) // the request id is made inside the submitter, once per attempt
     expect(e).not.toMatch(/saveDraft\(/) // saves go through the debounced saver
   })
+  test("round 2: after Reload theirs the editor refreshes when the fetched report is no longer editable, and the banner shows for every open conflict state", () => {
+    const e = strip(read("features/reports/components/report-editor.tsx"))
+    expect(e).toMatch(/!isEditable\(fresh\)\) router\.refresh\(\)/)
+    expect(e).toContain('conflict !== "none"')
+  })
   test("the owner is never offered Accept or Return", () => {
     const r = strip(read("features/reports/components/report-review.tsx"))
     expect(r).toMatch(/r\.personId !== meId/)

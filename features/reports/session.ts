@@ -6,7 +6,8 @@ import { classifyApiError } from "@/lib/api/problem"
 import { makeAutosaver, makeSubmitter, type ReportsClient } from "./client"
 import type { ShiftReport } from "./types"
 
-export type SessionSnapshot = { form: ShiftReport; conflict: ShiftReport | null }
+/** `conflictState`: "none"; "ready" (the server report is held); "unavailable" (a conflict is open but their version could not be loaded: the banner offers a retry). The banner shows whenever it is not "none". */
+export type SessionSnapshot = { form: ShiftReport; conflict: ShiftReport | null; conflictState: "none" | "ready" | "unavailable" }
 export type SubmitResult = { kind: "ok"; report: ShiftReport } | { kind: "conflict" } | { kind: "choose" } | { kind: "unsaved" }
 
 export type SessionOptions = {
@@ -24,15 +25,23 @@ export type SessionOptions = {
 export function makeDraftSession(o: SessionOptions) {
   let form = o.report
   let conflict: ShiftReport | null = null
+  let open = false
   let failing = false
-  const emit = () => o.onChange({ form, conflict })
-  const fetchConflict = async () => {
+  const state = (): SessionSnapshot["conflictState"] => (!open ? "none" : conflict ? "ready" : "unavailable")
+  const emit = () => o.onChange({ form, conflict, conflictState: state() })
+  /** A conflict is open from the first 409 until the user chooses; their version is loaded now and retried by either choice. */
+  const fetchConflict = async (): Promise<boolean> => {
+    open = true
     try {
       conflict = await o.client.get(o.report.reportId ?? "")
+      emit()
+      return true
     } catch (e) {
+      conflict = null
       o.onError(e)
+      emit()
+      return false
     }
-    emit()
   }
   const auto = makeAutosaver<ShiftReport, ShiftReport>({
     delay: o.delay ?? 800,
@@ -53,7 +62,7 @@ export function makeDraftSession(o: SessionOptions) {
   const submitter = makeSubmitter({ submit: (r, id) => o.client.submit(r, id) }, o.newId)
 
   return {
-    snapshot: (): SessionSnapshot => ({ form, conflict }),
+    snapshot: (): SessionSnapshot => ({ form, conflict, conflictState: state() }),
     edit(next: ShiftReport) {
       form = next
       auto.schedule(next)
@@ -64,24 +73,31 @@ export function makeDraftSession(o: SessionOptions) {
       await auto.flush()
       return !failing && !auto.isStopped()
     },
+    /** Continue on the server's NEW version with the local text; retries the fetch first when it had failed (the banner stays if it still fails). */
     async keepMine() {
-      if (!conflict) return
-      const v = conflict.version
+      if (!open) return
+      if (!conflict && !(await fetchConflict())) return
+      const v = conflict!.version
       conflict = null
+      open = false
       auto.schedule(form)
       auto.keep(v)
       emit()
       await auto.flush()
     },
-    reloadTheirs() {
-      if (!conflict) return
-      form = conflict
+    /** The form takes the server's data (retries the fetch first). Returns that report so the page can refresh when it is no longer editable. */
+    async reloadTheirs(): Promise<ShiftReport | null> {
+      if (!open) return null
+      if (!conflict && !(await fetchConflict())) return null
+      form = conflict!
       conflict = null
+      open = false
       auto.resume(form.version)
       emit()
+      return form
     },
     async submit(): Promise<SubmitResult> {
-      if (conflict || auto.isStopped()) return { kind: "choose" }
+      if (open || auto.isStopped()) return { kind: "choose" }
       if (!(await this.flush())) return auto.isStopped() ? { kind: "choose" } : { kind: "unsaved" }
       try {
         return { kind: "ok", report: await submitter.submit({ ...form, version: auto.version() }) }
@@ -97,3 +113,6 @@ export function makeDraftSession(o: SessionOptions) {
 }
 
 export type DraftSession = ReturnType<typeof makeDraftSession>
+
+/** A report the member may still edit: a draft or a returned one. */
+export const isEditable = (r: Pick<ShiftReport, "status">): boolean => r.status === "draft" || r.status === "returned"
