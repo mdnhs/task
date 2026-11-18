@@ -13,6 +13,9 @@ export const MOCK_ROUTES = [
   { prefix: "/files", label: "Files" },
 ] as const
 
+/** The permission modules whose screens are mock-only (popular search terms of these are hidden without the flag). */
+export const MOCK_MODULES: readonly string[] = ["attention", "roster", "staff", "recruitment", "files", "payroll", "orders"]
+
 export const isMockRoute = (href: string): boolean => MOCK_ROUTES.some((r) => href === r.prefix || href.startsWith(`${r.prefix}/`) || href.startsWith(`${r.prefix}?`))
 
 /** The navigation without the mock-only entries (everything when the flag is on). */

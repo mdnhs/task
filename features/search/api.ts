@@ -1,4 +1,5 @@
 import { getData } from "@/lib/data"
+import { isMockRoute, MOCK_MODULES } from "@/lib/mock-registry"
 import { ME_ID } from "@/lib/people"
 import type { Module, Role } from "@/lib/types"
 import { mockSearchEnabled } from "./adapters"
@@ -43,7 +44,10 @@ export async function getSearchData(role: Role): Promise<{ items: SearchItem[]; 
       getData<{ popular: { term: string; module: Module }[] }>("search/popular.json"),
       getData<{ actions: QuickAction[] }>("search/actions.json"),
     ])
-    return { items: [], config: { popular: filterPopularForRole(popular.popular, role), actions: filterActionsForRole(actions.actions, role) } }
+    // The shortcuts and popular terms of the mock-only screens are not offered either: they would lead to the unavailable state.
+    const realPopular = popular.popular.filter((p) => !MOCK_MODULES.includes(p.module))
+    const realActions = actions.actions.filter((a) => !isMockRoute(a.href))
+    return { items: [], config: { popular: filterPopularForRole(realPopular, role), actions: filterActionsForRole(realActions, role) } }
   }
   const [src, popular, actions] = await Promise.all([
     getSources(),
