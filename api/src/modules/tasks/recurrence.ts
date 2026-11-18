@@ -281,7 +281,7 @@ async function materialiseSeries(deps: Deps, r: Run): Promise<void> {
         if (items.length) await tx.insert(taskChecklistItems).values(items.map((i) => ({ tenantId, taskId: row.id, text: i.text, position: i.position }))) // the checklist comes back unticked
         created.push(row)
         const recipients = [assign.primary!, ...assign.others].sort()
-        await writeHistory(tx, { tenantId, actorId: SYSTEM_ACTOR, now }, row.id, { kind: "created", text: `Created from recurring task TSK-${s.refNo}`, notified: recipients })
+        await writeHistory(tx, { tenantId, actorId: SYSTEM_ACTOR, now }, row.id, { kind: "created", text: "Created from a recurring task", causeTaskId: s.id, notified: recipients })
         await notifyTask(tx, { deps, enqueue }, { tenantId }, row, recipients, "New task")
       }
     }

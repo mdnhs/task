@@ -21,12 +21,15 @@ export async function writeHistory(tx: TenantTx, ctx: Pick<TaskCtx, "tenantId" |
   return row.id
 }
 
-/** Lines that name another task (ruling S2): the stored text is neutral; a reader who can see the cause task gets its ref, anyone else a neutral line. */
-const CAUSE_TEXT: Record<string, (ref: string) => string> = {
-  rescheduled: (r) => `Moved because ${r} was rescheduled`,
-  archived: (r) => `Archived with ${r}`,
-  restored: (r) => `Restored with ${r}`,
+/** Lines that name another task (ruling S2): the stored text is neutral; a reader who can see the cause task gets its ref, anyone else the hidden form. `neutral` is what a row without a resolvable cause shows. */
+const CAUSE_TEXT: Record<string, { visible: (ref: string) => string; hidden: string; neutral: string }> = {
+  rescheduled: { visible: (r) => `Moved because ${r} was rescheduled`, hidden: "Moved because a task you cannot see was rescheduled", neutral: "Moved because another task was rescheduled" },
+  archived: { visible: (r) => `Archived with ${r}`, hidden: "Archived with a task you cannot see", neutral: "Archived with another task" },
+  restored: { visible: (r) => `Restored with ${r}`, hidden: "Restored with a task you cannot see", neutral: "Restored with another task" },
+  created: { visible: (r) => `Created from recurring task ${r}`, hidden: "Created from a recurring task", neutral: "Created from a recurring task" },
 }
+const DETACHED_NEUTRAL = "The parent task was removed; this is now a task of its own"
+const HAS_REF = /\bTSK-\d+\b/
 
 const FORMER = "Former member"
 /** Display names NOW (never snapshotted): an erased or unknown person is "Former member"; keys and the system have fixed labels. */
@@ -88,8 +91,17 @@ export async function historyDtos(tx: TenantTx, ctx: Pick<TaskCtx, "tenantId" | 
       : [],
   )
   const textOf = (r: HistoryRow): string => {
-    const render = r.causeTaskId ? CAUSE_TEXT[r.kind] : undefined
-    return render ? render(causeRef.get(r.causeTaskId!) ?? "a task you cannot see") : (r.text ?? "")
+    const c = CAUSE_TEXT[r.kind]
+    if (c && r.causeTaskId) {
+      const ref = causeRef.get(r.causeTaskId)
+      return ref ? c.visible(ref) : c.hidden
+    }
+    // Safety net: a legacy row whose cause was purged (or never resolved) must not keep a raw ref in its text.
+    if (r.text && HAS_REF.test(r.text)) {
+      if (c) return c.neutral
+      if (r.kind === "detached") return DETACHED_NEUTRAL
+    }
+    return r.text ?? ""
   }
   const depVisible = (x: unknown) => seeable.has(String(x))
   const fmt = {

@@ -12,7 +12,7 @@ import { registerSearchIndexers } from "../search"
 import { buildCommentsQuery } from "./collab"
 import { withTenant } from "../../db/tenant-tx"
 import { clearModuleOverride } from "../entitlements"
-import { applyTaskUpdate, buildListQuery, type TaskCtx } from "."
+import { applyTaskUpdate, buildListQuery, registerTasks, type TaskCtx } from "."
 import { NO_EVIDENCE } from "@opsdesk/domain/task-evidence"
 
 type Json = Record<string, any> // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -1372,18 +1372,136 @@ describe("projects, milestones, dependencies, knock-on and date proposals (T4.3)
       expect(JSON.stringify(items)).not.toContain(a.ref)
     })
 
-    test("legacy row text \"Moved because TSK-n was rescheduled\" is neutral for an out-of-scope caller after migration 0040 (backfill resolves cause_task_id)", async () => {
+    test("migration 0040 backfill, executed as app_owner with NO tenant context over several tenants, resolves legacy rows and is idempotent", async () => {
       const w = await world()
       const { a, b } = await moved(w)
-      const legacy = `Moved because ${a.ref} was rescheduled`
-      await w.q("update task_history set cause_task_id = null, text = $2 where task_id = $1 and kind = 'rescheduled'", [b.id, legacy])
+      // a second tenant with its own legacy knock-on pair (refs repeat across tenants: both are TSK-1000 / TSK-1001)
+      const t2 = await makeTenant(w.deps, { slug: "beta" })
+      const ops2 = await w.who("ops", t2.id)
+      const mk2 = async (title: string, day: string) => {
+        const r = await w.req("POST", "/v1/tasks", ops2, w.base({ title, primary: ops2.userId, start: `2026-11-${day}T09:00:00`, due: `2026-11-${day}T17:00:00` }), "beta")
+        expect(r.status, await r.clone().text()).toBe(201)
+        return w.json(r)
+      }
+      const a2 = await mk2("Beta A", "20")
+      const b2 = await mk2("Beta B", "21")
+      const sql2 = (q: string, ps: unknown[] = []) => ownerTenantQuery(t2.id, q, ps)
+      const legacy = (ref: string) => `Moved because ${ref} was rescheduled`
+      await w.q("update task_history set cause_task_id = null, text = $2 where task_id = $1 and kind = 'rescheduled'", [b.id, legacy(a.ref)])
+      await sql2("insert into task_history (tenant_id, task_id, at, kind, text) values ($1, $2, now(), 'rescheduled', $3)", [t2.id, b2.id, legacy(a2.ref)])
+      await sql2("insert into task_history (tenant_id, task_id, at, kind, text) values ($1, $2, now(), 'created', $3)", [t2.id, b2.id, `Created from recurring task ${a2.ref}`])
+      await sql2("insert into task_history (tenant_id, task_id, at, kind, text) values ($1, $2, now(), 'archived', 'Archived with TSK-99999999')", [t2.id, b2.id]) // unresolvable ref
+      await sql2("insert into task_history (tenant_id, task_id, at, kind, text) values ($1, $2, now(), 'restored', 'Restored with TSK-99999999999999999999')", [t2.id, b2.id]) // absurd digit string must not abort
+      await sql2("insert into task_history (tenant_id, task_id, at, kind, text) values ($1, $2, now(), 'detached', $3)", [t2.id, b2.id, `${a2.ref} was removed; this is now a task of its own`])
       const sqlText = (await import("node:fs")).readFileSync(new URL("../../db/migrations/0040_history_cause.sql", import.meta.url), "utf8")
-      for (const st of sqlText.split("--> statement-breakpoint").filter((x) => /^\s*UPDATE/i.test(x))) await w.q(st)
-      const [row] = await w.q("select cause_task_id, text from task_history where task_id = $1 and kind = 'rescheduled'", [b.id])
-      expect(row.cause_task_id).toBe(a.id)
-      expect(row.text).not.toContain(a.ref)
+      const backfill = sqlText.split("--> statement-breakpoint").map((x) => x.trim()).filter((x) => x && !/^ALTER TABLE/i.test(x)) // the DDL already ran with the test database
+      expect(backfill.length).toBeGreaterThan(0)
+      const run = async () => { for (const st of backfill) await ownerQuery(st) } // no app.tenant_id: only the migration's own per-tenant loop can see rows
+      await run()
+      const rows = async () => ({
+        one: (await w.q("select cause_task_id, text from task_history where task_id = $1 and kind = 'rescheduled'", [b.id]))[0],
+        two: await sql2("select kind, cause_task_id, text from task_history where task_id = $1 and kind <> 'created' or (task_id = $1 and text like 'Created%') order by kind, text", [b2.id]),
+      })
+      const after = await rows()
+      expect(after.one).toEqual({ cause_task_id: a.id, text: "Moved because another task was rescheduled" })
+      const by = (k: string, text?: string) => after.two.find((r) => r.kind === k && (!text || r.text === text))!
+      expect(by("rescheduled", "Moved because another task was rescheduled").cause_task_id).toBe(a2.id)
+      expect(by("created").cause_task_id).toBe(a2.id)
+      expect(by("created").text).toBe("Created from a recurring task")
+      expect(by("restored")).toMatchObject({ cause_task_id: null, text: "Restored with another task" })
+      expect(by("archived")).toMatchObject({ cause_task_id: null, text: "Archived with another task" })
+      expect(by("detached").text).toBe("The parent task was removed; this is now a task of its own")
+      expect(JSON.stringify(after)).not.toMatch(/TSK-\d/)
+      await run() // idempotent
+      expect(await rows()).toEqual(after)
       expect(textsOf(await histOf(w, b.id, w.staff))).toContain("Moved because a task you cannot see was rescheduled")
       expect(textsOf(await histOf(w, b.id, w.ops))).toContain(`Moved because ${a.ref} was rescheduled`)
+    })
+
+    test("a row with no resolvable cause but a raw ref in its text renders neutral (safety net)", async () => {
+      const w = await world()
+      const { a, b } = await moved(w)
+      await w.q("update task_history set cause_task_id = null, text = $2 where task_id = $1 and kind = 'rescheduled'", [b.id, `Moved because ${a.ref} was rescheduled`])
+      await w.q("insert into task_history (tenant_id, task_id, at, kind, text) values ($1, $2, now(), 'detached', $3)", [w.tenant.id, b.id, `${a.ref} was removed; this is now a task of its own`])
+      const raw = JSON.stringify((await histOf(w, b.id, w.ops)).items.filter((i: Json) => ["rescheduled", "detached"].includes(i.kind))) // (the dependency line legitimately shows A to ops)
+      expect(raw).not.toContain(a.ref)
+      expect(raw).toContain("Moved because another task was rescheduled")
+      expect(raw).toContain("The parent task was removed; this is now a task of its own")
+    })
+
+    test("a purged cause task: SET NULL, then the line is neutral for everyone", async () => {
+      const w = await world()
+      const { a, b } = await moved(w)
+      expect((await w.req("POST", `/v1/tasks/${a.id}/archive`, w.ops, { version: (await w.q("select version from tasks where id = $1", [a.id]))[0].version })).status).toBe(200)
+      expect((await w.req("DELETE", `/v1/tasks/${a.id}`, w.owner)).status).toBe(204)
+      expect((await w.q("select cause_task_id from task_history where task_id = $1 and kind = 'rescheduled'", [b.id]))[0].cause_task_id).toBeNull()
+      for (const who of [w.owner, w.ops, w.staff]) {
+        const raw = JSON.stringify(await histOf(w, b.id, who))
+        expect(raw).not.toContain(a.ref)
+        expect(raw).toContain("Moved because another task was rescheduled")
+      }
+    })
+
+    /** A team manager who manages staff cannot see tasks of staff2; the owner sees everything. */
+    const reassign = async (w: W, taskId: string, to: Who) => {
+      await w.q("delete from task_assignees where task_id = $1", [taskId])
+      await w.q("insert into task_assignees (tenant_id, task_id, user_id, is_primary) values ($1, $2, $3, true)", [w.tenant.id, taskId, to.userId])
+    }
+
+    test("detached subtask line: the purged parent ref is in no JSON a team manager reads", async () => {
+      const w = await world()
+      await w.manages(w.manager, w.staff)
+      const parent = await w.mk(w.ops, { title: "Parent", primary: w.staff2.userId })
+      const kid = await w.json(await w.req("POST", `/v1/tasks/${parent.id}/subtasks`, w.ops, { title: "Kid" }))
+      const done = await w.json(await w.req("POST", `/v1/tasks/${parent.id}/subtasks`, w.ops, { title: "Done kid" }))
+      await reassign(w, kid.id, w.staff)
+      await reassign(w, done.id, w.staff)
+      await w.q("update tasks set status = 'completed' where id = $1", [done.id])
+      const ver = async (id: string) => (await w.q("select version from tasks where id = $1", [id]))[0].version
+      expect((await w.req("POST", `/v1/tasks/${parent.id}/archive`, w.ops, { version: await ver(parent.id) })).status).toBe(200)
+      expect((await w.req("POST", `/v1/tasks/${parent.id}/restore`, w.ops, {})).status).toBe(200)
+      expect((await w.req("POST", `/v1/tasks/${parent.id}/archive`, w.ops, { version: await ver(parent.id) })).status).toBe(200)
+      expect((await w.req("DELETE", `/v1/tasks/${parent.id}`, w.owner)).status).toBe(204) // purge: the live completed subtask is detached
+      const mgr = JSON.stringify(await histOf(w, done.id, w.manager))
+      expect(mgr).not.toContain(parent.ref)
+      expect(mgr).toContain("The parent task was removed; this is now a task of its own")
+    })
+
+    test("archived and restored subtask lines: parent ref hidden from the team manager, shown to the owner", async () => {
+      const reassign2 = reassign
+      const w2 = await world()
+      await w2.manages(w2.manager, w2.staff)
+      const p2 = await w2.mk(w2.ops, { title: "Parent", primary: w2.staff2.userId })
+      const k2 = await w2.json(await w2.req("POST", `/v1/tasks/${p2.id}/subtasks`, w2.ops, { title: "Kid" }))
+      await reassign2(w2, k2.id, w2.staff)
+      expect((await w2.req("POST", `/v1/tasks/${p2.id}/archive`, w2.ops, { version: (await w2.q("select version from tasks where id = $1", [p2.id]))[0].version })).status).toBe(200)
+      expect((await w2.req("POST", `/v1/tasks/${p2.id}/restore`, w2.ops, {})).status).toBe(200)
+      const m2 = JSON.stringify(await histOf(w2, k2.id, w2.manager))
+      expect(m2).not.toContain(p2.ref)
+      expect(m2).toContain("Archived with a task you cannot see")
+      expect(m2).toContain("Restored with a task you cannot see")
+      const o2 = JSON.stringify(await histOf(w2, k2.id, w2.owner))
+      expect(o2).toContain(`Archived with ${p2.ref}`)
+      expect(o2).toContain(`Restored with ${p2.ref}`)
+    })
+
+    test("recurrence-created line: the series ref is hidden from a manager who cannot see the series, shown to the owner", async () => {
+      registerNotifications()
+      registerSearchIndexers()
+      registerTasks()
+      const w = await world({ sessionIdleHours: 72 })
+      await w.manages(w.manager, w.staff)
+      const series = await w.mk(w.ops, { title: "Mop", start: "2026-11-16T08:00:00", due: "2026-11-16T09:00:00", primary: w.staff2.userId })
+      expect((await w.req("PUT", `/v1/tasks/${series.id}/repeat`, w.ops, { version: 1, rule: { freq: "daily" } })).status).toBe(200)
+      w.clock.advance({ days: 1 })
+      await runJob("tasks.recurrence", {}, w.deps)
+      const [inst] = await w.q<{ id: string }>("select id from tasks where series_id = $1", [series.id])
+      await reassign(w, inst.id, w.staff)
+      const raw = JSON.stringify(await histOf(w, inst.id, w.manager))
+      expect(raw).not.toContain(series.ref)
+      expect(raw).toContain("Created from a recurring task")
+      expect(JSON.stringify(await histOf(w, inst.id, w.owner))).toContain(`Created from recurring task ${series.ref}`)
+      expect(JSON.stringify(await w.json(await w.req("GET", `/v1/tasks/${inst.id}`, w.manager)))).not.toContain(series.ref)
     })
 
     test("notification body, event payload and search hit for the moved task contain no root ref", async () => {

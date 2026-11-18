@@ -534,7 +534,7 @@ describe("per_shift recurrence (F15, D11)", () => {
     expect((await dates(w, s.id)).length).toBe(4)
     const refs = (await w.q("select ref_no from tasks order by ref_no")).map((r) => r.ref_no as number)
     expect(refs).toEqual(Array.from({ length: refs.length }, (_, i) => 1000 + i)) // no gaps: the losers took no number
-    expect((await w.q("select count(*)::int n from task_history h join tasks t on t.id = h.task_id where t.series_id = $1 and h.text like 'Created from recurring%'", [s.id]))[0].n).toBe(4)
+    expect((await w.q("select count(*)::int n from task_history h join tasks t on t.id = h.task_id where t.series_id = $1 and h.text like 'Created from a recurring%'", [s.id]))[0].n).toBe(4)
     const err = await w
       .q(`insert into tasks (tenant_id, ref_no, title, start_at, due_at, evidence_rule, series_id, occurrence_date, created_at, updated_at) values ($1, 9999, 'dup', now(), now(), '{}'::jsonb, $2, '2026-10-25', now(), now())`, [w.tenant.id, s.id])
       .catch((e) => e)
