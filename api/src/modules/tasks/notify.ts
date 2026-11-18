@@ -14,8 +14,8 @@ export const changeRecipients = (ctx: Pick<TaskCtx, "me" | "actorId">, task: Pic
  * In-app (and push, per preference) notice of kind "task" to each recipient, written in the request tx (ruling D15). The body is the
  * ref and title only (a Drive link in the title is withheld at write time, ruling E13): no person's name, so an erasure never leaves a name in someone's inbox.
  */
-export async function notifyTask(tx: TenantTx, env: TaskEnv, ctx: Pick<TaskCtx, "tenantId">, task: Pick<TaskRow, "refNo" | "title">, recipients: string[], title: string): Promise<void> {
+export async function notifyTask(tx: TenantTx, env: TaskEnv, ctx: Pick<TaskCtx, "tenantId">, task: Pick<TaskRow, "refNo" | "title">, recipients: string[], title: string, link?: string): Promise<void> {
   for (const userId of recipients) {
-    await notify(tx, ctx.tenantId, { userId, kind: "task", title, body: `TSK-${task.refNo} ${withholdDriveText(task.title)}`, link: `/tasks/TSK-${task.refNo}` }, env.deps, env.enqueue)
+    await notify(tx, ctx.tenantId, { userId, kind: "task", title, body: `TSK-${task.refNo} ${withholdDriveText(task.title)}`, link: link ?? `/tasks/TSK-${task.refNo}` }, env.deps, env.enqueue)
   }
 }

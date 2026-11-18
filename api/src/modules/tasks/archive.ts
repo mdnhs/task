@@ -114,7 +114,7 @@ export async function archiveTask(tx: TenantTx, env: TaskEnv, ctx: TaskCtx, id: 
     await removeDocument(tx, ctx.tenantId, "task", m.id) // gone from search at once, not when the relay catches up
   }
   const [next] = await tx.select().from(tasks).where(and(eq(tasks.id, row.id), eq(tasks.tenantId, ctx.tenantId)))
-  await notifyTask(tx, env, ctx, next, recipients, "Task removed")
+  await notifyTask(tx, env, ctx, next, recipients, "Task removed", "/tasks/archive") // an archived task 404s at /tasks/TSK-n
   const dto = await taskDetailDto(tx, ctx, next)
   for (const m of members) {
     await recordAudit(tx, ctx.tenantId, {

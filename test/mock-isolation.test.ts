@@ -80,7 +80,7 @@ describe("4. mock routes exist only behind ENABLE_MOCK_MODULES=1", () => {
   const mockPages = code.filter((f) => /^app\/\(app\)\/.+\/page\.tsx$/.test(f)).filter((f) => isMockRoute(`/${f.replace(/^app\/\(app\)\//, "").replace(/\/page\.tsx$/, "")}`))
   test("the flag is read in exactly one place", () => {
     const readers = code.filter((f) => /process\.env\.ENABLE_MOCK_MODULES|env\.ENABLE_MOCK_MODULES/.test(strip(read(f))))
-    expect(readers.sort()).toEqual(["features/search/adapters.ts", "lib/mock-registry.ts"].sort())
+    expect(readers).toEqual(["lib/mock-registry.ts"])
   })
   test("every page under a mock route starts with the gate, before any data call", () => {
     expect(mockPages.length).toBeGreaterThanOrEqual(11)

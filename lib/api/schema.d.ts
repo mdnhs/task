@@ -1458,6 +1458,7 @@ export interface paths {
                                         to: string;
                                     }[];
                                     notified: string[];
+                                    hiddenNotified: number;
                                     updateId?: string;
                                 }[];
                                 overdue?: {
@@ -1737,6 +1738,7 @@ export interface paths {
                                     to: string;
                                 }[];
                                 notified: string[];
+                                hiddenNotified: number;
                                 updateId?: string;
                             }[];
                             overdue?: {
@@ -1965,6 +1967,7 @@ export interface paths {
                                     to: string;
                                 }[];
                                 notified: string[];
+                                hiddenNotified: number;
                                 updateId?: string;
                             }[];
                             overdue?: {
@@ -2242,6 +2245,7 @@ export interface paths {
                                     to: string;
                                 }[];
                                 notified: string[];
+                                hiddenNotified: number;
                                 updateId?: string;
                             }[];
                             overdue?: {
@@ -2479,6 +2483,7 @@ export interface paths {
                                     to: string;
                                 }[];
                                 notified: string[];
+                                hiddenNotified: number;
                                 updateId?: string;
                             }[];
                             overdue?: {
@@ -2722,6 +2727,7 @@ export interface paths {
                                     to: string;
                                 }[];
                                 notified: string[];
+                                hiddenNotified: number;
                                 updateId?: string;
                             }[];
                             overdue?: {
@@ -2962,6 +2968,7 @@ export interface paths {
                                     to: string;
                                 }[];
                                 notified: string[];
+                                hiddenNotified: number;
                                 updateId?: string;
                             }[];
                             overdue?: {
@@ -3217,6 +3224,7 @@ export interface paths {
                                     to: string;
                                 }[];
                                 notified: string[];
+                                hiddenNotified: number;
                                 updateId?: string;
                             }[];
                             overdue?: {
@@ -3302,6 +3310,7 @@ export interface paths {
                                     to: string;
                                 }[];
                                 notified: string[];
+                                hiddenNotified: number;
                                 updateId?: string;
                             }[];
                             nextCursor: string | null;
@@ -3516,6 +3525,7 @@ export interface paths {
                                     to: string;
                                 }[];
                                 notified: string[];
+                                hiddenNotified: number;
                                 updateId?: string;
                             }[];
                             overdue?: {
@@ -3750,6 +3760,7 @@ export interface paths {
                                     to: string;
                                 }[];
                                 notified: string[];
+                                hiddenNotified: number;
                                 updateId?: string;
                             }[];
                             overdue?: {
@@ -4110,6 +4121,7 @@ export interface paths {
                                     to: string;
                                 }[];
                                 notified: string[];
+                                hiddenNotified: number;
                                 updateId?: string;
                             }[];
                             overdue?: {
@@ -4656,6 +4668,7 @@ export interface paths {
                                     to: string;
                                 }[];
                                 notified: string[];
+                                hiddenNotified: number;
                                 updateId?: string;
                             }[];
                             overdue?: {
@@ -4882,6 +4895,7 @@ export interface paths {
                                     to: string;
                                 }[];
                                 notified: string[];
+                                hiddenNotified: number;
                                 updateId?: string;
                             }[];
                             overdue?: {
@@ -5171,6 +5185,7 @@ export interface paths {
                                     to: string;
                                 }[];
                                 notified: string[];
+                                hiddenNotified: number;
                                 updateId?: string;
                             }[];
                             overdue?: {
@@ -5508,6 +5523,7 @@ export interface paths {
                                     to: string;
                                 }[];
                                 notified: string[];
+                                hiddenNotified: number;
                                 updateId?: string;
                             }[];
                             overdue?: {
@@ -5754,6 +5770,7 @@ export interface paths {
                                     to: string;
                                 }[];
                                 notified: string[];
+                                hiddenNotified: number;
                                 updateId?: string;
                             }[];
                             overdue?: {
@@ -6005,6 +6022,7 @@ export interface paths {
                                     to: string;
                                 }[];
                                 notified: string[];
+                                hiddenNotified: number;
                                 updateId?: string;
                             }[];
                             overdue?: {
@@ -6246,6 +6264,7 @@ export interface paths {
                                     to: string;
                                 }[];
                                 notified: string[];
+                                hiddenNotified: number;
                                 updateId?: string;
                             }[];
                             overdue?: {
@@ -6504,6 +6523,7 @@ export interface paths {
                                     to: string;
                                 }[];
                                 notified: string[];
+                                hiddenNotified: number;
                                 updateId?: string;
                             }[];
                             overdue?: {
@@ -6899,6 +6919,7 @@ export interface paths {
                                     to: string;
                                 }[];
                                 notified: string[];
+                                hiddenNotified: number;
                                 updateId?: string;
                             }[];
                             overdue?: {
@@ -7142,6 +7163,7 @@ export interface paths {
                                     to: string;
                                 }[];
                                 notified: string[];
+                                hiddenNotified: number;
                                 updateId?: string;
                             }[];
                             overdue?: {

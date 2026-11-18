@@ -4,10 +4,14 @@
 //   tenant  a tenant slug (default "northgate", the full demo dataset).
 //   mock    true = runs only against a demo deployment (SMOKE_MOCK=1, the web started with ENABLE_MOCK_MODULES=1); false = only against one without it.
 // Env: SMOKE_BASE (default http://localhost:3000), SMOKE_PASSWORD (required: the demo seed's SEED_DEMO_PASSWORD), SMOKE_EMAIL_DOMAIN (default demo.example), SMOKE_MOCK.
-// LOCAL / demo databases only: never point it at a real client's deployment. Cases live in scripts/smoke/*.json.
+// LOCAL / demo databases only (a non-localhost SMOKE_BASE needs SMOKE_ALLOW_REMOTE=1): never point it at a real client's deployment. Cases live in scripts/smoke/*.json.
 import { readFileSync, readdirSync, existsSync } from "node:fs"
 
 const BASE = process.env.SMOKE_BASE ?? "http://localhost:3000"
+if (!/^https?:\/\/(localhost|127\.0\.0\.1)(:|\/|$)/.test(BASE) && process.env.SMOKE_ALLOW_REMOTE !== "1") {
+  console.error(`SMOKE_BASE ${BASE} is not localhost: the smoke signs people in with the demo password. Set SMOKE_ALLOW_REMOTE=1 only for a demo deployment. Nothing is run.`)
+  process.exit(2)
+}
 const DOMAIN = process.env.SMOKE_EMAIL_DOMAIN ?? "demo.example"
 const MOCK = process.env.SMOKE_MOCK === "1"
 const PASSWORD = process.env.SMOKE_PASSWORD

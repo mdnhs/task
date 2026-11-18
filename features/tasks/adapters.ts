@@ -35,7 +35,9 @@ export function toTimeline(history: readonly unknown[], nameOf: (id: string) => 
       const x = rec(c, "change")
       return { field: str(x, "field"), from: str(x, "from"), to: str(x, "to") }
     })
-    const notified = strs(r, "notified").map(nameOf)
+    // People outside the caller's scope arrive as a count only ("2 others"), never as ids.
+    const hidden = typeof r.hiddenNotified === "number" ? r.hiddenNotified : 0
+    const notified = [...strs(r, "notified").map(nameOf), ...(hidden > 0 ? [`${hidden} other${hidden === 1 ? "" : "s"}`] : [])]
     const updateId = optStr(r, "updateId")
     return { at: str(r, "at"), by: str(r, "by"), text: str(r, "text"), ...(changes.length ? { changes } : {}), ...(notified.length ? { notified } : {}), ...when(updateId, "updateId") }
   })

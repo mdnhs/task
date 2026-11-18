@@ -203,8 +203,23 @@ describe("archive and restore", () => {
     expect(notes.map((n) => n.user_id).sort()).toEqual([w.staff.userId, w.staff2.userId].sort()) // the creator is the actor: not told
     expect(notes.every((n) => n.kind === "task" && n.title === "Task removed")).toBe(true)
     expect(notes[0].body).toContain("Mop the lobby")
+    const links = await w.q("select link from notifications where title = 'Task removed'")
+    expect(links.every((n) => n.link === "/tasks/archive")).toBe(true) // /tasks/TSK-n would 404 for an archived task
     const [h] = await w.q("select notified from task_history where task_id = $1 and kind = 'archived'", [t.id])
     expect([...h.notified].sort()).toEqual([w.staff.userId, w.staff2.userId].sort())
+  })
+
+  test("history names only the notified people the caller may see; the others are a count (T6.9 review)", async () => {
+    const w = await world()
+    await w.manages(w.manager, w.staff)
+    const t = await w.mk(w.ops, { title: "Shared task", primary: w.staff.userId, others: [w.staff2.userId] })
+    const team = (await w.json(await w.req("GET", `/v1/tasks/${t.id}/history`, w.manager))).items[0]
+    expect(team.notified).toEqual([w.staff.userId]) // staff2 is outside the team manager's scope
+    expect(team.hiddenNotified).toBe(1)
+    expect(JSON.stringify(team)).not.toContain(w.staff2.userId)
+    const all = (await w.json(await w.req("GET", `/v1/tasks/${t.id}/history`, w.owner))).items[0]
+    expect([...all.notified].sort()).toEqual([w.staff.userId, w.staff2.userId].sort())
+    expect(all.hiddenNotified).toBe(0)
   })
 
   test("only managers archive or restore (D6), scope applies (404), version is checked, archived twice is 409, a live task cannot be restored", async () => {

@@ -9,7 +9,7 @@ import type { TaskCtx } from "./scope"
 import { wallOf } from "./time"
 
 export type HistoryInput = { kind: string; text?: string | null; changes?: RawChange[]; notified?: string[]; updateId?: string | null }
-export type HistoryDto = { id: string; at: string; atUtc: string; actorId: string | null; by: string; kind: string; text: string; changes: FieldChange[]; notified: string[]; updateId?: string }
+export type HistoryDto = { id: string; at: string; atUtc: string; actorId: string | null; by: string; kind: string; text: string; changes: FieldChange[]; notified: string[]; hiddenNotified: number; updateId?: string }
 type HistoryRow = typeof taskHistory.$inferSelect
 
 /** Appends one history line (tenant-time instant = ctx.now). The text is device-agnostic, so a Drive link in it is always withheld at write time (ruling E13).  Returns its id. A repeated (task, update_id) is a unique violation: callers check first. */
@@ -49,7 +49,14 @@ function referenced(rows: HistoryRow[]): { users: string[]; teamIds: string[]; p
   return { users: [...users], teamIds: [...teamIds], projectIds: [...projectIds], milestoneIds: [...milestoneIds] }
 }
 
-export async function historyDtos(tx: TenantTx, ctx: Pick<TaskCtx, "tenantId" | "tz" | "drive">, rows: HistoryRow[]): Promise<HistoryDto[]> {
+/** Whether the caller may know this person exists in their scope (own: themself; team: themself and direct reports; all: everyone). Others are counted, never named or identified. */
+export function personVisible(ctx: Pick<TaskCtx, "me" | "scope" | "reports">, id: string): boolean {
+  if (id === ctx.me || id.startsWith("apikey:") || id.startsWith("system:")) return true
+  const s = ctx.scope
+  return s.kind === "all" || (s.kind === "team" && ctx.reports.includes(id))
+}
+
+export async function historyDtos(tx: TenantTx, ctx: Pick<TaskCtx, "tenantId" | "tz" | "drive" | "me" | "scope" | "reports">, rows: HistoryRow[]): Promise<HistoryDto[]> {
   const ref = referenced(rows)
   const nameOf = await namesOf(tx, ref.users)
   const teamRows = ref.teamIds.length ? await tx.select({ id: teams.id, name: teams.name }).from(teams).where(and(eq(teams.tenantId, ctx.tenantId), inArray(teams.id, ref.teamIds))) : []
@@ -73,7 +80,8 @@ export async function historyDtos(tx: TenantTx, ctx: Pick<TaskCtx, "tenantId" | 
     kind: r.kind,
     text: free(r.text ?? ""),
     changes: r.changes.map((c) => formatChange(c, fmt)).map((c) => ({ ...c, from: free(c.from), to: free(c.to) })),
-    notified: r.notified,
+    notified: r.notified.filter((n) => personVisible(ctx, n)),
+    hiddenNotified: r.notified.filter((n) => !personVisible(ctx, n)).length, // out-of-scope people: a count only (as hidden dependencies), never their ids
     ...(r.updateId ? { updateId: r.updateId } : {}),
   }))
 }

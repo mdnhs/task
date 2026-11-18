@@ -78,6 +78,10 @@ describe("history notified list (T6.9 browser-walk defect: the timeline printed 
     const names = new Map([["u-1", "Tomasz Wojcik"]])
     expect(toTimeline([h], (id) => names.get(id) ?? "Member")[0].notified).toEqual(["Tomasz Wojcik", "Member"])
   })
+  test("out-of-scope people arrive as a count and read as 'N others'", () => {
+    expect(toTimeline([{ ...h, notified: ["u-1"], hiddenNotified: 2 }], () => "Ann")[0].notified).toEqual(["Ann", "2 others"])
+    expect(toTimeline([{ ...h, notified: [], hiddenNotified: 1 }])[0].notified).toEqual(["1 other"])
+  })
   test("with no resolver an id is never shown", () => {
     expect(toTimeline([h])[0].notified).toEqual(["Member", "Member"])
   })

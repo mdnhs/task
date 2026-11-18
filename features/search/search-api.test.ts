@@ -3,7 +3,7 @@ import path from "node:path"
 import { describe, expect, test, vi } from "vitest"
 import { fakeApi } from "@/test/support/fake-api"
 import { applyFilters, EMPTY_FILTERS, groupResults } from "./match"
-import { hitsToItems, makeSearcher, mockSearchEnabled } from "./adapters"
+import { hitsToItems, makeSearcher } from "./adapters"
 
 const HITS = [
   { entity: "task", entityId: "11111111-1111-4111-8111-111111111111", title: "TSK-1042 Fire alarm test", module: "tasks" },
@@ -123,9 +123,3 @@ describe("T6.5 search: debounce 150 ms, 2+ characters, the previous request is a
   })
 })
 
-describe("T6.5 search: mock kinds only when mock modules are enabled", () => {
-  test("mockSearchEnabled follows ENABLE_MOCK_MODULES=1 exactly", () => {
-    expect(mockSearchEnabled({ ENABLE_MOCK_MODULES: "1" })).toBe(true)
-    for (const v of [undefined, "", "0", "true", "yes"]) expect(mockSearchEnabled({ ENABLE_MOCK_MODULES: v })).toBe(false)
-  })
-})

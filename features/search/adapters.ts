@@ -88,4 +88,3 @@ export function makeSearcher(o: {
 }
 
 /** Mock-backed kinds (payroll, orders, staff, recruitment, client files...) are in the index only on a demo deployment (I16). */
-export const mockSearchEnabled = (env: Record<string, string | undefined>): boolean => env.ENABLE_MOCK_MODULES === "1"
