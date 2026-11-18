@@ -17,7 +17,9 @@ import pg from "pg"
 const ROOT = fileURLToPath(new URL("..", import.meta.url))
 const API_DIR = `${ROOT}api`
 const LOG_DIR = `${ROOT}.local-run`
-const COMPOSE = ["docker", "compose", "-p", "opsdesk-local", "-f", `${ROOT}docker-compose.local.yml`]
+// LOCAL_COMPOSE_PROJECT lets a second checkout run its own stack beside the default one (own containers + volumes).
+const PROJECT = process.env.LOCAL_COMPOSE_PROJECT || "opsdesk-local"
+const COMPOSE = ["docker", "compose", "-p", PROJECT, "-f", `${ROOT}docker-compose.local.yml`]
 
 const port = (name, def) => {
   const v = Number(process.env[name] ?? def)
@@ -138,7 +140,7 @@ function down() {
   // Remove the optional ClamAV too, whichever way it was started.
   const r = run(COMPOSE[0], [...COMPOSE.slice(1), "--profile", "scan", "down", "-v", "--remove-orphans"], { env: composeEnv() })
   if (r.status !== 0) die("docker compose down failed")
-  console.log("dev-all: containers and volumes removed (project opsdesk-local).")
+  console.log(`dev-all: containers and volumes removed (project ${PROJECT}).`)
 }
 
 async function start() {
@@ -154,7 +156,7 @@ async function start() {
   for (const [name, p, envName] of need) if (!(await portFree(p))) die(`port ${p} (${name}) is already in use. Stop whatever uses it (lsof -nP -iTCP:${p} -sTCP:LISTEN) or set ${envName}=<free port>.`)
 
   console.log("dev-all: starting Postgres, Redis, MinIO" + (CLAMAV ? ", ClamAV (slow)" : "") + " ...")
-  if (compose(["up", "-d", "--wait"]).status !== 0) die("docker compose up failed (a port clash or a failed healthcheck; see `docker compose -p opsdesk-local logs`).")
+  if (compose(["up", "-d", "--wait"]).status !== 0) die(`docker compose up failed (a port clash or a failed healthcheck; see \`docker compose -p ${PROJECT} logs\`).`)
 
   const tsx = `${ROOT}node_modules/.bin/tsx`
   console.log("dev-all: roles, migrations (as app_owner) and MinIO bucket ...")
