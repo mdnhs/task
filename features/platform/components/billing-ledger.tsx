@@ -185,8 +185,7 @@ export function BillingLedger({ data, view, q = "", today, tzLabel, operator }: 
             onChange={setView}
             options={BILLING_VIEWS.map((v) => ({ value: v.value, label: <>{v.label} <span className="num pf-count">{counts[v.value]}</span></> }))}
           />
-        </FilterBar>
-        <FilterBar>
+          <FilterSearch value={filters.q} onChange={(q) => { setFilters((f) => ({ ...f, q })); setSorting(false); setPage(1) }} placeholder="Search number or tenant" />
           <span className="pf-sort-m">
             <FilterSelect
               label="Sort by"
@@ -198,7 +197,6 @@ export function BillingLedger({ data, view, q = "", today, tzLabel, operator }: 
               }}
             />
           </span>
-          <FilterSearch value={filters.q} onChange={(q) => { setFilters((f) => ({ ...f, q })); setSorting(false); setPage(1) }} placeholder="Search number or tenant" />
         </FilterBar>
         {rows.length > 0 ? (
           <>

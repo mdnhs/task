@@ -75,12 +75,10 @@ export function LiveTenants({ data, view: initial, q, can }: { data: LiveTenantL
       <div className="card pf-card">
         <FilterBar>
           <FilterSeg label="Saved views" value={view} onChange={changeView} options={LIVE_VIEWS.map((v) => ({ value: v.value, label: <>{v.label} <span className="num pf-count">{counts[v.value]}</span></> }))} />
-        </FilterBar>
-        <FilterBar>
+          <FilterSearch value={search} onChange={setSearch} placeholder="Search name or slug" />
           <span className="pf-sort-m">
             <FilterSelect label="Sort by" value={`${sort.key}:${sort.dir}`} options={SORTS} onChange={(v) => { const [key, dir] = v.split(":") as [LiveSortKey, LiveSort["dir"]]; setSort({ key, dir }) }} />
           </span>
-          <FilterSearch value={search} onChange={setSearch} placeholder="Search name or slug" />
         </FilterBar>
         {partial && <p className="pf-note">Views, search and sort apply to the {data.rows.length} tenants on this page.</p>}
         {rows.length > 0 ? (

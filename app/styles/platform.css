@@ -1,5 +1,8 @@
 /* platform feature styles */
 .pf-card .od-filters{margin-bottom:16px}
+/* Tabs left, search at the right end of the same row; the tabs shrink (and scroll) before the row wraps. */
+.pf-card .od-filters .od-filter-search{margin-left:auto}
+.pf-card .od-filters .seg.od-seg{flex:0 1 auto;min-width:0}
 .pf-link{display:block;color:var(--ink);text-decoration:none;transition:color var(--dur-fast) var(--ease)}
 .pf-link:hover{color:var(--brand-deep)}
 :root[data-theme="dark"] .pf-link:hover{color:var(--brand-3)}
@@ -225,13 +228,19 @@ button.pf-arrow:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
 .pf-sort-m{display:none}
 @media (max-width:720px){
   .pf-tenants.rtable,.pf-tenants.pf-no-mrr.rtable{min-width:0}
-  .pf-sort-m{display:contents}
+  /* Sort wraps to its own row under tabs + search (tablet); on phones it shares the row with the search. */
+  .pf-sort-m{display:block;flex:1 1 100%;order:2}
+  .pf-card .od-filters .od-filter-search{order:1}
   .rtable .pf-tname{align-items:flex-end;text-align:right;max-width:none;min-width:0}
   .rtable td.pf-tcell{align-items:flex-start}
   .rtable td.pf-users{flex-wrap:wrap}
   .rtable .pf-users>.num{margin-left:auto}
   .rtable td.pf-users .pf-seat{flex-basis:100%;width:auto;max-width:120px;margin:0 0 0 auto}
   .rtable td.pf-menu-cell{width:100%;justify-content:flex-end;padding-bottom:0}
+}
+@media (max-width:520px){
+  .pf-card .od-filters .od-filter-search{margin-left:0}
+  .pf-sort-m{flex:1 1 0;min-width:140px}
 }
 
 /* ---------- Billing ledger (/platform/billing, Task 6) ---------- */
