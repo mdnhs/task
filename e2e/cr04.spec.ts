@@ -78,7 +78,14 @@ test("CR-04 a manager adds, reassigns, reschedules and removes a task; the bell 
   const kone = await bell(await as("kone"))
   await expect(kone.getByText("Task removed")).toBeVisible()
 
-  // The removal is in the history too: a removed task leaves the lists, so the archive and the API history say so.
+  // The removal is in the history too. A removed task leaves the lists and its history is read through the archive: it shows in Tasks -> Archive, and once restored
+  // (the manager's undo) its history lists the archive line with the person who was told.
   await page.goto("/tasks/archive")
   await expect(page.getByRole("row").filter({ hasText: task.ref })).toContainText("30 days left")
+  const restored = await ops.send("POST", `/v1/tasks/${task.id}/restore`, {})
+  expect(restored.ref).toBe(task.ref)
+  const hist = (await ops.get(`/v1/tasks/${task.id}/history`)).items as { kind: string; notified: string[]; hiddenNotified: number }[]
+  expect(hist.map((h) => h.kind)).toEqual(expect.arrayContaining(["created", "rescheduled", "assigned", "archived", "restored"]))
+  const koneId = people.find((p) => p.name === "Amara Kone")!.userId
+  expect(hist.find((h) => h.kind === "archived")!.notified).toEqual([koneId]) // the new assignee was told; the manager who did it was not
 })

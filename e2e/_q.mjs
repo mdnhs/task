@@ -1,0 +1,17 @@
+import { chromium } from "@playwright/test"
+const [,, persona, path, width, rx, ...sels] = process.argv
+const b = await chromium.launch()
+const ctx = await b.newContext({ storageState: `/Users/nazmulhasansourab/ireland/task/e2e/.auth/${persona}.json`, viewport: { width: +width, height: 900 } })
+const p = await ctx.newPage()
+await fetch("http://localhost:3102/__delay/2500/" + encodeURIComponent(rx))
+await p.goto("http://localhost:3100" + path, { waitUntil: "commit" })
+await p.waitForSelector("main .sk, main [class*=sk-]", { timeout: 15000 })
+await p.waitForTimeout(1300)
+const m = (sel) => p.evaluate((s) => [...document.querySelectorAll(s)].map((e) => Math.round(e.getBoundingClientRect().height * 10) / 10), sel)
+const A = {}; for (const s of sels) A[s] = await m(s)
+await fetch("http://localhost:3102/__delay/0")
+await p.waitForFunction(() => !document.querySelector("main .sk"), null, { timeout: 45000 })
+await p.waitForTimeout(900)
+const C = {}; for (const s of sels) C[s] = await m(s)
+for (const s of sels) console.log(s, "\n  sk  :", JSON.stringify(A[s].slice(0, 14)), A[s].length, "\n  real:", JSON.stringify(C[s].slice(0, 14)), C[s].length)
+await b.close()
