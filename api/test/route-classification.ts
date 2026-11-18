@@ -226,4 +226,7 @@ export const ROUTE_CLASSIFICATION: Record<string, readonly [Classification, stri
   "POST /v1/_probe/write": ["test-only", "registered only when NODE_ENV=test; never in the OpenAPI document"],
   "GET /v1/_probe/drive-links": ["test-only", "registered only when NODE_ENV=test; never in the OpenAPI document"],
   "GET /v1/_probe/payroll": ["test-only", "registered only when NODE_ENV=test; never in the OpenAPI document"],
+  "GET /v1/_probe/roster": ["test-only", "registered only when NODE_ENV=test; never in the OpenAPI document"],
+  "GET /v1/_probe/roster/locations/{id}": ["test-only", "registered only when NODE_ENV=test; never in the OpenAPI document"],
+  "POST /v1/_probe/roster-write": ["test-only", "registered only when NODE_ENV=test; never in the OpenAPI document"],
 }

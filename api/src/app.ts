@@ -15,6 +15,7 @@ import { webhookRoutes } from "./modules/webhooks-out"
 import { deviceRoutes, probeRoutes } from "./modules/devices"
 import { billingRoutes, billingSettingsRoutes, billingWebhookRoutes } from "./modules/billing"
 import { entitlementProbeRoutes, entitlementRoutes } from "./modules/entitlements"
+import { rosterProbeRoutes } from "./modules/rosters"
 import { fileRoutes } from "./modules/files"
 import { gdprRoutes } from "./modules/gdpr"
 import { mfaRoutes } from "./modules/mfa"
@@ -134,6 +135,7 @@ export function createApp(deps: Deps) {
   app.route("/", billingRoutes)
   app.route("/", billingWebhookRoutes) // outside /v1: raw body, authenticated by the provider signature
   if (deps.env.NODE_ENV === "test") app.route("/", entitlementProbeRoutes) // test-only (M1A probe, write probe)
+  if (deps.env.NODE_ENV === "test") app.route("/", rosterProbeRoutes) // test-only (roster access boundary probes)
   if (deps.env.NODE_ENV === "test") app.route("/", probeRoutes) // test-only; never registered elsewhere, not in the OpenAPI doc
 
   app.doc31("/v1/openapi.json", { openapi: "3.1.0", info: { title: "OpsDesk API", version: "1" } })

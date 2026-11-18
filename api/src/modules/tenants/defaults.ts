@@ -10,7 +10,7 @@ function readJson<T>(path: string): T {
 }
 
 type OnboardingDefaults = { locale: string; timezones: { value: string }[]; inviteRoles: string[]; deadline: string; reportDueAfterMinutes: number; reportTemplate: { sections: TemplateSection[] } }
-type RoleTemplate = { id: string; label: string; description?: string; home: string; access: Record<string, string>; platform?: boolean; reportScope?: "team" }
+type RoleTemplate = { id: string; label: string; description?: string; home: string; access: Record<string, string>; platform?: boolean; reportScope?: "team"; rosterLevel?: "office" | "supervisor" }
 
 let defaults: OnboardingDefaults | undefined
 export function onboardingDefaults(): { timezone: string; locale: string; inviteRoles: string[]; deadline: string; reportDueAfterMinutes: number } {

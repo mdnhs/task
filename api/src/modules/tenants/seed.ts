@@ -15,6 +15,7 @@ export async function seedRoleTemplates(tx: TenantTx, tenantId: string): Promise
         home: r.home,
         access: r.access,
         isTemplate: true,
+        rosterLevel: r.rosterLevel ?? null, // R8-3: the template's roster level (roles.json), same map the 0043 backfill applied to existing tenants
       })),
     )
     .returning({ id: roles.id, key: roles.key })
