@@ -85,7 +85,7 @@ describe("occurrence engine across both DST changes", () => {
     ])
   })
 
-  test("an end time inside the repeated hour takes the earlier instant; a start inside the spring-forward gap moves forward", async () => {
+  test("an end time inside the repeated hour takes the earlier instant; a start inside the spring-forward gap resolves to the transition (R8-1)", async () => {
     const w = await world()
     const A = await w.team("A")
     const late = await w.pattern(w.ops, A, { name: "Late", start: "18:00", end: "01:30" })
@@ -95,7 +95,7 @@ describe("occurrence engine across both DST changes", () => {
     const [l] = await w.occ(w.ops, "2026-10-24", "2026-10-24", `&userId=${w.staff.userId}`)
     expect([l.startAt, l.endAt, l.minutes]).toEqual(["2026-10-24T17:00:00.000Z", "2026-10-25T00:30:00.000Z", 450]) // 01:30 BST, the first of the two
     const [e] = await w.occ(w.ops, "2027-03-28", "2027-03-28", `&userId=${w.staff2.userId}`)
-    expect([e.startAt, e.endAt, e.minutes, e.start]).toEqual(["2027-03-28T01:30:00.000Z", "2027-03-28T08:30:00.000Z", 420, "2027-03-28T02:30"])
+    expect([e.startAt, e.endAt, e.minutes, e.start]).toEqual(["2027-03-28T01:00:00.000Z", "2027-03-28T08:30:00.000Z", 450, "2027-03-28T02:00"]) // R8-1: 01:30 is in the gap, the shift starts at the transition (was 01:30Z, 420 min)
   })
 
   test("a pattern in Pacific/Auckland keeps its own start date; a tenant in Auckland gets the same real durations", async () => {
