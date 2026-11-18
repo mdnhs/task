@@ -50,7 +50,7 @@ export function TaskProjects({ people, projects, canDelete }: { people: Person[]
                 <p className="pj-desc">{p.description}</p>
                 <div className="pj-prog">
                   <span className="num">{pr.done} of {pr.total} tasks done · {pr.pct}%</span>
-                  <div className="progress ev-meter" role="progressbar" aria-label={`${p.name} progress`} aria-valuenow={pr.pct} aria-valuemin={0} aria-valuemax={100}>
+                  <div suppressHydrationWarning className="progress ev-meter" role="progressbar" aria-label={`${p.name} progress`} aria-valuenow={pr.pct} aria-valuemin={0} aria-valuemax={100}>
                     <i style={{ transform: `scaleX(${pr.pct / 100})` }} />
                   </div>
                 </div>

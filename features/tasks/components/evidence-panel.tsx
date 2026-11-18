@@ -300,7 +300,7 @@ function CountLine({ task }: { task: Task }) {
   return (
     <div className="ev-count">
       <span className="num">{`${have} of ${r.min} attached${missing > 0 ? ` · ${missing} more needed` : ""}`}</span>
-      <div className="progress ev-meter" role="progressbar" aria-label="Evidence attached" aria-valuenow={have} aria-valuemin={0} aria-valuemax={r.min}>
+      <div suppressHydrationWarning className="progress ev-meter" role="progressbar" aria-label="Evidence attached" aria-valuenow={have} aria-valuemin={0} aria-valuemax={r.min}>
         <i style={{ transform: `scaleX(${have / r.min})` }} />
       </div>
     </div>

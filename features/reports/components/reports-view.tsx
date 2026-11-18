@@ -121,7 +121,7 @@ function MyReportCard({ row: r, meId, now, nowAt, tzLabel }: { row?: InboxRow; m
       </dl>
       <div className="sr-mine-prog">
         <span className="tm">{r.doneCount} of {total} tasks done</span>
-        <div className="progress" role="progressbar" aria-label="Tasks done" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct}><i style={{ width: `${pct}%` }} /></div>
+        <div suppressHydrationWarning className="progress" role="progressbar" aria-label="Tasks done" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct}><i style={{ width: `${pct}%` }} /></div>
       </div>
       <Link href={rowHref(r, meId) ?? "/daily-reports"} className="btn btn-primary sr-mine-btn">
         {r.status === "draft" || r.status === "returned" ? "Open my report" : "View my report"}
