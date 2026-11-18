@@ -25,7 +25,8 @@ import {
   applyFilters,
   searchItems,
 } from "../match"
-import { pushRecent, readRecents, recentsKey, removeRecent, writeRecents } from "../recents"
+import { pushRecent, removeRecent } from "../recents"
+import { loadSearch, onSearchReset, recentsFor, type SearchData, type SearchLoader } from "../session-stores"
 import { isFilterShortcut, isMacPlatform, isNewTabEnter, isSlashShortcut, isToggleShortcut, shortcutLabel } from "../shortcuts"
 import type { FilterKey, SearchConfig, SearchFilters, SearchItem } from "../types"
 import { makeSearcher } from "../adapters"
@@ -42,33 +43,6 @@ const macSnapshot = () => isMacPlatform(navigator.platform || navigator.userAgen
 // Server and hydration render `null` (no hint), then the client value: no hydration mismatch, no setState in an effect.
 const useIsMac = () => React.useSyncExternalStore(noop, macSnapshot, () => null)
 
-// Recent searches, one store per index (`scope`), so tenant and platform queries never mix (recents.ts → recentsKey).
-type RecentsStore = { subscribe: (fn: () => void) => () => void; get: () => string[]; set: (next: string[]) => void }
-const recentsStores = new Map<string, RecentsStore>()
-function recentsFor(scope: string): RecentsStore {
-  let st = recentsStores.get(scope)
-  if (st) return st
-  const key = recentsKey(scope)
-  const listeners = new Set<() => void>()
-  let cache: string[] | null = null
-  st = {
-    subscribe(fn) {
-      listeners.add(fn)
-      return () => listeners.delete(fn)
-    },
-    get() {
-      if (cache === null) cache = readRecents(undefined, key)
-      return cache
-    },
-    set(next) {
-      cache = next
-      writeRecents(next, undefined, key)
-      listeners.forEach((fn) => fn())
-    },
-  }
-  recentsStores.set(scope, st)
-  return st
-}
 const EMPTY: string[] = []
 
 function Hl({ text, q }: { text: string; q: string }) {
@@ -98,23 +72,6 @@ const reducedMotion = () => {
   }
 }
 
-// The index is loaded lazily on the first open (server action, role-filtered on the server) and cached for the session.
-// It is never part of a page's RSC payload, so pages don't carry other modules' text.
-// One cache per index (`scope`), so the tenant app and the platform console never share results.
-type SearchData = { items: SearchItem[]; config: SearchConfig }
-type SearchLoader = () => Promise<SearchData>
-const dataCache = new Map<string, Promise<SearchData>>()
-const loadSearch = (scope: string, load: SearchLoader) => {
-  let p = dataCache.get(scope)
-  if (!p) {
-    p = load().catch((e: unknown) => {
-      dataCache.delete(scope)
-      throw e
-    })
-    dataCache.set(scope, p)
-  }
-  return p
-}
 const NO_ITEMS: SearchItem[] = []
 const NO_CONFIG: SearchConfig = { popular: [], actions: [] }
 
@@ -206,6 +163,9 @@ export function GlobalSearch({
   }, [searching, groups, config, recents])
   const cur = Math.min(active, Math.max(0, opts.length - 1))
   const activeId = open && view === "list" && opts[cur] ? optId(opts[cur].id) : undefined
+
+  // Sign-out or company switch in this tab: drop the old index so the next person never sees it.
+  React.useEffect(() => onSearchReset(() => { setData(null); setApiItems(NO_ITEMS) }), [])
 
   const openPanel = React.useCallback((v: "list" | "filters" = "list") => {
     loadSearch(scope, load).then(
