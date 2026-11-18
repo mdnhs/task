@@ -1,5 +1,4 @@
 import { readFileSync } from "node:fs"
-import { join } from "node:path"
 import { createOTP } from "@better-auth/utils/otp"
 import { afterAll, beforeAll, beforeEach, describe, expect, test, vi } from "vitest"
 import { call, resetDb, tenantGetRoutes, testApp } from "../../../test/harness"

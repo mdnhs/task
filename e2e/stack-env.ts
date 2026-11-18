@@ -4,20 +4,26 @@ export const API_PORT = 3101
 export const WEB_PORT = 3100
 export const WEB_ORIGIN = `http://localhost:${WEB_PORT}`
 export const API_ORIGIN = `http://localhost:${API_PORT}`
+export const PLATFORM_TOTP = "e2eplatformtotpsecret0123456789"
+export const PLATFORM_EMAIL = "platform.owner@demo.example"
 export const DEMO_PASSWORD = "e2e-demo-password-12"
 export const PG_ADMIN = "postgres://postgres:postgres@localhost:55432/opsdesk_e2e"
 export const OWNER_URL = "postgres://app_owner:e2e_owner_pw@localhost:55432/opsdesk_e2e"
 export const USER_URL = "postgres://app_user:e2e_user_pw@localhost:55432/opsdesk_e2e"
 export const PERSONAS = {
   owner: "amara.bello@demo.example", // all scope
+  platform: PLATFORM_EMAIL, // the console operator (2FA enrolled by the seed); signs in with a TOTP code
   ops: "lilianna.novak@demo.example", // all-scope manager
   supervisor: "daniel.okafor@demo.example", // Security team manager
   supervisor2: "grace.mensah@demo.example", // Cleaning team manager
+  auditor: "ibrahim.khan@demo.example", // read-only everywhere
+  hr: "priya.shah@demo.example",
   admin: "rhys.edwards@demo.example",
   member: "tomasz.wojcik@demo.example", // Cleaning, reports to Grace
   member2: "marcus.hill@demo.example", // Security, reports to Daniel
   kone: "amara.kone@demo.example", // Cleaning employee: the person CR-04 reassigns a task to
   leo: "leo.fernandez@demo.example", // CR-06: the member with the bound Android phone
+  ismail: "ismail.rahman@demo.example", // the fifth member of the all-day pattern: the one the conflict walk edits
   haddad: "m.haddad@demo.example", // unassigned Security employees: the people CR-01 and CR-03 give a shift to
   silva: "j.silva@demo.example",
   kowalski: "a.kowalski@demo.example",
@@ -50,6 +56,8 @@ export const apiEnv = {
   GOOGLE_CLIENT_ID: "",
   GOOGLE_CLIENT_SECRET: "",
   ALLOW_DEMO_SEED: "1",
+  // The seed creates platform.owner@<domain> (2FA enrolled with this raw key) only when this is set: the console walk signs in with it. Fake, local, never a real secret.
+  SEED_PLATFORM_TOTP_SECRET: PLATFORM_TOTP,
   E2E_PG_ADMIN_URL: PG_ADMIN,
   E2E_OWNER_PW: "e2e_owner_pw",
   E2E_USER_PW: "e2e_user_pw",

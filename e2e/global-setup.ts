@@ -1,8 +1,9 @@
 import { execFileSync } from "node:child_process"
 import { mkdirSync } from "node:fs"
 import { request, type FullConfig } from "@playwright/test"
-import { apiEnv, PERSONAS, DEMO_PASSWORD, WEB_ORIGIN, type Persona } from "./stack-env"
+import { apiEnv, PERSONAS, DEMO_PASSWORD, PLATFORM_TOTP, WEB_ORIGIN, type Persona } from "./stack-env"
 import { AUTH_DIR, statePath } from "./paths"
+import { totp } from "./totp"
 import { buildWorld } from "./world"
 
 
@@ -15,6 +16,11 @@ export default async function globalSetup(_config: FullConfig): Promise<void> {
     const ctx = await request.newContext({ baseURL: WEB_ORIGIN, extraHTTPHeaders: { origin: WEB_ORIGIN } })
     const res = await ctx.post("/api/auth/sign-in/email", { data: { email: PERSONAS[persona], password: DEMO_PASSWORD } })
     if (!res.ok()) throw new Error(`sign-in as ${persona} failed: ${res.status()}`)
+    if ((await res.json()).twoFactorRedirect) {
+      // The console operator: the second factor is a TOTP code from the seed's key.
+      const v = await ctx.post("/api/auth/two-factor/verify-totp", { data: { code: totp(PLATFORM_TOTP) } })
+      if (!v.ok()) throw new Error(`second factor for ${persona} failed: ${v.status()}`)
+    }
     // The active tenant is the httpOnly od-tenant cookie the page layout repairs on first load; set it up front.
     const url = new URL(WEB_ORIGIN)
     await ctx.storageState({ path: statePath(persona) })

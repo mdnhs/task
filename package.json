@@ -19,7 +19,8 @@
     "check:bundle": "node scripts/check-bundle.mjs",
     "e2e:stack": "docker compose -f docker-compose.e2e.yml up -d --wait",
     "e2e:stack:down": "docker compose -f docker-compose.e2e.yml down -v",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test --project=desktop --project=android",
+    "test:e2e:skeletons": "playwright test --project=skeletons --workers=1"
   },
   "dependencies": {
     "@ark-ui/react": "^5.39.3",

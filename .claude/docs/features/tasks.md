@@ -66,3 +66,9 @@ Timeline (Gantt) and workload views (Should), custom statuses (FR-M1-06), milest
 - Voice (D21): `components/voice-card.tsx`; the player asks for a fresh play path per click (`playUrl`), the API answers with a 60 s redirect and logs the play; no URL is kept.
 - Recurring instances come from the API job; `materialiseRecurring`, `store.ts` and `task-detail-loading.tsx` are gone.
 - Skeletons are static (K1): see `app/(app)/tasks/**/loading.tsx`.
+
+## Backend notes (B6 T6.9: CR-04 and CR-05 on the real stack, and what the walk found)
+- `e2e/cr04.spec.ts`: a manager adds a task for a member in the New task form, reschedules it (the dialog previews the dependent task that moves too), reassigns it, removes it; the member's bell shows New task, Task rescheduled and Task assignment changed, the new assignee's bell shows Task removed, and the timeline lists each change.
+- `e2e/cr05.spec.ts`: a proof-required task cannot be completed (the evidence step opens with "1 more needed"; the API says `422 evidence_required`); a photo goes to MinIO and ClamAV (the row reads Scanning, then counts); Complete moves the task to review; the assignee and a co-assignee manager get no Verify; a different manager verifies and sees the capture time and "Taken with the camera".
+- Defects the walk found and fixed: archiving a task did not notify anyone (AC-M1-04: now assignees and creator get "Task removed" and the history line lists them); the timeline printed raw user ids in "Notified ..." (now names; "Member" for people the caller cannot see); a co-assignee outside the caller's scope showed as a raw id with a "?" avatar (now "Member").
+- Not changed: a removed task leaves every list and `GET /v1/tasks?ref=` (managers read it in Tasks -> Archive), so its history is no longer reachable from the task page.

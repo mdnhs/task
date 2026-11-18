@@ -75,3 +75,9 @@ Rulings and follow-ups: `../superpowers/plans/2026-11-17-backend-b5-followups.md
 
 ## Backend notes (B6 T6.1: strict ReportSchema)
 `ReportSchema` (api `modules/shift-reports/dto.ts`) is a strict object with exactly the `ReportDto` fields: no `catchall`, no `z.any()`. `items` (with the optional `outcome`), `attachments`, `comments`, `unplanned` and `extra` are typed, and the version `snapshot` is typed too. An unknown or missing key fails `api/src/modules/shift-reports/dto.test.ts`, so a renamed field can no longer show up as `undefined` in the UI. The OpenAPI walker `api/test/openapi-typed.test.ts` fails on any new untyped 2xx JSON response.
+
+## Backend notes (B6 T6.9: CR-01 and CR-03 on the real stack)
+- `e2e/world.ts` builds the shared fixture once in globalSetup: a pattern "E2E all day" (00:00-23:59, every day) given to five members, so a report exists at any hour (a report needs its shift to have started), with reporting off for all five.
+- `e2e/cr01.spec.ts`: an all-scope manager turns reporting on for 3 of 5 on `/shifts` -> People; only those three have a report in the inbox; a member sees exactly the tasks due inside their shift (not another member's, not tomorrow's), sets status and minutes, submits; the manager sees the task updated (status, minutes, the neutral line "Status set to ..., N min logged from the shift report ...").
+- `e2e/cr03.spec.ts`: the submitted report is in the inbox within a minute (the inbox is re-read on each visit, polled up to 60 s), complete (summary, handover, task row); accept; a seeded past-deadline member is "Missing"; a returned report carries the manager's comment back to the member.
+- Deviation from the brief: Accept takes no comment in the UI (only Return does), so the spec accepts without one and tests the comment on Return.

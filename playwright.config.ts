@@ -16,8 +16,10 @@ export default defineConfig({
   reporter: process.env.CI ? [["list"], ["html", { open: "never" }]] : "list",
   use: { baseURL: WEB_ORIGIN, trace: "retain-on-failure", screenshot: "only-on-failure", actionTimeout: 15_000 },
   projects: [
-    { name: "desktop", use: { ...devices["Desktop Chrome"], viewport: { width: 1440, height: 900 } }, testIgnore: /cr06/ },
+    { name: "desktop", use: { ...devices["Desktop Chrome"], viewport: { width: 1440, height: 900 } }, testMatch: /(cr0[1-5]|walk)\.spec\.ts/ },
     { name: "android", use: { ...devices["Pixel 7"] }, testMatch: /cr06\.spec\.ts/ },
+    // Skeleton parity (npm run test:e2e:skeletons): needs the API behind e2e/slow-api.mjs; sets its own viewports.
+    { name: "skeletons", use: { ...devices["Desktop Chrome"] }, testMatch: /skeletons\.spec\.ts/ },
   ],
   webServer: [
     {
