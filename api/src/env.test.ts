@@ -93,3 +93,9 @@ test("AUTH_RATE_LIMIT_PER_MIN defaults to 30 and must be a positive integer", ()
   expect(parseEnv({ ...base, AUTH_RATE_LIMIT_PER_MIN: "600" }).AUTH_RATE_LIMIT_PER_MIN).toBe(600)
   expect(() => parseEnv({ ...base, AUTH_RATE_LIMIT_PER_MIN: "0" })).toThrow(/AUTH_RATE_LIMIT_PER_MIN/)
 })
+test("AUTH_RATE_LIMIT_PER_MIN is capped at 300 in production only", () => {
+  const prod = { ...base, NODE_ENV: "production", ...prodFiles, SECRETS_KEY: Buffer.alloc(32, 1).toString("base64") }
+  expect(parseEnv({ ...prod, AUTH_RATE_LIMIT_PER_MIN: "300" }).AUTH_RATE_LIMIT_PER_MIN).toBe(300)
+  expect(() => parseEnv({ ...prod, AUTH_RATE_LIMIT_PER_MIN: "301" })).toThrow(/AUTH_RATE_LIMIT_PER_MIN/)
+  expect(parseEnv({ ...base, AUTH_RATE_LIMIT_PER_MIN: "1000" }).AUTH_RATE_LIMIT_PER_MIN).toBe(1000) // the e2e stack (development)
+})

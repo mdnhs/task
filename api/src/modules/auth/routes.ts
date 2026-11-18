@@ -49,8 +49,8 @@ export const MFA_PROTECTED_AUTH_PATHS: readonly string[] = [
   "/update-user",
 ]
 
-/** POST paths under /api/auth that are guessable or send mail: limited per caller IP (all) and per target address (the mail senders). Sign-out, session reads and the rest stay free. */
-const LIMITED_PREFIXES = ["/sign-in", "/sign-up", "/forget-password", "/request-password-reset", "/reset-password", "/send-verification-email", "/two-factor/verify"]
+/** POST paths under /api/auth that are guessable (they check a password or a code) or send mail: limited per caller IP (all) and per target address (the mail senders). Sign-out, session reads and the rest stay free. */
+const LIMITED_PREFIXES = ["/sign-in", "/sign-up", "/forget-password", "/request-password-reset", "/reset-password", "/send-verification-email", "/two-factor/verify", "/change-password", "/two-factor/enable", "/two-factor/disable", "/two-factor/generate-backup-codes", "/delete-user"]
 const MAIL_PATHS = ["/sign-up/email", "/forget-password", "/request-password-reset", "/send-verification-email"]
 
 export const authRoutes = new Hono<AppEnv>()

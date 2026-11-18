@@ -231,7 +231,7 @@ test("totp verify locks after 5 failures with 429 mfa_attempts_exceeded and rese
   const m = await w.who("manager")
   const stale = (await signIn(w.app, m.email, m.password)).cookie
   const { secret } = await enrollTotp(w.deps, m.email, m.password)
-  for (let i = 0; i < 5; i++) expect((await verifyTotp(w, stale, "000000")).status).toBe(401)
+  for (let i = 0; i < 5; i++) expect((await verifyTotp(w, stale, `00000${i}`)).status).toBe(401) // distinct codes: the replay guard cannot be what answers 401
   const locked = await verifyTotp(w, stale, await totpCode(secret, 30_000)) // even the right code is refused while locked
   expect([locked.status, await codeOf(locked)]).toEqual([429, "mfa_attempts_exceeded"])
   expect(Number(locked.headers.get("retry-after"))).toBeGreaterThan(0)
@@ -243,6 +243,17 @@ test("totp verify locks after 5 failures with 429 mfa_attempts_exceeded and rese
   for (let i = 0; i < 4; i++) expect((await verifyTotp(w, stale2, "000000")).status).toBe(401)
   expect((await verifyTotp(w, stale2, await totpCode(secret))).status).toBe(200)
   for (let i = 0; i < 4; i++) expect((await verifyTotp(w, stale2, "000000")).status).toBe(401)
+})
+test("backup-code verification shares the cap", async () => {
+  const w = await world()
+  const m = await w.who("manager")
+  const stale = (await signIn(w.app, m.email, m.password)).cookie
+  await enrollTotp(w.deps, m.email, m.password)
+  const backup = (code: string) => call(w.app, "POST", "/api/auth/two-factor/verify-backup-code", { cookie: stale, body: { code }, headers: ORIGIN })
+  for (let i = 0; i < 5; i++) expect((await backup(`wrong-${i}`)).status).toBe(401)
+  const locked = await backup("wrong-5")
+  expect([locked.status, await codeOf(locked)]).toEqual([429, "mfa_attempts_exceeded"])
+  expect((await verifyTotp(w, stale, "123456")).status).toBe(429) // the TOTP path is locked by the same counter
 })
 test("the cap also holds on the sign-in challenge (no session yet) and is per user", async () => {
   const w = await world()

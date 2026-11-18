@@ -68,6 +68,7 @@ test("limiter store down: auth fails closed (503), reads fail open", async () =>
 })
 
 import { randomUUID } from "node:crypto"
+import { Redis } from "ioredis"
 import { makeRedisRateLimiter } from "./rate-limit"
 
 test("the Redis limiter counts in a fixed window, resets, claims once, and rejects when the store is unreachable", async () => {
@@ -81,6 +82,15 @@ test("the Redis limiter counts in a fixed window, resets, claims once, and rejec
     expect(third.allowed).toBe(false)
     expect(third.retryAfterSec).toBeGreaterThan(0)
     expect(third.retryAfterSec).toBeLessThanOrEqual(60)
+    // a counter that lost its TTL (crash between INCR and EXPIRE, manual SET) is re-armed, never a permanent block
+    const raw = new Redis(process.env.REDIS_URL!)
+    try {
+      await raw.set(`rl:${k}-ttl`, "9")
+      expect((await l.hit(`${k}-ttl`, rule)).allowed).toBe(false)
+      expect(await raw.ttl(`rl:${k}-ttl`)).toBeGreaterThan(0)
+    } finally {
+      raw.disconnect()
+    }
     await l.reset(k)
     expect((await l.hit(k, rule)).allowed).toBe(true)
     expect(await l.once(`${k}-c`, 30)).toBe(true)

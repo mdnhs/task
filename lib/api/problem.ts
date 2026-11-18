@@ -111,6 +111,8 @@ const KIND_COPY: Record<ErrorKind, string> = {
 // Codes whose own copy is more useful than their kind's. Never the server's text.
 const CODE_COPY: Record<string, string> = {
   device_policy: "Available on your work PC.",
+  mfa_attempts_exceeded: "Too many wrong codes. Wait about 15 minutes.",
+  rate_limit_unavailable: "Try again shortly.",
   self_verification: "You can't verify your own task.",
   evidence_not_ready: "Evidence is still being scanned.",
   // Invites (B1/B6): the plan's seats are all used.

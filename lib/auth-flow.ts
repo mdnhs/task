@@ -8,6 +8,8 @@ import { ApiError, classifyApiError, userMessage } from "./api/problem"
 
 export const GENERIC_CREDENTIALS = "Wrong email or password."
 const RATE_LIMITED = "Too many attempts, wait a minute."
+export const MFA_LOCKED = "Too many wrong codes. Wait about 15 minutes."
+export const TRY_SHORTLY = "Try again shortly."
 
 type Fail = { message: string; ref?: string }
 
@@ -26,6 +28,7 @@ export async function signInStep(deps: { signInEmail(b: { email: string; passwor
     if (e instanceof ApiError) {
       if (e.status === 403 && e.code === "email_not_verified") return { kind: "unverified" }
       if (e.status === 429) return { kind: "error", message: RATE_LIMITED }
+      if (e.status === 503 && e.code === "rate_limit_unavailable") return { kind: "error", message: TRY_SHORTLY }
       // Every credential problem (wrong password, unknown email, no password account) is the same message. Never branch on the code.
       if (e.status === 401 || e.status === 400 || e.status === 404 || e.status === 422) return { kind: "error", message: GENERIC_CREDENTIALS }
     }
@@ -44,7 +47,8 @@ export async function secondFactorStep(deps: { verifyTotp(code: string): Promise
     await (mode === "totp" ? deps.verifyTotp(code) : deps.verifyBackupCode(code))
     return { ok: true }
   } catch (e) {
-    if (e instanceof ApiError && e.status === 429) return { ok: false, message: RATE_LIMITED }
+    if (e instanceof ApiError && e.status === 429) return { ok: false, message: e.code === "mfa_attempts_exceeded" ? MFA_LOCKED : RATE_LIMITED }
+    if (e instanceof ApiError && e.status === 503 && e.code === "rate_limit_unavailable") return { ok: false, message: TRY_SHORTLY }
     if (e instanceof ApiError && (e.status === 401 || e.status === 400)) return { ok: false, message: "That code is not right. Try again." }
     return { ok: false, ...describe(e) }
   }

@@ -68,6 +68,16 @@ describe("T6.3 second factor: a code, or a backup code", () => {
   })
 })
 
+describe("B7 T3 copy", () => {
+  test("mfa_attempts_exceeded says to wait about 15 minutes, other 429s keep the generic copy, rate_limit_unavailable is 'try again shortly'", async () => {
+    const lock = await secondFactorStep({ verifyTotp: async () => { throw err(429, "mfa_attempts_exceeded") }, verifyBackupCode: vi.fn() }, "totp", "000000")
+    expect(lock).toEqual({ ok: false, message: "Too many wrong codes. Wait about 15 minutes." })
+    expect(await secondFactorStep({ verifyTotp: async () => { throw err(429, "rate_limited") }, verifyBackupCode: vi.fn() }, "totp", "000000")).toMatchObject({ message: "Too many attempts, wait a minute." })
+    expect(await secondFactorStep({ verifyTotp: async () => { throw err(503, "rate_limit_unavailable") }, verifyBackupCode: vi.fn() }, "totp", "000000")).toEqual({ ok: false, message: "Try again shortly." })
+    expect(await signInStep({ signInEmail: async () => { throw err(503, "rate_limit_unavailable") } }, { email: "a@x.ie", password: "p" })).toEqual({ kind: "error", message: "Try again shortly." })
+  })
+})
+
 describe("T6.3 sign-up, verification and reset", () => {
   test("sign-up creates no session: success is only 'check your inbox'; an existing email looks the same as a new one", async () => {
     expect(await signUpStep({ signUpEmail: async () => {} }, { name: "A", email: "a@x.ie", password: "Passw0rd!long" })).toEqual({ ok: true })

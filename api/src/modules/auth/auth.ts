@@ -105,6 +105,8 @@ export function buildAuth({ env, db, clock, mailer, logger, rateLimiter }: AuthD
       ipAddress: { ipAddressHeaders: [CLIENT_IP_HEADER], ipv6Subnet: 64 },
     },
     hooks: {
+      // Trade-off (accepted, S4): the cap is per USER, not per IP, so someone who knows a user's password can burn the 5 attempts of a 15-minute
+      // window and keep that user's TOTP refused until the window ends. A per-IP cap alone would let a botnet guess a 6-digit code.
       // S4: TOTP attempt cap (per user) and used-code replay guard, BEFORE Better Auth looks at the code. Every attempt counts; a success clears the
       // counter (after hook). The store being down fails CLOSED. The user is the session's, or on the sign-in challenge the one the two_factor cookie names.
       before: createAuthMiddleware(async (ctx) => {

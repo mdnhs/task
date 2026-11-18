@@ -81,6 +81,9 @@ const schema = z.object({
   if (e.NODE_ENV === "production" && !e.SECRETS_KEY && !e.SECRETS_KEYS) {
     ctx.addIssue({ code: "custom", path: ["SECRETS_KEY"], message: "required in production (or SECRETS_KEYS)" })
   }
+  if (e.NODE_ENV === "production" && e.AUTH_RATE_LIMIT_PER_MIN > 300) {
+    ctx.addIssue({ code: "custom", path: ["AUTH_RATE_LIMIT_PER_MIN"], message: "at most 300 in production (a higher value is no limit)" })
+  }
   if (e.NODE_ENV === "production") {
     // S3_* are only a bootstrap fallback: the platform admin configures R2 in the DB (storage fails closed with 503 otherwise)
     for (const k of ["CLAMD_HOST"] as const) {

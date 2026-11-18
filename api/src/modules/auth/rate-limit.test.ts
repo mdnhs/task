@@ -69,3 +69,9 @@ test("limiter store down: sign-in fails closed with 503", async () => {
   const r = await signInFrom(t.app, undefined)
   expect([r.status, ((await r.json()) as Json).code]).toEqual([503, "rate_limit_unavailable"])
 })
+test("password-checking endpoints are limited per IP too", async () => {
+  const t = behindProxy()
+  const post = () => call(t.app, "POST", "/api/auth/change-password", { body: { currentPassword: "x", newPassword: "y" }, headers: { ...ORIGIN, "x-forwarded-for": "5.5.5.5" } })
+  for (let i = 0; i < testEnv.AUTH_RATE_LIMIT_PER_MIN; i++) expect((await post()).status).not.toBe(429)
+  expect((await post()).status).toBe(429)
+})
