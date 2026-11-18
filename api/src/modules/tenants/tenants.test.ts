@@ -5,6 +5,7 @@ import { makeMember, makeStaff, makeTenant, signIn, signInWithTotp, signUp } fro
 import { withTenant } from "../../db/tenant-tx"
 import { memberships } from "../../db/schema"
 import { readFileSync } from "node:fs"
+import pg from "pg"
 
 type Json = Record<string, any> // eslint-disable-line @typescript-eslint/no-explicit-any
 beforeEach(resetDb)
@@ -372,6 +373,9 @@ test("tenants made by another user, and suspended-or-removed ones aside, count c
   expect(over.status).toBe(403)
   const text = await over.text()
   expect(text).not.toMatch(/cap-1-/)
+  // a suspended tenant still counts towards the cap
+  await ownerQuery("update tenants set status = 'suspended' where created_by = $1", [a.userId])
+  expect((await mkTenant(low, a.cookie, 4)).status).toBe(403)
   // a tenant marked deleted no longer counts
   await ownerQuery("update tenants set status = 'deleted' where created_by = $1", [a.userId])
   expect((await mkTenant(low, a.cookie, 3)).status).toBe(201)
@@ -384,4 +388,39 @@ test("two concurrent creates by one user cannot both pass the cap", async () => 
   const codes = rs.map((r) => r.status).sort()
   expect(codes.filter((c) => c === 201)).toHaveLength(1)
   expect(await ownerQuery("select 1 from tenants where created_by = (select id from \"user\" where email = 'owner@x.ie')")).toHaveLength(1)
+})
+
+test("0041 backfill: oldest owner wins, a tenant without an owner stays NULL, re-run is idempotent, and no tenant context leaks", async () => {
+  const t = testApp()
+  const multi = await makeTenant(t.deps, { slug: "multi" })
+  const newer = await makeMember(t.deps, multi.id, "owner")
+  const older = await makeMember(t.deps, multi.id, "owner")
+  await makeMember(t.deps, multi.id, "employee")
+  const bare = await makeTenant(t.deps, { slug: "bare" })
+  await ownerTenantQuery(multi.id, "update memberships set joined_at = $2 where user_id = $1", [newer.userId, "2026-02-01T00:00:00Z"])
+  await ownerTenantQuery(multi.id, "update memberships set joined_at = $2 where user_id = $1", [older.userId, "2026-01-01T00:00:00Z"])
+  await ownerQuery("update tenants set created_by = null")
+  const sqlText = readFileSync(new URL("../../db/migrations/0041_tenant_created_by.sql", import.meta.url), "utf8")
+  const backfill = sqlText.split("--> statement-breakpoint").map((x) => x.trim()).filter((x) => x && !/^(ALTER TABLE|CREATE INDEX)/i.test(x)) // the DDL already ran with the test database
+  expect(backfill.length).toBeGreaterThan(0)
+  const c = new pg.Client({ connectionString: process.env.TEST_DATABASE_OWNER_URL })
+  await c.connect()
+  try {
+    const run = async () => {
+      await c.query("begin") // one transaction like the migrator, and NO app.tenant_id: only the loop can see the rows
+      for (const st of backfill) await c.query(st)
+      const left = (await c.query("select current_setting('app.tenant_id', true) as v")).rows[0].v
+      await c.query("commit")
+      expect(left === null || left === "").toBe(true)
+    }
+    const owners = async () => ownerQuery("select slug, created_by from tenants order by slug")
+    await run()
+    const after = await owners()
+    expect(after).toEqual([{ slug: "bare", created_by: null }, { slug: "multi", created_by: older.userId }])
+    await run()
+    expect(await owners()).toEqual(after)
+    expect(bare.slug).toBe("bare")
+  } finally {
+    await c.end()
+  }
 })

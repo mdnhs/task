@@ -12,7 +12,7 @@ export const DEFAULT_INVITE_TTL_DAYS = 7
 const DAY_MS = 86_400_000
 
 const TENANT_CREATE_LOCK_NS = 0x74637265 // "tcre": serialises one user's tenant creations so the cap cannot be raced past
-/** Tenants in these states no longer count towards a user's cap. */
+/** Tenants in these states no longer count towards a user's cap. Not produced yet (only active/suspended exist); listed for forward compatibility. */
 const GONE = ["deleted", "erased"]
 
 export type NewTenant = { name: string; slug: string; timezone?: string; currency?: string; locale?: string }
