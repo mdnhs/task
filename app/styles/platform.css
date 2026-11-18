@@ -148,8 +148,10 @@ button.pf-arrow:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
 @media (max-width:420px){.stats.pf-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.pf-kpis .stat{padding:14px;min-height:128px}.pf-kpis .value{font-size:28px}.pf-kpis .value small{font-size:17px}.pf-kpis .arrow{width:32px;height:32px}}
 /* One gap token for the console's stacked sections and columns (same value as .stats). */
 :root{--pf-gap:calc(16px * var(--space-scale,1))}
-.pf-ov-grid{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:var(--pf-gap);align-items:start}
+.pf-ov-grid{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:var(--pf-gap);align-items:stretch}
 .pf-ov-col{display:flex;flex-direction:column;gap:var(--pf-gap);min-width:0}
+/* Both column stacks end on the same line: the last card of each grows (content stays top-aligned). */
+.pf-ov-col>:last-child{flex:1 1 auto}
 .pf-sample{display:flex;flex-direction:column;gap:var(--pf-gap);min-width:0}
 .pf-sample .pf-note{margin:0}
 @media (max-width:1100px){.pf-ov-grid{grid-template-columns:minmax(0,1fr)}}
