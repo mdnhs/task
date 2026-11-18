@@ -289,6 +289,26 @@ describe("auto-repeat sweep (R8-12)", () => {
     expect((await failures(w, w.a)).n).toBe(0) // success resets the count
   })
 
+  test("AG4: a week of a backed-off site made by hand (create, or a manual repeat) clears its failure count and back-off; another site's is untouched", async () => {
+    const w = await world()
+    await due(w)
+    await due(w, 7, w.b, w.tb, [w.staff3.userId, w.p.manager.userId])
+    await failFor(`new.location_id in ('${w.a}', '${w.b}')`)
+    try {
+      await run(w)
+    } finally {
+      await healFor()
+    }
+    expect([(await failures(w, w.a)).n, (await failures(w, w.b)).n]).toEqual([1, 1])
+    await w.week(w.p.owner, w.a, NEXT) // somebody makes next week of Alpha by hand
+    expect(await failures(w, w.a)).toMatchObject({ n: 0, auto_repeat_attempt_at: null })
+    expect((await failures(w, w.b)).n).toBe(1) // Bravo still backs off
+    // a manual repeat of Bravo's source clears Bravo's too
+    const [src] = await w.rows("select id, version from roster_weeks where location_id = $1 and week_start = $2", [w.b, SRC])
+    await w.ok("POST", `/v1/roster/weeks/${src.id}/repeat`, w.p.owner, { version: Number(src.version), weeks: 1 }, 201)
+    expect(await failures(w, w.b)).toMatchObject({ n: 0, auto_repeat_attempt_at: null })
+  })
+
   test("more than a batch of failing locations never starve a healthy one: candidates are ordered by last attempt, the failing ones back off", async () => {
     const w = await world()
     const GOOD = "ffffffff-ffff-4fff-8fff-ffffffffffff" // the largest id: last in a plain id order

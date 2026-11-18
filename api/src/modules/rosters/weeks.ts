@@ -49,6 +49,11 @@ export async function loadWeek(tx: TenantTx, ctx: RosterCtx, id: string, lock: b
 /** Monday of a real calendar date, or 422 invalid_week_start. */
 const isMonday = (d: string): boolean => realDate(d) && weekdayOf(d) === 1
 
+/** A week of the site was made by hand: the auto-repeat back-off and failure count of the site are history (job state only: the location row's version and `updated_at` do not move). */
+export async function clearAutoRepeatBackoff(tx: TenantTx, tenantId: string, locationId: string): Promise<void> {
+  await tx.update(locations).set({ autoRepeatAttemptAt: null, autoRepeatFailures: 0 }).where(and(eq(locations.tenantId, tenantId), eq(locations.id, locationId), sql`${locations.autoRepeatFailures} > 0`))
+}
+
 /** POST /v1/roster/weeks: an empty draft week of a location the caller may edit. A second create for the same Monday is 409 week_exists carrying the existing id. */
 export async function createWeek(tx: TenantTx, ctx: RosterCtx, input: { locationId: string; weekStart: string }): Promise<WeekDto> {
   if (!ctx.access.editDraft) throw Forbidden("forbidden") // the route guard already answered; fail closed
@@ -60,6 +65,7 @@ export async function createWeek(tx: TenantTx, ctx: RosterCtx, input: { location
   const [existing] = await tx.select({ id: rosterWeeks.id }).from(rosterWeeks).where(and(eq(rosterWeeks.tenantId, ctx.tenantId), eq(rosterWeeks.locationId, input.locationId), eq(rosterWeeks.weekStart, input.weekStart)))
   if (existing) throw new AppError(409, "week_exists", "Conflict", { weekId: existing.id })
   const [row] = await tx.insert(rosterWeeks).values({ tenantId: ctx.tenantId, locationId: input.locationId, weekStart: input.weekStart, createdAt: ctx.now, updatedAt: ctx.now }).returning()
+  await clearAutoRepeatBackoff(tx, ctx.tenantId, input.locationId)
   await writeHistory(tx, ctx, { locationId: row.locationId, weekId: row.id, action: "week_created", after: { weekId: row.id, weekStart: row.weekStart } })
   await auditRoster(tx, ctx, { action: "roster.week_created", entity: "roster_week", entityId: row.id, before: null, after: { locationId: row.locationId, weekStart: row.weekStart } })
   return weekDto(row, [], [], [])

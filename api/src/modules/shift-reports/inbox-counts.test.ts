@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, test } from "vitest"
+import { beforeEach, describe, expect, test, vi } from "vitest"
 import { resetDb } from "../../../test/harness"
 import { resetSubscribers } from "../../core/events"
 import { registerFiles } from "../files"
@@ -9,6 +9,12 @@ import { registerTasks } from "../tasks"
 import { registerWebhooks } from "../webhooks-out"
 import { DAY, world, type Json, type W, type Who } from "./world"
 import { registerShiftReports } from "."
+
+const occCalls = vi.hoisted(() => ({ n: 0 }))
+vi.mock("../shifts", async (orig) => {
+  const m = await orig<typeof import("../shifts")>()
+  return { ...m, occurrencesBetween: (...a: Parameters<typeof m.occurrencesBetween>) => ((occCalls.n += 1), m.occurrencesBetween(...a)) }
+})
 
 // B8 Task 15: the inbox's status counts (one aggregate, scope-cut, the same filters as the list) and the real minutes late / open of every item (instants, DST-safe).
 
@@ -95,6 +101,27 @@ describe("inbox counts (B8 T15)", () => {
     expect((await inbox(w, w.ops)).counts).toEqual({ all: 4, open: 4, missing: 0, late: 0, returned: 0, accepted: 0 })
     w.clock.advance({ minutes: 130 })
     expect((await inbox(w, w.ops)).counts).toEqual({ all: 4, open: 0, missing: 4, late: 0, returned: 0, accepted: 0 })
+  })
+})
+
+describe("AG2: counts only on the first page, one window pass", () => {
+  test("a page after a cursor answers counts: null (no count work); the first page has them; a first page walks the 31-day virtual window in ONE occurrence read, not one per 3 days", async () => {
+    const { w } = await night()
+    const first = await inbox(w, w.ops, `${RANGE}&limit=2`)
+    expect(first.nextCursor).not.toBeNull()
+    expect(first.counts.all).toBe(5)
+    occCalls.n = 0
+    const next = (await w.json(await w.req("GET", `/v1/shift-reports?${RANGE}&limit=2&cursor=${first.nextCursor}`, w.ops))) as Omit<Page, "counts"> & { counts: unknown }
+    expect(next.counts).toBeNull()
+    expect(next.items.length).toBeGreaterThan(0)
+    // the cursor page reads occurrences for the LIST only (at most the chunks it needs), never the whole window for counts
+    const afterPage = occCalls.n
+    occCalls.n = 0
+    const wide = await inbox(w, w.ops, `from=2026-09-25&to=2026-10-25&limit=1`)
+    expect(wide.counts.all).toBeGreaterThanOrEqual(5)
+    // list walk stops after the first chunk (limit 1), counts take exactly one pass over the whole 31 days
+    expect(occCalls.n).toBeLessThanOrEqual(1 + 1 + 1)
+    expect(afterPage).toBeLessThanOrEqual(2)
   })
 })
 

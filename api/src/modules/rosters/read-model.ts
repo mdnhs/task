@@ -201,7 +201,7 @@ export async function countUnconfirmed(tx: TenantTx, ctx: RosterCtx): Promise<nu
 }
 
 /**
- * How many open shifts the caller could claim (Today, for plain staff who have no attention feed): shifts nobody holds, on PUBLISHED weeks, from now to OPEN_SHIFT_DAYS ahead, at a site that is not
+ * How many open shifts there are at the caller's sites (Today, for plain staff who have no attention feed): shifts nobody holds, on PUBLISHED weeks, from now to OPEN_SHIFT_DAYS ahead, at a site that is not
  * archived and where the caller is LOCATED, the claim rule (AF1): homed there, or rostered at it that week. Another site's, a draft week's and an ended shift's are not counted. One statement.
  */
 export async function countOpenShiftsForMe(tx: TenantTx, ctx: RosterCtx): Promise<number> {

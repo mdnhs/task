@@ -94,6 +94,7 @@ describe("the worker logs with the request id (real BullMQ and Redis)", () => {
     const seen: string[] = []
     registerJob("test.rid", async (data, d) => {
       d.logger.info({ marker: (data as { n: number }).n }, "in the handler")
+      if ((data as { n: number }).n === 1) await d.queue.add("test.chained", { from: 1 }) // AG3: a job enqueued FROM a handler carries the id of the job that caused it
       seen.push(String((data as { n: number }).n))
     })
     const queue = makeBullQueue(url, name)
@@ -107,7 +108,9 @@ describe("the worker logs with the request id (real BullMQ and Redis)", () => {
       const line = (n: number) => lines.find((l) => l.marker === n)!
       expect(line(1).requestId).toBe("req-aaaaaaaa")
       expect(line(3).requestId).toBeUndefined()
-      expect(line(2).requestId).not.toBe("req-aaaaaaaa")
+      expect(line(2).requestId).toBeUndefined() // AG3: the legacy data.requestId fallback is gone (a DSR job's data once collided with it)
+      const chained = (deps.queue as unknown as { jobs: { name: string; opts?: { requestId?: string } }[] }).jobs.filter((j) => j.name === "test.chained")
+      expect(chained.map((j) => j.opts?.requestId)).toEqual(["req-aaaaaaaa"])
       const stored = await queue.raw.getJob("j1")
       expect((stored!.data as Record<string, unknown>).requestId).toBeUndefined() // the data in Redis is the data the producer gave
       expect(stored!.opts).toMatchObject({ requestId: "req-aaaaaaaa" })

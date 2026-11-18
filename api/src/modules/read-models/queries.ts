@@ -194,7 +194,7 @@ export function teamOverdueQuery(tx: TenantTx, ctx: TaskCtx, limit: number) {
 /**
  * The open tasks of the scope grouped by team, the S8 way: a task belongs to a team when it is FILED under it or ASSIGNED to one of its members (the same rule as `teamTaskWhere`, so a row here equals
  * the list it opens). A task counts once per team (never twice in one), a person who is in two teams is counted in both (`people` = distinct assignees that are members of the team), and the dashboard's
- * totals do not come from this statement (they count every task once). `teamId` keeps one team. At most one row per team.
+ * totals do not come from this statement (they count every task once). `teamId` keeps one team. At most one row per team, at most 200, the lowest team ids first (an explicit ORDER BY: the cap must cut the same teams every time, whatever plan the aggregate uses).
  */
 export async function teamBreakdownQuery(tx: TenantTx, ctx: TaskCtx, teamId?: string) {
   const base = and(...live(ctx), isOpen, taskScopeWhere(ctx.scope, ctx.reports))
@@ -213,6 +213,7 @@ export async function teamBreakdownQuery(tx: TenantTx, ctx: TaskCtx, teamId?: st
     ) g
     ${teamId ? sql`where g.team_id = ${teamId}::uuid` : sql``}
     group by g.team_id
+    order by g.team_id
     limit 200`)
   return (rows.rows ?? rows) as unknown as { teamId: string; open: number; overdue: number; people: number }[]
 }

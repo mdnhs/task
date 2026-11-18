@@ -108,7 +108,8 @@ export async function inboxCounts(tx: TenantTx, ctx: ReportCtx, f: InboxFilter):
   let virtualOpen = 0
   let virtualMissing = 0
   const nowMs = ctx.now.getTime()
-  for (const v of await virtualRows(tx, ctx, { ...f, status: "all", after: undefined }, Number.MAX_SAFE_INTEGER)) {
+  // AG2: the counts take the whole window (at most 31 days) in ONE pass (one occurrence read, one stored-keys read) instead of eleven 3-day chunks; and only the first page asks (inboxPage)
+  for (const v of await virtualRows(tx, ctx, { ...f, status: "all", after: undefined }, Number.MAX_SAFE_INTEGER, Number.MAX_SAFE_INTEGER)) {
     if (nowMs > v.dueAt.getTime()) virtualMissing++
     else virtualOpen++
   }
@@ -134,7 +135,7 @@ type Virtual = Key & { teamId: string; shiftName: string; startAt: Date; endAt: 
  * 250-member, 31-day window costs one or two chunks, not thirty-one days).
  */
 const CHUNK_DAYS = 3
-export async function virtualRows(tx: TenantTx, ctx: ReportCtx, f: InboxFilter, limit: number): Promise<Virtual[]> {
+export async function virtualRows(tx: TenantTx, ctx: ReportCtx, f: InboxFilter, limit: number, chunkDays: number = CHUNK_DAYS): Promise<Virtual[]> {
   let people: string[] | undefined = ctx.access.kind === "all" ? undefined : ctx.access.kind === "own" ? [ctx.access.personId] : [ctx.access.managerId, ...ctx.reports]
   if (f.person) people = people ? people.filter((p) => p === f.person) : [f.person]
   if (people && people.length === 0) return []
@@ -144,7 +145,7 @@ export async function virtualRows(tx: TenantTx, ctx: ReportCtx, f: InboxFilter, 
   const out: Virtual[] = []
   let hi = f.after && f.after.date < f.to ? f.after.date : f.to // rows after the cursor are on or before its date
   while (hi >= f.from && out.length < limit) {
-    const lo = dateOf(Math.max(dayNum(f.from), dayNum(hi) - (CHUNK_DAYS - 1)))
+    const lo = dateOf(Math.max(dayNum(f.from), dayNum(hi) - (chunkDays - 1)))
     const occ = await occurrencesBetween(tx, ctx.tenantId, ctx.tz, lo, hi, { userIds: people })
     if (occ.length > 0) {
       const keys = await tx
@@ -167,8 +168,8 @@ export async function virtualRows(tx: TenantTx, ctx: ReportCtx, f: InboxFilter, 
   return out
 }
 
-/** GET /v1/shift-reports: stored and virtual rows of the window in ONE ordered stream, one keyset page (limit + 1 of each, merged), scope applied to both. */
-export async function inboxPage(tx: TenantTx, ctx: ReportCtx, f: InboxFilter, limit: number): Promise<{ items: InboxItemDto[]; nextCursor: string | null; counts: InboxCounts }> {
+/** GET /v1/shift-reports: `counts` only on the first page (no `after` cursor; later pages answer `counts: null` and the client keeps the first page's); stored and virtual rows of the window in ONE ordered stream, one keyset page (limit + 1 of each, merged), scope applied to both. */
+export async function inboxPage(tx: TenantTx, ctx: ReportCtx, f: InboxFilter, limit: number): Promise<{ items: InboxItemDto[]; nextCursor: string | null; counts: InboxCounts | null }> {
   const stored: Row[] = await buildInboxQuery(tx, ctx.tenantId, ctx, f, ctx.now, limit + 1)
   let virtual: Virtual[] = []
   if (f.status === "all" || f.status === "draft" || f.status === "missing") {
@@ -221,5 +222,5 @@ export async function inboxPage(tx: TenantTx, ctx: ReportCtx, f: InboxFilter, li
       itemCount: c?.n ?? 0, doneCount: c?.done ?? 0, submittedAt: r?.submittedAt?.toISOString() ?? null, reviewedAt: r?.reviewedAt?.toISOString() ?? null, reviewedBy: r?.reviewedBy ? nameOf(r.reviewedBy) : null,
     }
   })
-  return { items, nextCursor: more && last ? encodeInboxCursor(last.key) : null, counts: await inboxCounts(tx, ctx, f) }
+  return { items, nextCursor: more && last ? encodeInboxCursor(last.key) : null, counts: f.after ? null : await inboxCounts(tx, ctx, f) }
 }

@@ -5,7 +5,7 @@ import type { Deps } from "../../deps"
 import { errorInfo } from "../safe-error"
 import { safeCapture } from "../observability/error-reporter"
 import { runJob, type Queue } from "./queue"
-import { stampRequestId, validRequestId } from "./request-context"
+import { runWithRequestId, stampRequestId, validRequestId } from "./request-context"
 
 export const QUEUE_NAME = "opsdesk"
 
@@ -28,11 +28,11 @@ export const ADD_TIMEOUT_MS = 3000
 
 type JobLike = { name?: string; id?: string; data?: unknown; opts?: unknown }
 /**
- * The request id a job was enqueued under: the one in its ENVELOPE (job options), when id-shaped. An older job whose payload happens to hold an id-shaped `requestId` field is still logged under it
- * (log correlation only: nothing else of the payload is ever read and it is never an identifier for authorization).
+ * The request id a job was enqueued under: the one in its ENVELOPE (job options), when id-shaped (log correlation only, never an identifier for authorization). The payload is never read for it:
+ * the old `data.requestId` fallback is gone (AG3), a job's own data fields are its own business.
  */
 export const jobRequestId = (job: JobLike | undefined): string | undefined =>
-  validRequestId((job?.opts as { requestId?: unknown } | null | undefined)?.requestId) ?? validRequestId((job?.data as { requestId?: unknown } | null | undefined)?.requestId)
+  validRequestId((job?.opts as { requestId?: unknown } | null | undefined)?.requestId)
 
 /** Tenant-scoped jobs that change what a read model shows (the tenant id is in the job data). The sweeps that do (recurrence, archive purge) bust per tenant themselves. Others (notification, webhook, export) are left out on purpose: busting for them would only thrash the cache. */
 export const READ_MODEL_JOBS = new Set(["file.scan", "dsr.erase"])
@@ -101,7 +101,8 @@ export function startWorker(deps: Deps, redisUrl: string, name: string = QUEUE_N
       const requestId = jobRequestId(job)
       const jobDeps = requestId ? { ...deps, logger: deps.logger.child({ requestId }) } : deps // the handler logs with the id of the request (or event) that caused the job
       try {
-        await runJob(job.name, job.data, jobDeps)
+        // AG3: every handler runs inside the request-id scope of its job, so a job it enqueues carries the same id (chains keep one id end to end)
+        await (requestId ? runWithRequestId(requestId, () => runJob(job.name, job.data, jobDeps)) : runJob(job.name, job.data, jobDeps))
       } finally {
         await bustAfterJob(deps, job) // a failed job may have committed part of its work
       }

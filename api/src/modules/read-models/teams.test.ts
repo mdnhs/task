@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto"
 import { beforeEach, describe, expect, test } from "vitest"
+import { ownerTenantQuery } from "../../../test/db"
 import { resetDb } from "../../../test/harness"
 import { resetSubscribers } from "../../core/events"
 import { registerFiles } from "../files"
@@ -129,6 +130,21 @@ describe("dashboard teamId (B8 T15)", () => {
     await w.manages(w.manager, w.staff)
     const d = await get(w, "/v1/dashboard", w.manager)
     expect(d.teams).toEqual([expect.objectContaining({ team: "Cleaning", open: 1, people: 1 })])
+  })
+})
+
+describe("AG4: the grouped view's cut is deterministic", () => {
+  test("with more teams than the 200 cap the 200 kept are the 200 lowest team ids (an ORDER BY before the limit), never an arbitrary hash order", async () => {
+    const w = await world({ now: NOW })
+    const ids: string[] = []
+    for (let i = 0; i < 204; i++) ids.push(randomUUID())
+    await ownerTenantQuery(w.tenant.id, `insert into teams (id, tenant_id, name, kind) select u, $1, 'T' || row_number() over (), 'department' from unnest($2::uuid[]) u`, [w.tenant.id, ids])
+    await ownerTenantQuery(w.tenant.id, `insert into team_members (tenant_id, team_id, user_id) select $1, u, $3 from unnest($2::uuid[]) u`, [w.tenant.id, ids, w.staff.userId])
+    for (const id of ids) await w.task(w.staff, { title: `T ${id.slice(0, 8)}`, teamId: id })
+    const d = await get(w, "/v1/dashboard", w.owner)
+    const got = new Set((d.teams as Json[]).map((t) => t.teamId as string))
+    expect(got.size).toBe(200)
+    expect([...got].sort()).toEqual([...ids].sort().slice(0, 200))
   })
 })
 

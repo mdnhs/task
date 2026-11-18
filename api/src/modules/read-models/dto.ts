@@ -106,7 +106,7 @@ export const TodayOut = z
     team: z.object({ count: z.number().int(), items: z.array(z.object({ ref: z.string(), title: z.string(), who: z.string(), reason: z.string() })) }).optional(),
     reports: z.number().int(),
     roster: z.number().int().optional().openapi({ description: "Upcoming shifts of the caller's own that are published and not confirmed yet (0 without the roster module)" }),
-    openShifts: z.number().int().optional().openapi({ description: "Open shifts the caller could claim: published weeks, the next 7 days, at a site they are homed at or rostered at that week (0 without the roster module). Plain staff have no attention feed, this is how open shifts reach them" }),
+    openShifts: z.number().int().optional().openapi({ description: "Open shifts at your sites: published weeks, the next 7 days, at a site you are homed at or rostered at that week (0 without the roster module). A count of the open shifts there, not a promise you could claim each one (qualifications are checked when you claim). Plain staff have no attention feed, this is how open shifts reach them" }),
   })
   .openapi({
     example: {

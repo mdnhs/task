@@ -179,7 +179,7 @@ const InboxCountsOut = z.object({
   all: z.number().int(), open: z.number().int().openapi({ description: "A draft not yet due plus a report submitted on time and not reviewed yet" }), missing: z.number().int(), late: z.number().int(), returned: z.number().int(), accepted: z.number().int(),
 }).openapi({ description: "How many items of each state the window has under the same scope, team and person filters as the list (not the status filter, not the cursor); open + missing + late + returned + accepted = all" })
 export const InboxOut = z
-  .object({ items: z.array(InboxItem), nextCursor: z.string().nullable(), counts: InboxCountsOut })
+  .object({ items: z.array(InboxItem), nextCursor: z.string().nullable(), counts: InboxCountsOut.nullable().openapi({ description: "Only on the first page (no `after` cursor); a page after a cursor answers null and the client keeps the counts of the first page" }) })
   .openapi({
     example: {
       items: [

@@ -173,8 +173,8 @@ export async function createRequest(
         .returning({ id: dataRequests.id })
       for (const c of cancelled) await recordAudit(tx, tenantId, { action: "dsr.rejected", entity: "data_request", entityId: c.id, actorId: actor.userId, before: { status: "pending" }, after: { status: "rejected", kind: "export", subjectUserId: input.subjectUserId, errorCode: "superseded_by_erase" } }, now)
     }
-    if (row.kind === "export") enqueue(EXPORT_JOB, { requestId: row.id, tenantId }, { key: row.id })
-    if (row.kind === "erase") enqueue(ERASE_JOB, { requestId: row.id, tenantId }, { key: row.id })
+    if (row.kind === "export") enqueue(EXPORT_JOB, { dsrId: row.id, tenantId }, { key: row.id })
+    if (row.kind === "erase") enqueue(ERASE_JOB, { dsrId: row.id, tenantId }, { key: row.id })
     return dto(row, now)
   })
 }
@@ -250,7 +250,7 @@ export async function retryRequest(deps: Deps, tenantId: string, actor: Actor, i
     const now = deps.clock.now()
     const [row] = await tx.update(dataRequests).set({ status: "pending", errorCode: null, startedAt: null }).where(and(eq(dataRequests.id, id), eq(dataRequests.tenantId, tenantId))).returning()
     await recordAudit(tx, tenantId, { action: "dsr.retried", entity: "data_request", entityId: id, actorId: actor.userId, before: { status: "failed", errorCode: cur.errorCode }, after: { status: "pending", kind: cur.kind, subjectUserId: cur.subjectUserId } }, now)
-    enqueue(cur.kind === "export" ? EXPORT_JOB : ERASE_JOB, { requestId: id, tenantId }, { key: `${id}-${crypto.randomUUID()}` })
+    enqueue(cur.kind === "export" ? EXPORT_JOB : ERASE_JOB, { dsrId: id, tenantId }, { key: `${id}-${crypto.randomUUID()}` })
     return dto(row, now)
   })
 }
@@ -278,7 +278,7 @@ export async function sweepRequests(_data: unknown, deps: Deps): Promise<void> {
       )
       for (const r of due) {
         const name = r.kind === "export" ? EXPORT_JOB : ERASE_JOB
-        await deps.queue.add(name, { requestId: r.id, tenantId }, { jobId: `${name}.${r.id}-${crypto.randomUUID()}` })
+        await deps.queue.add(name, { dsrId: r.id, tenantId }, { jobId: `${name}.${r.id}-${crypto.randomUUID()}` })
       }
       // The 30-day expiry normally rides a delayed job; if that job was lost, expire the export from here.
       const stale = await withTenant(deps.db, tenantId, (tx) =>
@@ -292,7 +292,7 @@ export async function sweepRequests(_data: unknown, deps: Deps): Promise<void> {
             sql`${dataRequests.completedAt} + (${EXPORT_TTL_MS}::bigint * interval '1 millisecond') < ${now.toISOString()}::timestamptz`,
           )),
       )
-      for (const r of stale) await deps.queue.add(EXPIRE_JOB, { requestId: r.id, tenantId, fileId: r.fileId }, { jobId: `${EXPIRE_JOB}.${r.id}-${crypto.randomUUID()}` })
+      for (const r of stale) await deps.queue.add(EXPIRE_JOB, { dsrId: r.id, tenantId, fileId: r.fileId }, { jobId: `${EXPIRE_JOB}.${r.id}-${crypto.randomUUID()}` })
     } catch (err) {
       deps.logger.error({ tenantId, errCode: safeCode(err) }, "dsr sweep failed for a tenant") // one tenant never stops the rest
     }
@@ -301,11 +301,11 @@ export async function sweepRequests(_data: unknown, deps: Deps): Promise<void> {
 
 // ---------------------------------------------------------------- jobs
 
-type JobData = { requestId: string; tenantId: string }
+type JobData = { dsrId: string; tenantId: string }
 function parseJob(data: unknown, name: string): JobData {
-  const d = data as { requestId?: unknown; tenantId?: unknown }
-  if (typeof d?.requestId !== "string" || typeof d?.tenantId !== "string" || !UUID.test(d.requestId) || !UUID.test(d.tenantId)) throw new Error(`invalid ${name} job data`)
-  return { requestId: d.requestId, tenantId: d.tenantId }
+  const d = data as { dsrId?: unknown; tenantId?: unknown }
+  if (typeof d?.dsrId !== "string" || typeof d?.tenantId !== "string" || !UUID.test(d.dsrId) || !UUID.test(d.tenantId)) throw new Error(`invalid ${name} job data`)
+  return { dsrId: d.dsrId, tenantId: d.tenantId }
 }
 
 /**
@@ -315,7 +315,7 @@ function parseJob(data: unknown, name: string): JobData {
  */
 async function claim(deps: Deps, job: JobData, kind: DsrKind): Promise<Row | null> {
   return withTenant(deps.db, job.tenantId, async (tx) => {
-    const [cur] = await tx.select().from(dataRequests).where(and(eq(dataRequests.id, job.requestId), eq(dataRequests.tenantId, job.tenantId))).for("update")
+    const [cur] = await tx.select().from(dataRequests).where(and(eq(dataRequests.id, job.dsrId), eq(dataRequests.tenantId, job.tenantId))).for("update")
     if (!cur || cur.kind !== kind) return null
     const now = deps.clock.now()
     const stale = cur.status === "running" && (!cur.startedAt || now.getTime() - cur.startedAt.getTime() > STALE_RUNNING_MS)
@@ -328,17 +328,17 @@ async function claim(deps: Deps, job: JobData, kind: DsrKind): Promise<Row | nul
 /** A handler/job failure: status failed + a short error code (never the message) + an audit entry; logs carry ids and the code only. */
 async function markFailed(deps: Deps, job: JobData, err: unknown): Promise<void> {
   const code = safeCode(err)
-  deps.logger.warn({ requestId: job.requestId, errCode: code }, "data request failed")
+  deps.logger.warn({ dsrId: job.dsrId, errCode: code }, "data request failed")
   try {
     await withTenant(deps.db, job.tenantId, async (tx) => {
-      const [cur] = await tx.select().from(dataRequests).where(and(eq(dataRequests.id, job.requestId), eq(dataRequests.tenantId, job.tenantId))).for("update")
+      const [cur] = await tx.select().from(dataRequests).where(and(eq(dataRequests.id, job.dsrId), eq(dataRequests.tenantId, job.tenantId))).for("update")
       if (!cur || cur.status !== "running") return
       const now = deps.clock.now()
       await tx.update(dataRequests).set({ status: "failed", errorCode: code }).where(and(eq(dataRequests.id, cur.id), eq(dataRequests.tenantId, job.tenantId)))
       await recordAudit(tx, job.tenantId, { action: "dsr.failed", entity: "data_request", entityId: cur.id, actorId: null, before: { status: "running" }, after: { status: "failed", kind: cur.kind, errorCode: code } }, now)
     })
   } catch (e) {
-    deps.logger.error({ requestId: job.requestId, errCode: safeCode(e) }, "could not record data request failure")
+    deps.logger.error({ dsrId: job.dsrId, errCode: safeCode(e) }, "could not record data request failure")
   }
 }
 
@@ -352,7 +352,7 @@ export function exportFileId(requestId: string): string {
 }
 
 /**
- * Job `dsr.export` { requestId, tenantId }. One tx: every registered handler's export (registration order) goes into one
+ * Job `dsr.export` { dsrId, tenantId }. One tx: every registered handler's export (registration order) goes into one
  * JSON document `{ schema, requestId, tenantId, subjectUserId, generatedAt, modules: { <module>: ... } }`, which is
  * written server-side to the final key as a `clean` file (purpose dsr_export, owner = requester) named
  * `dsr-export-<requestId>.json`; request completed, `dsr.export_completed` audited, requester notified, `dsr.completed`
@@ -365,7 +365,7 @@ export async function runExport(data: unknown, deps: Deps): Promise<void> {
   try {
     await withTenantAfterCommit(deps, job.tenantId, async (tx, enqueue) => {
       await lockDsr(tx, job.tenantId) // serialises with erase requests: no export is written for someone being erased
-      const cur = await requestIn(tx, job.tenantId, job.requestId, true)
+      const cur = await requestIn(tx, job.tenantId, job.dsrId, true)
       if (cur.status !== "running") return
       const [mem] = await tx.select({ joinedAt: memberships.joinedAt }).from(memberships).where(and(eq(memberships.tenantId, job.tenantId), eq(memberships.userId, cur.subjectUserId)))
       // An erase blocks while it is open, or when it finished AFTER the current membership began (a person who re-joined later may export again).
@@ -387,7 +387,7 @@ export async function runExport(data: unknown, deps: Deps): Promise<void> {
       await tx.update(dataRequests).set({ status: "completed", completedAt: now, resultFileId: fileId, errorCode: null }).where(and(eq(dataRequests.id, cur.id), eq(dataRequests.tenantId, job.tenantId)))
       await recordAudit(tx, job.tenantId, { action: "dsr.export_completed", entity: "data_request", entityId: cur.id, actorId: null, before: { status: "running" }, after: { status: "completed", kind: "export", subjectUserId: cur.subjectUserId, fileId, sizeBytes: body.length, modules: Object.keys(modules) } }, now)
       await tellRequester(tx, deps, enqueue, cur, "Your data export is ready", "The export is available for 30 days.", `/v1/files/${fileId}/download`)
-      enqueue(EXPIRE_JOB, { requestId: cur.id, tenantId: job.tenantId, fileId }, { key: cur.id, delayMs: EXPORT_TTL_MS })
+      enqueue(EXPIRE_JOB, { dsrId: cur.id, tenantId: job.tenantId, fileId }, { key: cur.id, delayMs: EXPORT_TTL_MS })
       await publish(tx, { tenantId: job.tenantId, type: "dsr.completed", payload: { requestId: cur.id, kind: "export", subjectUserId: cur.subjectUserId }, actorId: null }, now)
     })
   } catch (err) {
@@ -401,17 +401,17 @@ export async function runExport(data: unknown, deps: Deps): Promise<void> {
  * no files row, so the object holds personal data nobody can reach: delete it. With a row (a successful earlier run) it is kept.
  */
 async function dropUncommittedExport(deps: Deps, job: JobData): Promise<void> {
-  const id = exportFileId(job.requestId)
+  const id = exportFileId(job.dsrId)
   try {
     const [row] = await withTenant(deps.db, job.tenantId, (tx) => tx.select({ id: files.id }).from(files).where(and(eq(files.id, id), eq(files.tenantId, job.tenantId))))
     if (!row) await deps.storage.delete(fileKey(job.tenantId, id))
   } catch (e) {
-    deps.logger.error({ requestId: job.requestId, errCode: safeCode(e) }, "could not remove an uncommitted export object")
+    deps.logger.error({ dsrId: job.dsrId, errCode: safeCode(e) }, "could not remove an uncommitted export object")
   }
 }
 
 /**
- * Job `dsr.export-expire` { requestId, tenantId, fileId }: deletes the generated export (soft delete + object removal job)
+ * Job `dsr.export-expire` { dsrId, tenantId, fileId }: deletes the generated export (soft delete + object removal job)
  * once its 30 days are over. Re-runs find the file already deleted and do nothing.
  */
 export async function expireExport(data: unknown, deps: Deps): Promise<void> {
@@ -422,13 +422,13 @@ export async function expireExport(data: unknown, deps: Deps): Promise<void> {
     const [f] = await tx.select({ purpose: files.purpose }).from(files).where(and(eq(files.id, fileId), eq(files.tenantId, job.tenantId)))
     if (!f || f.purpose !== "dsr_export") return
     if (await expireFile(tx, job.tenantId, fileId, enqueue)) {
-      await recordAudit(tx, job.tenantId, { action: "dsr.export_expired", entity: "data_request", entityId: job.requestId, actorId: null, before: { fileId, status: "available" }, after: { status: "deleted" } }, deps.clock.now())
+      await recordAudit(tx, job.tenantId, { action: "dsr.export_expired", entity: "data_request", entityId: job.dsrId, actorId: null, before: { fileId, status: "available" }, after: { status: "deleted" } }, deps.clock.now())
     }
   })
 }
 
 /**
- * Job `dsr.erase` { requestId, tenantId }. Three steps, each safe to repeat, so a crash in between just resumes:
+ * Job `dsr.erase` { dsrId, tenantId }. Three steps, each safe to repeat, so a crash in between just resumes:
  *  1. tenant tx: rbac lock then dsr lock; last active owner -> 409 last_owner (request fails with that code); every
  *     registered handler's erase; requests about the subject get reason/notes scrubbed to "[erased]" and their generated
  *     export files deleted; the membership is removed (audit `member.removed`, event `member.removed`);
@@ -477,7 +477,7 @@ export async function runErase(data: unknown, deps: Deps): Promise<void> {
     })
     const globalErased = await eraseGlobalIdentity(deps, subject)
     await withTenantAfterCommit(deps, job.tenantId, async (tx, enqueue) => {
-      const cur = await requestIn(tx, job.tenantId, job.requestId, true)
+      const cur = await requestIn(tx, job.tenantId, job.dsrId, true)
       if (cur.status !== "running") return
       const now = deps.clock.now()
       await tx.update(dataRequests).set({ status: "completed", completedAt: now, errorCode: null }).where(and(eq(dataRequests.id, cur.id), eq(dataRequests.tenantId, job.tenantId)))

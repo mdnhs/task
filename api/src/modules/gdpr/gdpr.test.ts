@@ -393,7 +393,7 @@ test("jobs are idempotent: re-running a finished export or erase changes nothing
   expect(await w.get(er.body.id)).toEqual(done)
   expect((await q(w.tenant.id, `select count(*)::int n from audit_events where action = 'dsr.erasure_completed'`))[0].n).toBe(1)
   // a job for an unknown request is a quiet no-op
-  await runJob("dsr.erase", { requestId: crypto.randomUUID(), tenantId: w.tenant.id }, w.deps)
+  await runJob("dsr.erase", { dsrId: crypto.randomUUID(), tenantId: w.tenant.id }, w.deps)
 })
 
 test("a crashed erase resumes: re-running a request left `failed` finishes it", async () => {
@@ -408,7 +408,7 @@ test("a crashed erase resumes: re-running a request left `failed` finishes it", 
   expect(await q(w.tenant.id, `select 1 from memberships where user_id = $1`, [w.mary.userId])).toHaveLength(1) // all-or-nothing in the tenant tx
   expect(JSON.stringify(failed) + logs.join("\n")).not.toContain("Message-Sentinel-9917") // code only, never the message
   boom = false
-  await runJob("dsr.erase", { requestId: er.body.id, tenantId: w.tenant.id }, w.deps) // the same job again
+  await runJob("dsr.erase", { dsrId: er.body.id, tenantId: w.tenant.id }, w.deps) // the same job again
   await w.jobs()
   expect(await w.get(er.body.id)).toMatchObject({ status: "completed", errorCode: null })
   expect(await q(w.tenant.id, `select 1 from memberships where user_id = $1`, [w.mary.userId])).toHaveLength(0)
@@ -535,7 +535,7 @@ test("[F3] opening an erase cancels open exports of the same subject; an export 
   // an export that slipped in anyway (request row inserted behind the API) for the erased subject
   const id = crypto.randomUUID()
   await q(w.tenant.id, `insert into data_requests (id, tenant_id, subject_user_id, kind, status, requested_by, reason, created_at, due_at) values ($1, $2, $3, 'export', 'pending', $4, 'r', now(), now() + interval '1 day')`, [id, w.tenant.id, w.mary.userId, w.admin.userId])
-  await runJob("dsr.export", { requestId: id, tenantId: w.tenant.id }, w.deps)
+  await runJob("dsr.export", { dsrId: id, tenantId: w.tenant.id }, w.deps)
   expect(await w.get(id)).toMatchObject({ status: "failed", errorCode: "subject_erased", resultFileId: null })
   expect(await q(w.tenant.id, `select 1 from files where purpose = 'dsr_export'`)).toEqual([])
   expect(await w.deps.storage.head(`t/${w.tenant.id}/${exportFileIdOf(id)}`)).toBeNull()
@@ -624,7 +624,7 @@ test("[G2a] an erase that is retried or re-run after the subject re-joined is re
   const retry = await w.req("POST", `/v1/data-requests/${er.body.id}/retry`, w.c.owner)
   expect(retry.status).toBe(409)
   expect(((await retry.json()) as Json).code).toBe("subject_rejoined")
-  await runJob("dsr.erase", { requestId: er.body.id, tenantId: w.tenant.id }, w.deps) // a stray job (sweeper) is refused too
+  await runJob("dsr.erase", { dsrId: er.body.id, tenantId: w.tenant.id }, w.deps) // a stray job (sweeper) is refused too
   expect(await w.get(er.body.id)).toMatchObject({ status: "failed", errorCode: "subject_rejoined" })
   expect(await q(w.tenant.id, `select 1 from memberships where user_id = $1`, [w.mary.userId])).toHaveLength(1)
   expect((await ownerQuery(`select name from "user" where id = $1`, [w.mary.userId]))[0].name).toBe("Mary Byrne")
@@ -647,7 +647,7 @@ test("[G2b] a re-joined member can export again after an earlier completed erase
   const id = crypto.randomUUID()
   await q(w.tenant.id, `insert into data_requests (id, tenant_id, subject_user_id, kind, status, requested_by, reason, created_at, due_at) values ($1, $2, $3, 'export', 'pending', $4, 'r', now(), now() + interval '1 day')`, [id, w.tenant.id, w.mary.userId, w.admin.userId])
   await q(w.tenant.id, `insert into data_requests (tenant_id, subject_user_id, kind, status, requested_by, reason, created_at, due_at) values ($1, $2, 'erase', 'pending', $3, 'r', now(), now() + interval '1 day')`, [w.tenant.id, w.mary.userId, w.admin.userId])
-  await runJob("dsr.export", { requestId: id, tenantId: w.tenant.id }, w.deps)
+  await runJob("dsr.export", { dsrId: id, tenantId: w.tenant.id }, w.deps)
   expect(await w.get(id)).toMatchObject({ status: "failed", errorCode: "subject_erased" })
 })
 

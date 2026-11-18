@@ -11,7 +11,7 @@ import { instantSql, shiftInstants } from "./locations"
 import { realDate } from "./qualifications"
 import { HIDDEN_LINE, loadRuleContext, PRIVATE_RULES, type LoadedRuleContext } from "./rules"
 import { assertLocation, inScopeSql, type RosterCtx } from "./scope"
-import { loadWeek, shiftSnap, weekDtos, type ShiftRow, type WeekRow } from "./weeks"
+import { clearAutoRepeatBackoff, loadWeek, shiftSnap, weekDtos, type ShiftRow, type WeekRow } from "./weeks"
 import { auditRoster, isUuid, officeOnly, writeHistory } from "./write"
 
 // Repeat a published week, saved week templates and the auto-repeat setting (B8 Task 13; FR-RS-22, 26..29, R8-12). Everything here writes DRAFT weeks only: a copy is never published
@@ -154,7 +154,7 @@ async function lockTargets(tx: TenantTx, ctx: RosterCtx, locationId: string, sta
 /**
  * POST /v1/roster/weeks/{id}/repeat (`{ version, weeks 1..12, replace? }`, FR-RS-26, 27, R8-12). The source is any week of a location the caller may edit drafts at (a supervisor repeats their own
  * published week: the COPIES are drafts, so the publish lock is not touched). A published target is 409 `week_published` for everybody; a draft target needs `replace` (409 `week_exists_draft`),
- * then its shifts are replaced. A stale source `version`, or a stale `targetVersions[monday]` of a draft being replaced, is 409 `version_conflict`; an archived site 409 `location_archived`. Nothing is written unless every target is acceptable.
+ * then its shifts are replaced. `replace` REQUIRES `targetVersions` for every existing draft target (422 `targets_version_required`; a key that is not a target Monday 422 `invalid_target_version`); a stale source `version` or `targetVersions[monday]` (or a key for a week that no longer exists) is 409 `version_conflict`; an archived site 409 `location_archived`. Nothing is written unless every target is acceptable.
  */
 export async function repeatWeek(tx: TenantTx, ctx: RosterCtx, weekId: string, input: { version: number; weeks: number; replace?: boolean; targetVersions?: Record<string, number> }): Promise<RepeatDto> {
   const loaded = await loadWeek(tx, ctx, weekId, true)
@@ -164,14 +164,19 @@ export async function repeatWeek(tx: TenantTx, ctx: RosterCtx, weekId: string, i
   if (loaded.archived) throw Conflict("location_archived")
   if (!Number.isInteger(input.weeks) || input.weeks < 1 || input.weeks > MAX_REPEAT_WEEKS) throw unprocessable("invalid_weeks")
   const starts = Array.from({ length: input.weeks }, (_, i) => addDays(week.weekStart, 7 * (i + 1)))
+  const given = input.targetVersions ?? {}
+  if (Object.keys(given).some((k) => !starts.includes(k))) throw unprocessable("invalid_target_version") // a key that is not one of the target Mondays
   const found = await lockTargets(tx, ctx, week.locationId, starts)
   for (const s of starts) {
     const t = found.get(s)
     if (t?.status === "published") throw Conflict("week_published")
     if (t && !input.replace) throw Conflict("week_exists_draft")
-    if (t && input.targetVersions?.[s] !== undefined && input.targetVersions[s] !== t.version) throw Conflict("version_conflict") // the target draft changed since the caller looked
+    if (t && given[s] === undefined) throw unprocessable("targets_version_required") // replacing is destructive: the caller must name the version of every draft it saw
+    if (t && given[s] !== t.version) throw Conflict("version_conflict") // the target draft changed since the caller looked
+    if (!t && given[s] !== undefined) throw Conflict("version_conflict") // the caller saw a draft that is not there any more
   }
   const out = await copyWeek(tx, ctx, { week, zone: loaded.zone }, starts.map((s) => ({ weekStart: s, existing: found.get(s) ?? null })), "repeat")
+  await clearAutoRepeatBackoff(tx, ctx.tenantId, week.locationId) // a manual repeat made the next weeks: the site's auto-repeat failures are history
   return { created: await weekDtos(tx, ctx, out.weeks), conflicts: out.conflicts, counts: out.counts }
 }
 

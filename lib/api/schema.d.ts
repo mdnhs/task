@@ -11445,7 +11445,7 @@ export interface paths {
                         weeks: number;
                         /** @description Replace an existing DRAFT target week (without it 409 week_exists_draft) */
                         replace?: boolean;
-                        /** @description With `replace`: the version of each target draft the caller saw, by its Monday. A target whose version moved since is 409 version_conflict and nothing is written. A target left out of the map is not checked. */
+                        /** @description REQUIRED with `replace` for every existing target draft: the version of each draft the caller saw, by its Monday (422 targets_version_required when one is missing, 422 invalid_target_version for a key that is not a target Monday). A draft whose version moved since is 409 version_conflict and nothing is written. */
                         targetVersions?: {
                             [key: string]: number;
                         };
@@ -11453,7 +11453,7 @@ export interface paths {
                 };
             };
             responses: {
-                /** @description Copies the week's people and individual times to the next 1..12 weeks as DRAFTS (a supervisor of the site too: the copies are drafts, the publish lock is not touched), all or nothing. Every copied shift is re-checked: a block (approved leave, a clash anywhere, a person who left or lacks a qualification) makes it an OPEN shift with a conflict row (open true), a warning or a public holiday keeps the person with a line (open false); copied = kept + warned + opened. Nobody is notified. 404 not_found for a week or shift of a site the caller may not see, a missing or another tenant's one and an id that is not a uuid (all the same answer); 403 forbidden (a role that edits nothing); 409 version_conflict (the source version, or a targetVersions entry of a draft being replaced, is stale) | week_published (a target is published) | week_exists_draft (a target is a draft and replace is not true) | location_archived; 422 invalid_weeks */
+                /** @description Copies the week's people and individual times to the next 1..12 weeks as DRAFTS (a supervisor of the site too: the copies are drafts, the publish lock is not touched), all or nothing. Every copied shift is re-checked: a block (approved leave, a clash anywhere, a person who left or lacks a qualification) makes it an OPEN shift with a conflict row (open true), a warning or a public holiday keeps the person with a line (open false); copied = kept + warned + opened. Nobody is notified. 404 not_found for a week or shift of a site the caller may not see, a missing or another tenant's one and an id that is not a uuid (all the same answer); 403 forbidden (a role that edits nothing); 409 version_conflict (the source version, or a targetVersions entry of a draft being replaced, is stale) | week_published (a target is published) | week_exists_draft (a target is a draft and replace is not true) | location_archived; 422 invalid_weeks | targets_version_required (replace without a version for every draft target) | invalid_target_version (a targetVersions key that is not a target Monday) */
                 201: {
                     headers: {
                         [name: string]: unknown;
@@ -12162,7 +12162,7 @@ export interface paths {
                                 minutesOpen: number;
                             }[];
                             nextCursor: string | null;
-                            /** @description How many items of each state the window has under the same scope, team and person filters as the list (not the status filter, not the cursor); open + missing + late + returned + accepted = all */
+                            /** @description Only on the first page (no `after` cursor); a page after a cursor answers null and the client keeps the counts of the first page */
                             counts: {
                                 all: number;
                                 /** @description A draft not yet due plus a report submitted on time and not reviewed yet */
@@ -12171,7 +12171,7 @@ export interface paths {
                                 late: number;
                                 returned: number;
                                 accepted: number;
-                            };
+                            } | null;
                         };
                     };
                 };
@@ -13771,7 +13771,7 @@ export interface paths {
                             reports: number;
                             /** @description Upcoming shifts of the caller's own that are published and not confirmed yet (0 without the roster module) */
                             roster?: number;
-                            /** @description Open shifts the caller could claim: published weeks, the next 7 days, at a site they are homed at or rostered at that week (0 without the roster module). Plain staff have no attention feed, this is how open shifts reach them */
+                            /** @description Open shifts at your sites: published weeks, the next 7 days, at a site you are homed at or rostered at that week (0 without the roster module). A count of the open shifts there, not a promise you could claim each one (qualifications are checked when you claim). Plain staff have no attention feed, this is how open shifts reach them */
                             openShifts?: number;
                         };
                     };

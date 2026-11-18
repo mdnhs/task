@@ -21,6 +21,19 @@ const repeatOk = async (w: W, who: Who, weekId: string, body: Json): Promise<Jso
   expect(r.status, text).toBe(201)
   return JSON.parse(text)
 }
+/** The versions of the existing target drafts of the next `n` weeks after the source, by Monday (what a client that looked at them sends). */
+const tv = async (w: W, srcId: string, n: number): Promise<Record<string, number>> => {
+  const [src] = await w.rows("select location_id, week_start::text as ws from roster_weeks where id = $1", [srcId])
+  const out: Record<string, number> = {}
+  for (let i = 1; i <= n; i++) {
+    const d = new Date(`${src.ws}T00:00:00Z`)
+    d.setUTCDate(d.getUTCDate() + 7 * i)
+    const day = d.toISOString().slice(0, 10)
+    const [r] = await w.rows("select version from roster_weeks where location_id = $1 and week_start = $2", [src.location_id, day])
+    if (r) out[day] = Number(r.version)
+  }
+  return out
+}
 const shiftsOf = (w: W, weekId: string) => w.rows("select id, date::text as date, user_id, start_time, end_time, start_at, end_at, source_shift_id, version, confirmed_at from roster_shifts where week_id = $1 order by date, start_time, id", [weekId])
 const weekIdAt = async (w: W, locationId: string, start: string): Promise<string | undefined> => (await w.rows("select id from roster_weeks where location_id = $1 and week_start = $2", [locationId, start]))[0]?.id
 /** Alpha's published SRC week: the employee on Monday, Cian (staff2) on Tuesday, the employee on Wednesday 09:00-15:00. */
@@ -174,6 +187,30 @@ describe("repeat (FR-RS-26, 27, AC-RS-06, R8-12)", () => {
     expect((await shiftsOf(w, t1)).some((r) => r.user_id === w.staff3.userId)).toBe(false)
   })
 
+  test("AG1: replace:true REQUIRES targetVersions for every existing target draft (422 targets_version_required, nothing written); a key outside the target set is 422 invalid_target_version; a stale one 409; a key for a week that does not exist 409", async () => {
+    const w = await sites()
+    const { wk } = await coppers(w)
+    const t1 = await w.week(w.p.owner, w.a, T1)
+    const t2 = await w.week(w.p.owner, w.a, T2)
+    await w.addOk(w.p.owner, t1, [{ date: T1, userIds: [w.staff3.userId], shiftTypeId: w.ta }])
+    const v = await version(w, wk)
+    const before = (await w.rows("select count(*)::int n from roster_shifts"))[0].n
+    const nothingWritten = async () => expect((await w.rows("select count(*)::int n from roster_shifts"))[0].n).toBe(before)
+    // none at all, then one of two missing
+    expect((await w.fail("POST", `/v1/roster/weeks/${wk}/repeat`, w.p.owner, { version: v, weeks: 2, replace: true }, 422)).code).toBe("targets_version_required")
+    expect((await w.fail("POST", `/v1/roster/weeks/${wk}/repeat`, w.p.owner, { version: v, weeks: 2, replace: true, targetVersions: { [T1]: await version(w, t1) } }, 422)).code).toBe("targets_version_required")
+    // a key that is not one of the target Mondays (the source itself, a week beyond N, a non-Monday)
+    for (const key of [SRC, T3, "2026-12-16"]) {
+      expect((await w.fail("POST", `/v1/roster/weeks/${wk}/repeat`, w.p.owner, { version: v, weeks: 2, replace: true, targetVersions: { [T1]: await version(w, t1), [T2]: await version(w, t2), [key]: 1 } }, 422)).code, key).toBe("invalid_target_version")
+    }
+    await nothingWritten()
+    // stale -> 409, a key for a target that does not exist -> 409
+    expect((await w.fail("POST", `/v1/roster/weeks/${wk}/repeat`, w.p.owner, { version: v, weeks: 2, replace: true, targetVersions: { [T1]: 99, [T2]: await version(w, t2) } }, 409)).code).toBe("version_conflict")
+    await nothingWritten()
+    // all current: passes; the new week T3 needs no version (it does not exist yet)
+    await repeatOk(w, w.p.owner, wk, { weeks: 3, replace: true, targetVersions: { [T1]: await version(w, t1), [T2]: await version(w, t2) } })
+  })
+
   test("a location in another zone than the tenant keeps its wall times across ITS clock change: Sydney 09:00 on Mon 29 Mar 2027 (AEDT) repeats to 09:00 on Mon 5 Apr (AEST, the clocks went back on the 4th), not 09:00 Dublin", async () => {
     const w = await sites()
     await w.rows("update locations set time_zone = 'Australia/Sydney' where id = $1", [w.a])
@@ -197,7 +234,7 @@ describe("repeat (FR-RS-26, 27, AC-RS-06, R8-12)", () => {
     const v = await version(w, wk)
     expect((await w.fail("POST", `/v1/roster/weeks/${wk}/repeat`, w.p.owner, { version: v, weeks: 1 }, 409)).code).toBe("week_exists_draft")
     expect(await shiftsOf(w, t1)).toHaveLength(1) // untouched
-    const out = await repeatOk(w, w.p.owner, wk, { replace: true })
+    const out = await repeatOk(w, w.p.owner, wk, { replace: true, targetVersions: await tv(w, wk, 1) })
     expect(out.created[0].id).toBe(t1) // the same week row, new content
     const rows = await shiftsOf(w, t1)
     expect(rows).toHaveLength(3)
@@ -206,7 +243,7 @@ describe("repeat (FR-RS-26, 27, AC-RS-06, R8-12)", () => {
     expect(removed).toHaveLength(1) // the replaced shift is in history whole
     expect(removed[0].before).toMatchObject({ userId: w.staff3.userId, date: T1 })
     // retry of the same replace: no duplicates
-    await repeatOk(w, w.p.owner, wk, { replace: true })
+    await repeatOk(w, w.p.owner, wk, { replace: true, targetVersions: await tv(w, wk, 1) })
     expect(await shiftsOf(w, t1)).toHaveLength(3)
     // a published target
     await publish(w, t1)
