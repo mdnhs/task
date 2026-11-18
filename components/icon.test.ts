@@ -63,3 +63,20 @@ describe("Icon map", () => {
     expect(iconName("roster")).toBe("roster")
   })
 })
+
+describe("one icon set", () => {
+  it("has no lucide-react and no sprite references left", () => {
+    const offenders: string[] = []
+    for (const f of source) {
+      if (!/\.(tsx?|mjs|json)$/.test(f)) continue
+      const s = read(f)
+      if (/lucide-react|components\/icons["']|IconSprite|href=\{?[`"']#i-|<use\b/.test(s)) offenders.push(f)
+    }
+    expect(offenders).toEqual([])
+  })
+
+  it("only components/icon.tsx imports Hugeicons", () => {
+    const importers = source.filter((f) => /\.(tsx?)$/.test(f) && /from "@hugeicons\//.test(read(f)))
+    expect(importers).toEqual(["components/icon.tsx"])
+  })
+})
