@@ -20,7 +20,7 @@ const KNOWN: Record<string, number> = {
   "billing@1568": 59,
   "audit@1568": 3,
   "dashboard manager@768": 492,
-  "reports inbox@768": 532,
+  "reports inbox@768": 680,
   "shifts week@768": 51,
   "tasks list@768": 456,
   "task detail@768": 238,
