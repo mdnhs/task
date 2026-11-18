@@ -73,12 +73,12 @@ describe("the console MFA gate mirrors the API (carry-in a)", () => {
     expect(calls).toEqual([])
   })
   test("401 mfa_challenge shows the step-up; 401 mfa_enrolment_required the enrolment; an answer is 'ok'", async () => {
-    expect(await resolvePlatformMfa(me(true), fakeApi({ "GET /v1/platform/tenants": problem(401, "mfa_challenge") }).client)).toBe("challenge")
-    expect(await resolvePlatformMfa(me(true), fakeApi({ "GET /v1/platform/tenants": problem(401, "mfa_enrolment_required") }).client)).toBe("enrol")
-    expect(await resolvePlatformMfa(me(true), fakeApi({ "GET /v1/platform/tenants": listDto }).client)).toBe("ok")
+    expect(await resolvePlatformMfa(me(true), fakeApi({ "GET /v1/platform/session": problem(401, "mfa_challenge") }).client)).toBe("challenge")
+    expect(await resolvePlatformMfa(me(true), fakeApi({ "GET /v1/platform/session": problem(401, "mfa_enrolment_required") }).client)).toBe("enrol")
+    expect(await resolvePlatformMfa(me(true), fakeApi({ "GET /v1/platform/session": { staff: true, role: "owner", mfa: "ok" } }).client)).toBe("ok")
   })
   test("any other refusal is not an MFA answer: it is rethrown (a dead cookie is the session's business)", async () => {
-    await expect(resolvePlatformMfa(me(true), fakeApi({ "GET /v1/platform/tenants": problem(401, "unauthenticated") }).client)).rejects.toBeInstanceOf(ApiError)
+    await expect(resolvePlatformMfa(me(true), fakeApi({ "GET /v1/platform/session": problem(401, "unauthenticated") }).client)).rejects.toBeInstanceOf(ApiError)
   })
 })
 

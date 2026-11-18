@@ -24,7 +24,7 @@ type Tenants = Record<string, { status?: number; code?: string; body?: unknown; 
 export function world(o: {
   cookie?: boolean; tenantCookie?: string | null; me?: unknown | number | { status: number; code: string }; tenants?: Tenants
   ent?: Record<string, unknown>
-  /** What GET /v1/platform/tenants answers (the console's second-factor probe): ok by default. */
+  /** What GET /v1/platform/session answers (the console's second-factor probe): ok by default. */
   platform?: { status: number; code: string }
 } = {}) {
   const calls: { path: string; tenant: string | null }[] = []
@@ -52,7 +52,7 @@ export function world(o: {
       if (!tenant) return problem(404, "not_found")
       return json(tenantCtx(tenant, t?.roleKey))
     }
-    if (path === "/v1/platform/tenants") return o.platform ? problem(o.platform.status, o.platform.code) : json({ items: [], page: 1, pageSize: 1, total: 0 })
+    if (path === "/v1/platform/session") return o.platform ? problem(o.platform.status, o.platform.code) : json({ staff: true, role: "owner", mfa: "ok" })
     if (path === "/v1/entitlements") return json(ent)
     return problem(404, "not_found")
   }) as unknown as typeof globalThis.fetch

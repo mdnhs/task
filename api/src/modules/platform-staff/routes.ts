@@ -13,6 +13,11 @@ const PatchBody = z
   .openapi({ example: { role: "billing" } })
 const Param = z.object({ userId: z.string().min(1).max(64).openapi({ param: { name: "userId", in: "path" }, example: "usr_01H8XYZ" }) })
 
+const SessionProbe = z.object({ staff: z.literal(true), role: Role, mfa: z.literal("ok") }).openapi({ example: { staff: true, role: "support", mfa: "ok" } })
+const sessionRoute = createRoute({
+  method: "get", path: "/v1/platform/session", middleware: [requirePlatformStaff(...PLATFORM_ROLES)] as const,
+  responses: { 200: { description: "Cheap console probe: the caller is active staff and this session passed its second factor. One indexed staff lookup, no tenant query. 401 mfa_challenge | mfa_enrolment_required, 404 not_found for everyone who is not active staff", content: { "application/json": { schema: SessionProbe } } } },
+})
 const listRoute = createRoute({
   method: "get", path: "/v1/platform/staff", middleware: [requirePlatformStaff("owner")] as const,
   responses: { 200: { description: "Platform staff", content: { "application/json": { schema: z.array(Member) } } } },
@@ -29,6 +34,7 @@ const patchRoute = createRoute({
 })
 
 export const platformStaffRoutes = newRouter()
+  .openapi(sessionRoute, (c) => c.json({ staff: true as const, role: c.get("staff")!.role, mfa: "ok" as const }, 200))
   .openapi(listRoute, async (c) => {
     const rows = await listStaff(c.get("deps").db)
     return c.json(rows.map((r) => ({ ...r, addedAt: r.addedAt.toISOString() })), 200)

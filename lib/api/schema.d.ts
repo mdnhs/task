@@ -12320,6 +12320,48 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/platform/session": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Cheap console probe: the caller is active staff and this session passed its second factor. One indexed staff lookup, no tenant query. 401 mfa_challenge | mfa_enrolment_required, 404 not_found for everyone who is not active staff */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @enum {boolean} */
+                            staff: true;
+                            /** @enum {string} */
+                            role: "owner" | "support" | "billing" | "viewer";
+                            /** @enum {string} */
+                            mfa: "ok";
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/platform/staff": {
         parameters: {
             query?: never;

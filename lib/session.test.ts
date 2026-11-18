@@ -148,7 +148,14 @@ describe("T6.3 getPlatformSession: the console accepts a user with no company", 
     state.memos.forEach((m) => m.clear())
     const calls = (state.current = world({ me: { user: { ...user, twoFactorEnabled: false }, platformRole: "owner", tenants: [] } })).calls
     expect((await getPlatformSession()).mfa).toBe("enrol")
-    expect(calls.map((c) => c.path)).not.toContain("/v1/platform/tenants")
+    expect(calls.map((c) => c.path)).not.toContain("/v1/platform/session")
+  })
+  test("console probe calls /v1/platform/session and no longer the tenants list", async () => {
+    const calls = (state.current = world({ me: { user, platformRole: "owner", tenants: [] } })).calls
+    expect((await getPlatformSession()).mfa).toBe("ok")
+    const paths = calls.map((c) => c.path)
+    expect(paths).toContain("/v1/platform/session")
+    expect(paths).not.toContain("/v1/platform/tenants")
   })
   test("a company member who is staff gets the console's own factor state, not the company's", async () => {
     state.current = world({ me: { user, platformRole: "support", tenants: [{ slug: "alpha", name: "Alpha Co", roleKey: "owner" }] }, platform: { status: 401, code: "mfa_challenge" } })

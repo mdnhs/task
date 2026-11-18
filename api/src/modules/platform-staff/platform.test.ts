@@ -1,5 +1,6 @@
 import { execFileSync } from "node:child_process"
-import { beforeEach, expect, test } from "vitest"
+import { getTableName } from "drizzle-orm"
+import { beforeEach, expect, test, vi } from "vitest"
 import { ownerQuery, testDb } from "../../../test/db"
 import { makeMember, makeStaff, makeTenant, makeUser, signInWithTotp } from "../../../test/factories"
 import { call, resetDb, testApp, testEnv } from "../../../test/harness"
@@ -291,3 +292,44 @@ test("the CLI script runs end to end (npm -w api run platform:owner) and prints 
   expect(run(good.email).out).toContain("platform owner unchanged")
   expect(run("--x").code).toBe(2) // usage
 }, 60_000)
+
+test("GET /v1/platform/session: staff with a verified second factor gets 200 with the role and a single staff lookup (no tenant query)", async () => {
+  const w = await world()
+  for (const role of ["owner", "support", "billing", "viewer"] as const) {
+    const s = role === "owner" ? w.owner : await makeStaff(w.deps, role)
+    const read: string[] = []
+    const orig = w.deps.db.select.bind(w.deps.db) as (...a: unknown[]) => any // eslint-disable-line @typescript-eslint/no-explicit-any
+    const spy = vi.spyOn(w.deps.db, "select").mockImplementation(((...a: unknown[]) => {
+      const q = orig(...a)
+      const from = q.from.bind(q)
+      q.from = (t: unknown) => (read.push(getTableName(t as never)), from(t))
+      return q
+    }) as never)
+    const r = await w.req("GET", "/v1/platform/session", s.cookie)
+    spy.mockRestore()
+    expect([r.status, await r.json()]).toEqual([200, { staff: true, role, mfa: "ok" }])
+    expect(read.filter((t) => t === "tenants" || t === "memberships" || t === "subscriptions")).toEqual([])
+    expect(read.filter((t) => t === "platform_staff")).toHaveLength(1)
+  }
+})
+
+test("GET /v1/platform/session: staff without a verified second factor gets 401 mfa_challenge, no factor 401 mfa_enrolment_required", async () => {
+  const w = await world()
+  const stale = await w.req("GET", "/v1/platform/session", w.owner.staleCookie)
+  expect([stale.status, await codeOf(stale)]).toEqual([401, "mfa_challenge"])
+  const noTfa = await makeStaff(w.deps, "viewer", { totp: false })
+  const r = await call(w.app, "POST", "/api/auth/sign-in/email", { body: { email: noTfa.email, password: noTfa.password }, headers: { origin: testEnv.APP_URL } })
+  const cookie = r.headers.getSetCookie().map((c) => c.split(";")[0]).join("; ")
+  const enrol = await w.req("GET", "/v1/platform/session", cookie)
+  expect([enrol.status, await codeOf(enrol)]).toEqual([401, "mfa_enrolment_required"])
+  expect((await w.req("GET", "/v1/platform/session")).status).toBe(401)
+})
+
+test("GET /v1/platform/session: non-staff gets 404 not_found", async () => {
+  const w = await world()
+  const tenant = await makeTenant(w.deps)
+  const tOwner = await makeMember(w.deps, tenant.id, "owner", { totp: true })
+  const cookie = (await signInWithTotp(w.app, tOwner.email, tOwner.password, tOwner.totpSecret!)).cookie
+  const r = await w.req("GET", "/v1/platform/session", cookie)
+  expect([r.status, await codeOf(r)]).toEqual([404, "not_found"])
+})

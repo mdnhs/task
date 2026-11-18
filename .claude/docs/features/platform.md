@@ -14,8 +14,8 @@ without the console's nav or search.
 
 - **Operator** = the signed-in user: `getOperator()` builds the staff member from `getPlatformSession()` (role from `/v1/me.platformRole`). No seed, no `od-staff-role`.
 - **Second factor** (T6.3 carry-in): every `/v1/platform/*` route needs an enrolled factor and a session that passed it (401 `mfa_enrolment_required` / `mfa_challenge`).
-  `getPlatformSession()` computes `session.mfa` with `resolvePlatformMfa` (`lib/session-core.ts`: no factor on `/v1/me` is "enrol" without a call, otherwise one one-row
-  `GET /v1/platform/tenants` probe). `gate()` returns the same `MfaGate` / `MfaStepUp` a company page gets, and the layout swaps its children for it; the search action returns nothing.
+  `getPlatformSession()` computes `session.mfa` with `resolvePlatformMfa` (`lib/session-core.ts`: no factor on `/v1/me` is "enrol" without a call, otherwise one cheap
+  `GET /v1/platform/session` probe: one staff lookup, no tenant query; returns `{ staff, role, mfa: "ok" }`). `gate()` returns the same `MfaGate` / `MfaStepUp` a company page gets, and the layout swaps its children for it; the search action returns nothing.
 - **Reads**: pages call `gate()`, then `apiServer()` through `settle()` (JSX is never built inside try/catch); a 403 is the "Access restricted" state, anything else the error page.
 - **Writes**: `usePlatform()` (`components/use-platform.ts`) wraps `makePlatformClient(apiBrowser)` in `use-api-action`: one request per key, mapped copy plus "Ref", refresh after every answer.
   The client refuses a bad reason (1 to 500), trial days (1 to 30), grant hours (1 to 24) before any request.
