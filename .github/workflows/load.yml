@@ -1,0 +1,65 @@
+name: Load test
+
+# B7 Task 17. MANUAL only (workflow_dispatch), never on push: it builds a throwaway local stack on the runner (Postgres, Redis, MinIO, the API) with fake credentials and
+# generated demo users, and runs k6 against http://localhost only. A separate workflow file (not a job of ci.yml) so that dispatching it does not also run every CI job.
+# Thresholds and the scenario mix: load/README.md and load/k6/thresholds.json. No Stripe, Resend or R2 keys exist in this job.
+on:
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: "smoke = 5 users, 1 minute; full = 250 users, 13 minutes"
+        type: choice
+        options: [smoke, full]
+        default: smoke
+
+permissions:
+  contents: read
+
+jobs:
+  load:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      NODE_ENV: development
+      PORT: "3101"
+      DATABASE_URL: postgres://app_user:e2e_user_pw@localhost:55432/opsdesk_e2e
+      DATABASE_OWNER_URL: postgres://app_owner:e2e_owner_pw@localhost:55432/opsdesk_e2e
+      REDIS_URL: redis://localhost:56379
+      BETTER_AUTH_SECRET: load-secret-load-secret-load-secret-load-secret
+      APP_URL: http://localhost:3100
+      DATA_REGION: eu-west-1
+      S3_ENDPOINT: http://localhost:59000
+      S3_REGION: eu-west-1
+      S3_BUCKET: opsdesk-e2e
+      S3_ACCESS_KEY_ID: e2eminio
+      S3_SECRET_ACCESS_KEY: e2eminio-secret
+      S3_FORCE_PATH_STYLE: "true"
+      AUTH_RATE_LIMIT_PER_MIN: "1000"
+      METRICS_PORT: "9464"
+      ALLOW_DEMO_SEED: "1"
+      SEED_DEMO_PASSWORD: load-demo-password-12
+      E2E_PG_ADMIN_URL: postgres://postgres:postgres@localhost:55432/opsdesk_e2e
+      E2E_OWNER_PW: e2e_owner_pw
+      E2E_USER_PW: e2e_user_pw
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - uses: grafana/setup-k6-action@v1
+      - run: docker compose -f docker-compose.e2e.yml up -d --wait postgres redis minio
+      - name: Migrate, seed the load tenant, start the API
+        run: |
+          export SECRETS_KEY="$(node -e 'console.log(Buffer.alloc(32, 9).toString("base64"))')"
+          (cd api && npx tsx scripts/e2e-prepare.ts)
+          npm run load:prepare
+          (cd api && nohup ../node_modules/.bin/tsx src/server.ts > ../api.log 2>&1 &)
+          for i in $(seq 1 30); do curl -sf http://localhost:3101/healthz && break; sleep 2; done
+      - name: k6
+        run: |
+          if [ "${{ inputs.profile }}" = "full" ]; then SCRIPT=load/k6/scenarios.js; else SCRIPT=load/k6/smoke.js; fi
+          BASE_URL=http://localhost:3101 TARGET=api METRICS_URL=http://127.0.0.1:9464/metrics k6 run "$SCRIPT"
+      - if: failure()
+        run: tail -n 100 api.log
