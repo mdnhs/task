@@ -1,5 +1,4 @@
 import { describe, expect, test } from "vitest"
-// @ts-expect-error plain .mjs launcher module without types
 import { decide, failMessage, hashDeps } from "./dev-all-runner.mjs"
 
 const base = { inRunner: false, useCurrent: false, mainExists: true, runnerExists: true, runnerClean: true, needsDeps: true, depsHash: "h1", stampHash: "h1", hasModules: true }
