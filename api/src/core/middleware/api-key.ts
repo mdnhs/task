@@ -1,3 +1,4 @@
+import { bindLog } from "../observability/logger"
 import { and, eq } from "drizzle-orm"
 import type { Context } from "hono"
 import type { AppEnv } from "../context"
@@ -132,6 +133,7 @@ export async function enterApiKeyPath(c: Context<AppEnv>, token: string): Promis
     id: tenant.id, slug: tenant.slug, timezone: tenant.timezone, currency: tenant.currency, locale: tenant.locale,
     sessionIdleHours: tenant.sessionIdleHours, mfaPolicy: tenant.mfaPolicy,
   })
+  bindLog(c, { tenantId: tenant.id })
   const access = effectiveAccess(key.scopes, creator.access as Record<string, string>)
   c.set("apiKey", { id: key.id, prefix: key.prefix, scopes: key.scopes, creatorId: key.createdBy, access, role: { id: creator.roleId, key: creator.roleKey, home: homeOf(creator.home), fieldRules: creator.fieldRules ?? {} } })
   c.set("member", { userId: apiKeyActor(key.id), roleId: API_KEY_ROLE_ID, roleKey: API_KEY_ROLE_KEY })

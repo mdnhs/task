@@ -10,6 +10,8 @@ import type { Auth } from "./modules/auth/auth"
 import type { BillingProvider } from "./modules/billing/provider"
 import type { Net } from "./core/net/net"
 import type { RateLimiter } from "./core/middleware/rate-limit"
+import type { ErrorReporter } from "./core/observability/error-reporter"
+import type { Metrics } from "./core/observability/metrics"
 
 export type { Db }
 
@@ -20,4 +22,4 @@ export type Mailer = {
   invalidate?(): void
 }
 export type { Auth }
-export type Deps = { env: Env; db: Db; auth: Auth; clock: Clock; mailer: Mailer; logger: Logger; queue: Queue; push: PushSender; storage: Storage; scanner: MalwareScanner; oauth: OAuthClient; billing: BillingProvider; net: Net; rateLimiter: RateLimiter }
+export type Deps = { env: Env; db: Db; auth: Auth; clock: Clock; mailer: Mailer; logger: Logger; queue: Queue; push: PushSender; storage: Storage; scanner: MalwareScanner; oauth: OAuthClient; billing: BillingProvider; net: Net; rateLimiter: RateLimiter; errorReporter: ErrorReporter; metrics: Metrics }

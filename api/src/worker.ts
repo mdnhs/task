@@ -11,11 +11,12 @@ import { DEADLINE_JOB, EXPORT_SWEEP_JOB, registerShiftReports } from "./modules/
 import { ARCHIVE_PURGE_JOB, RECURRENCE_JOB, registerTasks } from "./modules/tasks"
 import { registerWebhooks, SWEEP_JOB as WEBHOOK_SWEEP_JOB } from "./modules/webhooks-out"
 import { parseEnv, type Env } from "./env"
-import { makeDeps } from "./server"
+import { makeDeps, startInternalMetrics } from "./server"
 
 /** Background worker process: BullMQ job handlers plus the 1 s `events.relay` repeatable job. */
 export async function startWorkerProcess(env: Env = parseEnv(process.env)) {
-  const deps = makeDeps(env)
+  const deps = makeDeps(env, { service: "worker" })
+  const metricsServer = await startInternalMetrics(deps, env.WORKER_METRICS_PORT)
   registerNotifications() // notification.send job + member.joined subscriber
   registerSearchIndexers() // search index: members, teams, files
   registerFiles() // file.scan + file.delete-object jobs
@@ -41,6 +42,7 @@ export async function startWorkerProcess(env: Env = parseEnv(process.env)) {
   return {
     async close() {
       await worker.close()
+      await new Promise((r) => (metricsServer ? metricsServer.close(r) : r(undefined)))
       await queue.close?.()
       await deps.queue.close?.()
       await deps.db.$client.end()

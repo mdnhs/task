@@ -18,6 +18,8 @@ export interface RateLimiter {
   reset(key: string): Promise<void>
   /** Claims `key` for `ttlSec`; false when it is already claimed (a TOTP code used once). */
   once(key: string, ttlSec: number): Promise<boolean>
+  /** Reachability of the store, for /readyz (B7 Task 15). Rejects when it is down. */
+  ping?(): Promise<void>
 }
 
 /** The fixed limits of ruling S4 (per user for TOTP and tenant creation, per address for mail). The auth per-IP limit is env: AUTH_RATE_LIMIT_PER_MIN. */
@@ -51,6 +53,7 @@ export function makeRedisRateLimiter(redisUrl: string): RateLimiter & { close():
       await redis.del(k(key))
     },
     once: async (key, ttlSec) => (await redis.set(k(`once:${key}`), "1", "EX", ttlSec, "NX")) === "OK",
+    ping: async () => void (await redis.ping()),
     close: async () => {
       redis.disconnect()
     },
@@ -82,7 +85,9 @@ export async function enforceRateLimit(c: Context<AppEnv>, name: string, rule: R
   const deps = c.get("deps")
   try {
     const r = await deps.rateLimiter.hit(`${name}:${key}`, rule)
-    return r.allowed ? null : rateLimited(c.get("requestId"), r.retryAfterSec)
+    if (r.allowed) return null
+    deps.metrics.counter("rate_limited_total", { bucket: name }).inc()
+    return rateLimited(c.get("requestId"), r.retryAfterSec)
   } catch (err) {
     deps.logger.warn({ ...errorInfo(err), limiter: name, failClosed: opts.failClosed === true, requestId: c.get("requestId") }, "rate limiter store unavailable")
     if (opts.failClosed) throw new AppError(503, "rate_limit_unavailable", "Service Unavailable")

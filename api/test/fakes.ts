@@ -52,6 +52,9 @@ export function fakeRateLimiter(clock: { now(): Date }): FakeRateLimiter {
       if (f.down) throw new Error("store down")
       counters.delete(key)
     },
+    ping: async () => {
+      if (f.down) throw new Error("store down")
+    },
     once: async (key, ttlSec) => {
       if (f.down) throw new Error("store down")
       const now = clock.now().getTime()

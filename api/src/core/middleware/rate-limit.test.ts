@@ -6,6 +6,7 @@ import { fakeClock, fakeRateLimiter } from "../../../test/fakes"
 import { clientIp, ipBucket } from "../net/client-ip"
 import { rateLimit } from "./rate-limit"
 import type { Deps } from "../../deps"
+import { makeMetrics } from "../observability/metrics"
 
 const RULE = { limit: 3, windowSec: 60 }
 
@@ -14,7 +15,7 @@ function build(hops = 1) {
   const limiter = fakeRateLimiter(clock)
   const app = newRouter()
   app.use("*", async (c, next) => {
-    c.set("deps", { rateLimiter: limiter, env: { TRUST_PROXY_HOPS: hops }, logger: pino({ level: "silent" }), clock } as unknown as Deps)
+    c.set("deps", { rateLimiter: limiter, env: { TRUST_PROXY_HOPS: hops }, logger: pino({ level: "silent" }), metrics: makeMetrics(), clock } as unknown as Deps)
     c.set("requestId", "rid-1")
     await next()
   })

@@ -10,6 +10,7 @@ import { enforceMfa } from "./mfa"
 import { establishSession } from "./session"
 import { enforceBilling } from "./module"
 import { enterSupportPath } from "./support"
+import { bindLog } from "../observability/logger"
 import { enterApiKeyPath, presentedApiKey } from "./api-key"
 
 /**
@@ -67,11 +68,13 @@ export const requireTenant: MiddlewareHandler<AppEnv> = async (c, next) => {
   if (!member || member.status !== "active") {
     await enterSupportPath(c, tenant) // throws NotFound() unless an active support grant applies
     c.set("tenant", tenantCtx)
+    bindLog(c, { tenantId: tenant.id })
     await next()
     return
   }
 
   c.set("tenant", tenantCtx)
+  bindLog(c, { tenantId: tenant.id })
   c.set("member", { userId, roleId: member.roleId, roleKey: member.roleKey })
   // Forced MFA (FR-M0-04) is applied here so every tenant route is covered by construction (fail closed).
   await enforceMfa(c, async () => {})

@@ -41,10 +41,12 @@ type JobIntent = { name: string; data: unknown; opts: { delayMs?: number; jobId:
 export async function relayOnce(deps: Deps, batch: number = DEFAULT_BATCH): Promise<number> {
   const hints = await deps.db.select({ tenant: eventRelayHints.tenant }).from(eventRelayHints)
   let relayed = 0
+  let lagSec = 0 // age of the oldest event still waiting, across tenants (event_relay_lag_seconds)
   for (const { tenant } of hints) {
     try {
       const r = await relayTenant(deps, tenant, batch)
       relayed += r.relayed
+      lagSec = Math.max(lagSec, r.lagSec)
       for (const j of r.jobs) {
         try {
           await deps.queue.add(j.name, j.data, j.opts)
@@ -56,11 +58,13 @@ export async function relayOnce(deps: Deps, batch: number = DEFAULT_BATCH): Prom
       deps.logger.error({ tenantId: tenant, ...errorInfo(err) }, "event relay failed for tenant")
     }
   }
+  deps.metrics.gauge("event_relay_lag_seconds").set(lagSec)
   return relayed
 }
 
-async function relayTenant(deps: Deps, tenantId: string, batch: number): Promise<{ relayed: number; jobs: JobIntent[] }> {
+async function relayTenant(deps: Deps, tenantId: string, batch: number): Promise<{ relayed: number; jobs: JobIntent[]; lagSec: number }> {
   const jobs: JobIntent[] = []
+  let lagSec = 0
   const relayed = await withTenant(deps.db, tenantId, async (tx) => {
     const now = deps.clock.now()
     const pending = await tx
@@ -81,6 +85,7 @@ async function relayTenant(deps: Deps, tenantId: string, batch: number): Promise
       .limit(batch)
       .for("update", { skipLocked: true })
     let done = 0
+    if (pending[0]) lagSec = Math.max(0, (now.getTime() - pending[0].occurredAt.getTime()) / 1000)
     for (const row of pending) {
       const event: DomainEvent = {
         id: row.id, tenantId: row.tenantId, type: row.type as EventType, payload: row.payload,
@@ -132,7 +137,7 @@ async function relayTenant(deps: Deps, tenantId: string, batch: number): Promise
     await dropHintIfIdle(tx, tenantId)
     return done
   })
-  return { relayed, jobs }
+  return { relayed, jobs, lagSec }
 }
 
 async function dropHintIfIdle(tx: TenantTx, tenantId: string): Promise<void> {

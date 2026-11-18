@@ -5,13 +5,19 @@ export type FakeJob = { name: string; data: unknown; opts?: { delayMs?: number; 
 /** In-memory Queue for tests: records jobs; `drain` runs and clears them. A repeated jobId is dropped (BullMQ semantics). */
 export type FakeQueue = Queue & {
   jobs: FakeJob[]
+  /** `true` makes `ping` reject, like an unreachable Redis. */
+  down: boolean
   drain(run: (name: string, data: unknown) => Promise<void>): Promise<number>
 }
 
 export function fakeQueue(): FakeQueue {
   const jobs: FakeJob[] = []
-  return {
+  const q: FakeQueue = {
     jobs,
+    down: false,
+    ping: async () => {
+      if (q.down) throw new Error("redis down")
+    },
     add: async (name, data, opts) => {
       if (opts?.jobId?.includes(":")) throw new Error("Custom Id cannot contain :") // same rule as BullMQ
       if (opts?.jobId && jobs.some((j) => j.opts?.jobId === opts.jobId)) return
@@ -27,4 +33,5 @@ export function fakeQueue(): FakeQueue {
       return n
     },
   }
+  return q
 }

@@ -1,9 +1,11 @@
-import { sql } from "drizzle-orm"
 import { HTTPException } from "hono/http-exception"
 import type { Deps } from "./deps"
 import { newRouter } from "./core/router"
 import { AppError, problem, statusCode, statusTitle } from "./core/errors"
 import { errorInfo } from "./core/safe-error"
+import { accessLog, routeTemplate } from "./core/observability/access-log"
+import { safeCapture } from "./core/observability/error-reporter"
+import { readiness } from "./core/observability/readiness"
 import { requestId } from "./core/middleware/request-id"
 import { secureHeaders } from "./core/middleware/secure-headers"
 import { requireSameOrigin } from "./core/middleware/origin"
@@ -49,7 +51,8 @@ export function createApp(deps: Deps) {
     await next()
   })
   app.use("*", requestId)
-  app.use("*", secureHeaders()) // after the request id (Task 15 puts the access log between them); sets headers after next(), so error and 404 responses are covered
+  app.use("*", accessLog()) // request context, one access-log line per request, http metrics; after the request id, before the security headers
+  app.use("*", secureHeaders()) // sets headers after next(), so error and 404 responses are covered
   app.use("/v1/*", requireSameOrigin) // CSRF layer 2 (B6 I6): a foreign Origin on a non-GET call is 403 bad_origin, before any auth
   // F18: a write that succeeded through THIS instance drops that tenant's read-model cache (a read model is derived from tasks, shifts, reports and settings; other instances catch up within the 30 s TTL).
   // Conservative on purpose: any successful non-GET request of a tenant busts it, the tenant is the one the request resolved.
@@ -76,20 +79,18 @@ export function createApp(deps: Deps) {
       logger.warn({ ...info, requestId: rid }, "transient database conflict")
       return problem(409, "retry", "Conflict", rid)
     }
-    logger.error({ ...info, requestId: rid }, "unhandled error") // never the message or object: Drizzle messages carry query params
+    // Unhandled: one report (the default reporter logs only the class name and the pg code: Drizzle messages carry query params), a generic body, never a stack.
+    const tenantId = c.get("tenant")?.id
+    const userId = c.get("user")?.id ?? c.get("session")?.userId
+    safeCapture(deps.errorReporter, err, { requestId: rid, route: routeTemplate(c), ...(tenantId ? { tenantId } : {}), ...(userId ? { userId } : {}) })
     return problem(500, "internal", "Internal Server Error", rid)
   })
   app.notFound((c) => problem(404, "not_found", "Not Found", c.get("requestId")))
 
   app.get("/healthz", (c) => c.json({ status: "ok" }))
   app.get("/readyz", async (c) => {
-    try {
-      await deps.db.execute(sql`select 1`)
-      return c.json({ status: "ready" })
-    } catch (err) {
-      logger.error({ err, requestId: c.get("requestId") }, "readiness check failed")
-      return c.json({ status: "unavailable" }, 503)
-    }
+    const r = await readiness(deps)
+    return c.json(r.body, r.status === "ready" ? 200 : 503)
   })
 
   app.route("/", authRoutes)

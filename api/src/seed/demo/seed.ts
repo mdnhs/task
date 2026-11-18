@@ -1,4 +1,6 @@
-import pino from "pino"
+import { noopErrorReporter } from "../../core/observability/error-reporter"
+import { makeLogger } from "../../core/observability/logger"
+import { makeMetrics } from "../../core/observability/metrics"
 import { fakeQueue } from "../../core/queue/fake-queue"
 import { fakeBilling } from "../../modules/billing/fake-provider"
 import { relayOnce, resetSubscribers } from "../../core/events"
@@ -135,7 +137,7 @@ export async function seedDemoInternal(db: Db, o: SeedOptions, hooks: { beforeLo
     const owner = byName.get(src.users.find((u) => u.role === "owner")?.name ?? "")
     if (!owner) throw new SeedRefused("bad_source")
     const queue = fakeQueue()
-    const deps = { db, clock: o.clock, queue, billing: fakeBilling(), logger: pino({ level: "silent" }), mailer, auth } as unknown as Deps
+    const deps = { db, clock: o.clock, queue, billing: fakeBilling(), logger: makeLogger({ level: "silent", service: "seed" }), metrics: makeMetrics(), errorReporter: noopErrorReporter, mailer, auth } as unknown as Deps
     const counts: Record<string, number> = {}
     const warnings: string[] = [...resetWarnings]
     if (latestReportMode) warnings.push("latest-report: the newest report is today; shift and report dates keep the exact offset, so a weekday can differ from its pattern")

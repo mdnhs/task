@@ -4,6 +4,7 @@ import type { AppEnv } from "../context"
 import type { Deps } from "../../deps"
 import { session as sessionTable } from "../../db/schema"
 import { Unauthorized } from "../errors"
+import { bindLog } from "../observability/logger"
 import { DEFAULT_SESSION_IDLE_HOURS, strictestIdleHours } from "../session-policy"
 
 export { DEFAULT_SESSION_IDLE_HOURS }
@@ -47,6 +48,7 @@ export async function establishSession(c: Context<AppEnv>, idle: IdleHours) {
     mfaPassed: found.session.mfaPassed === true,
   })
   c.set("user", { id: found.user.id, email: found.user.email, twoFactorEnabled: found.user.twoFactorEnabled === true })
+  bindLog(c, { userId: found.user.id })
 }
 
 // Idempotent: requireTenant already authenticated (with the strictest hours across memberships, R23), so it is not re-run (or re-stamped).

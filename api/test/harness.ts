@@ -11,6 +11,8 @@ import { fakeQueue, type FakeQueue } from "../src/core/queue/fake-queue"
 import { fakeBilling, type FakeBillingProvider } from "../src/modules/billing"
 import { fakeOAuth, type FakeOAuth } from "../src/core/oauth/fake-oauth"
 import { fakeNet, type FakeNet } from "../src/core/net/fake-net"
+import { makeLogErrorReporter, type ErrorReporter } from "../src/core/observability/error-reporter"
+import { makeMetrics, type Metrics } from "../src/core/observability/metrics"
 import { fakeClock, fakeMailer, fakeRateLimiter, type FakeClock, type FakeMailer, type FakeRateLimiter } from "./fakes"
 
 export { fakeClock, fakeMailer }
@@ -40,6 +42,8 @@ export const testEnv: Deps["env"] = {
   TASK_VIDEO_MAX_BYTES: 104857600,
   TASK_VOICE_MAX_BYTES: 3145728,
   TRUST_PROXY_HOPS: 0,
+  METRICS_HOST: "127.0.0.1",
+  LOG_LEVEL: "info",
   AUTH_RATE_LIMIT_PER_MIN: 30,
   TENANT_CREATE_MAX_PER_USER: 5,
 }
@@ -47,7 +51,7 @@ export const testEnv: Deps["env"] = {
 // Lets helpers (factories.ts) find an app's fake mailer from the app alone.
 export const mailerOf = new WeakMap<object, FakeMailer>()
 
-export function testApp(over: Partial<Deps> = {}): { app: AppType; deps: Deps; mailer: FakeMailer; clock: FakeClock; queue: FakeQueue; push: FakePush; oauth: FakeOAuth; billing: FakeBillingProvider; net: FakeNet; rateLimiter: FakeRateLimiter } {
+export function testApp(over: Partial<Deps> = {}): { app: AppType; deps: Deps; mailer: FakeMailer; clock: FakeClock; queue: FakeQueue; push: FakePush; oauth: FakeOAuth; billing: FakeBillingProvider; net: FakeNet; rateLimiter: FakeRateLimiter; metrics: Metrics; errorReporter: ErrorReporter } {
   const clock = fakeClock()
   const env = over.env ?? testEnv
   // Real (lazy-connecting) Testcontainers db when global setup provided one; inert fake otherwise.
@@ -61,12 +65,14 @@ export function testApp(over: Partial<Deps> = {}): { app: AppType; deps: Deps; m
   const billing = (over.billing ?? fakeBilling()) as FakeBillingProvider
   const net = (over.net ?? fakeNet()) as FakeNet
   const rateLimiter = (over.rateLimiter ?? fakeRateLimiter(usedClock)) as FakeRateLimiter
+  const errorReporter = over.errorReporter ?? makeLogErrorReporter(logger) // the server default; tests that assert on reports inject fakeErrorReporter()
+  const metrics = over.metrics ?? makeMetrics()
   const storage = over.storage ?? makeStorage({ env, db })
   const scanner = over.scanner ?? fakeScanner() // auto: flags EICAR, everything else clean
-  const deps: Deps = { env, db, clock: usedClock, mailer, logger, queue, push, storage, scanner, oauth, billing, net, rateLimiter, auth: over.auth ?? buildAuth({ env, db, clock: usedClock, mailer, logger, rateLimiter }) }
+  const deps: Deps = { env, db, clock: usedClock, mailer, logger, queue, push, storage, scanner, oauth, billing, net, rateLimiter, errorReporter, metrics, auth: over.auth ?? buildAuth({ env, db, clock: usedClock, mailer, logger, rateLimiter }) }
   const app = createApp(deps)
   mailerOf.set(app, mailer)
-  return { app, deps, mailer, clock: usedClock as FakeClock, queue, push, oauth, billing, net, rateLimiter }
+  return { app, deps, mailer, clock: usedClock as FakeClock, queue, push, oauth, billing, net, rateLimiter, metrics, errorReporter }
 }
 
 export function call(

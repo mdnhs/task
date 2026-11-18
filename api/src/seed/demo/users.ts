@@ -1,6 +1,6 @@
 import { and, eq, inArray } from "drizzle-orm"
 import { symmetricEncrypt } from "better-auth/crypto"
-import pino from "pino"
+import { makeLogger } from "../../core/observability/logger"
 import type { Db } from "../../db/client"
 import { account, platformStaff, session, twoFactor, user } from "../../db/schema"
 import { buildAuth } from "../../modules/auth/auth"
@@ -20,7 +20,7 @@ export function noopMailer(): Mailer & { suppressed: number } {
 
 /** Better Auth with the seed's own settings. Only the secret, the app URL and the environment name matter here (hashing, sealing a TOTP secret). */
 export function buildSeedAuth(db: Db, env: { BETTER_AUTH_SECRET: string; APP_URL: string; NODE_ENV?: string }, mailer: Mailer, clock: { now(): Date }): SeedAuth {
-  return buildAuth({ env: { BETTER_AUTH_SECRET: env.BETTER_AUTH_SECRET, APP_URL: env.APP_URL, NODE_ENV: env.NODE_ENV ?? "development" } as Env, db, clock, mailer, logger: pino({ level: "silent" }), rateLimiter: noopRateLimiter })
+  return buildAuth({ env: { BETTER_AUTH_SECRET: env.BETTER_AUTH_SECRET, APP_URL: env.APP_URL, NODE_ENV: env.NODE_ENV ?? "development" } as Env, db, clock, mailer, logger: makeLogger({ level: "silent", service: "seed" }), rateLimiter: noopRateLimiter })
 }
 
 /**

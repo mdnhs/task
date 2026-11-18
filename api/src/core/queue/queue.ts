@@ -4,6 +4,8 @@ import type { Deps } from "../../deps"
 export type Queue = {
   add(name: string, data: unknown, opts?: { delayMs?: number; jobId?: string }): Promise<void>
   close?(): Promise<void>
+  /** Reachability of the queue's Redis, for /readyz (B7 Task 15). Rejects when it is down. */
+  ping?(): Promise<void>
 }
 
 export type JobHandler = (data: unknown, deps: Deps) => Promise<void>

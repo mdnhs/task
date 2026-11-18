@@ -67,6 +67,12 @@ const schema = z.object({
   TRUST_PROXY_HOPS: z.preprocess(unsetIfEmpty, z.coerce.number().int().min(0).max(10).optional()),
   // Most tenants one user may create (POST /v1/tenants; ruling S5). A user's second and later tenant also needs an MFA-verified session.
   TENANT_CREATE_MAX_PER_USER: z.preprocess(unsetIfEmpty, z.coerce.number().int().min(1).max(1000).default(5)),
+  // Observability (B7 Task 15, .claude/docs/deploy/observability.md). Metrics are served on their OWN port, off when METRICS_PORT is unset, on loopback unless METRICS_HOST says
+  // otherwise (a container sets the private-network address; the port is never published or put behind the public proxy). The worker has its own port, WORKER_METRICS_PORT.
+  METRICS_PORT: z.preprocess(unsetIfEmpty, z.coerce.number().int().min(1).max(65535).optional()),
+  WORKER_METRICS_PORT: z.preprocess(unsetIfEmpty, z.coerce.number().int().min(1).max(65535).optional()),
+  METRICS_HOST: z.preprocess(unsetIfEmpty, z.string().min(1).default("127.0.0.1")),
+  LOG_LEVEL: z.preprocess(unsetIfEmpty, z.enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"]).default("info")),
 }).superRefine((e, ctx) => {
   if (e.SECRETS_KEYS) {
     try {
@@ -79,6 +85,9 @@ const schema = z.object({
     }
   } else if (e.SECRETS_KEY_ID) {
     ctx.addIssue({ code: "custom", path: ["SECRETS_KEY_ID"], message: "requires SECRETS_KEYS" })
+  }
+  if (e.METRICS_PORT !== undefined && e.METRICS_PORT === e.PORT) {
+    ctx.addIssue({ code: "custom", path: ["METRICS_PORT"], message: "must differ from PORT: metrics are never served on the public port" })
   }
   if (e.NODE_ENV === "production" && !e.SECRETS_KEY && !e.SECRETS_KEYS) {
     ctx.addIssue({ code: "custom", path: ["SECRETS_KEY"], message: "required in production (or SECRETS_KEYS)" })

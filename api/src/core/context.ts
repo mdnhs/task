@@ -2,6 +2,7 @@ import type { Role } from "@opsdesk/domain/permissions"
 import type { Device, DevicePolicy } from "@opsdesk/domain/devices"
 import type { MfaPolicy } from "@opsdesk/domain/mfa"
 import type { Access, Module } from "@opsdesk/domain/permissions"
+import type { Logger } from "pino"
 import type { Deps } from "../deps"
 
 /** The caller's role in the current tenant, loaded once per request by requirePermission. */
@@ -13,6 +14,8 @@ export type AppEnv = {
   Variables: {
     deps: Deps
     requestId: string
+    /** Request-scoped logger (access-log middleware): requestId, then tenantId and userId once they are known. Absent only in a bare test context. */
+    log: Logger
     session?: { id: string; userId: string; lastSeenAt: Date; mfaPassed: boolean }
     user?: { id: string; email: string; twoFactorEnabled: boolean }
     tenant?: { id: string; slug: string; timezone: string; currency: string; locale: string; sessionIdleHours: number; mfaPolicy: MfaPolicy }
