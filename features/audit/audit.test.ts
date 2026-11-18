@@ -4,7 +4,7 @@ import { describe, expect, test } from "vitest"
 import { fakeApi } from "@/test/support/fake-api"
 import { AUDIT_ACTIONS, actionInfo } from "./actions-catalogue"
 import { auditQuery, exportUrl, loadAudit, toAuditEvent } from "./adapters"
-import { EMPTY_FILTERS, filterEvents } from "./filters"
+import { EMPTY_FILTERS, filterEvents, logBody } from "./filters"
 
 const DTO = { seq: 42, at: "2026-11-18T09:30:00.000Z", actorId: "u1", action: "invite.created", entity: "invite", entityId: "inv-1", before: null, after: { roleKey: "employee", expiresAt: "2026-11-25T09:30:00.000Z", emailHmac: "abc" }, hash: "h" }
 
@@ -115,5 +115,15 @@ describe("T6.5 fix: audit labels", () => {
     expect(src).toMatch(/same filters, not the search/i)
     expect(src).toMatch(/Load older/)
     expect(src).not.toMatch(/\bids\[|\?\? id\b/)
+  })
+})
+
+describe("V1: Load older is offered whenever the API has older rows, also when nothing loaded matches", () => {
+  test("empty rows with a cursor: the empty state AND Load older; without a cursor: the empty state only; an error never offers it", () => {
+    expect(logBody({ error: null, rows: 0, cursor: "C" })).toEqual({ kind: "empty", loadOlder: true })
+    expect(logBody({ error: null, rows: 0, cursor: null })).toEqual({ kind: "empty", loadOlder: false })
+    expect(logBody({ error: null, rows: 3, cursor: "C" })).toEqual({ kind: "rows", loadOlder: true })
+    expect(logBody({ error: null, rows: 3, cursor: null })).toEqual({ kind: "rows", loadOlder: false })
+    expect(logBody({ error: "x", rows: 0, cursor: "C" })).toEqual({ kind: "error", loadOlder: false })
   })
 })

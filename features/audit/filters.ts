@@ -21,3 +21,9 @@ export function filterEvents(events: AuditEvent[], f: AuditFilters): AuditEvent[
     )
   })
 }
+
+/** What the log body shows (pure, so it is tested without a DOM). Load older is offered whenever the API has older rows (`cursor`), including when none of the loaded rows match the client-side filters. */
+export function logBody(o: { error: string | null; rows: number; cursor: string | null }): { kind: "error" | "empty" | "rows"; loadOlder: boolean } {
+  if (o.error) return { kind: "error", loadOlder: false }
+  return { kind: o.rows === 0 ? "empty" : "rows", loadOlder: o.cursor !== null }
+}

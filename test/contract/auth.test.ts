@@ -110,7 +110,9 @@ describe("T6.3 contract: sessions, providers, verification and reset against the
     expect(items).toHaveLength(3)
     expect(items.filter((i) => i.current)).toHaveLength(1)
     expect(items.map((i) => i.label).sort()).toEqual(["Edge on Windows", "Safari on iOS", sessionLabel(null)].sort())
-    expect(JSON.stringify(items)).not.toMatch(/token|ip/i)
+    // no token or IP key anywhere (keys, not values: random session ids can contain "ip")
+    const keys = (v: unknown): string[] => (Array.isArray(v) ? v.flatMap(keys) : v && typeof v === "object" ? Object.entries(v).flatMap(([k, x]) => [k, ...keys(x)]) : [])
+    expect(keys(items).filter((k) => /token|^ip$|ipAddress|ip_address/i.test(k))).toEqual([])
 
     const other = items.find((i) => !i.current)!
     await client.delete("/v1/me/sessions/{id}", { path: { id: other.id } })

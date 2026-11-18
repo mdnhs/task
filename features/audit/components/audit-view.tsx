@@ -15,7 +15,7 @@ import { userMessage } from "@/lib/api/problem"
 import { paginate } from "@/lib/paginate"
 import { AUDIT_ACTIONS, actionInfo } from "../actions-catalogue"
 import { exportUrl, loadAudit, nameFrom } from "../adapters"
-import { AUDIT_PAGE_SIZE, EMPTY_FILTERS, SYSTEM_ACTOR, filterEvents } from "../filters"
+import { AUDIT_PAGE_SIZE, EMPTY_FILTERS, SYSTEM_ACTOR, filterEvents, logBody } from "../filters"
 import type { AuditEvent, AuditFilters } from "../types"
 
 const uniq = (xs: string[]) => [...new Set(xs)].sort((a, b) => a.localeCompare(b))
@@ -84,6 +84,12 @@ export function AuditView({
 
   const rows = useMemo(() => filterEvents(events, filters), [events, filters])
   const pg = paginate(rows, page, AUDIT_PAGE_SIZE)
+  const body = logBody({ error, rows: rows.length, cursor })
+  const loadOlder = cursor && (
+    <div className="au-more">
+      <button type="button" className="btn btn-outline" disabled={busy} onClick={() => read(filters, cursor)}>Load older</button>
+    </div>
+  )
   const flagged = events.filter((e) => e.sensitive).length
 
   return (
@@ -112,10 +118,13 @@ export function AuditView({
           <DatePicker value={filters.to} onChange={(v) => set("to", v)} today={today} min={filters.from || undefined} label="To date" placeholder="To" />
           <FilterSearch value={filters.q} onChange={(v) => set("q", v)} placeholder="Search events" />
         </FilterBar>
-        {error ? (
-          <EmptyState icon="history" title="Couldn't load the log" text={error} />
-        ) : rows.length === 0 ? (
-          <EmptyState icon="history" title="No events match" text="Try a different actor, action or date range." />
+        {body.kind === "error" ? (
+          <EmptyState icon="history" title="Couldn't load the log" text={error ?? ""} />
+        ) : body.kind === "empty" ? (
+          <>
+            <EmptyState icon="history" title="No events match" text={cursor ? "No match in the loaded events. Load older entries to keep looking." : "Try a different actor, action or date range."} />
+            {body.loadOlder && loadOlder}
+          </>
         ) : (
           <>
             <div className="table-wrap" aria-busy={busy}>
@@ -176,11 +185,7 @@ export function AuditView({
               </table>
             </div>
             <DataPagination {...pg} label="Audit log pages" onPageChange={(p) => { setPage(p); setOpen(null) }} />
-            {cursor && (
-              <div className="au-more">
-                <button type="button" className="btn btn-outline" disabled={busy} onClick={() => read(filters, cursor)}>Load older</button>
-              </div>
-            )}
+            {body.loadOlder && loadOlder}
           </>
         )}
       </div>
