@@ -167,6 +167,15 @@ describe("the platform client sends what the API takes and refuses the rest befo
     expect(calls.map((x) => `${x.method} ${x.path}`)).toEqual(["post /v1/platform/tenants/{tenantId}/support-grants", "delete /v1/platform/support-grants/{id}"])
     expect(calls[0]?.body).toEqual({ reason: "Ticket 4411", hours: 24 })
   })
+  test("the support page lists the grants the API returns (tenant, who, status) and keeps Revoke for active ones only", () => {
+    const g = (id: string, status: "active" | "expired" | "revoked", revokedAt: string | null) => ({ id, tenantId: TID, tenantName: "Coppers Cafe", staffName: "Aoife Support", reason: "Ticket 4411", status, createdAt: "2026-11-17T09:00:00.000Z", expiresAt: "2026-11-17T11:00:00.000Z", revokedAt })
+    const html = renderToStaticMarkup(createElement(LiveSupport, { tenants: [], grants: [g("g1", "active", null), g("g2", "expired", null), g("g3", "revoked", "2026-11-17T10:00:00.000Z")] }))
+    expect(html.match(/Coppers Cafe/g)).toHaveLength(3)
+    expect(html).toContain("Aoife Support")
+    expect(html).toContain("Revoked")
+    expect(html).toContain("Expired")
+    expect(html.match(/>Revoke</g)).toHaveLength(1)
+  })
   test("409 already_suspended and not_suspended, and the last owner, have their own copy", () => {
     expect(userMessage(new ApiError(409, "already_suspended", "r1")).text).toMatch(/already suspended/i)
     expect(userMessage(new ApiError(409, "not_suspended", "r1")).text).toMatch(/not suspended/i)

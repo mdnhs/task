@@ -3,7 +3,7 @@
 import type { ApiClient } from "@/lib/api/client"
 import { ApiError } from "@/lib/api/problem"
 import { getPlatformSession } from "@/lib/session"
-import { billingMode, toAuditLines, toBillingSettings, toDataRequests, toEmailSettings, toMetrics, toStaffRows, toStorageSettings, toTenant360, toTenantList } from "./adapters"
+import { billingMode, toAuditLines, toGrants, toBillingSettings, toDataRequests, toEmailSettings, toMetrics, toStaffRows, toStorageSettings, toTenant360, toTenantList } from "./adapters"
 import type { StaffMember } from "./types"
 
 type Reader = Pick<ApiClient, "get">
@@ -35,6 +35,10 @@ export const loadMetrics = async (api: Reader) => toMetrics(await api.get("/v1/p
 export const loadAudit = async (api: Reader, o: { targetTenantId?: string; entity?: string; limit?: number } = {}) =>
   toAuditLines(await api.get("/v1/platform/audit", { query: { ...(o.targetTenantId ? { targetTenantId: o.targetTenantId } : {}), ...(o.entity ? { entity: o.entity } : {}), limit: o.limit ?? 200 } }))
 export const loadDataRequests = async (api: Reader, page = 1) => toDataRequests(await api.get("/v1/platform/data-requests", { query: { page, pageSize: 100 } }))
+export const GRANTS_PAGE = 50
+/** The newest grants across tenants (every status), for the support page; `tenantId` narrows it to one tenant. */
+export const loadSupportGrants = async (api: Reader, o: { tenantId?: string; status?: "active" | "expired" | "revoked"; cursor?: string } = {}) =>
+  toGrants(await api.get("/v1/platform/support-grants", { query: { ...(o.tenantId ? { tenantId: o.tenantId } : {}), ...(o.status ? { status: o.status } : {}), ...(o.cursor ? { cursor: o.cursor } : {}), limit: GRANTS_PAGE } }))
 export const loadStaff = async (api: Reader) => toStaffRows(await api.get("/v1/platform/staff"))
 export async function loadSettings(api: Reader) {
   const [email, storage, billing] = await Promise.all([api.get("/v1/platform/settings/email"), api.get("/v1/platform/settings/storage"), api.get("/v1/platform/settings/billing")])

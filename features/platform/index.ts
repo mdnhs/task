@@ -1,7 +1,7 @@
 export { PlansView } from "./components/plans-view"
 export { PlanEditView, PlanNewView } from "./components/plan-form"
 export { OverviewDashboard } from "./components/overview-dashboard"
-export { getOperator, loadTenantList, loadTenant360, loadMetrics, loadAudit, loadDataRequests, loadStaff, loadSettings, loadEnv, TENANTS_PAGE } from "./api"
+export { getOperator, loadTenantList, loadTenant360, loadMetrics, loadAudit, loadDataRequests, loadStaff, loadSupportGrants, loadSettings, loadEnv, TENANTS_PAGE } from "./api"
 export { getPlatformNav, getPlatformSeed, getPlatformSettings } from "./mock"
 export { unavailablePlatformPage } from "./mock-gate"
 export { staffCan, requireStaff, filterForStaff, actionForPath, STAFF_ROLES, STAFF_ROLE_LABEL } from "./permissions"

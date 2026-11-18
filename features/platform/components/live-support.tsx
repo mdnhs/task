@@ -9,30 +9,30 @@ import { Icon } from "@/components/icons"
 import { PageHead } from "@/components/page-head"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import type { LiveTenantRow } from "../adapters"
+import type { LiveGrant, LiveTenantRow } from "../adapters"
 import { GRANT_HOURS_MAX, REASON_MAX } from "../client"
 import { dateTimeUtc } from "../format"
 import { usePlatform } from "./use-platform"
 
-type Grant = { id: string; tenantId: string; expiresAt: string; revokedAt: string | null }
+type Grant = Pick<LiveGrant, "id" | "tenantId" | "expiresAt" | "revokedAt"> & Partial<Pick<LiveGrant, "tenantName" | "status" | "staffName">>
 
 /**
- * Read-only support access for the CALLER (B6 T6.8): a reason (1 to 500) and hours (1 to 24). The API has no list route for staff, so the grants made in this visit show below with Revoke;
- * the tenant's owners see every grant (and can revoke it) under Settings, Support access (/settings/support-access), and are told at once.
+ * Read-only support access for the CALLER (B6 T6.8): a reason (1 to 500) and hours (1 to 24). `grants` is the newest 50 from GET /v1/platform/support-grants (any status, any tenant), with Revoke on the active ones; a grant made here is added to the top.
+ * The tenant's owners see every grant (and can revoke it) under Settings, Support access (/settings/support-access), and are told at once.
  */
-export function GrantForm({ tenants, tenantId: fixed, initial }: { tenants: { id: string; name: string }[]; tenantId?: string; initial?: string }) {
+export function GrantForm({ tenants, tenantId: fixed, initial, grants: initialGrants = [] }: { tenants: { id: string; name: string }[]; tenantId?: string; initial?: string; grants?: Grant[] }) {
   const { client, act } = usePlatform()
   const [tenantId, setTenantId] = useState(fixed ?? (tenants.some((t) => t.id === initial) ? initial! : tenants[0]?.id ?? ""))
   const [reason, setReason] = useState("")
   const [hours, setHours] = useState("2")
-  const [grants, setGrants] = useState<Grant[]>([])
-  const name = (id: string) => tenants.find((t) => t.id === id)?.name ?? id
+  const [grants, setGrants] = useState<Grant[]>(initialGrants)
+  const name = (g: Grant) => g.tenantName ?? tenants.find((t) => t.id === g.tenantId)?.name ?? g.tenantId
 
   async function create() {
     const r = await act(`grant:${tenantId}`, () => client.createGrant(tenantId, reason, Number(hours)), "Support access granted")
     if (r.ok) {
       const g = r.value
-      setGrants((l) => [{ id: g.id, tenantId: g.tenantId, expiresAt: g.expiresAt, revokedAt: g.revokedAt }, ...l])
+      setGrants((l) => [{ id: g.id, tenantId: g.tenantId, expiresAt: g.expiresAt, revokedAt: g.revokedAt, status: g.status }, ...l])
       setReason("")
     }
   }
@@ -59,10 +59,10 @@ export function GrantForm({ tenants, tenantId: fixed, initial }: { tenants: { id
           {grants.map((g) => (
             <li key={g.id}>
               <div className="pf-modlist-main">
-                <span className="tt">{name(g.tenantId)}</span>
-                <span className="pf-modlist-d">{g.revokedAt ? "Revoked" : `Until ${dateTimeUtc(g.expiresAt)}`}</span>
+                <span className="tt">{name(g)}</span>
+                <span className="pf-modlist-d">{g.revokedAt ? "Revoked" : g.status === "expired" ? `Expired ${dateTimeUtc(g.expiresAt)}` : `Until ${dateTimeUtc(g.expiresAt)}`}{g.staffName ? ` · ${g.staffName}` : ""}</span>
               </div>
-              {!g.revokedAt && <button type="button" className="btn btn-outline pf-act" onClick={() => void revoke(g)}>Revoke</button>}
+              {!g.revokedAt && g.status !== "expired" && <button type="button" className="btn btn-outline pf-act" onClick={() => void revoke(g)}>Revoke</button>}
             </li>
           ))}
         </ul>
@@ -71,11 +71,11 @@ export function GrantForm({ tenants, tenantId: fixed, initial }: { tenants: { id
   )
 }
 
-export function LiveSupport({ tenants, requestFor }: { tenants: LiveTenantRow[]; requestFor?: string }) {
+export function LiveSupport({ tenants, requestFor, grants }: { tenants: LiveTenantRow[]; requestFor?: string; grants?: LiveGrant[] }) {
   return (
     <>
       <PageHead title="Support access" subtitle="Time-limited, read-only access to a tenant, with a reason" />
-      <GrantForm tenants={tenants.filter((t) => t.status !== "suspended")} initial={requestFor} />
+      <GrantForm tenants={tenants.filter((t) => t.status !== "suspended")} initial={requestFor} grants={grants} />
       <p className="pf-note">
         Each grant also shows on the tenant&apos;s own <Link href="/settings/support-access">Settings, support-access</Link> page, where its owners can revoke it. Hours, reason and who asked are in the audit log.
       </p>

@@ -41,10 +41,11 @@ export const Live360TabSkeleton = () => <SkMask label="Loading"><LiveOverviewTab
 export const LiveAuditSkeleton = () => <SkMask label="Loading audit log"><LiveAudit lines={AUDIT} /></SkMask>
 export const LiveDataRequestsSkeleton = () => <SkMask label="Loading data requests"><DataRequestsView data={REQUESTS} /></SkMask>
 export const LiveTeamSkeleton = () => <SkMask label="Loading team"><LiveTeam staff={STAFF} meId="" /></SkMask>
+const SAMPLE_GRANTS = [1, 2, 3].map((i) => ({ id: `g${i}`, tenantId: "t", tenantName: "Company name", staffName: "Staff name", status: "active" as const, expiresAt: "2026-11-17T11:00:00.000Z", revokedAt: null }))
 export const LiveSupportSkeleton = () => (
   <SkMask label="Loading support access">
     <div className="head"><div><h1>Support access</h1><p>Time-limited, read-only access to a tenant, with a reason</p></div></div>
-    <GrantForm tenants={[{ id: "t", name: "Company name" }]} />
+    <GrantForm tenants={[{ id: "t", name: "Company name" }]} grants={SAMPLE_GRANTS} />
   </SkMask>
 )
 export const LiveSettingsSkeleton = () => <SkMask label="Loading settings"><LiveSettings email={{ configured: false }} storage={{ configured: false }} billing={{ configured: false }} canWrite /></SkMask>

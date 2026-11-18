@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, test, vi } from "vitest"
 import { bootApi, resetDb } from "./harness"
 import { makeApiClient } from "@/lib/api/client"
 import { resolvePlatformMfa } from "@/lib/session-core"
-import { loadAudit, loadDataRequests, loadMetrics, loadSettings, loadStaff, loadTenant360, loadTenantList, loadEnv } from "@/features/platform/api"
+import { loadAudit, loadDataRequests, loadMetrics, loadSettings, loadStaff, loadSupportGrants, loadTenant360, loadTenantList, loadEnv } from "@/features/platform/api"
 import { makePlatformClient } from "@/features/platform/client"
 import { auditExportHref } from "@/features/platform/components/live-audit"
 import { makeMember, makeStaff, makeTenant, signIn, signInWithTotp } from "../../api/test/factories"
@@ -91,7 +91,12 @@ describe("T6.8 contract (real API): the platform console", () => {
     const { cookie } = await signInWithTotp(t.app, owner.email, owner.password, owner.totpSecret!)
     const tenantApi = makeApiClient({ baseUrl: "http://api.test", fetch: async (i, init) => { const u = new URL(typeof i === "string" ? i : i instanceof URL ? i.href : i.url); const h = new Headers(init?.headers); h.set("cookie", cookie); h.set("x-tenant", "coppers"); return t.app.request(u.pathname + u.search, { method: init?.method ?? "GET", headers: h }) } })
     expect((await tenantApi.get("/v1/settings/support-grants")).items.map((x) => x.id)).toContain(g.id)
+    const listed = await loadSupportGrants(o.api)
+    expect(listed.items).toMatchObject([{ id: g.id, tenantId: tenant.id, tenantName: "Coppers Cafe", status: "active", revokedAt: null }])
+    expect(noUndefined(listed)).toEqual([])
     await o.client.revokeGrant(g.id)
+    expect((await loadSupportGrants(o.api, { status: "revoked" })).items.map((x) => x.id)).toEqual([g.id])
+    expect((await loadSupportGrants(o.api, { status: "active" })).items).toEqual([])
     await expect(o.client.revokeGrant(g.id)).rejects.toMatchObject({ status: 409, code: "grant_inactive" })
   })
 

@@ -8,6 +8,7 @@ type DetailDto = Res<"/v1/platform/tenants/{tenantId}", "get">
 type MetricsDto = Res<"/v1/platform/metrics", "get">
 type AuditDto = Res<"/v1/platform/audit", "get">
 type DsrDto = Res<"/v1/platform/data-requests", "get">
+type GrantsDto = Res<"/v1/platform/support-grants", "get">
 type StaffDto = Res<"/v1/platform/staff", "get">
 type EmailDto = Res<"/v1/platform/settings/email", "get">
 type StorageDto = Res<"/v1/platform/settings/storage", "get">
@@ -67,6 +68,13 @@ export type LiveDataRequests = { rows: LiveDataRequest[]; page: number; pageSize
 export const toDataRequests = (dto: DsrDto): LiveDataRequests => ({
   rows: dto.items.map((i) => ({ id: i.id, tenantId: i.tenantId, tenant: i.tenantName, kind: i.kind, kindLabel: DSR_KIND[i.kind] ?? titleCase(i.kind), status: i.status, createdAt: i.createdAt, dueAt: i.dueAt, overdue: i.overdue })),
   page: dto.page, pageSize: dto.pageSize, total: dto.total,
+})
+
+/** A support grant as the console lists it (GET /v1/platform/support-grants): the tenant name comes with the row, never a secret. */
+export type LiveGrant = { id: string; tenantId: string; tenantName: string; staffName: string | null; reason: string; status: "active" | "expired" | "revoked"; createdAt: string; expiresAt: string; revokedAt: string | null }
+export const toGrants = (dto: GrantsDto): { items: LiveGrant[]; nextCursor: string | null } => ({
+  items: dto.items.map((g) => ({ id: g.id, tenantId: g.tenantId, tenantName: g.tenantName, staffName: g.staffName, reason: g.reason, status: g.status, createdAt: g.createdAt, expiresAt: g.expiresAt, revokedAt: g.revokedAt })),
+  nextCursor: dto.nextCursor,
 })
 
 export type LiveStaff = StaffMember & { addedAt: string }

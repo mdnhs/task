@@ -22,8 +22,9 @@ without the console's nav or search.
 - **Tenants**: the list is the API's page (`?page=`, `?q=`, 100 per page, newest first); saved views other than suspended and every sort work on the loaded page and the list says so.
   Metadata only; the 360 is aggregates (counts, one date), never a member name or email.
 - **Modules**: the module catalogue and plan table come from the static `billing/entitlements.json`, which can drift from the API's plans table (the API stays the authority and refuses unknown modules). The tab drafts changes, then one `PUT .../modules` sends the FULL overrides array with the reason (the API replaces the list). Core modules can't be revoked.
-- **Support access**: `POST .../support-grants` (reason, hours) for the caller and `DELETE /v1/platform/support-grants/{id}`. There is no staff list route, so the page shows the grants made in this visit;
-  the tenant owner sees every grant under `/settings/support-access`.
+- **Support access**: `POST .../support-grants` (reason, hours) for the caller and `DELETE /v1/platform/support-grants/{id}`, and (B7 T7) `GET /v1/platform/support-grants?tenantId&status&limit&cursor` (every staff role, newest first, keyset cursor, items
+  `{ id, tenantId, tenantName, grantedBy, staffName, scope: "read_only", reason, status, createdAt, expiresAt, revokedAt }`; a read, so no audit row, one info log line).
+  `/platform/support` lists the newest 50 grants (any status) from it, with Revoke on active ones; the tenant owner sees every grant under `/settings/support-access`.
 - **Settings** (owner only): email (Resend), storage (R2) and billing (Stripe). The forms start empty; an empty secret keeps the stored one; only the last 4 come back. The Test / Live pill comes from the
   Stripe publishable key prefix (`pk_test_` / `pk_live_`), owner only.
 - **Times** show in UTC (the console is not inside a company). Money is the API's integer minor units per currency.
@@ -45,7 +46,7 @@ The operator is the signed-in user (`/v1/me.platformRole`), not `platform/staff.
 | Suspend, reactivate | backed | `POST .../suspend`, `POST .../reactivate` (reason 1-500; 409 `already_suspended`, `not_suspended`) |
 | Extend trial | backed | `POST .../extend-trial` (days 1-30, reason) |
 | Module overrides | backed | `PUT .../modules` with the full overrides array |
-| Support access | backed | `POST /v1/platform/tenants/{tenantId}/support-grants`, `DELETE /v1/platform/support-grants/{id}` (no list route: grants show on the tenant's `/settings/support-access`) |
+| Support access | backed | `POST /v1/platform/tenants/{tenantId}/support-grants`, `DELETE /v1/platform/support-grants/{id}`, `GET /v1/platform/support-grants` (list; also on the tenant's `/settings/support-access`) |
 | Data requests | backed (read) | `GET /v1/platform/data-requests` (no subject identity; no resolve route) |
 | Audit log and export | backed | `GET /v1/platform/audit`, `GET /v1/platform/audit/export` (CSV, through the BFF) |
 | Team (staff) | backed | `GET/POST /v1/platform/staff`, `PATCH /v1/platform/staff/{userId}` |
