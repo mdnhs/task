@@ -45,14 +45,14 @@ describe("create (FR-RS-36)", () => {
 
   test("an office requester is never told of their own request; the other office roles are", async () => {
     const w = await sites()
-    const { mon } = await world(w)
+    const { mon, tue } = await world(w)
     await askOk(w, w.p.owner, mon.id, { patch: { start: "09:00" }, reason: "x" })
     const first = (await notices(w)).map((x) => x.user_id)
     expect(first).toContain(w.p["roster-manager"].userId)
     expect(first).not.toContain(w.p.owner.userId)
     await w.rows("update memberships set status = 'deactivated' where user_id = $1", [w.p["roster-manager"].userId])
     await w.rows("delete from notifications")
-    await askOk(w, w.p["location-supervisor"], mon.id, { patch: { start: "10:00" }, reason: "y" })
+    await askOk(w, w.p["location-supervisor"], tue.id, { patch: { start: "10:00" }, reason: "y" })
     const second = (await notices(w)).map((x) => x.user_id)
     expect(second).toContain(w.p.owner.userId)
     expect(second).not.toContain(w.p["roster-manager"].userId) // a deactivated office member hears nothing
@@ -303,5 +303,54 @@ describe("list", () => {
     expect(p2.nextCursor).toBeNull()
     expect((await w.req("GET", "/v1/roster/change-requests?limit=0", w.p.owner)).status).toBe(422)
     expect((await w.req("GET", "/v1/roster/change-requests?cursor=zz", w.p.owner)).status).toBe(400)
+  })
+})
+
+describe("round 1: one open request per shift (AF5) and the remaining gaps (AF6)", () => {
+  test("a second request for a shift that already has an open one is 409 request_open; after it is decided a new one is fine", async () => {
+    const w = await sites()
+    const { mon } = await world(w)
+    const sup = w.p["location-supervisor"]
+    const r = await askOk(w, sup, mon.id, { patch: { start: "09:00" }, reason: "x" })
+    const again = await ask(w, w.p.owner, mon.id, { patch: { start: "10:00" }, reason: "y" })
+    expect([again.status, ((await again.json()) as Json).code]).toEqual([409, "request_open"])
+    expect(await w.rows("select 1 from roster_change_requests")).toHaveLength(1)
+    await w.ok("POST", `/v1/roster/change-requests/${r.id}/decide`, w.p.owner, { decision: "reject" })
+    expect((await ask(w, sup, mon.id, { patch: { start: "10:00" }, reason: "y" })).status).toBe(201)
+  })
+
+  test("an archived site: create is 409 location_archived, and approving a request made before the archive is 409 location_archived (a rejection works)", async () => {
+    const w = await sites()
+    const { mon, tue } = await world(w)
+    const sup = w.p["location-supervisor"]
+    const r = await askOk(w, sup, mon.id, { patch: { start: "09:00" }, reason: "x" })
+    await w.ok("POST", `/v1/locations/${w.a}/archive`, w.p.owner, undefined)
+    const c = await ask(w, sup, tue.id, { patch: { start: "09:00" }, reason: "x" })
+    expect([c.status, ((await c.json()) as Json).code]).toEqual([409, "location_archived"])
+    const d = await decide(w, w.p.owner, r.id, { decision: "approve" })
+    expect([d.status, ((await d.json()) as Json).code]).toEqual([409, "location_archived"])
+    expect((await decide(w, w.p.owner, r.id, { decision: "reject" })).status).toBe(200)
+  })
+
+  test("approving after the week went back to draft (operator repair) applies as a draft edit: no event, nobody told of the shift", async () => {
+    const w = await sites()
+    const { wk, mon } = await world(w)
+    const r = await askOk(w, w.p["location-supervisor"], mon.id, { patch: { start: "09:00" }, reason: "x" })
+    await w.rows("update roster_weeks set status = 'draft' where id = $1", [wk])
+    await w.rows("delete from notifications")
+    await w.ok("POST", `/v1/roster/change-requests/${r.id}/decide`, w.p.owner, { decision: "approve" })
+    expect((await w.rows("select start_time from roster_shifts where id = $1", [mon.id]))[0].start_time).toBe("09:00")
+    expect((await notices(w)).map((x) => x.title)).toEqual(["Change request approved"]) // the requester only
+    expect(await w.rows("select 1 from domain_events where type = 'roster.shift_changed'")).toHaveLength(0)
+  })
+
+  test("list bounds: limit 0, 101 and non-numeric are 422 invalid_filter, a garbage cursor is 400 invalid_cursor", async () => {
+    const w = await sites()
+    for (const limit of ["0", "101", "abc"]) {
+      const r = await w.req("GET", `/v1/roster/change-requests?limit=${limit}`, w.p.owner)
+      expect([r.status, ((await r.json()) as Json).code], limit).toEqual([422, "invalid_filter"])
+    }
+    const c = await w.req("GET", "/v1/roster/change-requests?cursor=zz", w.p.owner)
+    expect([c.status, ((await c.json()) as Json).code]).toEqual([400, "invalid_cursor"])
   })
 })

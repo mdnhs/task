@@ -121,6 +121,7 @@ export const ROUTE_PARAMS: Record<string, Record<string, Resource>> = {
   "/v1/roster/exchanges/{id}/recommend": { id: "exchange" },
   "/v1/roster/exchanges/{id}/decide": { id: "exchange" },
   "/v1/roster/exchanges/{id}/cancel": { id: "exchange" },
+  "/v1/roster/exchanges/{id}/decline": { id: "exchange" },
   "/v1/locations/{id}/history": { id: "location" },
   "/v1/roster/shifts/{id}": { id: "rosterShift" },
   "/v1/leave/{id}/cancel": { id: "leave" },
@@ -287,7 +288,7 @@ export async function fixtureIds(t: { app: AppType; deps: Deps }, tenant: { id: 
   const crRes = await call(t.app, "POST", `/v1/roster/shifts/${pubShift.id}/change-requests`, { cookie: owner.cookie, tenant: tenant.slug, body: { patch: { start: "09:00" }, reason: `Change ${uniq}` } })
   if (crRes.status !== 201) throw new Error(`fixture change request failed: ${crRes.status} ${await crRes.text()}`)
   const changeRequest = (await crRes.json()) as { id: string }
-  // B8 T12: a PUBLISHED, upcoming week with one open shift and the OWNER'S own claim on it (control: decide and recommend 403 self_decision, cancel 200)
+  // B8 T12: a PUBLISHED, upcoming week with one open shift and the OWNER'S own claim on it (withdrawn at once; controls: decide and recommend 403 self_decision, decline 403, cancel 409 already_decided)
   const [claimWeek] = await ownerTenantQuery(tenant.id, "insert into roster_weeks (tenant_id, location_id, week_start, created_at, updated_at) values ($1, $2, '2026-11-23', now(), now()) returning id", [tenant.id, location.id])
   const claimShiftRes = await call(t.app, "POST", `/v1/roster/weeks/${claimWeek.id}/shifts`, { cookie: owner.cookie, tenant: tenant.slug, body: { shifts: [{ date: "2026-11-23", userIds: [null], shiftTypeId: shiftType.id }] } })
   if (claimShiftRes.status !== 201) throw new Error(`fixture claim shift failed: ${claimShiftRes.status} ${await claimShiftRes.text()}`)
@@ -298,6 +299,9 @@ export async function fixtureIds(t: { app: AppType; deps: Deps }, tenant: { id: 
   const claimRes = await call(t.app, "POST", `/v1/roster/shifts/${claimShift.id}/claim`, { cookie: owner.cookie, tenant: tenant.slug })
   if (claimRes.status !== 201) throw new Error(`fixture claim failed: ${claimRes.status} ${await claimRes.text()}`)
   const exchange = (await claimRes.json()) as { id: string }
+  // withdrawn at once: the owner has at most 5 OPEN exchanges and every fixture of the walk adds one (controls: decide/recommend/decline still 403, cancel 409 already_decided, none 404)
+  const withdrawn = await call(t.app, "POST", `/v1/roster/exchanges/${exchange.id}/cancel`, { cookie: owner.cookie, tenant: tenant.slug })
+  if (withdrawn.status !== 200) throw new Error(`fixture claim cancel failed: ${withdrawn.status} ${await withdrawn.text()}`)
   const lifecycle = await makeMember(t.deps, tenant.id, "employee")
   // B8 T7: the OWNER'S own leave request (control: cancel 200, decide 403 self_decision: nobody decides their own)
   const leaveDay = new Date(Date.UTC(2030, 0, 1) + leaveSeq++ * 7 * DAY_MS).toISOString().slice(0, 10) // a fresh week per fixture: the owner may not hold overlapping leave

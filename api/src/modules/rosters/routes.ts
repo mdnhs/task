@@ -20,7 +20,7 @@ import { getQualifications, setQualifications } from "./qualifications"
 import { ChangeRequestListOut, ChangeRequestQuery, ChangeRequestSchema, CreateChangeRequestBody, DecideChangeBody, DecideChangeOut } from "./dto"
 import { createChangeRequest, decideChangeRequest, listChangeRequests } from "./requests"
 import { DecideExchangeBody, DecideExchangeOut, ExchangeListOut, ExchangeQuery, ExchangeSchema, SwapBody } from "./dto"
-import { cancelExchange, claimShift, decideExchange, listExchanges, recommendExchange, swapShift } from "./exchange"
+import { cancelExchange, claimShift, declineExchange, decideExchange, listExchanges, recommendExchange, swapShift } from "./exchange"
 import { rosterGuard } from "./scope"
 import { rosterRead, rosterWrite } from "./write"
 
@@ -176,7 +176,7 @@ const shiftDeleteR = createRoute({
 const CR_HIDDEN = "404 change_request_not_found for a request of a site the caller may not see, a missing or another tenant's one and an id that is not a uuid (all the same answer)"
 const changeCreateR = createRoute({
   method: "post", path: "/v1/roster/shifts/{id}/change-requests", middleware: guard("write"), request: { params: RosterIdParam, body: body(CreateChangeRequestBody) },
-  responses: { 201: json(ChangeRequestSchema, `A request for a change to a shift of a PUBLISHED week (a supervisor of the site or an office role); the patch takes the same keys as a shift edit, never a week. Office is told. ${WEEK_HIDDEN}; 409 use_direct_edit (the week is a draft: edit it) | location_archived; 422 reason_required (missing or blank) | invalid_patch | cannot_move_week | invalid_shift | invalid_shift_type | invalid_reason`) },
+  responses: { 201: json(ChangeRequestSchema, `A request for a change to a shift of a PUBLISHED week (a supervisor of the site or an office role); the patch takes the same keys as a shift edit, never a week. Office is told. ${WEEK_HIDDEN}; 409 use_direct_edit (the week is a draft: edit it) | location_archived | request_open (the shift already has an open request); 422 reason_required (missing or blank) | invalid_patch | cannot_move_week | invalid_shift | invalid_shift_type | invalid_reason`) },
 })
 const changeListR = createRoute({
   method: "get", path: "/v1/roster/change-requests", middleware: guard("read"), request: { query: ChangeRequestQuery },
@@ -191,14 +191,14 @@ const EX_HIDDEN = "404 exchange_not_found for an exchange of a site the caller m
 const claimR = createRoute({
   method: "post", path: "/v1/roster/shifts/{id}/claim", middleware: guard("read"), request: { params: RosterIdParam },
   responses: {
-    201: json(ExchangeSchema, `The caller asks for an OPEN shift of a published, upcoming week at a site they are located at (homed there or rostered there that week); approvers are told. The same open claim again is the same exchange with 200. ${WEEK_HIDDEN} (also for a shift of a site the caller is not located at); 409 week_not_published | shift_not_open | shift_started | location_archived; 422 ineligible (left, a required qualification missing or expired)`),
+    201: json(ExchangeSchema, `The caller asks for an OPEN shift of a published, upcoming week at a site they are located at (homed there or rostered there that week); approvers are told. The same open claim again is the same exchange with 200. ${WEEK_HIDDEN} (also for a shift of a site the caller is not located at); 409 week_not_published (office roles; a member with no edit role gets the plain 404 for a draft week) | shift_not_open | shift_started | location_archived | too_many_open (5 open exchanges per person); 422 ineligible (left, a required qualification missing or expired)`),
     200: json(ExchangeSchema, "The caller's own open claim of this shift, returned as it is (a double click)"),
   },
 })
 const swapR = createRoute({
   method: "post", path: "/v1/roster/shifts/{id}/swap", middleware: guard("read"), request: { params: RosterIdParam, body: body(SwapBody) },
   responses: {
-    201: json(ExchangeSchema, `The person on the shift hands it over to a named colleague (homed at the shift's site, rostered there that week, or within the caller's scope); the colleague and the approvers are told. Someone else who can see the shift: 403 forbidden. ${WEEK_HIDDEN}; 404 member_not_found (the colleague does not exist, is another tenant's or of a site the caller does not know: one answer); 409 exchange_open (another open swap of the shift) | shift_started | location_archived; 422 invalid_swap (yourself) | invalid_note | ineligible (generic for a person the caller may not know)`),
+    201: json(ExchangeSchema, `The person on the shift hands it over to a named colleague (homed at the shift's site, rostered there that week, or within the caller's scope); the colleague and the approvers are told. Someone else who can see the shift: 403 forbidden. ${WEEK_HIDDEN}; 404 member_not_found (the colleague does not exist, is another tenant's or of a site the caller does not know: one answer); 404 not_found also for a member with no edit role on a DRAFT week; 409 exchange_open (another open swap of the shift) | shift_started | location_archived | too_many_open | cooldown (the same colleague again within an hour of a cancel or a refusal); 422 invalid_swap (yourself) | invalid_note | ineligible (generic for a person the caller may not know)`),
     200: json(ExchangeSchema, "The same open swap to the same colleague, returned as it is (a double click)"),
   },
 })
@@ -213,6 +213,10 @@ const recommendR = createRoute({
 const decideR = createRoute({
   method: "post", path: "/v1/roster/exchanges/{id}/decide", middleware: guard("write"), request: { params: RosterIdParam, body: body(DecideExchangeBody) },
   responses: { 200: json(DecideExchangeOut, `Approve (the shift changes hands, rules and eligibility run again, the new person confirms) or reject. Who: a supervisor or office on a draft week; on a published week office only, unless the location delegates swap approval (then its supervisor too); staff never. ${EX_HIDDEN}; 403 forbidden (a role that edits nothing) | roster_locked (a supervisor on a published week without delegation) | self_decision (a party to it or the person on the shift); 409 already_decided | exchange_expired | shift_taken (a claim whose shift was assigned meanwhile) | shift_changed (a swap whose shift changed hands) | location_archived | version_conflict | shift_exists; 422 rule_blocked (a block: office needs overrideReason and, on a published week, overrideRuleIds) | ineligible | invalid_override | invalid_reason | invalid_decision`) },
+})
+const declineR = createRoute({
+  method: "post", path: "/v1/roster/exchanges/{id}/decline", middleware: guard("read"), request: { params: RosterIdParam },
+  responses: { 200: json(ExchangeSchema, `The colleague a swap is offered to refuses it: the exchange is rejected and the requester is told. Anyone else who can see it (the requester cancels instead): 403 forbidden. ${EX_HIDDEN}; 409 already_decided`) },
 })
 const cancelR = createRoute({
   method: "post", path: "/v1/roster/exchanges/{id}/cancel", middleware: guard("read"), request: { params: RosterIdParam },
@@ -287,6 +291,7 @@ export const rosterRoutes = newRouter()
   .openapi(exchangesR, async (c) => c.json(await rosterRead(c, (tx, ctx) => listExchanges(tx, ctx, c.req.valid("query"))), 200))
   .openapi(recommendR, async (c) => c.json(await rosterWrite(c, (tx, ctx, env) => recommendExchange(tx, ctx, env, c.req.valid("param").id)), 200))
   .openapi(decideR, async (c) => c.json(await rosterWrite(c, (tx, ctx, env) => decideExchange(tx, ctx, env, c.req.valid("param").id, c.req.valid("json"))), 200))
+  .openapi(declineR, async (c) => c.json(await rosterWrite(c, (tx, ctx, env) => declineExchange(tx, ctx, env, c.req.valid("param").id), "self"), 200))
   .openapi(cancelR, async (c) => c.json(await rosterWrite(c, (tx, ctx) => cancelExchange(tx, ctx, c.req.valid("param").id), "self"), 200))
   .openapi(shiftDeleteR, async (c) => {
     await rosterWrite(c, (tx, ctx, env) => deleteShift(tx, ctx, env, c.req.valid("param").id, c.req.valid("query")))

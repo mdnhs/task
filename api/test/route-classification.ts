@@ -271,6 +271,7 @@ export const ROUTE_CLASSIFICATION: Record<string, readonly [Classification, stri
   "POST /v1/roster/exchanges/{id}/recommend": ["tenant-record", "path carries a tenant record id: walked by the isolation walker"],
   "POST /v1/roster/exchanges/{id}/decide": ["tenant-record", "path carries a tenant record id: walked by the isolation walker"],
   "POST /v1/roster/exchanges/{id}/cancel": ["tenant-record", "path carries a tenant record id: walked by the isolation walker"],
+  "POST /v1/roster/exchanges/{id}/decline": ["tenant-record", "path carries a tenant record id: walked by the isolation walker"],
   "GET /v1/_probe/roster": ["test-only", "registered only when NODE_ENV=test; never in the OpenAPI document"],
   "GET /v1/_probe/roster/locations/{id}": ["test-only", "registered only when NODE_ENV=test; never in the OpenAPI document"],
   "POST /v1/_probe/roster-write": ["test-only", "registered only when NODE_ENV=test; never in the OpenAPI document"],

@@ -1,10 +1,11 @@
-import { and, desc, eq, lt, or, sql } from "drizzle-orm"
+import { and, asc, desc, eq, gt, inArray, lt, ne, or, sql } from "drizzle-orm"
 import { canSeeLocation } from "@opsdesk/domain/roster-access"
 import type { RuleViolation } from "@opsdesk/domain/roster-rules"
 import { decodeCursor, encodeCursor } from "../../core/cursor"
 import { Conflict, Forbidden, NotFound } from "../../core/errors"
 import { locations, memberships, rosterExchanges, rosterShifts, rosterWeeks, shiftTypes } from "../../db/schema"
 import type { TenantTx } from "../../db/tenant-tx"
+import { instantSql } from "./locations"
 import type { ExchangeDto, ShiftDto } from "./dto"
 import { approversOf, notifyActive, type Notice } from "./events"
 import { announce, assertEligible, assertNoDuplicate, bumpWeek, guarded, loadShift, ruleGate, unprocessable, type Spec } from "./shifts"
@@ -76,9 +77,21 @@ async function readShift(tx: TenantTx, ctx: RosterCtx, id: string): Promise<Shif
 /** What to tell the people who decide (office in scope, and the site's supervisors, who may recommend or, with delegation, decide) when something is asked; never the people it concerns. */
 const askers = (tx: TenantTx, ctx: RosterCtx, locationId: string, exclude: string[]) => approversOf(tx, ctx.tenantId, locationId, { supervisors: true, exclude })
 
+const MAX_OPEN_PER_PERSON = 5
+const COOLDOWN_MS = 3_600_000
+
+/** At most 5 open exchanges per requester (409 `too_many_open`): a loop of propose, cancel, propose cannot notify people for ever (AF2). */
+async function assertRoom(tx: TenantTx, ctx: RosterCtx): Promise<void> {
+  const open = await tx.select({ id: rosterExchanges.id }).from(rosterExchanges).where(and(eq(rosterExchanges.tenantId, ctx.tenantId), eq(rosterExchanges.fromUserId, ctx.me), sql`${rosterExchanges.status} in ('requested','recommended')`)).limit(MAX_OPEN_PER_PERSON)
+  if (open.length >= MAX_OPEN_PER_PERSON) throw Conflict("too_many_open")
+}
+
+/** The one place that says whether a week is shown to a caller: a DRAFT week is unknown to a member with no edit role (staff): the same 404 as a shift that does not exist (AF1). */
+const unpublished = (ctx: RosterCtx): Error => (ctx.access.editDraft ? Conflict("week_not_published") : NotFound())
+
 type Created = { exchange: ExchangeDto; created: boolean }
 
-async function openExchange(tx: TenantTx, ctx: RosterCtx, env: RosterEnv, cur: ShiftRow, kind: "claim" | "swap", toUserId: string | null, note: string | null): Promise<ExchangeDto> {
+async function openExchange(tx: TenantTx, ctx: RosterCtx, env: RosterEnv, cur: ShiftRow, kind: "claim" | "swap", toUserId: string | null, note: string | null, draft: boolean): Promise<ExchangeDto> {
   const [row] = await tx
     .insert(rosterExchanges)
     .values({ tenantId: ctx.tenantId, kind, shiftId: cur.id, fromUserId: ctx.me, toUserId, status: "requested", note: note ?? "", createdAt: ctx.now, updatedAt: ctx.now })
@@ -89,7 +102,8 @@ async function openExchange(tx: TenantTx, ctx: RosterCtx, env: RosterEnv, cur: S
     userId, title: kind === "claim" ? "Shift claim requested" : "Shift swap requested", subjectUserId: ctx.me,
     body: kind === "claim" ? "{{subject}} asked to claim an open shift. Review it in the roster." : "{{subject}} asked to hand a shift over to a colleague. Review it in the roster.",
   }))
-  if (toUserId) notices.push({ userId: toUserId, title: "Shift swap requested", body: "{{subject}} wants to hand a shift over to you. A supervisor decides.", subjectUserId: ctx.me })
+  // a draft week is not shown to anyone yet: the colleague hears nothing (R8-17)
+  if (toUserId && !draft) notices.push({ userId: toUserId, title: "Shift swap requested", body: "{{subject}} wants to hand a shift over to you. A supervisor decides.", subjectUserId: ctx.me })
   await notifyActive(tx, ctx, env, notices)
   await auditRoster(tx, ctx, { action: "roster.exchange_requested", entity: "roster_exchange", entityId: row.id, before: null, after: { kind, shiftId: cur.id, locationId: cur.locationId, fromUserId: ctx.me, toUserId } })
   await publishRoster(tx, ctx, "roster.exchange_requested", { exchangeId: row.id, kind, shiftId: cur.id, weekId: cur.weekId, locationId: cur.locationId, fromUserId: ctx.me, toUserId })
@@ -105,15 +119,16 @@ export async function claimShift(tx: TenantTx, ctx: RosterCtx, env: RosterEnv, s
   const seen = await readShift(tx, ctx, shiftId)
   if (!canSeeLocation(ctx.access, seen.locationId) && !(await locatedAt(tx, ctx, ctx.me, seen.locationId, seen.weekId))) throw NotFound()
   const { cur, loaded } = await lockShiftOf(tx, ctx, seen)
-  if (loaded.week.status !== "published") throw Conflict("week_not_published")
+  if (loaded.week.status !== "published") throw unpublished(ctx)
   if (loaded.archived) throw Conflict("location_archived")
   if (cur.userId !== null) throw Conflict("shift_not_open")
   if (cur.startAt.getTime() <= ctx.now.getTime()) throw Conflict("shift_started")
   const [open] = await tx.select().from(rosterExchanges).where(and(eq(rosterExchanges.tenantId, ctx.tenantId), eq(rosterExchanges.shiftId, cur.id), eq(rosterExchanges.fromUserId, ctx.me), eq(rosterExchanges.kind, "claim"), sql`${rosterExchanges.status} in ('requested','recommended')`))
   if (open) return { exchange: view(open, bits(cur), ctx.now), created: false }
+  await assertRoom(tx, ctx)
   const [type] = await tx.select().from(shiftTypes).where(and(eq(shiftTypes.tenantId, ctx.tenantId), eq(shiftTypes.id, cur.shiftTypeId)))
   await assertEligible(tx, ctx, [{ userId: ctx.me, date: cur.date, type }])
-  return { exchange: await openExchange(tx, ctx, env, cur, "claim", null, null), created: true }
+  return { exchange: await openExchange(tx, ctx, env, cur, "claim", null, null, false), created: true }
 }
 
 /**
@@ -130,6 +145,7 @@ export async function swapShift(tx: TenantTx, ctx: RosterCtx, env: RosterEnv, sh
   if (to === ctx.me) throw unprocessable("invalid_swap")
   const { cur, loaded } = await lockShiftOf(tx, ctx, seen)
   if (cur.userId !== ctx.me) throw NotFound() // handed on while we waited for the lock
+  if (loaded.week.status !== "published" && !ctx.access.editDraft) throw NotFound() // staff do not know a draft exists (AF1)
   if (loaded.archived) throw Conflict("location_archived")
   if (cur.startAt.getTime() <= ctx.now.getTime()) throw Conflict("shift_started")
   const [target] = to.length > 0 && to.length <= 128 ? await tx.select({ home: memberships.homeLocationId }).from(memberships).where(and(eq(memberships.tenantId, ctx.tenantId), eq(memberships.userId, to))) : []
@@ -139,9 +155,17 @@ export async function swapShift(tx: TenantTx, ctx: RosterCtx, env: RosterEnv, sh
     if (open.toUserId !== to) throw Conflict("exchange_open")
     return { exchange: view(open, bits(cur), ctx.now), created: false }
   }
+  await assertRoom(tx, ctx)
+  // AF2: after a cancel or a refusal the same shift is not offered to the same colleague again for an hour (deps.clock)
+  const [recent] = await tx
+    .select({ id: rosterExchanges.id })
+    .from(rosterExchanges)
+    .where(and(eq(rosterExchanges.tenantId, ctx.tenantId), eq(rosterExchanges.shiftId, cur.id), eq(rosterExchanges.fromUserId, ctx.me), eq(rosterExchanges.kind, "swap"), eq(rosterExchanges.toUserId, to), sql`${rosterExchanges.status} in ('rejected','cancelled')`, gt(rosterExchanges.updatedAt, instantSql(ctx.now.getTime() - COOLDOWN_MS) as unknown as Date)))
+    .limit(1)
+  if (recent) throw Conflict("cooldown")
   const [type] = await tx.select().from(shiftTypes).where(and(eq(shiftTypes.tenantId, ctx.tenantId), eq(shiftTypes.id, cur.shiftTypeId)))
   await assertEligible(tx, ctx, [{ userId: to, date: cur.date, type }])
-  return { exchange: await openExchange(tx, ctx, env, cur, "swap", to, note), created: true }
+  return { exchange: await openExchange(tx, ctx, env, cur, "swap", to, note, loaded.week.status !== "published"), created: true }
 }
 
 /** GET /v1/roster/exchanges?status=&shiftId=: what the caller is a party to, plus every exchange of the sites they see (a supervisor: their own; office: those in scope). Newest first, keyset cursor. */
@@ -237,6 +261,32 @@ export async function cancelExchange(tx: TenantTx, ctx: RosterCtx, id: string): 
 }
 
 /**
+ * POST /v1/roster/exchanges/{id}/decline: the colleague a swap is offered to may refuse it (AF2): rejected, the requester is told (generic text, nothing on a draft week). Only the colleague:
+ * anyone else who can see it is 403 (the requester cancels instead), who cannot is 404; a claim has no colleague. 409 `already_decided`. Starts the 1 hour cooldown for that offer.
+ */
+export async function declineExchange(tx: TenantTx, ctx: RosterCtx, env: RosterEnv, id: string): Promise<ExchangeDto> {
+  if (!isUuid(id)) throw exNotFound()
+  const [f] = await tx
+    .select({ ex: rosterExchanges, shift: rosterShifts, status: rosterWeeks.status })
+    .from(rosterExchanges)
+    .innerJoin(rosterShifts, and(eq(rosterShifts.tenantId, rosterExchanges.tenantId), eq(rosterShifts.id, rosterExchanges.shiftId)))
+    .innerJoin(rosterWeeks, and(eq(rosterWeeks.tenantId, rosterShifts.tenantId), eq(rosterWeeks.id, rosterShifts.weekId)))
+    .where(and(eq(rosterExchanges.tenantId, ctx.tenantId), eq(rosterExchanges.id, id)))
+  const party = f && (f.ex.fromUserId === ctx.me || f.ex.toUserId === ctx.me)
+  const draft = f?.status !== "published"
+  if (!f || !(party || canSeeLocation(ctx.access, f.shift.locationId)) || (draft && !ctx.access.editDraft)) throw exNotFound()
+  const row = await lockExchange(tx, ctx, id)
+  if (row.kind !== "swap" || row.toUserId !== ctx.me) throw Forbidden("forbidden")
+  if (!OPEN.includes(row.status)) throw Conflict("already_decided")
+  const [next] = await tx.update(rosterExchanges).set({ status: "rejected", decidedBy: ctx.me, decidedAt: ctx.now, updatedAt: ctx.now }).where(and(eq(rosterExchanges.tenantId, ctx.tenantId), eq(rosterExchanges.id, row.id))).returning()
+  await writeHistory(tx, ctx, { locationId: f.shift.locationId, weekId: f.shift.weekId, shiftId: f.shift.id, action: "exchange_declined", before: { exchangeId: row.id, status: row.status }, after: { exchangeId: row.id, status: "rejected", declinedBy: ctx.me } })
+  if (!draft) await notifyActive(tx, ctx, env, [{ userId: row.fromUserId, title: "Swap declined", body: "Your swap request was declined by the colleague." }])
+  await auditRoster(tx, ctx, { action: "roster.exchange_declined", entity: "roster_exchange", entityId: row.id, before: { status: row.status }, after: { status: "rejected", shiftId: f.shift.id, declinedBy: ctx.me } })
+  await publishRoster(tx, ctx, "roster.exchange_decided", { exchangeId: row.id, kind: row.kind, shiftId: f.shift.id, weekId: f.shift.weekId, locationId: f.shift.locationId, decision: "decline", fromUserId: row.fromUserId, toUserId: row.toUserId })
+  return view(next, bits(f.shift), ctx.now)
+}
+
+/**
  * POST /v1/roster/exchanges/{id}/decide (`{ decision, note?, overrideReason?, overrideRuleIds? }`). See the header for who may. Order of answers: not visible 404 `exchange_not_found`; a role that edits
  * nothing 403 `forbidden`; a supervisor on a published week of a location that does not delegate 403 `roster_locked` (a rejection is a decision too); a party to the exchange or the person on the shift
  * 403 `self_decision`; already decided or cancelled 409 `already_decided`; an approval after the shift started 409 `exchange_expired`. An approval needs the shift in the state the exchange expects (a claim:
@@ -262,6 +312,8 @@ export async function decideExchange(
   let violations: RuleViolation[] = []
   let done: () => Promise<void> = async () => undefined
   let incoming: string | null = null
+  let closed: Row[] = [] // the other open claims of a shift that has just been given away
+  const draft = loaded.week.status !== "published"
   if (approve) {
     if (cur.startAt.getTime() <= ctx.now.getTime()) throw Conflict("exchange_expired")
     if (loaded.archived) throw Conflict("location_archived")
@@ -288,6 +340,10 @@ export async function decideExchange(
     )
     await bumpWeek(tx, ctx, loaded.week)
     shift = shiftDto(moved)
+    if (row.kind === "claim") {
+      closed = await tx.select().from(rosterExchanges).where(and(eq(rosterExchanges.tenantId, ctx.tenantId), eq(rosterExchanges.shiftId, cur.id), eq(rosterExchanges.kind, "claim"), ne(rosterExchanges.id, row.id), sql`${rosterExchanges.status} in ('requested','recommended')`)).orderBy(asc(rosterExchanges.id)).for("update")
+      if (closed.length > 0) await tx.update(rosterExchanges).set({ status: "rejected", decidedBy: ctx.me, decidedAt: ctx.now, updatedAt: ctx.now }).where(and(eq(rosterExchanges.tenantId, ctx.tenantId), inArray(rosterExchanges.id, closed.map((c) => c.id))))
+    }
     await writeHistory(tx, ctx, {
       locationId: cur.locationId, weekId: cur.weekId, shiftId: cur.id, action: "exchange_approved", reason: overrideReason ?? note, before: shiftSnap(cur),
       after: { ...shiftSnap(moved), exchangeId: row.id, kind: row.kind, ...(gate.overrides.length ? { overrides: gate.overrides } : {}) },
@@ -306,7 +362,12 @@ export async function decideExchange(
   const noteText = note ? ` Note: ${note}` : ""
   const notices: Notice[] = [{ userId: row.fromUserId, title: `${what} ${status}`, body: `Your ${what.toLowerCase()} request was ${status}.${approve && row.kind === "claim" ? " Please confirm the shift in your roster." : ""}${noteText}` }]
   if (approve && row.kind === "swap" && incoming) notices.push({ userId: incoming, title: `${what} ${status}`, body: `A shift was handed over to you. Please confirm it in your roster.${noteText}` })
-  await notifyActive(tx, ctx, env, notices)
+  for (const c of closed) {
+    await writeHistory(tx, ctx, { locationId: cur.locationId, weekId: cur.weekId, shiftId: cur.id, action: "exchange_rejected", reason: "The shift was assigned to someone else", before: { exchangeId: c.id, status: c.status }, after: { exchangeId: c.id, status: "rejected", autoRejected: true } })
+    await auditRoster(tx, ctx, { action: "roster.exchange_decided", entity: "roster_exchange", entityId: c.id, before: { status: c.status }, after: { status: "rejected", kind: c.kind, shiftId: cur.id, fromUserId: c.fromUserId, autoRejected: true } })
+    notices.push({ userId: c.fromUserId, title: "Claim rejected", body: "Your claim was rejected: the shift was assigned to someone else." })
+  }
+  if (!draft) await notifyActive(tx, ctx, env, notices) // a draft week is not shown to the people yet: nothing person-facing (R8-17)
   await auditRoster(tx, ctx, {
     action: "roster.exchange_decided", entity: "roster_exchange", entityId: row.id, before: { status: row.status, shiftUserId: cur.userId },
     after: { status, kind: row.kind, shiftId: cur.id, fromUserId: row.fromUserId, toUserId: row.toUserId, ...(approve ? { shiftUserId: incoming } : {}), ...(note ? { note } : {}), ...(approve && overrideReason ? { overrideReason } : {}) },

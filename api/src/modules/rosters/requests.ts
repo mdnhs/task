@@ -35,6 +35,8 @@ export async function createChangeRequest(tx: TenantTx, ctx: RosterCtx, env: Ros
   const { shift: cur, loaded } = await loadShift(tx, ctx, shiftId)
   if (loaded.week.status !== "published") throw Conflict("use_direct_edit")
   if (loaded.archived) throw Conflict("location_archived")
+  const [open] = await tx.select({ id: rosterChangeRequests.id }).from(rosterChangeRequests).where(and(eq(rosterChangeRequests.tenantId, ctx.tenantId), eq(rosterChangeRequests.shiftId, cur.id), eq(rosterChangeRequests.status, "requested"))).limit(1)
+  if (open) throw Conflict("request_open") // one open request per shift (AF5); decided under the roster lock, so a double click cannot slip two in
   const reason = cleanReason(input.reason)
   if (reason === null) throw unprocessable("reason_required")
   const patch: Patch = parsePatch(input.patch)

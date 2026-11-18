@@ -15,6 +15,7 @@ const claim = (w: W, who: Who, shiftId: string) => w.req("POST", `/v1/roster/shi
 const swap = (w: W, who: Who, shiftId: string, toUserId: string, note?: string) => w.req("POST", `/v1/roster/shifts/${shiftId}/swap`, who, { toUserId, ...(note === undefined ? {} : { note }) })
 const decide = (w: W, who: Who, id: string, body: Json) => w.req("POST", `/v1/roster/exchanges/${id}/decide`, who, body)
 const recommend = (w: W, who: Who, id: string) => w.req("POST", `/v1/roster/exchanges/${id}/recommend`, who)
+const decline = (w: W, who: Who, id: string) => w.req("POST", `/v1/roster/exchanges/${id}/decline`, who)
 const cancel = (w: W, who: Who, id: string) => w.req("POST", `/v1/roster/exchanges/${id}/cancel`, who)
 const code = async (r: Response): Promise<[number, string]> => [r.status, ((await r.json()) as Json).code]
 const claimOk = async (w: W, who: Who, shiftId: string, status = 201): Promise<Json> => w.ok("POST", `/v1/roster/shifts/${shiftId}/claim`, who, undefined, status)
@@ -71,10 +72,11 @@ describe("claim (FR-RS-38)", () => {
     expect(await w.rows("select 1 from roster_exchanges where from_user_id = $1", [w.staff2.userId])).toHaveLength(1)
   })
 
-  test("a claim on a draft week is 409 week_not_published; on an assigned shift 409 shift_not_open; on a shift that has started 409 shift_started", async () => {
+  test("a claim on a draft week is 409 for office and the plain 404 for staff; on an assigned shift 409 shift_not_open; on a shift that has started 409 shift_started", async () => {
     const w = await sites()
     const d = await world(w, "draft")
-    expect(await code(await claim(w, w.p.employee, d.open.id))).toEqual([409, "week_not_published"])
+    expect(await code(await claim(w, w.p.owner, d.open.id))).toEqual([409, "week_not_published"]) // an office role sees drafts: the plain conflict
+    expect(await code(await claim(w, w.p.employee, d.open.id))).toEqual([404, "not_found"]) // a member with no edit role does not know a draft exists (AF1)
     await publish(w, d.wk)
     expect(await code(await claim(w, w.staff2, d.tue.id))).toEqual([409, "shift_not_open"])
     await past(w, d.open.id) // the shift has started
@@ -156,7 +158,7 @@ describe("state guards", () => {
 })
 
 describe("two claims on one open shift", () => {
-  test("both are stored; approving one leaves the other 409 shift_taken on approval; a concurrent approve of both has exactly one winner", async () => {
+  test("both are stored; approving one rejects the other in the same transaction (a later decide on it is 409 already_decided)", async () => {
     const w = await sites()
     const { open } = await world(w)
     const c1 = await claimOk(w, w.p.employee, open.id)
@@ -164,9 +166,15 @@ describe("two claims on one open shift", () => {
     expect(await w.rows("select 1 from roster_exchanges")).toHaveLength(2)
     expect((await decide(w, w.p.owner, c1.id, { decision: "approve" })).status).toBe(200)
     expect((await w.rows("select user_id from roster_shifts where id = $1", [open.id]))[0].user_id).toBe(w.p.employee.userId)
-    expect(await code(await decide(w, w.p.owner, c2.id, { decision: "approve" }))).toEqual([409, "shift_taken"])
-    expect((await w.rows("select status from roster_exchanges where id = $1", [c2.id]))[0].status).toBe("requested") // still open: the approver may reject it
-    expect((await decide(w, w.p.owner, c2.id, { decision: "reject" })).status).toBe(200)
+    expect((await w.rows("select status, decided_by from roster_exchanges where id = $1", [c2.id]))[0]).toMatchObject({ status: "rejected", decided_by: w.p.owner.userId }) // AF4: closed in the same transaction
+    expect(await code(await decide(w, w.p.owner, c2.id, { decision: "approve" }))).toEqual([409, "already_decided"])
+    const h = await w.rows("select after, reason from roster_history where action = 'exchange_rejected' and shift_id = $1", [open.id])
+    expect(h).toHaveLength(1)
+    expect(h[0].after).toMatchObject({ exchangeId: c2.id, status: "rejected", autoRejected: true })
+    expect(await w.rows("select 1 from audit_events where action = 'roster.exchange_decided' and entity_id = $1", [c2.id])).toHaveLength(1)
+    const lost = (await notices(w, `user_id = '${w.staff2.userId}'`)).filter((x) => x.title === "Claim rejected")
+    expect(lost).toHaveLength(1)
+    for (const leak of ["Aoife", "Cian", "Alpha", "08:00", w.a]) expect(`${lost[0].title} ${lost[0].body}`.includes(leak), leak).toBe(false)
   })
 
   test("racing approvals: exactly one wins, the shift has one owner", async () => {
@@ -176,9 +184,12 @@ describe("two claims on one open shift", () => {
     const c2 = await claimOk(w, w.staff2, open.id)
     const res = await Promise.all([decide(w, w.p.owner, c1.id, { decision: "approve" }), decide(w, w.p["roster-manager"], c2.id, { decision: "approve" })])
     expect(res.map((r) => r.status).sort()).toEqual([200, 409])
+    const loser = (await Promise.all(res.map(async (r) => ((await r.clone().json()) as Json).code))).find((c) => c === "already_decided" || c === "shift_taken")
+    expect(loser).toBe("already_decided")
     const owner = (await w.rows("select user_id from roster_shifts where id = $1", [open.id]))[0].user_id
     expect([w.p.employee.userId, w.staff2.userId]).toContain(owner)
     expect(await w.rows("select 1 from roster_exchanges where status = 'approved'")).toHaveLength(1)
+    expect(await w.rows("select 1 from roster_exchanges where status = 'rejected'")).toHaveLength(1)
   })
 })
 
@@ -205,15 +216,18 @@ describe("approval (R8-11)", () => {
   test("approver matrix: a supervisor approves on a draft week; on a published week only office, unless the location delegates (then the supervisor too); staff never; nobody approves their own", async () => {
     const w = await sites()
     const sup = w.p["location-supervisor"]
-    // draft week: a swap from the employee (Tuesday) to Cian
+    // draft week: the roster manager (office) owns a Wednesday shift and hands it to Cian; staff cannot even see a draft (AF1)
+    const rm = w.p["roster-manager"]
     const d = await world(w, "draft")
-    const s1 = await swapOk(w, w.p.employee, d.tue.id, w.staff2.userId)
+    const wed = (await w.addOk(w.p.owner, d.wk, [{ date: "2026-11-25", userIds: [rm.userId], shiftTypeId: w.ta }])).shifts[0] as Json
+    expect(await code(await swap(w, w.p.employee, d.tue.id, w.staff2.userId))).toEqual([404, "not_found"])
+    const s1 = await swapOk(w, rm, wed.id, w.staff2.userId)
     expect(await code(await decide(w, w.p.employee, s1.id, { decision: "approve" }))).toEqual([403, "forbidden"]) // staff never
     expect(await code(await decide(w, w.sup2, s1.id, { decision: "approve" }))).toEqual([404, "exchange_not_found"]) // another site's supervisor cannot see it
     expect((await decide(w, sup, s1.id, { decision: "approve" })).status).toBe(200)
     // published week, no delegation: the supervisor is locked out (Review Focus 2), office decides
     await publish(w, d.wk)
-    const s2 = await swapOk(w, w.staff2, d.tue.id, w.p.employee.userId) // Cian now holds Tuesday: hand it back
+    const s2 = await swapOk(w, w.staff2, wed.id, w.p.employee.userId) // Cian now holds Wednesday: hand it to the employee
     const locked = await decide(w, sup, s2.id, { decision: "approve" })
     const lj = (await locked.json()) as Json
     expect([locked.status, lj.code]).toEqual([403, "roster_locked"])
@@ -344,8 +358,8 @@ describe("recommend and cancel", () => {
     expect((await decide(w, w.p.owner, c.id, { decision: "approve" })).status).toBe(200) // a recommended exchange is decided like a requested one
     expect(await code(await recommend(w, sup, c.id))).toEqual([409, "already_decided"])
     // a draft week: the supervisor decides directly, nothing to recommend
-    await w.rows("update roster_weeks set status = 'draft' where id = $1", [wk])
     const s = await swapOk(w, w.p.employee, tue.id, w.staff2.userId)
+    await w.rows("update roster_weeks set status = 'draft' where id = $1", [wk])
     expect(await code(await recommend(w, sup, s.id))).toEqual([409, "week_not_published"])
   })
 
@@ -589,5 +603,146 @@ describe("who may do what", () => {
     await decide(w, w.p.owner, c.id, { decision: "maybe" })
     await cancel(w, w.staff2, c.id)
     expect(await counts()).toEqual(before)
+  })
+})
+
+describe("round 1: drafts are not leaked (AF1)", () => {
+  test("a staff swap or claim on a DRAFT week is the plain 404, stores nothing and tells nobody; the office path is unchanged and tells nobody person-facing", async () => {
+    const w = await sites()
+    const rm = w.p["roster-manager"]
+    const d = await world(w, "draft")
+    const miss = async (r: Response) => strip(r, await r.text())
+    const gone = await miss(await claim(w, w.p.employee, "00000000-0000-4000-8000-000000000000"))
+    expect(await miss(await claim(w, w.p.employee, d.open.id))).toEqual(gone)
+    expect(await miss(await swap(w, w.p.employee, d.tue.id, w.staff2.userId))).toEqual(gone)
+    expect(await w.rows("select 1 from roster_exchanges")).toHaveLength(0)
+    expect(await notices(w)).toEqual([])
+    // office: an office-level owner of a draft shift may hand it over; approvers hear, the colleague does not (a draft edit tells nobody)
+    const wed = (await w.addOk(w.p.owner, d.wk, [{ date: "2026-11-25", userIds: [rm.userId], shiftTypeId: w.ta }])).shifts[0] as Json
+    await w.rows("delete from notifications")
+    const s = await swapOk(w, rm, wed.id, w.staff2.userId)
+    expect((await notices(w)).map((x) => x.user_id)).not.toContain(w.staff2.userId)
+    expect((await notices(w)).map((x) => x.user_id)).toContain(w.p.owner.userId)
+    await w.rows("delete from notifications")
+    expect((await decide(w, w.p["location-supervisor"], s.id, { decision: "approve" })).status).toBe(200)
+    expect(await notices(w)).toEqual([]) // nobody person-facing is told of a decision on a draft
+  })
+})
+
+describe("round 1: decline and throttle (AF2)", () => {
+  test("the swap colleague may decline: rejected, the requester hears (generic), nobody else may decline, a closed one is 409", async () => {
+    const w = await sites()
+    const { tue } = await world(w)
+    const s = await swapOk(w, w.p.employee, tue.id, w.staff2.userId)
+    await w.rows("delete from notifications")
+    expect(await code(await decline(w, w.p.employee, s.id))).toEqual([403, "forbidden"]) // the requester cancels, they do not decline
+    expect(await code(await decline(w, w.p["location-supervisor"], s.id))).toEqual([403, "forbidden"])
+    expect(await code(await decline(w, w.staff3, s.id))).toEqual([404, "exchange_not_found"])
+    expect(await code(await decline(w, w.staff2, "not-a-uuid"))).toEqual([404, "exchange_not_found"])
+    const out = await w.ok("POST", `/v1/roster/exchanges/${s.id}/decline`, w.staff2, undefined)
+    expect(out).toMatchObject({ status: "rejected", decidedBy: w.staff2.userId })
+    expect((await notices(w)).map((x) => [x.user_id, x.title])).toEqual([[w.p.employee.userId, "Swap declined"]])
+    expect(await w.rows("select 1 from roster_history where action = 'exchange_declined' and shift_id = $1", [tue.id])).toHaveLength(1)
+    expect(await w.rows("select 1 from audit_events where action = 'roster.exchange_declined' and entity_id = $1", [s.id])).toHaveLength(1)
+    expect(await code(await decline(w, w.staff2, s.id))).toEqual([409, "already_decided"])
+    expect(await code(await decide(w, w.p.owner, s.id, { decision: "approve" }))).toEqual([409, "already_decided"])
+    expect((await w.rows("select user_id from roster_shifts where id = $1", [tue.id]))[0].user_id).toBe(w.p.employee.userId)
+  })
+
+  test("at most 5 open exchanges per requester (409 too_many_open); a 1 hour cooldown before the same swap is proposed again after a cancel or a decline (409 cooldown)", async () => {
+    const w = await sites()
+    const { tue } = await world(w)
+    const wk = (await w.rows("select id from roster_weeks where week_start = $1 and location_id = $2", [WK, w.a]))[0].id as string
+    // cooldown: cancel, then propose again at once
+    const first = await swapOk(w, w.p.employee, tue.id, w.staff2.userId)
+    await w.ok("POST", `/v1/roster/exchanges/${first.id}/cancel`, w.p.employee, undefined)
+    expect(await code(await swap(w, w.p.employee, tue.id, w.staff2.userId))).toEqual([409, "cooldown"])
+    expect(await w.rows("select 1 from roster_exchanges")).toHaveLength(1)
+    const before = (await w.rows("select 1 from notifications")).length
+    await swap(w, w.p.employee, tue.id, w.staff2.userId)
+    expect((await w.rows("select 1 from notifications")).length).toBe(before)
+    // a different colleague is not throttled by it; the hour passes and the same one may be asked again
+    w.clock.advance({ minutes: 61 })
+    expect((await swap(w, w.p.employee, tue.id, w.staff2.userId)).status).toBe(201)
+    // a decline starts the cooldown too
+    const [open] = await w.rows("select id from roster_exchanges where status = 'requested'")
+    await w.ok("POST", `/v1/roster/exchanges/${open.id}/decline`, w.staff2, undefined)
+    expect(await code(await swap(w, w.p.employee, tue.id, w.staff2.userId))).toEqual([409, "cooldown"])
+    // the open-exchange cap: five open claims are fine, the sixth is too many
+    await w.rows("update roster_weeks set status = 'draft' where id = $1", [wk])
+    const many = (await w.addOk(w.p.owner, wk, [{ date: "2026-11-26", userIds: [null, null, null, null, null, null], shiftTypeId: w.ta }])).shifts as Json[]
+    await w.rows("update roster_weeks set status = 'published' where id = $1", [wk])
+    for (const s of many.slice(0, 5)) expect((await claim(w, w.staff2, s.id)).status).toBe(201)
+    expect(await code(await claim(w, w.staff2, many[5].id))).toEqual([409, "too_many_open"])
+    // a decided one frees a slot
+    const [one] = await w.rows("select id from roster_exchanges where from_user_id = $1 and status = 'requested' limit 1", [w.staff2.userId])
+    await w.ok("POST", `/v1/roster/exchanges/${one.id}/cancel`, w.staff2, undefined)
+    expect((await claim(w, w.staff2, many[5].id)).status).toBe(201)
+  })
+})
+
+describe("round 1: swap cap and draft decline", () => {
+  test("six swaps by one person: the sixth is 409 too_many_open (swaps count towards the cap too)", async () => {
+    const w = await sites()
+    const { wk } = await world(w)
+    await w.rows("update roster_weeks set status = 'draft' where id = $1", [wk])
+    const mine = (await w.addOk(w.p.owner, wk, [{ date: "2026-11-27", userIds: [w.p.employee.userId], shiftTypeId: w.ta }, { date: "2026-11-28", userIds: [w.p.employee.userId], shiftTypeId: w.ta }, { date: "2026-11-29", userIds: [w.p.employee.userId], shiftTypeId: w.ta }, { date: "2026-11-25", userIds: [w.p.employee.userId], shiftTypeId: w.ta }, { date: "2026-11-26", userIds: [w.p.employee.userId], shiftTypeId: w.ta }])).shifts as Json[]
+    await w.rows("update roster_weeks set status = 'published' where id = $1", [wk])
+    const tue = (await w.rows("select id from roster_shifts where user_id = $1 and date = '2026-11-24'", [w.p.employee.userId]))[0].id as string
+    for (const id of [...mine.map((s) => s.id), tue].slice(0, 5)) expect((await swap(w, w.p.employee, id, w.staff2.userId)).status).toBe(201)
+    expect(await code(await swap(w, w.p.employee, [...mine.map((s) => s.id), tue][5], w.staff2.userId))).toEqual([409, "too_many_open"])
+  })
+
+  test("the colleague of a swap on a DRAFT week (offered by an office owner) cannot see it to decline: the plain 404", async () => {
+    const w = await sites()
+    const rm = w.p["roster-manager"]
+    const d = await world(w, "draft")
+    const wed = (await w.addOk(w.p.owner, d.wk, [{ date: "2026-11-25", userIds: [rm.userId], shiftTypeId: w.ta }])).shifts[0] as Json
+    const s = await swapOk(w, rm, wed.id, w.staff2.userId)
+    expect(await code(await decline(w, w.staff2, s.id))).toEqual([404, "exchange_not_found"])
+    expect((await w.rows("select status from roster_exchanges where id = $1", [s.id]))[0].status).toBe("requested")
+  })
+})
+
+describe("round 1: open-shift audience is filtered before the cap (AF3)", () => {
+  test("with more than 500 located people only the last ones qualified, the qualified are still told", async () => {
+    const w = await sites()
+    const armed = await w.type(w.a, "Armed", { start: "18:00", end: "22:00", requires: ["firearms"] })
+    await world(w)
+    const wk = (await w.rows("select id from roster_weeks where week_start = $1 and location_id = $2", [WK, w.a]))[0].id as string
+    const role = (await w.rows("select role_id from memberships where user_id = $1", [w.p.employee.userId]))[0].role_id
+    await w.rows(`insert into "user" (id, name, email, email_verified, created_at, updated_at) select 'zbulk' || lpad(i::text, 4, '0'), 'Bulk ' || i, 'bulk' || i || '@x.ie', true, now(), now() from generate_series(1, 520) i`)
+    await w.rows(`insert into memberships (tenant_id, user_id, role_id, status, joined_at, home_location_id) select $1::uuid, 'zbulk' || lpad(i::text, 4, '0'), $2::uuid, 'active', now(), $3::uuid from generate_series(1, 520) i`, [w.tenant.id, role, w.a])
+    await w.rows(`insert into member_qualifications (tenant_id, user_id, type, expires_on, created_at, updated_at) select $1::uuid, 'zbulk' || lpad(i::text, 4, '0'), 'firearms', null, now(), now() from generate_series(517, 520) i`, [w.tenant.id])
+    await w.rows("delete from notifications")
+    await w.addOk(w.p.owner, wk, [{ date: "2026-11-28", userIds: [null], shiftTypeId: armed }], { reason: "Cover needed" })
+    const told = (await notices(w, "title = 'Open shift available'")).map((x) => x.user_id).sort()
+    expect(told).toEqual(["zbulk0517", "zbulk0518", "zbulk0519", "zbulk0520"])
+  }, 60_000)
+})
+
+describe("round 1: gaps (AF6)", () => {
+  test("a swap whose colleague was erased (no toUserId) is 409 shift_changed at approval", async () => {
+    const w = await sites()
+    const { tue } = await world(w)
+    const s = await swapOk(w, w.p.employee, tue.id, w.staff2.userId)
+    await w.rows("update roster_exchanges set to_user_id = null where id = $1", [s.id])
+    expect(await code(await decide(w, w.p.owner, s.id, { decision: "approve" }))).toEqual([409, "shift_changed"])
+  })
+
+  test("the colleague of a swap cannot cancel it (403); the requester can cancel after the shift started", async () => {
+    const w = await sites()
+    const { tue } = await world(w)
+    const s = await swapOk(w, w.p.employee, tue.id, w.staff2.userId)
+    expect(await code(await cancel(w, w.staff2, s.id))).toEqual([403, "forbidden"])
+    await past(w, tue.id)
+    expect((await w.ok("POST", `/v1/roster/exchanges/${s.id}/cancel`, w.p.employee, undefined)).status).toBe("cancelled")
+  })
+
+  test("list bounds: limit 0, 101 and non-numeric are 422 invalid_filter, a garbage cursor is 400 invalid_cursor", async () => {
+    const w = await sites()
+    await world(w)
+    for (const limit of ["0", "101", "abc", "-1"]) expect(await code(await w.req("GET", `/v1/roster/exchanges?limit=${limit}`, w.p.owner))).toEqual([422, "invalid_filter"])
+    expect(await code(await w.req("GET", "/v1/roster/exchanges?cursor=zz", w.p.owner))).toEqual([400, "invalid_cursor"])
   })
 })

@@ -96,6 +96,7 @@ export const AUDIT_ACTIONS: Record<string, Info> = {
   "roster.exchange_requested": { label: "Shift claim or swap requested", tone: "info" },
   "roster.exchange_recommended": { label: "Shift exchange recommended", tone: "mute" },
   "roster.exchange_decided": { label: "Shift claim or swap decided", tone: "info" },
+  "roster.exchange_declined": { label: "Shift swap declined by the colleague", tone: "mute" },
   "roster.exchange_cancelled": { label: "Shift claim or swap withdrawn", tone: "mute" },
   "roster.rules_changed": { label: "Roster rules changed", tone: "warn", sensitive: S },
   "shift.pattern_created": { label: "Shift pattern added", tone: "mute" },

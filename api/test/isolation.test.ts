@@ -200,6 +200,7 @@ const SPECS: Record<string, Spec> = {
   "POST /v1/roster/exchanges/{id}/recommend": { actor: "owner", expect: "exchange_not_found" },
   "POST /v1/roster/exchanges/{id}/decide": { actor: "owner", expect: "exchange_not_found" },
   "POST /v1/roster/exchanges/{id}/cancel": { actor: "owner", expect: "exchange_not_found" },
+  "POST /v1/roster/exchanges/{id}/decline": { actor: "owner", expect: "exchange_not_found" }, // control: 403 forbidden, the owner is the requester, not the colleague (cancel: 409 already_decided, the fixture claim is withdrawn)
   "PATCH /v1/task-templates/{id}": { actor: "owner", expect: "template_not_found" },
   "DELETE /v1/task-templates/{id}": { actor: "owner", expect: "template_not_found" },
   // T5.1: shift patterns (control: PATCH 200, DELETE 204), assignments (control: PATCH 200 with an end date after the fixture's start, DELETE 204 for the future one),

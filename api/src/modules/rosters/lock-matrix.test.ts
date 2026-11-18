@@ -44,7 +44,7 @@ const EXPECT: Record<Action, Record<Role, [number, number | null, number | null]
   publish: { supervisor: [200, 409, null], office: [200, 409, null], manager: [403, 403, null], staff: [403, 403, null] },
   confirm: { supervisor: [403, 403, null], office: [403, 403, null], manager: [403, 403, null], staff: [409, 200, null] },
   check: { supervisor: [200, 200, null], office: [200, 200, null], manager: [403, 403, null], staff: [403, 403, null] },
-  claim: { supervisor: [409, 409, null], office: [409, 409, null], manager: [409, 409, null], staff: [409, 409, null] }, // the cell's shift is assigned (not open), or the week is a draft: a claim is never accepted here
+  claim: { supervisor: [409, 409, null], office: [409, 409, null], manager: [404, 409, null], staff: [404, 409, null] }, // staff do not know a draft week exists (AF1); the cell's shift is assigned (not open), or the week is a draft: a claim is never accepted here
   swap: { supervisor: [403, 403, null], office: [403, 403, null], manager: [403, 403, null], staff: [404, 404, null] }, // only the person on the shift may hand it over, and only to a colleague they know
   changeRequest: { supervisor: [409, 422, 201], office: [409, 422, 201], manager: [403, 403, 403], staff: [403, 403, 403] }, // a draft week is edited directly; a request always needs its reason
 }

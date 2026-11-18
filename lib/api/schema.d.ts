@@ -10643,7 +10643,7 @@ export interface paths {
                 };
             };
             responses: {
-                /** @description A request for a change to a shift of a PUBLISHED week (a supervisor of the site or an office role); the patch takes the same keys as a shift edit, never a week. Office is told. 404 not_found for a week or shift of a site the caller may not see, a missing or another tenant's one and an id that is not a uuid (all the same answer); 409 use_direct_edit (the week is a draft: edit it) | location_archived; 422 reason_required (missing or blank) | invalid_patch | cannot_move_week | invalid_shift | invalid_shift_type | invalid_reason */
+                /** @description A request for a change to a shift of a PUBLISHED week (a supervisor of the site or an office role); the patch takes the same keys as a shift edit, never a week. Office is told. 404 not_found for a week or shift of a site the caller may not see, a missing or another tenant's one and an id that is not a uuid (all the same answer); 409 use_direct_edit (the week is a draft: edit it) | location_archived | request_open (the shift already has an open request); 422 reason_required (missing or blank) | invalid_patch | cannot_move_week | invalid_shift | invalid_shift_type | invalid_reason */
                 201: {
                     headers: {
                         [name: string]: unknown;
@@ -10919,7 +10919,7 @@ export interface paths {
                         };
                     };
                 };
-                /** @description The caller asks for an OPEN shift of a published, upcoming week at a site they are located at (homed there or rostered there that week); approvers are told. The same open claim again is the same exchange with 200. 404 not_found for a week or shift of a site the caller may not see, a missing or another tenant's one and an id that is not a uuid (all the same answer) (also for a shift of a site the caller is not located at); 409 week_not_published | shift_not_open | shift_started | location_archived; 422 ineligible (left, a required qualification missing or expired) */
+                /** @description The caller asks for an OPEN shift of a published, upcoming week at a site they are located at (homed there or rostered there that week); approvers are told. The same open claim again is the same exchange with 200. 404 not_found for a week or shift of a site the caller may not see, a missing or another tenant's one and an id that is not a uuid (all the same answer) (also for a shift of a site the caller is not located at); 409 week_not_published (office roles; a member with no edit role gets the plain 404 for a draft week) | shift_not_open | shift_started | location_archived | too_many_open (5 open exchanges per person); 422 ineligible (left, a required qualification missing or expired) */
                 201: {
                     headers: {
                         [name: string]: unknown;
@@ -11018,7 +11018,7 @@ export interface paths {
                         };
                     };
                 };
-                /** @description The person on the shift hands it over to a named colleague (homed at the shift's site, rostered there that week, or within the caller's scope); the colleague and the approvers are told. Someone else who can see the shift: 403 forbidden. 404 not_found for a week or shift of a site the caller may not see, a missing or another tenant's one and an id that is not a uuid (all the same answer); 404 member_not_found (the colleague does not exist, is another tenant's or of a site the caller does not know: one answer); 409 exchange_open (another open swap of the shift) | shift_started | location_archived; 422 invalid_swap (yourself) | invalid_note | ineligible (generic for a person the caller may not know) */
+                /** @description The person on the shift hands it over to a named colleague (homed at the shift's site, rostered there that week, or within the caller's scope); the colleague and the approvers are told. Someone else who can see the shift: 403 forbidden. 404 not_found for a week or shift of a site the caller may not see, a missing or another tenant's one and an id that is not a uuid (all the same answer); 404 member_not_found (the colleague does not exist, is another tenant's or of a site the caller does not know: one answer); 404 not_found also for a member with no edit role on a DRAFT week; 409 exchange_open (another open swap of the shift) | shift_started | location_archived | too_many_open | cooldown (the same colleague again within an hour of a cancel or a refusal); 422 invalid_swap (yourself) | invalid_note | ineligible (generic for a person the caller may not know) */
                 201: {
                     headers: {
                         [name: string]: unknown;
@@ -11279,6 +11279,66 @@ export interface paths {
                                 message: string;
                                 otherShiftIds: string[];
                             }[];
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/roster/exchanges/{id}/decline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The colleague a swap is offered to refuses it: the exchange is rejected and the requester is told. Anyone else who can see it (the requester cancels instead): 403 forbidden. 404 exchange_not_found for an exchange of a site the caller may not see, a missing or another tenant's one and an id that is not a uuid (all the same answer); 409 already_decided */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** Format: uuid */
+                            id: string;
+                            /** @enum {string} */
+                            kind: "claim" | "swap";
+                            /** Format: uuid */
+                            shiftId: string;
+                            /** Format: uuid */
+                            weekId: string;
+                            /** Format: uuid */
+                            locationId: string;
+                            date: string;
+                            start: string;
+                            end: string;
+                            fromUserId: string;
+                            toUserId: string | null;
+                            /** @enum {string} */
+                            status: "requested" | "recommended" | "approved" | "rejected" | "cancelled";
+                            note: string;
+                            decidedBy: string | null;
+                            decidedAt: string | null;
+                            createdAt: string;
+                            expired: boolean;
                         };
                     };
                 };
