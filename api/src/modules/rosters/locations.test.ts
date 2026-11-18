@@ -302,14 +302,15 @@ describe("shift types and targets (FR-RS-30..33)", () => {
     const w = await world()
     const loc = await w.mk(w.p.owner, "Alpha")
     const t1 = await w.mkType(loc.id, "A", { requires: [" SIA licence ", "SIA licence", "First aid", "First aid  "] })
-    expect(t1.requires).toEqual(["SIA licence", "First aid"])
-    const twenty = Array.from({ length: 20 }, (_, i) => `Q${i}`)
+    expect(t1.requires).toEqual(["sia licence", "first aid"]) // keys are canonical lower case: 'First aid' and 'first AID' are one key (Task 8 eligibility compares equal)
+    expect((await w.mkType(loc.id, "A2", { requires: ["First Aid", "first aid", "FIRST AID"] })).requires).toEqual(["first aid"])
+    const twenty = Array.from({ length: 20 }, (_, i) => `q${i}`)
     expect((await w.mkType(loc.id, "B", { requires: [...twenty, ...twenty] })).requires).toEqual(twenty) // duplicates collapse first, 20 is fine
-    expect(await w.code("POST", `/v1/locations/${loc.id}/shift-types`, w.p.owner, { name: "C", start: "07:00", end: "15:00", role: "G", requires: [...twenty, "Q20"] }, 422)).toBe("invalid_shift_type")
+    expect(await w.code("POST", `/v1/locations/${loc.id}/shift-types`, w.p.owner, { name: "C", start: "07:00", end: "15:00", role: "G", requires: [...twenty, "q20"] }, 422)).toBe("invalid_shift_type")
     expect(await w.code("POST", `/v1/locations/${loc.id}/shift-types`, w.p.owner, { name: "D", start: "07:00", end: "15:00", role: "G", requires: ["ok", "   "] }, 422)).toBe("invalid_shift_type")
     expect(await w.code("POST", `/v1/locations/${loc.id}/shift-types`, w.p.owner, { name: "E", start: "07:00", end: "15:00", role: "G", requires: ["x".repeat(81)] }, 422)).toBe("invalid_shift_type")
     expect((await w.ok("PATCH", `/v1/shift-types/${t1.id}`, w.p.owner, { version: 1, requires: [] })).requires).toEqual([])
-    expect(normaliseRequires(["b", " a", "b", "a "])).toEqual(["b", "a"])
+    expect(normaliseRequires(["b", " a", "B", "a "])).toEqual(["b", "a"])
   })
 
   test("targets: a per-weekday count replaces the whole set; duplicates, a bad weekday or count 100 are 422; an unchanged set bumps nothing", async () => {

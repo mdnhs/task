@@ -227,7 +227,7 @@ export async function setSupervisors(tx: TenantTx, ctx: RosterCtx, env: RosterEn
       .for("share")
     if (active.length !== next.length) throw unprocessable("invalid_supervisor")
   }
-  const old = (await tx.select({ userId: locationSupervisors.userId }).from(locationSupervisors).where(and(eq(locationSupervisors.tenantId, ctx.tenantId), eq(locationSupervisors.locationId, loc.id))).orderBy(asc(locationSupervisors.userId)).for("update")).map((r) => r.userId)
+  const old = (await tx.select({ userId: locationSupervisors.userId }).from(locationSupervisors).where(and(eq(locationSupervisors.tenantId, ctx.tenantId), eq(locationSupervisors.locationId, loc.id))).orderBy(asc(locationSupervisors.userId)).for("update")).map((r) => r.userId).sort() // JS order like `next` (the DB collation may order mixed-case ids differently)
   const added = next.filter((u) => !old.includes(u))
   const removed = old.filter((u) => !next.includes(u))
   if (added.length === 0 && removed.length === 0) return { locationId: loc.id, userIds: next }
@@ -268,11 +268,14 @@ async function loadType(tx: TenantTx, ctx: RosterCtx, id: string, lock: boolean)
 }
 
 type TypeInput = Partial<{ name: string; start: string; end: string; unpaidBreakMin: number; role: string; requires: string[] }>
-/** Trimmed free-text qualification keys, deduplicated in first-seen order, at most 20 (FR-RS-04: the same text `member_qualifications.type` holds). */
+/** The canonical qualification key: trimmed and lower case, so 'First Aid' and 'first aid' are ONE key wherever it is written or compared (shift type `requires`, `member_qualifications.type`). */
+export const qualificationKey = (raw: string): string => raw.trim().toLowerCase()
+
+/** Canonical (trimmed, lower-case) free-text qualification keys, deduplicated in first-seen order, at most 20 (FR-RS-04: the same text `member_qualifications.type` holds). */
 export function normaliseRequires(v: string[]): string[] {
   const out: string[] = []
   for (const raw of v) {
-    const s = raw.trim()
+    const s = qualificationKey(raw)
     if (s.length < 1 || s.length > 80 || CTRL.test(s)) throw unprocessable("invalid_shift_type")
     if (!out.includes(s)) out.push(s)
   }

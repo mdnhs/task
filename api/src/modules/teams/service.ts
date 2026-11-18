@@ -209,9 +209,9 @@ export type PersonDto = { userId: string; name: string; email: string; roleKey: 
 
 /**
  * People in the caller's scope. `status` is "active" (the default: pickers and assignees never see a deactivated person), "deactivated" or "all" (Settings -> Users,
- * which the route allows only to a caller who can read settings). `lastActiveAt` is the member's last authenticated request (stamped at most every 5 minutes), null when never seen.
+ * which the route allows only to a caller who can read settings). `lastActiveAt` is the member's last authenticated request (stamped at most every 5 minutes), null when never seen; `showActivity` (the caller can read settings) gates it: anyone else gets null for everyone.
  */
-export async function listPeople(tx: TenantTx, tenantId: string, scope: Scope, meId: string, status: PersonStatus | "all" = "active"): Promise<PersonDto[]> {
+export async function listPeople(tx: TenantTx, tenantId: string, scope: Scope, meId: string, status: PersonStatus | "all" = "active", showActivity = false): Promise<PersonDto[]> {
   const conds = [eq(memberships.tenantId, tenantId)]
   if (status !== "all") conds.push(eq(memberships.status, status))
   if (scope === "own") conds.push(eq(memberships.userId, meId))
@@ -224,5 +224,5 @@ export async function listPeople(tx: TenantTx, tenantId: string, scope: Scope, m
     .leftJoin(reportingLines, and(eq(reportingLines.tenantId, memberships.tenantId), eq(reportingLines.userId, memberships.userId)))
     .where(and(...conds))
     .orderBy(asc(user.name), asc(memberships.userId))
-  return rows.map((r) => ({ ...r, status: r.status === "deactivated" ? "deactivated" : "active", lastActiveAt: r.lastActiveAt ? r.lastActiveAt.toISOString() : null }))
+  return rows.map((r) => ({ ...r, status: r.status === "deactivated" ? "deactivated" : "active", lastActiveAt: showActivity && r.lastActiveAt ? r.lastActiveAt.toISOString() : null }))
 }

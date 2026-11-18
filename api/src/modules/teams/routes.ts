@@ -57,7 +57,7 @@ const managerRoute = createRoute({
 const peopleRoute = createRoute({
   method: "get", path: "/v1/people", middleware: [requireTenant, requireModule("M1"), requirePermission("reports", "read")] as const,
   request: { query: z.object({ scope: z.enum(["own", "team", "all"]).optional(), status: z.enum(["active", "deactivated", "all"]).optional().openapi({ description: "Default active. deactivated and all need settings:read (Settings -> Users); anyone else gets 403 forbidden", example: "active" }) }) },
-  responses: { 200: { description: "People in the caller's report scope with their status (active | deactivated) and lastActiveAt (the last authenticated request, stamped at most every 5 minutes; null = never seen)", content: { "application/json": { schema: z.array(PersonDto) } } } },
+  responses: { 200: { description: "People in the caller's report scope with their status (active | deactivated) and lastActiveAt (the last authenticated request, stamped at most every 5 minutes; null = never seen, and null for every person unless the caller can read settings)", content: { "application/json": { schema: z.array(PersonDto) } } } },
 })
 
 export const teamRoutes = newRouter()
@@ -107,7 +107,7 @@ export const teamRoutes = newRouter()
       if (scope === "forbidden") throw Forbidden("forbidden")
       const status = c.req.valid("query").status ?? "active"
       if (status !== "active" && !can(role, "settings", "read")) throw Forbidden("forbidden") // deactivated people are an admin view
-      return listPeople(tx, t.id, scope, me, status)
+      return listPeople(tx, t.id, scope, me, status, can(role, "settings", "read"))
     })
     return c.json(rows, 200)
   })

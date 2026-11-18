@@ -1034,7 +1034,7 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description People in the caller's report scope with their status (active | deactivated) and lastActiveAt (the last authenticated request, stamped at most every 5 minutes; null = never seen) */
+                /** @description People in the caller's report scope with their status (active | deactivated) and lastActiveAt (the last authenticated request, stamped at most every 5 minutes; null = never seen, and null for every person unless the caller can read settings) */
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -9490,7 +9490,7 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description The member is deactivated (owner or admin: settings write): they cannot reach the workspace, keep their history and shifts, their open shift assignments end today and their pending roster requests are closed. Sessions are revoked when this was their last workspace. 404 member_not_found; 403 role_escalation (acting on a role above yours); 409 already_deactivated; 422 last_owner | self_deactivation */
+                /** @description The member is deactivated (owner or admin: settings write): they cannot reach the workspace, keep their history and shifts, their open shift assignments end today and their pending roster requests are closed. Sessions are revoked when this was their last workspace. 404 member_not_found; 403 role_escalation (acting on a role above yours); 409 already_deactivated | last_owner (the last active owner, as the role-change and erasure guards); 422 self_deactivation */
                 200: {
                     headers: {
                         [name: string]: unknown;

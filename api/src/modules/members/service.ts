@@ -1,4 +1,4 @@
-import { and, asc, count, eq, gt, inArray, isNull, lte, or } from "drizzle-orm"
+import { and, asc, count, eq, gt, inArray, isNull, lte, or, sql } from "drizzle-orm"
 import { epochToWall } from "@opsdesk/domain/shifts"
 import { AppError, Conflict, Forbidden, NotFound } from "../../core/errors"
 import { publish } from "../../core/events"
@@ -12,7 +12,7 @@ import { recordAudit } from "../audit"
 import { assertSeatAvailable } from "../entitlements"
 import { notify, SUBJECT_TOKEN, type Enqueue } from "../notifications"
 import { assertNoEscalation, lockActor, lockRbac } from "../rbac"
-import { lockRoster, writeHistory } from "../rosters"
+import { ROSTER_LOCK_TIMEOUT_MS, lockRoster, writeHistory } from "../rosters"
 import { lockShifts } from "../shifts"
 
 type Actor = { userId: string }
@@ -48,6 +48,8 @@ async function lockedTarget(tx: TenantTx, tenantId: string, userId: string) {
 export async function deactivateMember(tx: TenantTx, env: LifecycleEnv, tenant: { id: string; tz: string }, actor: Actor, userId: string): Promise<MemberStatusDto> {
   humanActorOnly(actor)
   const tenantId = tenant.id
+  // the same 5 s bound as every roster writer, set BEFORE the first advisory lock: a stuck RBAC, shift or roster writer is a 55P03 -> 409 retry, never a hang
+  await tx.execute(sql.raw(`set local lock_timeout = ${ROSTER_LOCK_TIMEOUT_MS}`))
   await lockRbac(tx, tenantId)
   await lockShifts(tx, tenantId)
   await lockRoster(tx, tenantId)
@@ -64,7 +66,7 @@ export async function deactivateMember(tx: TenantTx, env: LifecycleEnv, tenant: 
       .where(and(eq(memberships.tenantId, tenantId), eq(memberships.status, "active"), eq(roles.key, "owner")))
       .orderBy(memberships.userId)
       .for("update", { of: memberships })
-    if (owners.length <= 1) throw new AppError(422, "last_owner", "Unprocessable Entity")
+    if (owners.length <= 1) throw Conflict("last_owner") // 409 like the role-change and erasure guards
   }
   if (userId === actor.userId) throw new AppError(422, "self_deactivation", "Unprocessable Entity")
   assertNoEscalation(me, m.access as Record<string, string>) // never act on someone who outranks you (R24)

@@ -2,6 +2,7 @@ import { and, asc, eq } from "drizzle-orm"
 import { epochToWall } from "@opsdesk/domain/shifts"
 import { AppError } from "../../core/errors"
 import { memberQualifications } from "../../db/schema"
+import { qualificationKey } from "./locations"
 import type { TenantTx } from "../../db/tenant-tx"
 import type { QualificationsDto } from "./dto"
 import { reachablePerson } from "./people"
@@ -41,7 +42,7 @@ export async function setQualifications(tx: TenantTx, ctx: RosterCtx, userId: st
   await reachablePerson(tx, ctx, userId, { lock: "share" })
   const next = new Map<string, string | null>()
   for (const q of input) {
-    const type = q.type.trim()
+    const type = qualificationKey(q.type)
     const exp = q.expiresOn ?? null
     if (type.length < 1 || type.length > 80 || /[\u0000-\u001f\u007f]/.test(type) || next.has(type) || (exp !== null && !realDate(exp))) throw unprocessable("invalid_qualification")
     next.set(type, exp)

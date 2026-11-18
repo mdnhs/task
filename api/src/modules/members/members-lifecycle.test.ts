@@ -1,11 +1,11 @@
 import { randomUUID } from "node:crypto"
 import { readFileSync } from "node:fs"
 import pg from "pg"
-import { afterAll, beforeEach, describe, expect, test } from "vitest"
+import { afterAll, beforeEach, describe, expect, test, vi } from "vitest"
 import { ownerQuery, ownerTenantQuery } from "../../../test/db"
 import { makeMember, makeTenant, signIn } from "../../../test/factories"
 import { call, resetDb, testApp } from "../../../test/harness"
-import { flushLastActive } from "../../core/middleware/last-active"
+import { flushLastActive, touchLastActive } from "../../core/middleware/last-active"
 
 // B8 Task 6: member deactivate / reactivate, last active, GET /v1/people status (the API behind Settings -> Users).
 
@@ -94,11 +94,11 @@ describe("deactivate and reactivate", () => {
     expect((await call(w.app, "GET", "/v1/people", { cookie: ck, tenant: "other" })).status).not.toBe(404)
   })
 
-  test("the last active owner cannot be deactivated (422 last_owner); guards on who may deactivate whom", async () => {
+  test("the last active owner cannot be deactivated (409 last_owner); guards on who may deactivate whom", async () => {
     const w = await world()
-    // the sole owner, by themself or by an admin: last_owner (the explicit answer comes first)
-    expect(await w.code("POST", `/v1/members/${w.p.owner.userId}/deactivate`, w.p.owner, undefined, 422)).toBe("last_owner")
-    expect(await w.code("POST", `/v1/members/${w.p.owner.userId}/deactivate`, w.p.admin, undefined, 422)).toBe("last_owner")
+    // the sole owner, by themself or by an admin: 409 last_owner (the explicit answer comes first)
+    expect(await w.code("POST", `/v1/members/${w.p.owner.userId}/deactivate`, w.p.owner, undefined, 409)).toBe("last_owner")
+    expect(await w.code("POST", `/v1/members/${w.p.owner.userId}/deactivate`, w.p.admin, undefined, 409)).toBe("last_owner")
     expect((await w.rows("select status from memberships where user_id = $1", [w.p.owner.userId]))[0].status).toBe("active")
     // with a second owner: an admin may not touch an owner (R24), an owner cannot deactivate themself, one owner may deactivate the other
     const owner2 = await makeMember(w.deps, w.tenant.id, "owner")
@@ -106,7 +106,7 @@ describe("deactivate and reactivate", () => {
     expect(await w.code("POST", `/v1/members/${w.p.owner.userId}/deactivate`, w.p.owner, undefined, 422)).toBe("self_deactivation")
     await w.ok("POST", `/v1/members/${owner2.userId}/deactivate`, w.p.owner)
     // ... and now the first owner is the last one again
-    expect(await w.code("POST", `/v1/members/${w.p.owner.userId}/deactivate`, w.p.admin, undefined, 422)).toBe("last_owner")
+    expect(await w.code("POST", `/v1/members/${w.p.owner.userId}/deactivate`, w.p.admin, undefined, 409)).toBe("last_owner")
     // a reactivated owner counts again
     await w.ok("POST", `/v1/members/${owner2.userId}/reactivate`, w.p.owner)
     await w.ok("POST", `/v1/members/${w.p.owner.userId}/deactivate`, owner2)
@@ -118,7 +118,7 @@ describe("deactivate and reactivate", () => {
     const [x, y] = await Promise.all([w.req("POST", `/v1/members/${owner2.userId}/deactivate`, w.p.owner), w.req("POST", `/v1/members/${w.p.owner.userId}/deactivate`, owner2)])
     const statuses = [x.status, y.status].sort()
     expect(statuses[0]).toBe(200) // exactly one wins
-    expect(statuses[1]).not.toBe(200) // the loser: 401 (their session was revoked), 404 or 422 last_owner, never a second success
+    expect(statuses[1]).not.toBe(200) // the loser: 401 (their session was revoked), 404 or 409 last_owner, never a second success
     const active = await w.rows("select user_id from memberships m join roles r on r.id = m.role_id where m.status = 'active' and r.key = 'owner'")
     expect(active).toHaveLength(1)
   })
@@ -248,6 +248,71 @@ describe("last active", () => {
     expect((await w.req("GET", "/v1/people", rep)).status).toBe(200)
     for (const q of ["status=all", "status=deactivated"]) expect((await w.req("GET", `/v1/people?${q}`, rep)).status, q).toBe(403)
     expect((await w.req("GET", "/v1/people?status=bogus", w.p.owner)).status).toBe(400)
+  })
+})
+
+describe("deactivation lock timeout (minor 1)", () => {
+  const pool = new pg.Pool({ connectionString: process.env.TEST_DATABASE_URL, max: 2 })
+  afterAll(() => pool.end())
+  test.each([["RBAC", 0x72626163], ["shift", 0x73686966]])("a stuck %s writer makes deactivate answer 409 retry after about 5 s, not hang", async (_n, ns) => {
+    const w = await world()
+    const holder = await pool.connect()
+    try {
+      await holder.query("begin")
+      await holder.query("select pg_advisory_xact_lock($1::int, hashtext($2::text))", [ns, w.tenant.id])
+      const started = Date.now()
+      const r = await w.req("POST", `/v1/members/${w.p.employee.userId}/deactivate`, w.p.owner)
+      const took = Date.now() - started
+      expect(r.status).toBe(409)
+      expect(((await r.json()) as Json).code).toBe("retry")
+      expect(took).toBeGreaterThan(4000)
+      expect(took).toBeLessThan(9000)
+      expect((await w.rows("select status from memberships where user_id = $1", [w.p.employee.userId]))[0].status).toBe("active")
+    } finally {
+      await holder.query("rollback")
+      holder.release()
+    }
+    expect((await w.req("POST", `/v1/members/${w.p.employee.userId}/deactivate`, w.p.owner)).status).toBe(200) // once released it goes through
+  }, 30_000)
+})
+
+describe("last active dedupe (AC4)", () => {
+  test("10 parallel requests of one page load produce exactly one stamp transaction; the next window stamps again", async () => {
+    const w = await world()
+    const who = w.p.employee
+    const spy = vi.spyOn(w.deps.db, "transaction")
+    for (let i = 0; i < 10; i++) touchLastActive(w.deps, w.tenant.id, who.userId, null) // ten requests that all read the membership before any stamp landed
+    await flushLastActive()
+    expect(spy.mock.calls.length).toBe(1)
+    touchLastActive(w.deps, w.tenant.id, who.userId, null) // still inside the window on the fake clock
+    await flushLastActive()
+    expect(spy.mock.calls.length).toBe(1)
+    w.clock.advance({ minutes: 6 })
+    for (let i = 0; i < 10; i++) touchLastActive(w.deps, w.tenant.id, who.userId, null)
+    await flushLastActive()
+    expect(spy.mock.calls.length).toBe(2)
+    expect(new Date((await w.rows("select last_active_at from memberships where user_id = $1", [who.userId]))[0].last_active_at as string).toISOString()).toBe(w.clock.now().toISOString())
+    // other people and other tenants dedupe separately
+    touchLastActive(w.deps, w.tenant.id, w.p.manager.userId, null)
+    await flushLastActive()
+    expect(spy.mock.calls.length).toBe(3)
+    spy.mockRestore()
+  })
+})
+
+describe("last active visibility (AC3)", () => {
+  test("lastActiveAt is returned only to callers with settings:read, null for everyone else", async () => {
+    const w = await world()
+    await w.rows("insert into roles (tenant_id, key, label, home, access) select tenant_id, 'rep', 'Rep', home, '{\"reports\":\"read\"}'::jsonb from roles where key = 'manager'")
+    const rep = await makeMember(w.deps, w.tenant.id, "rep")
+    await w.ok("GET", "/v1/locations", w.p.employee)
+    await flushLastActive()
+    const seen = async (who: Who) => Object.fromEntries(((await w.ok("GET", "/v1/people?scope=all", who)) as Json[]).map((x) => [x.userId, x.lastActiveAt]))
+    expect((await seen(w.p.owner))[w.p.employee.userId]).toBe(w.clock.now().toISOString())
+    expect((await seen(w.p.admin))[w.p.employee.userId]).toBe(w.clock.now().toISOString())
+    const asRep = await seen(rep)
+    expect(Object.keys(asRep).length).toBeGreaterThan(3)
+    for (const v of Object.values(asRep)) expect(v).toBeNull()
   })
 })
 

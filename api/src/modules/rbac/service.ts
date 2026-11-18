@@ -141,8 +141,10 @@ export async function updateRole(
   if (cur.isTemplate) throw Conflict("template_locked")
   assertNoEscalation(me, cur.access) // never touch (rename, re-scope, demote) a role that outranks you, whatever the patch
   if (patch.access) assertNoEscalation(me, patch.access) // only the modules being set; others are unchanged
-  if (patch.rosterLevel !== undefined) {
-    await assertLevelNotAbove(tx, tenantId, me, patch.rosterLevel) // never grant a level above your own
+  if (patch.rosterLevel !== undefined || patch.access?.roster !== undefined) {
+    // the EFFECTIVE level after the patch: granting roster access to a role that already carries a level activates that level, so it is judged like a grant
+    const effective = patch.rosterLevel !== undefined ? patch.rosterLevel : asRosterLevel(cur.rosterLevel)
+    await assertLevelNotAbove(tx, tenantId, me, effective) // never grant or activate a level above your own
     await assertLevelNotAbove(tx, tenantId, me, asRosterLevel(cur.rosterLevel)) // nor re-level (demote or clear) a role that outranks you
   }
   const access = patch.access ? { ...cur.access, ...patch.access } : cur.access
@@ -175,6 +177,7 @@ export async function changeMemberRole(
   // R24: administrative-module escalation both ways, and the owner role is only given or taken by an owner.
   assertNoEscalation(me, target.access)
   assertNoEscalation(me, cur.access)
+  await assertLevelNotAbove(tx, tenantId, me, asRosterLevel(target.rosterLevel)) // never assign a role whose roster level exceeds your own (yourself included)
   if ((target.key === "owner" || cur.key === "owner") && me.key !== "owner") throw Forbidden("role_escalation")
 
   if (cur.key === "owner" && target.key !== "owner") {

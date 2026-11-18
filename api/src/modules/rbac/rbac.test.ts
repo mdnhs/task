@@ -418,3 +418,54 @@ describe("roster level on custom roles (R8-3, B8 carry-in)", () => {
     for (const level of ["office", "supervisor", null]) expect((await w.req("PATCH", `/v1/roles/${custom.id}`, w.admin, { rosterLevel: level })).status).toBe(200)
   })
 })
+
+describe("roster level escalation, round 1 (AC1)", () => {
+  /** A caller with admin's access (settings, audit) and the given roster level; plus a custom role at office level that does NOT yet manage rosters (roster read). */
+  async function levels() {
+    const w = await world()
+    await ownerTenantQuery(w.tenant.id, "insert into roles (tenant_id, key, label, home, access, roster_level) select tenant_id, 'sup-admin', 'Sup admin', home, access, 'supervisor' from roles where key='admin'")
+    await ownerTenantQuery(w.tenant.id, "insert into roles (tenant_id, key, label, home, access, roster_level) select tenant_id, 'none-admin', 'None admin', home, access, null from roles where key='admin'")
+    await ownerTenantQuery(w.tenant.id, "insert into roles (tenant_id, key, label, home, access, roster_level) select tenant_id, 'dormant-office', 'Dormant office', home, access || '{\"roster\":\"read\"}'::jsonb, 'office' from roles where key='manager'")
+    const sup = await w.who("sup-admin")
+    const none = await w.who("none-admin")
+    const emp = await w.who("employee")
+    return { ...w, sup, none, emp }
+  }
+
+  test("(a) PATCH access.roster on an office-level role cannot activate it for a lower-level caller; the effective level is checked", async () => {
+    const w = await levels()
+    const dormant = await w.roleId("dormant-office")
+    for (const who of [w.sup, w.none]) {
+      const r = await w.req("PATCH", `/v1/roles/${dormant}`, who, { access: { roster: "write" } })
+      expect(r.status).toBe(403)
+      expect(((await r.json()) as Json).code).toBe("role_escalation")
+    }
+    expect((await ownerTenantQuery(w.tenant.id, "select access from roles where id = $1", [dormant]))[0].access).toMatchObject({ roster: "read" })
+    // a supervisor-level caller may activate a supervisor-level role, an office caller may activate the office one
+    await ownerTenantQuery(w.tenant.id, "insert into roles (tenant_id, key, label, home, access, roster_level) select tenant_id, 'dormant-sup', 'Dormant sup', home, access || '{\"roster\":\"read\"}'::jsonb, 'supervisor' from roles where key='manager'")
+    expect((await w.req("PATCH", `/v1/roles/${await w.roleId("dormant-sup")}`, w.sup, { access: { roster: "write" } })).status).toBe(200)
+    expect((await w.req("PATCH", `/v1/roles/${dormant}`, w.admin, { access: { roster: "write" } })).status).toBe(200)
+  })
+
+  test("(b) changeMemberRole: a caller can never assign a role whose roster level exceeds their own, themself included", async () => {
+    const w = await levels()
+    const office = await w.roleId("roster-manager")
+    const supervisor = await w.roleId("location-supervisor")
+    for (const [who, target] of [[w.sup, w.emp], [w.none, w.emp], [w.sup, w.sup], [w.none, w.none]] as const) {
+      const r = await w.req("PATCH", `/v1/members/${target.userId}`, who, { roleId: office })
+      expect(r.status, `${who.email} -> ${target.email}`).toBe(403)
+      expect(((await r.json()) as Json).code).toBe("role_escalation")
+    }
+    expect((await w.req("PATCH", `/v1/members/${w.emp.userId}`, w.none, { roleId: supervisor })).status).toBe(403) // no level cannot hand out supervisor either
+    expect((await w.req("PATCH", `/v1/members/${w.emp.userId}`, w.sup, { roleId: supervisor })).status).toBe(200) // at their own level
+    expect((await w.req("PATCH", `/v1/members/${w.emp.userId}`, w.admin, { roleId: office })).status).toBe(200) // office caller
+    expect((await ownerTenantQuery(w.tenant.id, "select r.key from memberships m join roles r on r.id = m.role_id where m.user_id = $1", [w.sup.userId]))[0].key).toBe("sup-admin")
+  })
+
+  test("(c) clone keeps the same rule for every level", async () => {
+    const w = await levels()
+    expect((await w.req("POST", `/v1/roles/${await w.roleId("roster-manager")}/clone`, w.sup, { label: "C1" })).status).toBe(403)
+    expect((await w.req("POST", `/v1/roles/${await w.roleId("location-supervisor")}/clone`, w.none, { label: "C2" })).status).toBe(403)
+    expect((await w.req("POST", `/v1/roles/${await w.roleId("roster-manager")}/clone`, w.admin, { label: "C3" })).status).toBe(201)
+  })
+})

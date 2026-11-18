@@ -40,3 +40,5 @@ The run is one transaction: the database is unchanged and the error class and co
 If `migrate` succeeded but the new api misbehaves, go to [rollback.md](rollback.md): migrations are **forward-only**; the old image works against the new schema by rule 1.
 
 Note on 0045: additive only (three nullable `memberships` columns: `deactivated_at`, `last_active_at`, `home_location_id` with a composite FK to `locations` that clears only that column on a location delete, plus its index). No backfill, so existing rows are untouched. Tested by replaying the real file as `app_owner` with no tenant context over seeded tenants.
+
+FK additions on large tables: add the constraint `NOT VALID` first, then `VALIDATE CONSTRAINT` in a later statement, so the table is not locked for the whole scan (0045 skipped this on purpose: `memberships` is small and the new column is all null).

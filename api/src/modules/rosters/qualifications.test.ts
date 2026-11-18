@@ -50,7 +50,7 @@ describe("qualifications (FR-RS-40)", () => {
     await w.ok("PUT", `/v1/locations/${a}/supervisors`, w.p.owner, { userIds: [sup.userId] })
     const staff = w.p.employee
     const put = await w.ok("PUT", q(staff.userId), w.p.owner, { qualifications: [{ type: " SIA licence ", expiresOn: "2027-03-31" }, { type: "First aid", expiresOn: null }] })
-    expect(put).toEqual({ userId: staff.userId, items: [{ type: "First aid", expiresOn: null, expired: false }, { type: "SIA licence", expiresOn: "2027-03-31", expired: false }] })
+    expect(put).toEqual({ userId: staff.userId, items: [{ type: "first aid", expiresOn: null, expired: false }, { type: "sia licence", expiresOn: "2027-03-31", expired: false }] }) // canonical lower-case keys
     expect((await w.rows("select action from audit_events where action = 'roster.qualifications_changed'")).length).toBe(1)
     // office (admin) reads; the person reads their own; a colleague (staff) reads nobody else's
     expect((await w.ok("GET", q(staff.userId), w.p.admin)).items).toHaveLength(2)
@@ -102,14 +102,28 @@ describe("qualifications (FR-RS-40)", () => {
     const staff = w.p.employee // the clock starts 2026-11-16 09:00Z; Europe/Dublin today is 2026-11-16
     await w.ok("PUT", q(staff.userId), w.p.owner, { qualifications: [{ type: "Past", expiresOn: "2026-11-15" }, { type: "Today", expiresOn: "2026-11-16" }, { type: "Future", expiresOn: "2026-11-17" }, { type: "Never" }] })
     const by = (r: Json) => Object.fromEntries(r.items.map((i: Json) => [i.type, i.expired]))
-    expect(by(await w.ok("GET", q(staff.userId), staff))).toEqual({ Past: true, Today: false, Future: false, Never: false }) // valid THROUGH its expiry date
+    expect(by(await w.ok("GET", q(staff.userId), staff))).toEqual({ past: true, today: false, future: false, never: false }) // valid THROUGH its expiry date
     w.clock.advance({ days: 1 })
     w.cookies.clear() // a day on the fake clock is past the 12 h idle timeout: sign in again
-    expect(by(await w.ok("GET", q(staff.userId), staff))).toEqual({ Past: true, Today: true, Future: false, Never: false })
+    expect(by(await w.ok("GET", q(staff.userId), staff))).toEqual({ past: true, today: true, future: false, never: false })
     w.clock.advance({ days: 1 })
     w.cookies.clear()
-    expect(by(await w.ok("GET", q(staff.userId), w.p.owner))).toEqual({ Past: true, Today: true, Future: true, Never: false })
+    expect(by(await w.ok("GET", q(staff.userId), w.p.owner))).toEqual({ past: true, today: true, future: true, never: false })
     expect([isExpired(null, "2026-01-01"), isExpired("2026-01-01", "2026-01-01"), isExpired("2025-12-31", "2026-01-01")]).toEqual([false, false, true])
+  })
+
+  test("'First Aid' == 'first aid': keys are case-insensitive, one row per key, and a shift type's requires compares equal", async () => {
+    const w = await world()
+    const staff = w.p.employee
+    const out = await w.ok("PUT", q(staff.userId), w.p.owner, { qualifications: [{ type: "First Aid", expiresOn: "2027-01-01" }] })
+    expect(out.items).toEqual([{ type: "first aid", expiresOn: "2027-01-01", expired: false }])
+    expect(await w.code("PUT", q(staff.userId), w.p.owner, { qualifications: [{ type: "First Aid" }, { type: "first aid" }] }, 422)).toBe("invalid_qualification") // the same key twice
+    await w.ok("PUT", q(staff.userId), w.p.owner, { qualifications: [{ type: "FIRST AID", expiresOn: "2027-01-01" }] }) // same key: unchanged, nothing written
+    expect((await w.rows("select 1 from audit_events where action = 'roster.qualifications_changed'")).length).toBe(1)
+    const loc = await w.loc("Alpha")
+    const ty = await w.ok("POST", `/v1/locations/${loc}/shift-types`, w.p.owner, { name: "Day", start: "07:00", end: "15:00", role: "G", requires: ["First AID"] }, 201)
+    const have = new Set((await w.rows("select type from member_qualifications where user_id = $1", [staff.userId])).map((r) => r.type))
+    expect(ty.requires.every((k: string) => have.has(k))).toBe(true)
   })
 
   test("PUT replaces the whole set; invalid types or dates are 422; an unchanged set writes nothing; removing and changing keep the other rows", async () => {
@@ -119,18 +133,18 @@ describe("qualifications (FR-RS-40)", () => {
     const ids = Object.fromEntries((await w.rows("select id, type from member_qualifications")).map((r) => [r.type, r.id]))
     await w.ok("PUT", q(staff.userId), w.p.owner, { qualifications: [{ type: "B", expiresOn: "2027-02-01" }, { type: "A", expiresOn: "2028-01-01" }, { type: "C" }] })
     const now = Object.fromEntries((await w.rows("select id, type, expires_on::text as e from member_qualifications")).map((r) => [r.type, [r.id, r.e]]))
-    expect(now.A).toEqual([ids.A, "2028-01-01"]) // same row, new date (a linked proof file survives)
-    expect(now.B).toEqual([ids.B, "2027-02-01"])
-    expect(now.C[1]).toBeNull()
+    expect(now.a).toEqual([ids.a, "2028-01-01"]) // same row, new date (a linked proof file survives)
+    expect(now.b).toEqual([ids.b, "2027-02-01"])
+    expect(now.c[1]).toBeNull()
     expect((await w.rows("select 1 from audit_events where action = 'roster.qualifications_changed'")).length).toBe(2)
     await w.ok("PUT", q(staff.userId), w.p.owner, { qualifications: [{ type: "C" }, { type: "A", expiresOn: "2028-01-01" }, { type: "B", expiresOn: "2027-02-01" }] })
     expect((await w.rows("select 1 from audit_events where action = 'roster.qualifications_changed'")).length).toBe(2) // unchanged: nothing written
     await w.ok("PUT", q(staff.userId), w.p.owner, { qualifications: [{ type: "C" }] })
-    expect((await w.rows("select type from member_qualifications")).map((r) => r.type)).toEqual(["C"])
+    expect((await w.rows("select type from member_qualifications")).map((r) => r.type)).toEqual(["c"])
     for (const bad of [[{ type: "" }], [{ type: "  " }], [{ type: "x".repeat(81) }], [{ type: "A" }, { type: " A " }], [{ type: "A", expiresOn: "2027-02-30" }], [{ type: "A", expiresOn: "31/12/2027" }], Array.from({ length: 51 }, (_, i) => ({ type: `T${i}` }))]) {
       expect(await w.code("PUT", q(staff.userId), w.p.owner, { qualifications: bad }, 422)).toBe("invalid_qualification")
     }
-    expect((await w.rows("select type from member_qualifications")).map((r) => r.type)).toEqual(["C"]) // a refused PUT changed nothing
+    expect((await w.rows("select type from member_qualifications")).map((r) => r.type)).toEqual(["c"]) // a refused PUT changed nothing
   })
 })
 

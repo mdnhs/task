@@ -2,6 +2,6 @@ export { ROSTER_LOCK_NS, ROSTER_LOCK_TIMEOUT_MS, lockRoster, loadRosterCtx, asse
 export { rosterProbeRoutes } from "./probe"
 export { rosterRoutes } from "./routes"
 export { rosterRead, rosterWrite, officeOnly, unrestrictedOffice, writeHistory, auditRoster, publishRoster, isUuid, type RosterEnv } from "./write"
-export { shiftInstants, instantSql, normaliseRequires } from "./locations"
+export { shiftInstants, instantSql, normaliseRequires, qualificationKey } from "./locations"
 export { reachablePerson, ROSTERED_LOOKBACK_DAYS } from "./people"
 export { isExpired, todayOf } from "./qualifications"
