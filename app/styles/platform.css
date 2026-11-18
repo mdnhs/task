@@ -23,7 +23,10 @@ button.pf-arrow:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
 @media (max-width:720px){.rtable td.pf-acts{justify-content:flex-end}.rtable td.pf-acts:empty{display:none}}
 
 /* ---------- Tenant detail ---------- */
-.pf-back{align-self:flex-start;font-size:13px;font-weight:600;color:var(--ink-2);text-decoration:none;line-height:20px;margin-bottom:-6px;transition:color var(--dur-fast) var(--ease)}
+.pf-back{align-self:flex-start;display:inline-flex;align-items:center;gap:4px;max-width:100%;font-size:13px;font-weight:600;color:var(--ink-2);text-decoration:none;line-height:20px;margin-bottom:-6px;transition:color var(--dur-fast) var(--ease)}
+.pf-back-ico{flex:none;margin-left:-4px;transition:transform var(--dur-fast) var(--ease)}
+.pf-back:hover .pf-back-ico{transform:translateX(-2px)}
+.pf-back-lbl{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .pf-back:hover{color:var(--brand-deep)}
 :root[data-theme="dark"] .pf-back:hover{color:var(--brand-3)}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .pf-back:hover{color:var(--brand-3)}}
@@ -297,7 +300,8 @@ button.pf-arrow:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
 .pf-360-meta{display:flex;align-items:center;flex-wrap:wrap;gap:8px 10px;margin-top:10px;font-size:13px;line-height:20px;color:var(--ink-2)}
 .pf-360-meta .st{flex:none}
 .pf-360-plan{font-weight:600;color:var(--ink)}
-.pf-360-slug{font-size:13px;line-height:20px}
+.pf-360-slug{font-size:13px;line-height:20px;flex-wrap:wrap;min-width:0}
+.pf-360-slug>.num:first-child{white-space:nowrap}
 .pf-360-head .head-actions{align-self:flex-end}
 .pf-360-head .head-actions .btn{cursor:pointer}
 .pf-360-more{border:1.6px solid var(--brand);padding:11px 18px}
@@ -524,3 +528,16 @@ button.pf-arrow:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
 .pf-set-panel[hidden]{display:none}
 .pf-set-panel{min-width:0}
 @media (max-width:900px){.pf-tab{width:auto;flex:none}}
+
+/* Tenant 360 Overview tab: three borderless groups (subscription, usage, tenant), label left (muted) and value right, one column on phones. */
+.pf-dl-groups{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));gap:var(--pf-gap)}
+.pf-dl-group{background:var(--mute-bg);border-radius:var(--r-md);padding:16px 18px;min-width:0}
+.pf-dl-group h3{display:flex;align-items:center;gap:8px;margin:0 0 6px;font-size:13px;font-weight:700;color:var(--ink-2)}
+.pf-dl-group h3 svg{width:16px;height:16px;flex:none;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.pf-dl{margin:0;display:flex;flex-direction:column}
+.pf-dl-row{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:4px 12px;padding:9px 0;min-height:40px}
+.pf-dl-row dt{font-size:12.5px;line-height:18px;color:var(--ink-3)}
+.pf-dl-row dd{margin:0;min-width:0;font-size:14px;line-height:20px;font-weight:600;color:var(--ink);text-align:right;overflow-wrap:anywhere}
+.pf-dl-row dd span{font-weight:500;color:var(--ink-3)}
+.pf-dl-seats .pf-dl-bar{flex:1 0 100%;width:100%;height:6px;margin-top:2px;background:var(--card)}
+.pf-dl-seats .pf-dl-bar i{background:var(--brand)}

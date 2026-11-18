@@ -2,6 +2,7 @@
 
 import { useState, useSyncExternalStore } from "react"
 import Link from "next/link"
+import { BackLink } from "@/components/back-link"
 import { ArrowLeftRight, CalendarCheck, CalendarPlus, Layers, ShieldCheck, Trash2 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
@@ -30,7 +31,7 @@ import { commitTenant, subIds, useLiveTenant, type T360Ctx } from "./live"
 const num = (n: number) => n.toLocaleString(PLATFORM_LOCALE)
 
 function Back({ t, to, label }: { t: PlatformTenant; to: Parameters<typeof tenantPath>[1]; label: string }) {
-  return <Link href={tenantPath(t.id, to)} className="pf-back">← {label}</Link>
+  return <BackLink href={tenantPath(t.id, to)}>{label}</BackLink>
 }
 
 function ReasonField({ value, onChange, error }: { value: string; onChange(v: string): void; error?: string }) {

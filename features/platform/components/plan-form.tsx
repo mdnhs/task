@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import { BackLink } from "@/components/back-link"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
 import { Banknote, Blocks, FileText, Gauge, Tag } from "lucide-react"
@@ -60,7 +61,7 @@ export function PlanEditView({ data, planId, operator, today }: { data: PlanForm
   if (!plan) return null // the route already 404s unknown ids
   return (
     <>
-      <Link href={PLANS_PATH} className="pf-back">← Plans</Link>
+      <BackLink href={PLANS_PATH}>Plans</BackLink>
       <PageHead title={`Edit ${plan.name} plan`} subtitle={PLAN_EDIT_SUBTITLE} />
       <PlanForm key={plan.id} plan={plan} entitlements={entitlements} operator={operator} today={today} />
     </>
@@ -216,7 +217,7 @@ export function PlanNewView({ data, operator, today, defaultTrialDays }: { data:
   const { plans, entitlements } = usePlanCatalogue(data)
   return (
     <>
-      <Link href={PLANS_PATH} className="pf-back">← Plans</Link>
+      <BackLink href={PLANS_PATH}>Plans</BackLink>
       <PageHead title="New plan" subtitle={PLAN_NEW_SUBTITLE} />
       <NewPlanForm plans={plans} entitlements={entitlements} operator={operator} today={today} defaultTrialDays={defaultTrialDays} />
     </>
