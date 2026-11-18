@@ -86,7 +86,7 @@ export async function enforceRateLimit(c: Context<AppEnv>, name: string, rule: R
   try {
     const r = await deps.rateLimiter.hit(`${name}:${key}`, rule)
     if (r.allowed) return null
-    deps.metrics.counter("rate_limited_total", { bucket: name }).inc()
+    deps.metrics.counter("rate_limited_total", { bucket: /^[a-z][a-z0-9-]{1,31}$/.test(name) ? name : "other" }).inc() // callers pass static names (auth-ip, auth-mail, tenant-create, invite-mail); anything else cannot grow the series
     return rateLimited(c.get("requestId"), r.retryAfterSec)
   } catch (err) {
     deps.logger.warn({ ...errorInfo(err), limiter: name, failClosed: opts.failClosed === true, requestId: c.get("requestId") }, "rate limiter store unavailable")

@@ -12,8 +12,9 @@
  *  public         no session needed, leaks no tenant data
  *  webhook        provider calls, authenticated by a signature, no tenant header
  *  test-only      registered only under NODE_ENV=test
+ *  middleware     a method-ALL mount (app.use): runs before the matched route, answers no data of its own
  */
-export type Classification = "tenant-record" | "tenant-static" | "user" | "platform" | "public" | "webhook" | "test-only"
+export type Classification = "middleware" | "tenant-record" | "tenant-static" | "user" | "platform" | "public" | "webhook" | "test-only"
 
 export const ROUTE_CLASSIFICATION: Record<string, readonly [Classification, string]> = {
   "GET /v1/auth/providers": ["public", "which social providers are configured; no tenant data"],
@@ -159,7 +160,7 @@ export const ROUTE_CLASSIFICATION: Record<string, readonly [Classification, stri
   "PUT /v1/settings/holidays": ["tenant-static", "tenant resolved from X-Tenant and the caller membership; no record id in the path"],
   "GET /v1/integrations": ["tenant-static", "tenant resolved from X-Tenant and the caller membership; no record id in the path"],
   "POST /v1/integrations/google/start": ["tenant-static", "tenant resolved from X-Tenant and the caller membership; no record id in the path"],
-  "GET /v1/integrations/google/callback": ["user", "browser redirect: authenticated by session, tenant comes from the single-use state"],
+  "GET /v1/integrations/google/callback": ["user", "browser redirect: session only, the tenant comes from the single-use state; X-Tenant is ignored (integrations.test.ts: no write to another tenant of the same user, no replay)"],
   "DELETE /v1/integrations/{id}": ["tenant-record", "path carries a tenant record id: walked by the isolation walker"],
   "GET /v1/search": ["tenant-static", "tenant resolved from X-Tenant and the caller membership; no record id in the path"],
   "GET /v1/data-requests": ["tenant-static", "tenant resolved from X-Tenant and the caller membership; no record id in the path"],
@@ -212,6 +213,8 @@ export const ROUTE_CLASSIFICATION: Record<string, readonly [Classification, stri
   "POST /v1/billing/cancel": ["tenant-static", "tenant resolved from X-Tenant and the caller membership; no record id in the path"],
   "POST /v1/billing/resume": ["tenant-static", "tenant resolved from X-Tenant and the caller membership; no record id in the path"],
   "PUT /v1/billing/seats": ["tenant-static", "tenant resolved from X-Tenant and the caller membership; no record id in the path"],
+  "ALL /*": ["middleware", "request id, access log and security headers on every response; no data of its own"],
+  "ALL /v1/*": ["middleware", "same-origin check and read-model cache bust around every /v1 route; no data of its own"],
   // registered but not in the OpenAPI document (plain Hono routes); the inventory lists app.routes minus the OpenAPI paths so these cannot grow unnoticed
   "GET /healthz": ["public", "liveness, no dependencies, no tenant data"],
   "GET /readyz": ["public", "readiness: named checks only, no connection strings or error text"],

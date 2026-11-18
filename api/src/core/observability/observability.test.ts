@@ -63,9 +63,31 @@ describe("metrics", () => {
       expect(ok.headers.get("content-type")).toContain("text/plain")
       expect(await ok.text()).toContain('rate_limited_total{bucket="auth"} 1')
       expect(collected).toBe(1)
-      for (const [method, path] of [["GET", "/"], ["GET", "/healthz"], ["GET", "/v1/me"], ["POST", "/metrics"]]) expect((await fetch(`http://127.0.0.1:${addr.port}${path}`, { method })).status, `${method} ${path}`).toBe(404)
+      for (const [method, path] of [["GET", "/"], ["GET", "/healthz"], ["GET", "/readyz"], ["GET", "/v1/me"], ["POST", "/metrics"]]) expect((await fetch(`http://127.0.0.1:${addr.port}${path}`, { method })).status, `${method} ${path}`).toBe(404)
     } finally {
       await new Promise((r) => server.close(r))
+    }
+  })
+})
+
+describe("internal readiness details", () => {
+  test("the detailed readiness is served only on the internal listener, with its own status code", async () => {
+    const details = { status: "unavailable" as const, body: { status: "unavailable", checks: { db: { ok: true }, redis: { ok: false } } } }
+    const server = await startMetricsServer({ metrics: makeMetrics(), port: 0, host: "127.0.0.1", details: async () => details })
+    try {
+      const { port } = server.address() as { port: number }
+      const r = await fetch(`http://127.0.0.1:${port}/readyz/details`)
+      expect(r.status).toBe(503)
+      expect(await r.json()).toEqual(details.body)
+      expect((await fetch(`http://127.0.0.1:${port}/readyz/details`, { method: "POST" })).status).toBe(404)
+    } finally {
+      await new Promise((r) => server.close(r))
+    }
+    const bare = await startMetricsServer({ metrics: makeMetrics(), port: 0, host: "127.0.0.1" })
+    try {
+      expect((await fetch(`http://127.0.0.1:${(bare.address() as { port: number }).port}/readyz/details`)).status).toBe(404)
+    } finally {
+      await new Promise((r) => bare.close(r))
     }
   })
 })

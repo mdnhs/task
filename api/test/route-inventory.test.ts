@@ -28,6 +28,15 @@ describe("route inventory", () => {
     expect(Object.keys(ROUTE_CLASSIFICATION).filter((k) => !keys.has(k)).map((k) => `stale classification ${k}: no such route`)).toEqual([])
   })
 
+  test("a route registered with method ALL is in the inventory too, and unclassified until someone classifies it", () => {
+    const app = testApp().app
+    app.all("/v1/_wide-open", (c) => c.text("x"))
+    const e = routeInventory(app).find((x) => x.key === "ALL /v1/_wide-open")
+    expect(e).toBeDefined()
+    expect(e!.classification).toBeUndefined()
+    expect(routeInventory(testApp().app).filter((x) => x.method === "ALL").map((x) => x.key).sort()).toEqual(["ALL /*", "ALL /v1/*"]) // the two middleware mounts, classified as such
+  })
+
   test("the B7 routes are in the inventory with the right class", () => {
     const by = new Map(routeInventory(t.app).map((e) => [e.key, e.classification]))
     expect(by.get("GET /v1/platform/session")).toBe("platform")

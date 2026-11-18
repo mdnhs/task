@@ -2,7 +2,7 @@ import { expect, test } from "vitest"
 import { sql } from "drizzle-orm"
 import { ownerQuery, testDb } from "../../../test/db"
 import { call, testApp } from "../../../test/harness"
-import { expectedMigrations } from "./readiness"
+import { expectedMigrations, readiness } from "./readiness"
 
 test("migration 0042: schema_migration_count() answers the applied count to app_user and app_owner with no tenant context, and the drizzle schema itself stays closed to app_user", async () => {
   const n = expectedMigrations()
@@ -14,11 +14,13 @@ test("migration 0042: schema_migration_count() answers the applied count to app_
   await expect(testDb().execute(sql`select count(*) from drizzle.__drizzle_migrations`)).rejects.toMatchObject({ cause: { code: "42501" } })
 })
 
-test("readyz is 503 when the database is behind this build's migrations, and says by how many it is behind", async () => {
+test("readiness is not ready when the database is behind this build's migrations, and the details say by how many; the public route only says unavailable", async () => {
   const real = testDb()
   const behind = new Proxy(real, { get: (t, p, r) => (p === "execute" ? async (q: unknown) => ((await real.execute(q as never)), { rows: [{ n: expectedMigrations() - 1 }] }) : Reflect.get(t, p, r)) })
-  const r = await call(testApp({ db: behind as never }).app, "GET", "/readyz")
+  const t = testApp({ db: behind as never })
+  const r = await call(t.app, "GET", "/readyz")
   expect(r.status).toBe(503)
-  const body = (await r.json()) as { checks: { migrations: { ok: boolean; expected: number; applied: number } } }
-  expect(body.checks.migrations).toEqual({ ok: false, expected: expectedMigrations(), applied: expectedMigrations() - 1 })
+  expect(await r.json()).toEqual({ status: "unavailable" })
+  const d = await readiness(t.deps)
+  expect((d.body as { checks: { migrations: unknown } }).checks.migrations).toEqual({ ok: false, expected: expectedMigrations(), applied: expectedMigrations() - 1 })
 })

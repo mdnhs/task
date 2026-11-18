@@ -90,7 +90,7 @@ export function createApp(deps: Deps) {
   app.get("/healthz", (c) => c.json({ status: "ok" }))
   app.get("/readyz", async (c) => {
     const r = await readiness(deps)
-    return c.json(r.body, r.status === "ready" ? 200 : 503)
+    return c.json({ status: r.status }, r.status === "ready" ? 200 : 503) // the internet gets ok / not ok; the details are on the internal metrics port
   })
 
   app.route("/", authRoutes)

@@ -5,9 +5,10 @@ import { Conflict } from "./core/errors"
 import { makeLogger } from "./core/observability/logger"
 import { fakeErrorReporter } from "./core/observability/error-reporter"
 import { makeMember, makeTenant, signIn } from "../test/factories"
-import { resetDb } from "../test/db"
+import { resetDb, testDb } from "../test/db"
 import { requireTenant } from "./core/middleware/tenant"
 import { rateLimit } from "./core/middleware/rate-limit"
+import { readiness } from "./core/observability/readiness"
 
 test("GET /healthz returns 200 ok", async () => {
   const r = await call(testApp().app, "GET", "/healthz")
@@ -120,7 +121,7 @@ test("the access log has the route template, not the concrete path, and no query
   const access = parsed().filter((l) => l.msg === "request")
   expect(access).toHaveLength(1) // exactly one line per request
   expect(access[0]).toMatchObject({ method: "POST", route: "/v1/_things/{id}", status: 200, durationMs: 60000, requestId: "0b9d6f3e-5c1a-4f6e-9a57-2f1d3c8e7a10" })
-  expect(access[0].bytes).toBeGreaterThan(100)
+  expect(access[0].bytes).toBeNull() // no content-length on the response: never buffered to count it
   expect(Object.keys(access[0]).sort()).toEqual(["bytes", "durationMs", "level", "method", "msg", "requestId", "route", "service", "status", "time"].sort())
 })
 
@@ -183,42 +184,122 @@ test("a reporter that throws does not turn the 500 into anything else", async ()
   expect(((await r.json()) as { code: string }).code).toBe("internal")
 })
 
-test("readyz names each dependency and 503s when redis is down, with no connection string in the body", async () => {
+test("public /readyz is ok or not ok only: no check names, counts, flags or error text", async () => {
   await resetDb()
   const t = testApp()
   const ok = await call(t.app, "GET", "/readyz")
   expect(ok.status).toBe(200)
-  const body = (await ok.json()) as any // eslint-disable-line @typescript-eslint/no-explicit-any
-  expect(body).toMatchObject({ status: "ready", checks: { db: { ok: true }, redis: { ok: true }, queue: { ok: true }, migrations: { ok: true } }, storage: { configured: expect.any(Boolean) } })
-  expect(body.checks.migrations.expected).toBeGreaterThan(40)
-  expect(body.checks.migrations.applied).toBe(body.checks.migrations.expected)
+  expect(await ok.json()).toEqual({ status: "ready" })
   t.rateLimiter.down = true
+  t.clock.advance({ minutes: 1 }) // past the 2 s cache
   const down = await call(t.app, "GET", "/readyz")
   expect(down.status).toBe(503)
   const text = await down.text()
-  expect(JSON.parse(text)).toMatchObject({ status: "unavailable", checks: { db: { ok: true }, redis: { ok: false }, queue: { ok: true } } })
-  expect(text).not.toMatch(/redis:\/\/|postgres:\/\/|localhost|password|down/i)
-  t.rateLimiter.down = false
-  t.queue.down = true
-  expect(JSON.parse(await (await call(t.app, "GET", "/readyz")).text())).toMatchObject({ checks: { redis: { ok: true }, queue: { ok: false } } })
+  expect(JSON.parse(text)).toEqual({ status: "unavailable" })
+  expect(text).not.toMatch(/redis|postgres|migrations|expected|applied|storage|configured|localhost|password|down/i)
 })
 
-test("readyz never calls a live provider: storage is a config-presence flag and the mail/billing/oauth/net fakes are untouched", async () => {
+test("readiness details name each dependency and 503 when redis is down, with no connection string (internal use only)", async () => {
+  await resetDb()
+  const t = testApp()
+  const ok = await readiness(t.deps)
+  expect(ok.status).toBe("ready")
+  expect(ok.body).toMatchObject({ status: "ready", checks: { db: { ok: true }, redis: { ok: true }, queue: { ok: true }, migrations: { ok: true } }, storage: { configured: expect.any(Boolean) } })
+  const m = (ok.body as any).checks.migrations // eslint-disable-line @typescript-eslint/no-explicit-any
+  expect(m.expected).toBeGreaterThan(40)
+  expect(m.applied).toBe(m.expected)
+  t.rateLimiter.down = true
+  t.clock.advance({ minutes: 1 })
+  const down = await readiness(t.deps)
+  expect(down.status).toBe("unavailable")
+  expect(down.body).toMatchObject({ checks: { db: { ok: true }, redis: { ok: false }, queue: { ok: true } } })
+  expect(JSON.stringify(down.body)).not.toMatch(/redis:\/\/|postgres:\/\/|localhost|password/i)
+  t.rateLimiter.down = false
+  t.queue.down = true
+  t.clock.advance({ minutes: 1 })
+  expect((await readiness(t.deps)).body).toMatchObject({ checks: { redis: { ok: true }, queue: { ok: false } } })
+})
+
+test("readiness is single-flight and cached for 2 s on deps.clock: a flood runs one check, not one per request", async () => {
+  await resetDb()
+  const real = testDb()
+  let executes = 0
+  const counting = new Proxy(real, { get: (tg, p, r) => (p === "execute" ? (q: unknown) => (executes++, real.execute(q as never)) : Reflect.get(tg, p, r)) })
+  const t = testApp({ db: counting as never })
+  const flood = await Promise.all(Array.from({ length: 30 }, () => call(t.app, "GET", "/readyz")))
+  expect(flood.map((r) => r.status)).toEqual(Array(30).fill(200))
+  const first = executes
+  expect(first).toBeGreaterThan(0)
+  expect(first).toBeLessThanOrEqual(3) // select 1, migration count, storage settings: once
+  await call(t.app, "GET", "/readyz")
+  expect(executes).toBe(first) // inside the 2 s window: served from the cache
+  t.clock.advance({ minutes: 1 })
+  await call(t.app, "GET", "/readyz")
+  expect(executes).toBe(first * 2) // the window passed: one more check
+})
+
+test("readiness never calls a live provider: storage is a config-presence flag and the mail/billing/oauth/net fakes are untouched", async () => {
   await resetDb()
   const t = testApp()
   await call(t.app, "GET", "/readyz")
+  await readiness(t.deps)
   expect(t.mailer.sent).toHaveLength(0)
   expect(t.net.sent).toHaveLength(0)
   expect(t.net.resolves).toHaveLength(0)
 })
 
-test("readyz with a failing database is 503 with db failed and nothing else leaked", async () => {
+test("readiness with a failing database is 503 and nothing leaks", async () => {
   const t = testApp({ db: { execute: async () => { throw new Error("connect ECONNREFUSED postgres://app_user:pw@db:5432/x") } } as never })
   const r = await call(t.app, "GET", "/readyz")
   expect(r.status).toBe(503)
-  const text = await r.text()
-  expect(JSON.parse(text).checks.db).toEqual({ ok: false })
-  expect(text).not.toMatch(/ECONNREFUSED|postgres:\/\/|app_user/)
+  expect(await r.json()).toEqual({ status: "unavailable" })
+  const d = await readiness(t.deps)
+  expect((d.body as any).checks.db).toEqual({ ok: false }) // eslint-disable-line @typescript-eslint/no-explicit-any
+  expect(JSON.stringify(d.body)).not.toMatch(/ECONNREFUSED|postgres:\/\/|app_user/)
+})
+
+test("a streamed response (CSV export) is delivered incrementally and is the very response object the handler made: the access log never buffers or rebuilds it", async () => {
+  const { logger, parsed } = logCapture()
+  const t = testApp({ logger })
+  let release!: () => void
+  const gate = new Promise<void>((r) => (release = r))
+  const enc = new TextEncoder()
+  const stream = new ReadableStream({ async start(ctrl) { ctrl.enqueue(enc.encode("a,b\n")); await gate; ctrl.enqueue(enc.encode("c,d\n")); ctrl.close() } })
+  const made = new Response(stream, { headers: { "content-type": "text/csv", "content-disposition": 'attachment; filename="x.csv"' } })
+  t.app.get("/v1/_csv", () => made)
+  const timeout = (ms: number) => new Promise<never>((_, rej) => setTimeout(() => rej(new Error("buffered: no response before the producer finished")), ms))
+  try {
+    const res = await Promise.race([call(t.app, "GET", "/v1/_csv"), timeout(1500)])
+    expect(res).toBe(made) // not rebuilt
+    expect(res.body).toBe(stream)
+    const reader = res.body!.getReader()
+    const first = await Promise.race([reader.read(), timeout(1500)])
+    expect(new TextDecoder().decode(first.value)).toBe("a,b\n") // first chunk before the producer finished
+    release()
+    expect(new TextDecoder().decode((await reader.read()).value)).toBe("c,d\n")
+  } finally {
+    release()
+  }
+  const line = parsed().find((l) => l.route === "/v1/_csv")
+  expect(line).toMatchObject({ status: 200, bytes: null })
+})
+
+test("the http method metric label is an allow-list: an odd method is `other`", async () => {
+  const t = testApp()
+  await t.app.request("/healthz", { method: "PROPFIND" })
+  await call(t.app, "GET", "/healthz")
+  const out = t.metrics.render()
+  expect(out).toContain('method="other"')
+  expect(out).not.toContain("PROPFIND")
+  expect(out).toContain('method="GET"')
+})
+
+test("rate_limited_total only ever carries a static bucket name: a odd name becomes `other`", async () => {
+  const t = testApp()
+  t.app.get("/v1/_limited2", rateLimit("Weird Bucket/" + "x".repeat(40), { limit: 1, windowSec: 60 }, () => "k"), (c) => c.json({ ok: true }))
+  await call(t.app, "GET", "/v1/_limited2")
+  await call(t.app, "GET", "/v1/_limited2")
+  expect(t.metrics.render()).toContain('rate_limited_total{bucket="other"} 1')
 })
 
 test("the public app serves no /metrics (it lives on the internal metrics port only)", async () => {

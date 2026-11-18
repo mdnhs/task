@@ -254,9 +254,9 @@ const OPENAPI_METHODS = ["get", "put", "post", "delete", "patch"]
 
 /**
  * Every route the app serves, never hand-listed: the OpenAPI operations plus the registered routes that are NOT in the document
- * (health, Better Auth, the provider webhook, the test probes). `classification` comes from route-classification.ts and is
+ * (health, Better Auth, the provider webhook, the test probes, and method-ALL mounts: an ALL route is never skipped, it must be classified too). `classification` comes from route-classification.ts and is
  * `undefined` for a route nobody classified, which route-inventory.test.ts turns into a failure by name.
- * (`method` is upper case; middleware registered with ALL is not a route.)
+ * (`method` is upper case.)
  */
 export function routeInventory(app: AppType): InventoryEntry[] {
   const doc = app.getOpenAPI31Document({ openapi: "3.1.0", info: { title: "t", version: "1" } })
@@ -270,6 +270,6 @@ export function routeInventory(app: AppType): InventoryEntry[] {
     out.push({ method, path, key, source, classification: hit?.[0], reason: hit?.[1] })
   }
   for (const [path, item] of Object.entries(doc.paths ?? {})) for (const m of OPENAPI_METHODS) if ((item as Record<string, unknown>)[m]) add(m.toUpperCase(), path, "openapi")
-  for (const r of app.routes) if (r.method !== "ALL") add(r.method, r.path.replace(/:(\w+)/g, "{$1}"), "registered")
+  for (const r of app.routes) add(r.method, r.path.replace(/:(\w+)/g, "{$1}"), "registered")
   return out.sort((x, y) => x.key.localeCompare(y.key))
 }

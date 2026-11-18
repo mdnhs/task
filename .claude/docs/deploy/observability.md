@@ -23,7 +23,9 @@ No vendor SDK and no live provider is needed for any of this (ruling S10). A Sen
 ## Health and readiness
 
 - `GET /healthz`: liveness, no dependencies.
-- `GET /readyz`: `200 ready` or `503 unavailable`, each check named: `checks.db` (`select 1`), `checks.redis` (limiter store ping), `checks.queue` (queue connection ping), `checks.migrations` (`expected` = migrations in this build, `applied` = rows read through the `schema_migration_count()` function of migration 0042; behind is not ready). `storage.configured` is a presence flag (stored settings or `S3_*` env), informational: an unconfigured bucket makes the file routes fail closed, not the instance. A failed check is `{ ok: false }` with no error text, host or connection string. No mail, billing, storage or Google call is made.
+- `GET /readyz` (public): `200 {"status":"ready"}` or `503 {"status":"unavailable"}`, nothing else (no check names, counts or flags). The result is shared by concurrent callers and cached for 2 s, so a flood costs one set of queries per window.
+- `GET /readyz/details` (internal listener on `METRICS_PORT` only, same cache): each check named: `checks.db` (`select 1`), `checks.redis` (limiter store ping), `checks.queue` (queue connection ping), `checks.migrations` (`expected` = migrations in this build, `applied` = read through the `schema_migration_count()` function of migration 0042; behind is not ready). `storage.configured` is a presence flag (stored settings or `S3_*` env), informational. A failed check is `{ ok: false }` with no error text, host or connection string. No mail, billing, storage or Google call is made.
+- The access log never reads a response body (exports are streamed): `bytes` is the `content-length` header or null. The `method` label of the http metric is an allow-list (anything else is `other`) and the `bucket` label of `rate_limited_total` is a static name (anything else is `other`).
 
 ## Alert rules
 

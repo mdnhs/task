@@ -44,18 +44,19 @@ function walk(v: unknown, depth: number, seen: WeakSet<object>): unknown {
   try {
     if (Array.isArray(v)) return v.slice(0, MAX_ITEMS).map((x) => walk(x, depth + 1, seen))
     const out: Record<string, unknown> = {}
+    const put = (k: string, val: unknown) => void Object.defineProperty(out, k, { value: val, enumerable: true, writable: true, configurable: true }) // defineProperty, not out[k]=: a `__proto__` key from JSON.parse is data, never the prototype setter
     for (const k of Object.keys(v).slice(0, MAX_ITEMS)) {
       let raw: unknown
       try {
         raw = (v as Record<string, unknown>)[k]
       } catch {
-        out[k] = "[unreadable]"
+        put(k, "[unreadable]")
         continue
       }
-      if (SECRET_KEY.test(k)) out[k] = CENSOR
-      else if (BODY_KEY.test(k)) out[k] = "[omitted]"
-      else if (k.toLowerCase() === "code" && OTP_VALUE.test(String(raw))) out[k] = CENSOR
-      else out[k] = walk(raw, depth + 1, seen)
+      if (SECRET_KEY.test(k)) put(k, CENSOR)
+      else if (BODY_KEY.test(k)) put(k, "[omitted]")
+      else if (k.toLowerCase() === "code" && OTP_VALUE.test(String(raw))) put(k, CENSOR)
+      else put(k, walk(raw, depth + 1, seen))
     }
     return out
   } finally {

@@ -68,10 +68,17 @@ export function makeMetrics(): Metrics {
 /**
  * The internal metrics listener (ruling S10): its own port, `GET /metrics` only, never mounted on the public app and never behind the
  * public proxy. The caller decides whether to start it (METRICS_PORT unset = off) and which interface (METRICS_HOST, default loopback).
- * `collect` refreshes pull-style gauges (the pool) just before a scrape. Returns the server; the caller closes it.
+ * `collect` refreshes pull-style gauges (the pool) just before a scrape; `details` serves GET /readyz/details (the dependency-level readiness the public /readyz does not show). Returns the server; the caller closes it.
  */
-export function startMetricsServer(o: { metrics: Metrics; port: number; host?: string; collect?: () => void }): Promise<Server> {
+export function startMetricsServer(o: { metrics: Metrics; port: number; host?: string; collect?: () => void; details?: () => Promise<{ status: string; body: unknown }> }): Promise<Server> {
   const server = createServer((req, res) => {
+    if (req.method === "GET" && o.details && (req.url ?? "").split("?")[0] === "/readyz/details") {
+      o.details().then(
+        (d) => res.writeHead(d.status === "ready" ? 200 : 503, { "content-type": "application/json", "cache-control": "no-store" }).end(JSON.stringify(d.body)),
+        () => res.writeHead(503, { "content-type": "application/json" }).end('{"status":"unavailable"}'),
+      )
+      return
+    }
     if (req.method === "GET" && (req.url ?? "").split("?")[0] === "/metrics") {
       try {
         o.collect?.()

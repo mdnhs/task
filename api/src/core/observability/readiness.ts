@@ -25,12 +25,31 @@ const ok = async (fn: () => Promise<unknown>): Promise<{ ok: boolean }> => {
 }
 
 /**
- * GET /readyz (B7 Task 15): can this instance take traffic. Each dependency is named; any failing check makes it 503. It reads only
+ * Can this instance take traffic. The public GET /readyz answers only ok / not ok (200 / 503); this detailed result, with each dependency named,
+ * is served on the internal listener only (GET /readyz/details on METRICS_PORT). Any failing check makes it unavailable. It reads only
  * what the instance owns: Postgres (`select 1` and the applied migration count through `schema_migration_count()`), Redis through the
  * limiter store and the queue connection. Storage is a config-presence flag (an unconfigured bucket fails the file routes closed, not
  * the instance). No provider (mail, billing, storage, Google) is ever called.
  */
-export async function readiness(deps: Deps): Promise<{ status: "ready" | "unavailable"; body: Record<string, unknown> }> {
+export type ReadinessResult = { status: "ready" | "unavailable"; body: Record<string, unknown> }
+
+const CACHE_MS = 2000
+const cache = new WeakMap<Deps, { at: number; run: Promise<ReadinessResult> }>()
+
+/**
+ * Single-flight and cached for 2 s on deps.clock: concurrent callers share one check and a flood of /readyz calls costs one set of queries
+ * per window (a check that times out is not cancelled, so an unbounded one-per-request would starve the pool).
+ */
+export function readiness(deps: Deps): Promise<ReadinessResult> {
+  const now = deps.clock.now().getTime()
+  const hit = cache.get(deps)
+  if (hit && now - hit.at < CACHE_MS) return hit.run
+  const run = check(deps)
+  cache.set(deps, { at: now, run })
+  return run
+}
+
+async function check(deps: Deps): Promise<ReadinessResult> {
   const expected = expectedMigrations()
   let applied: number | null = null
   const [db, redis, queue, migrations, storage] = await Promise.all([

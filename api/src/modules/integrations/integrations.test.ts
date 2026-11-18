@@ -310,3 +310,17 @@ test("integration id from another tenant -> 404 integration_not_found", async ()
   await expect(getAccessToken(w.deps, w.other.id, id)).rejects.toMatchObject({ status: 404, code: "integration_not_found" })
   expect(await (await w.req("GET", "/v1/integrations", w.cx, undefined, "other")).json()).toEqual([])
 })
+
+test("the callback has no tenant of its own: the single-use state binds tenant and user, an X-Tenant header on the callback is ignored, and nothing is written to another tenant the same user belongs to", async () => {
+  const w = await world()
+  await makeMember(w.deps, w.other.id, "owner", { email: w.owner.email }) // the same person owns a second tenant
+  const before = await q(w.other.id, "select count(*)::int as n from integration_connections")
+  const { state } = await w.start() // started in `acme`
+  const r = await call(w.app, "GET", `/v1/integrations/google/callback?${new URLSearchParams({ code: w.oauth.codeFor("drive@example.com"), state })}`, { cookie: w.co, tenant: w.other.slug }) // header names the OTHER tenant
+  expect(r.headers.get("location")).toBe(`${testEnv.APP_URL}/settings/integrations?status=connected`)
+  expect(await connections(w)).toHaveLength(1) // acme, where it started
+  expect(await q(w.other.id, "select count(*)::int as n from integration_connections")).toEqual(before) // nothing in the other tenant
+  const replay = await call(w.app, "GET", `/v1/integrations/google/callback?${new URLSearchParams({ code: w.oauth.codeFor("again@example.com"), state })}`, { cookie: w.co, tenant: w.other.slug })
+  expect(replay.status).toBe(400) // spent: cannot be replayed into any tenant
+  expect(await q(w.other.id, "select count(*)::int as n from integration_connections")).toEqual(before)
+})

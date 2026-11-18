@@ -16,6 +16,7 @@ import { makeNet } from "./core/net/net"
 import { makeRedisRateLimiter } from "./core/middleware/rate-limit"
 import { makeLogErrorReporter } from "./core/observability/error-reporter"
 import { makeLogger } from "./core/observability/logger"
+import { readiness } from "./core/observability/readiness"
 import { makeMetrics, startMetricsServer } from "./core/observability/metrics"
 import { errorInfo } from "./core/safe-error"
 import { parseEnv, type Env } from "./env"
@@ -34,7 +35,7 @@ export function makeDeps(env: Env, o: { service?: "api" | "worker" } = {}): Deps
 /** The internal metrics listener (ruling S10); a no-op when `port` is unset. The pool gauge is read at scrape time. */
 export async function startInternalMetrics(deps: Deps, port: number | undefined) {
   if (port === undefined) return undefined
-  return startMetricsServer({ metrics: deps.metrics, port, host: deps.env.METRICS_HOST, collect: () => deps.metrics.gauge("db_pool_waiting").set(deps.db.$client.waitingCount) })
+  return startMetricsServer({ metrics: deps.metrics, port, host: deps.env.METRICS_HOST, details: () => readiness(deps), collect: () => deps.metrics.gauge("db_pool_waiting").set(deps.db.$client.waitingCount) })
 }
 
 export function start(env: Env = parseEnv(process.env)) {

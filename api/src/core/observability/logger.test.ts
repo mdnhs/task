@@ -87,4 +87,30 @@ describe("log redaction", () => {
     logger.info({ body: { anything: "SECRET-IN-BODY" }, reqBody: "x" }, "m")
     expect(JSON.stringify(last())).not.toContain("SECRET-IN-BODY")
   })
+
+  test("a hostile __proto__ key is just data: it pollutes nothing, is still scrubbed, and never throws", () => {
+    const { logger, lines } = capture()
+    const hostile = JSON.parse('{"__proto__": {"polluted": "yes", "password": "PROTOSECRET"}, "constructor": {"token": "CTORSECRET"}, "ok": 1}')
+    expect(() => logger.info(hostile, "m")).not.toThrow()
+    const out = lines.join("")
+    expect(out).not.toMatch(/PROTOSECRET|CTORSECRET/)
+    expect(({} as Record<string, unknown>).polluted).toBeUndefined()
+    expect(Object.hasOwn(scrub(hostile), "__proto__")).toBe(true) // kept as an own data key, not swallowed by the prototype setter
+    expect(JSON.parse(lines[0]).ok).toBe(1)
+  })
+
+  test("an error with a cause chain logs only the outer class name and code: no inner message, no nested detail", () => {
+    const { logger, lines } = capture()
+    const inner = Object.assign(new Error("INNERMSG leak@example.com"), { code: "ECONNRESET", detail: "INNERDETAIL" })
+    const mid = Object.assign(new Error("MIDMSG", { cause: inner }), { code: "XX000" })
+    logger.error({ err: new Error("OUTERMSG", { cause: mid }), nested: { error: new Error("NESTEDMSG", { cause: inner }) } }, "boom")
+    expect(lines.join("")).not.toMatch(/INNERMSG|MIDMSG|OUTERMSG|NESTEDMSG|INNERDETAIL|leak@/)
+  })
+
+  test("a string over the cap is truncated, not logged whole", () => {
+    const { logger, last } = capture()
+    logger.info({ blob: "x".repeat(50_000) + "TAILSECRET" }, "m")
+    expect((last().blob as string).length).toBeLessThanOrEqual(2000)
+    expect(JSON.stringify(last())).not.toContain("TAILSECRET")
+  })
 })
