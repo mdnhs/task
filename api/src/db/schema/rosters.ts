@@ -106,7 +106,7 @@ export const shiftTypes = pgTable(
     check("shift_types_end_check", sql`${t.endTime} ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$'`),
     check("shift_types_break_check", sql`${t.unpaidBreakMin} BETWEEN 0 AND 480`),
     check("shift_types_role_check", sql`char_length(${t.role}) BETWEEN 1 AND 80`),
-    uniqueIndex("shift_types_location_name_uq").on(t.tenantId, t.locationId, t.name).where(sql`${t.archivedAt} is null`),
+    uniqueIndex("shift_types_location_name_uq").on(t.tenantId, t.locationId, sql`lower(${t.name})`).where(sql`${t.archivedAt} is null`),
     index("shift_types_location_idx").on(t.tenantId, t.locationId).where(sql`${t.archivedAt} is null`),
     tenantPolicy(),
   ],
@@ -151,6 +151,269 @@ export const memberQualifications = pgTable(
     foreignKey({ columns: [t.tenantId, t.fileId], foreignColumns: [files.tenantId, files.id], name: "member_qualifications_file_fk" }).onDelete("set null"),
     check("member_qualifications_type_check", sql`char_length(${t.type}) BETWEEN 1 AND 80`),
     index("member_qualifications_expiry_idx").on(t.tenantId, t.expiresOn).where(sql`${t.expiresOn} is not null`),
+    index("member_qualifications_file_idx").on(t.tenantId, t.fileId), // the SET NULL file FK scans this on a file delete
+    tenantPolicy(),
+  ],
+).enableRLS()
+
+const HHMM = "^([01][0-9]|2[0-3]):[0-5][0-9]$"
+
+/** One location's week (FR-RS-10): Monday-anchored, draft until published. `auto_repeat_days` (null = off) is read by the auto-repeat job. */
+export const rosterWeeks = pgTable(
+  "roster_weeks",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    tenantId: uuid("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    locationId: uuid("location_id").notNull(),
+    weekStart: date("week_start", { mode: "string" }).notNull(),
+    status: text("status").notNull().default("draft"),
+    publishedAt: ts("published_at"),
+    publishedBy: text("published_by"),
+    autoRepeatDays: smallint("auto_repeat_days"),
+    version: integer("version").notNull().default(1),
+    createdAt: ts("created_at").notNull(),
+    updatedAt: ts("updated_at").notNull(),
+  },
+  (t) => [
+    unique("roster_weeks_tenant_id_id").on(t.tenantId, t.id),
+    unique("roster_weeks_location_start_uq").on(t.tenantId, t.locationId, t.weekStart),
+    foreignKey({ columns: [t.tenantId, t.locationId], foreignColumns: [locations.tenantId, locations.id], name: "roster_weeks_location_fk" }),
+    check("roster_weeks_monday_check", sql`extract(isodow from ${t.weekStart}) = 1`),
+    check("roster_weeks_status_check", sql`${t.status} in ('draft','published')`),
+    check("roster_weeks_repeat_check", sql`${t.autoRepeatDays} is null or ${t.autoRepeatDays} BETWEEN 1 AND 365`),
+    tenantPolicy(),
+  ],
+).enableRLS()
+
+/**
+ * A shift in a week. `user_id` null = an open shift. The type's role/times/break are COPIED (a later edit of the type never rewrites a rostered shift).
+ * `start_at`/`end_at` are the instants (wallToEpoch in the location zone). Deleting the member clears only user_id (tenant_id stays).
+ */
+export const rosterShifts = pgTable(
+  "roster_shifts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    tenantId: uuid("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    weekId: uuid("week_id").notNull(),
+    locationId: uuid("location_id").notNull(),
+    date: date("date", { mode: "string" }).notNull(),
+    userId: text("user_id"),
+    shiftTypeId: uuid("shift_type_id").notNull(),
+    role: text("role").notNull(),
+    startTime: text("start_time").notNull(),
+    endTime: text("end_time").notNull(),
+    unpaidBreakMin: smallint("unpaid_break_min").notNull().default(0),
+    startAt: ts("start_at").notNull(),
+    endAt: ts("end_at").notNull(),
+    confirmedAt: ts("confirmed_at"),
+    version: integer("version").notNull().default(1),
+    sourceShiftId: uuid("source_shift_id"),
+    createdBy: text("created_by"),
+    createdAt: ts("created_at").notNull(),
+    updatedAt: ts("updated_at").notNull(),
+  },
+  (t) => [
+    unique("roster_shifts_tenant_id_id").on(t.tenantId, t.id),
+    foreignKey({ columns: [t.tenantId, t.weekId], foreignColumns: [rosterWeeks.tenantId, rosterWeeks.id], name: "roster_shifts_week_fk" }),
+    foreignKey({ columns: [t.tenantId, t.locationId], foreignColumns: [locations.tenantId, locations.id], name: "roster_shifts_location_fk" }),
+    foreignKey({ columns: [t.tenantId, t.shiftTypeId], foreignColumns: [shiftTypes.tenantId, shiftTypes.id], name: "roster_shifts_type_fk" }),
+    foreignKey({ columns: [t.tenantId, t.userId], foreignColumns: [memberships.tenantId, memberships.userId], name: "roster_shifts_member_fk" }).onDelete("set null"), // column list added by hand in the SQL
+    foreignKey({ columns: [t.tenantId, t.sourceShiftId], foreignColumns: [t.tenantId, t.id], name: "roster_shifts_source_fk" }).onDelete("set null"), // column list added by hand in the SQL
+    check("roster_shifts_time_check", sql`${t.endAt} > ${t.startAt}`),
+    check("roster_shifts_start_check", sql`${t.startTime} ~ '${sql.raw(HHMM)}'`),
+    check("roster_shifts_end_check", sql`${t.endTime} ~ '${sql.raw(HHMM)}'`),
+    check("roster_shifts_break_check", sql`${t.unpaidBreakMin} BETWEEN 0 AND 480`),
+    check("roster_shifts_role_check", sql`char_length(${t.role}) BETWEEN 1 AND 80`),
+    index("roster_shifts_user_idx").on(t.tenantId, t.userId, t.startAt),
+    index("roster_shifts_location_date_idx").on(t.tenantId, t.locationId, t.date),
+    index("roster_shifts_week_idx").on(t.tenantId, t.weekId),
+    tenantPolicy(),
+  ],
+).enableRLS()
+
+/**
+ * Append-only roster change log (FR-RS-13). week_id and shift_id are plain ids, NOT foreign keys: the log outlives a deleted shift or week.
+ * before/after are DTO snapshots the service decides (never more PII than the shift itself).
+ */
+export const rosterHistory = pgTable(
+  "roster_history",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    tenantId: uuid("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    weekId: uuid("week_id"),
+    locationId: uuid("location_id").notNull(),
+    shiftId: uuid("shift_id"),
+    action: text("action").notNull(),
+    actorId: text("actor_id").notNull(),
+    reason: text("reason"),
+    before: jsonb("before").$type<Record<string, unknown> | null>(),
+    after: jsonb("after").$type<Record<string, unknown> | null>(),
+    createdAt: ts("created_at").notNull(),
+  },
+  (t) => [
+    foreignKey({ columns: [t.tenantId, t.locationId], foreignColumns: [locations.tenantId, locations.id], name: "roster_history_location_fk" }),
+    check("roster_history_action_check", sql`char_length(${t.action}) BETWEEN 1 AND 80`),
+    index("roster_history_location_idx").on(t.tenantId, t.locationId, t.createdAt.desc(), t.id.desc()),
+    tenantPolicy(),
+  ],
+).enableRLS()
+
+/** A person asks to change a published shift (patch = the wanted fields); an office role decides (FR-RS-14). Deleting the person erases the request. */
+export const rosterChangeRequests = pgTable(
+  "roster_change_requests",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    tenantId: uuid("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    shiftId: uuid("shift_id").notNull(),
+    requestedBy: text("requested_by").notNull(),
+    patch: jsonb("patch").$type<Record<string, unknown>>().notNull(),
+    reason: text("reason").notNull(),
+    status: text("status").notNull().default("requested"),
+    decidedBy: text("decided_by"),
+    decidedAt: ts("decided_at"),
+    decisionNote: text("decision_note"),
+    createdAt: ts("created_at").notNull(),
+    updatedAt: ts("updated_at").notNull(),
+  },
+  (t) => [
+    foreignKey({ columns: [t.tenantId, t.shiftId], foreignColumns: [rosterShifts.tenantId, rosterShifts.id], name: "roster_change_requests_shift_fk" }).onDelete("cascade"),
+    foreignKey({ columns: [t.tenantId, t.requestedBy], foreignColumns: [memberships.tenantId, memberships.userId], name: "roster_change_requests_member_fk" }).onDelete("cascade"),
+    check("roster_change_requests_status_check", sql`${t.status} in ('requested','approved','rejected')`),
+    index("roster_change_requests_shift_idx").on(t.tenantId, t.shiftId),
+    index("roster_change_requests_open_idx").on(t.tenantId, t.createdAt).where(sql`${t.status} = 'requested'`),
+    tenantPolicy(),
+  ],
+).enableRLS()
+
+/** A claim of an open shift or a swap of an assigned one (FR-RS-15). One OPEN exchange per (shift, requester, kind); a decided one frees the slot. */
+export const rosterExchanges = pgTable(
+  "roster_exchanges",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    tenantId: uuid("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    kind: text("kind").notNull(),
+    shiftId: uuid("shift_id").notNull(),
+    fromUserId: text("from_user_id").notNull(),
+    toUserId: text("to_user_id"),
+    status: text("status").notNull().default("requested"),
+    note: text("note").notNull().default(""),
+    decidedBy: text("decided_by"),
+    decidedAt: ts("decided_at"),
+    createdAt: ts("created_at").notNull(),
+    updatedAt: ts("updated_at").notNull(),
+  },
+  (t) => [
+    foreignKey({ columns: [t.tenantId, t.shiftId], foreignColumns: [rosterShifts.tenantId, rosterShifts.id], name: "roster_exchanges_shift_fk" }).onDelete("cascade"),
+    foreignKey({ columns: [t.tenantId, t.fromUserId], foreignColumns: [memberships.tenantId, memberships.userId], name: "roster_exchanges_from_fk" }).onDelete("cascade"),
+    foreignKey({ columns: [t.tenantId, t.toUserId], foreignColumns: [memberships.tenantId, memberships.userId], name: "roster_exchanges_to_fk" }).onDelete("set null"), // column list added by hand in the SQL
+    check("roster_exchanges_kind_check", sql`${t.kind} in ('claim','swap')`),
+    check("roster_exchanges_status_check", sql`${t.status} in ('requested','recommended','approved','rejected','cancelled')`),
+    uniqueIndex("roster_exchanges_open_uq").on(t.tenantId, t.shiftId, t.fromUserId, t.kind).where(sql`${t.status} in ('requested','recommended')`),
+    index("roster_exchanges_shift_idx").on(t.tenantId, t.shiftId),
+    tenantPolicy(),
+  ],
+).enableRLS()
+
+/** Time off (FR-RS-20), whole dates inclusive. */
+export const leaveRequests = pgTable(
+  "leave_requests",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    tenantId: uuid("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    userId: text("user_id").notNull(),
+    fromDate: date("from_date", { mode: "string" }).notNull(),
+    toDate: date("to_date", { mode: "string" }).notNull(),
+    kind: text("kind").notNull(),
+    status: text("status").notNull().default("requested"),
+    note: text("note").notNull().default(""),
+    decidedBy: text("decided_by"),
+    decidedAt: ts("decided_at"),
+    createdAt: ts("created_at").notNull(),
+    updatedAt: ts("updated_at").notNull(),
+  },
+  (t) => [
+    foreignKey({ columns: [t.tenantId, t.userId], foreignColumns: [memberships.tenantId, memberships.userId], name: "leave_requests_member_fk" }).onDelete("cascade"),
+    check("leave_requests_dates_check", sql`${t.toDate} >= ${t.fromDate}`),
+    check("leave_requests_status_check", sql`${t.status} in ('requested','approved','rejected','cancelled')`),
+    check("leave_requests_kind_check", sql`char_length(${t.kind}) BETWEEN 1 AND 40`),
+    index("leave_requests_user_idx").on(t.tenantId, t.userId, t.fromDate),
+    tenantPolicy(),
+  ],
+).enableRLS()
+
+/** A "not available" window on a weekday (0 = Sunday ... 6). A window that crosses midnight is two rows (the service splits it), so from < to; to may be 24:00. */
+export const rosterAvailability = pgTable(
+  "roster_availability",
+  {
+    tenantId: uuid("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    userId: text("user_id").notNull(),
+    weekday: smallint("weekday").notNull(),
+    fromTime: text("from_time").notNull(),
+    toTime: text("to_time").notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.tenantId, t.userId, t.weekday, t.fromTime, t.toTime] }),
+    foreignKey({ columns: [t.tenantId, t.userId], foreignColumns: [memberships.tenantId, memberships.userId], name: "roster_availability_member_fk" }).onDelete("cascade"),
+    check("roster_availability_weekday_check", sql`${t.weekday} BETWEEN 0 AND 6`),
+    check("roster_availability_from_check", sql`${t.fromTime} ~ '${sql.raw(HHMM)}'`),
+    check("roster_availability_to_check", sql`${t.toTime} ~ '^(([01][0-9]|2[0-3]):[0-5][0-9]|24:00)$'`),
+    check("roster_availability_order_check", sql`${t.fromTime} < ${t.toTime}`),
+    tenantPolicy(),
+  ],
+).enableRLS()
+
+/** A saved week layout of a location (FR-RS-12). `shifts` is the service's validated list; the DB only keeps it. */
+export const rosterWeekTemplates = pgTable(
+  "roster_week_templates",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    tenantId: uuid("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    locationId: uuid("location_id").notNull(),
+    name: text("name").notNull(),
+    shifts: jsonb("shifts").$type<unknown[]>().notNull().default(sql`'[]'::jsonb`),
+    createdBy: text("created_by"),
+    createdAt: ts("created_at").notNull(),
+    updatedAt: ts("updated_at").notNull(),
+  },
+  (t) => [
+    unique("roster_week_templates_name_uq").on(t.tenantId, t.locationId, t.name),
+    foreignKey({ columns: [t.tenantId, t.locationId], foreignColumns: [locations.tenantId, locations.id], name: "roster_week_templates_location_fk" }),
+    check("roster_week_templates_name_check", sql`char_length(${t.name}) BETWEEN 1 AND 80`),
+    check("roster_week_templates_shifts_check", sql`jsonb_typeof(${t.shifts}) = 'array'`),
+    tenantPolicy(),
+  ],
+).enableRLS()
+
+/** Exactly-once ledger of the auto-repeat job: one row per (source week, target week start) it copied. */
+export const rosterAutoRepeatRuns = pgTable(
+  "roster_auto_repeat_runs",
+  {
+    tenantId: uuid("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    sourceWeekId: uuid("source_week_id").notNull(),
+    targetWeekStart: date("target_week_start", { mode: "string" }).notNull(),
+    createdAt: ts("created_at").notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.tenantId, t.sourceWeekId, t.targetWeekStart] }),
+    foreignKey({ columns: [t.tenantId, t.sourceWeekId], foreignColumns: [rosterWeeks.tenantId, rosterWeeks.id], name: "roster_auto_repeat_runs_week_fk" }).onDelete("cascade"),
+    tenantPolicy(),
+  ],
+).enableRLS()
+
+/** Exactly-once ledger of the expiry-notice job: one row per (person, qualification type, expiry date, lead days) already notified. */
+export const qualificationExpiryNotices = pgTable(
+  "qualification_expiry_notices",
+  {
+    tenantId: uuid("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    userId: text("user_id").notNull(),
+    type: text("type").notNull(),
+    expiresOn: date("expires_on", { mode: "string" }).notNull(),
+    leadDays: smallint("lead_days").notNull(),
+    createdAt: ts("created_at").notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.tenantId, t.userId, t.type, t.expiresOn, t.leadDays] }),
+    foreignKey({ columns: [t.tenantId, t.userId], foreignColumns: [memberships.tenantId, memberships.userId], name: "qualification_expiry_notices_member_fk" }).onDelete("cascade"),
     tenantPolicy(),
   ],
 ).enableRLS()

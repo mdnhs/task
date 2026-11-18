@@ -119,12 +119,22 @@ describe("time zones", () => {
     expect(wallToEpoch("2026-10-04T02:15", "Australia/Lord_Howe")).toBe(Date.UTC(2026, 9, 3, 15, 30))
     expect(wallToEpoch("2026-04-05T01:45", "Australia/Lord_Howe")).toBe(Date.UTC(2026, 3, 4, 14, 45))
   })
+  it("midnight gap (America/Havana, 8 Mar 2026: 00:00 does not exist, the day starts at 01:00 = 05:00Z)", () => {
+    expect(wallToEpoch("2026-03-08T00:00", "America/Havana")).toBe(Date.UTC(2026, 2, 8, 5, 0))
+    expect(wallToEpoch("2026-03-08T00:30", "America/Havana")).toBe(Date.UTC(2026, 2, 8, 5, 0))
+    expect(epochToWall(wallToEpoch("2026-03-08T00:00", "America/Havana"), "America/Havana")).toBe("2026-03-08T01:00")
+    expect(wallToEpoch("2026-03-08T01:00", "America/Havana")).toBe(Date.UTC(2026, 2, 8, 5, 0))
+    expect(wallToEpoch("2026-03-07T23:59", "America/Havana")).toBe(Date.UTC(2026, 2, 8, 4, 59)) // the minute before is untouched
+    expect(minutesBetween("2026-03-07T22:00", "2026-03-08T02:00", "America/Havana")).toBe(180) // real minutes across the lost hour
+    // the fold at the other end (1 Nov 2026: 01:00 -> 00:00): 00:30 happens twice, the first one wins
+    expect(wallToEpoch("2026-11-01T00:30", "America/Havana")).toBe(Date.UTC(2026, 10, 1, 4, 30))
+  })
   it("a wall time on the first minute after the gap is unchanged", () => {
     expect(wallToEpoch("2026-03-29T02:00", TZ)).toBe(Date.UTC(2026, 2, 29, 1, 0))
     expect(wallToEpoch("2026-03-29T02:01", TZ)).toBe(Date.UTC(2026, 2, 29, 1, 1))
   })
   it("a sweep of every minute around both Dublin and New_York changes is monotonic and lands on the wall time or its transition", () => {
-    for (const [tz, from, to] of [[TZ, "2026-03-28", "2026-03-30"], [TZ, "2026-10-24", "2026-10-26"], ["America/New_York", "2026-03-07", "2026-03-09"], ["America/New_York", "2026-10-31", "2026-11-02"]] as const) {
+    for (const [tz, from] of [[TZ, "2026-03-28", "2026-03-30"], [TZ, "2026-10-24", "2026-10-26"], ["America/New_York", "2026-03-07", "2026-03-09"], ["America/New_York", "2026-10-31", "2026-11-02"], ["America/Havana", "2026-03-07", "2026-03-09"], ["America/Havana", "2026-10-31", "2026-11-02"]] as const) {
       let prev = -Infinity
       for (let m = 0; m < 48 * 60; m++) {
         const day = addDays(from, Math.floor(m / 1440))
@@ -135,7 +145,6 @@ describe("time zones", () => {
         const back = epochToWall(ms, tz)
         if (back !== wall) expect(epochToWall(ms - 60_000, tz) < wall && back > wall).toBe(true) // a gap minute: the transition, the first minute after it
       }
-      expect(to > from).toBe(true)
     }
   })
   it("fold: 01:30 on 25 Oct 2026 takes the first occurrence (00:30Z)", () => {

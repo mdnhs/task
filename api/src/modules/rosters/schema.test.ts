@@ -176,7 +176,7 @@ describe("migration 0043 SQL run for real", () => {
 
   test("the journal and the 0043 snapshot follow 0042", () => {
     const j = JSON.parse(readFileSync(new URL("../../db/migrations/meta/_journal.json", import.meta.url), "utf8")) as { entries: { idx: number; tag: string }[] }
-    expect(j.entries.slice(-2).map((e) => [e.idx, e.tag])).toEqual([[42, "0042_schema_migration_count"], [43, "0043_roster_locations"]])
+    expect(j.entries.slice(42, 44).map((e) => [e.idx, e.tag])).toEqual([[42, "0042_schema_migration_count"], [43, "0043_roster_locations"]])
     const s = JSON.parse(readFileSync(new URL("../../db/migrations/meta/0043_snapshot.json", import.meta.url), "utf8")) as { prevId: string; id: string }
     const prev = JSON.parse(readFileSync(new URL("../../db/migrations/meta/0042_snapshot.json", import.meta.url), "utf8")) as { id: string }
     expect(s.prevId).toBe(prev.id)

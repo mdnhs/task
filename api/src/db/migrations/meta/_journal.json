@@ -309,6 +309,13 @@
       "when": 1795005503794,
       "tag": "0043_roster_locations",
       "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1795006850478,
+      "tag": "0044_roster_weeks",
+      "breakpoints": true
     }
   ]
 }

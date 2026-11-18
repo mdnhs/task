@@ -11,6 +11,8 @@ export type EventType =
   | "project.created" | "project.updated" | "project.deleted"
   | "shift.pattern_created" | "shift.pattern_updated" | "shift.pattern_archived" | "shift.assigned" | "shift.unassigned" | "shift.reporting_changed"
   | "shift.report.submitted" | "shift.report.accepted" | "shift.report.returned" | "shift.report.missing" | "report.export_completed"
+  | "roster.week_published" | "roster.shift_changed" | "roster.change_requested" | "roster.change_decided" | "roster.exchange_requested" | "roster.exchange_decided"
+  | "roster.leave_requested" | "roster.leave_decided" | "roster.auto_repeat_created" | "roster.qualification_expiring" | "location.supervisors_changed" | "member.deactivated"
 
 export type DomainEvent = {
   id: string

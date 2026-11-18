@@ -1,6 +1,6 @@
 # Migrations runbook (B7 Task 19)
 
-Migrations are numbered SQL files in `api/src/db/migrations/` (drizzle; 44 at the time of writing, 0000 to 0043), applied as `app_owner`. The API connects as `app_user`, which cannot create or alter anything and has no BYPASSRLS.
+Migrations are numbered SQL files in `api/src/db/migrations/` (drizzle; 45 at the time of writing, 0000 to 0044), applied as `app_owner`. The API connects as `app_user`, which cannot create or alter anything and has no BYPASSRLS.
 
 ## Rules
 
