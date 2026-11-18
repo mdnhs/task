@@ -2,10 +2,14 @@
 
 import { useState } from "react"
 import { Plus } from "lucide-react"
+import { DndContext, rectIntersection, useDraggable, useDroppable } from "@dnd-kit/core"
+import type { Announcements, DragEndEvent, DragStartEvent } from "@dnd-kit/core"
+import { useReducedMotion } from "motion/react"
 
 import { RollNumber } from "@/components/roll-number"
 import { formatDate } from "@/lib/dates"
 import { numDir } from "@/lib/motion"
+import { DragLayer, moveBetweenTargets, originOf, useDragSensors } from "@/lib/drag-card"
 import type { RosterViewKind, ViewBlock, ViewDay, ViewShift } from "../view"
 
 // By location (FR-RS-10): one card per day, laid out as the seven-day columns (a single column at 640px and under). A card shows the
@@ -56,10 +60,14 @@ function RollCount({ value }: { value: number }) {
   return <RollNumber value={String(value)} dir={seen.dir} />
 }
 
-export function ShiftLine({ s, place, fresh, onEdit, onRequest, onDragStart }: { s: ViewShift; place?: boolean; fresh?: boolean; onEdit?(): void; onRequest?(): void; onDragStart?(): void }) {
+type LineProps = { s: ViewShift; place?: boolean; fresh?: boolean; card?: boolean; onEdit?(): void; onRequest?(): void }
+
+/** One shift. `card` = a card on a day column (the same card as the recruitment kanban: lib/drag-card.tsx + drag.css); the person grid uses plain lines. */
+export function ShiftLine({ s, place, fresh, card, onEdit, onRequest }: LineProps) {
+  const cls = card ? "ros-shift ros-card" : "ros-shift"
   if (!onEdit && onRequest) {
     return (
-      <li className="ros-shift" data-open={s.open || undefined} data-new={fresh || undefined}>
+      <li className={cls} data-open={s.open || undefined} data-new={fresh || undefined}>
         <Lines s={s} place={place} />
         <button type="button" className="ros-req-btn" onClick={onRequest} aria-label={`Request change, ${s.person}, ${s.start} to ${s.end}`}>Request change</button>
       </li>
@@ -67,35 +75,38 @@ export function ShiftLine({ s, place, fresh, onEdit, onRequest, onDragStart }: {
   }
   if (!onEdit) {
     return (
-      <li className="ros-shift" data-open={s.open || undefined} data-new={fresh || undefined}>
+      <li className={cls} data-open={s.open || undefined} data-new={fresh || undefined}>
         <Lines s={s} place={place} />
       </li>
     )
   }
-  // Editable: the whole card opens the edit form (also the keyboard and touch way to move it); mouse users can drag it to another day.
+  return <DragShift s={s} place={place} fresh={fresh} card={card} onEdit={onEdit} />
+}
+
+// Editable: the whole card opens the edit form (Enter; also the touch way to move it); drag it to another day with the mouse, a held touch,
+// or the keyboard (Space lifts, arrow keys pick the day, Space drops). Needs a DndContext (DayBoard).
+function DragShift({ s, place, fresh, card, onEdit }: { s: ViewShift; place?: boolean; fresh?: boolean; card?: boolean; onEdit(): void }) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: s.id })
   return (
     <li
-      className="ros-shift"
+      ref={setNodeRef}
+      className={`${card ? "ros-shift ros-card" : "ros-shift"} dnd-card`}
+      data-edit=""
+      data-dragging={isDragging ? "" : undefined}
       data-open={s.open || undefined} data-new={fresh || undefined}
-      draggable
-      onDragStartCapture={(e: React.DragEvent) => {
-        e.dataTransfer.setData("text/plain", s.id)
-        e.dataTransfer.effectAllowed = "move"
-        onDragStart?.()
-      }}
     >
-      <button type="button" className="ros-shift-btn" onClick={onEdit} aria-label={`Edit shift, ${s.person}, ${s.start} to ${s.end}`}>
+      <button type="button" className="ros-shift-btn" onClick={onEdit} aria-label={`Edit shift, ${s.person}, ${s.start} to ${s.end}`} {...attributes} {...listeners}>
         <Lines s={s} place={place} />
       </button>
+      <span className="dnd-grip" aria-hidden="true" />
     </li>
   )
 }
 
-function Day({ day, today, locationId, editor, dragId, setDragId }: { day: ViewDay; today: string; locationId: string; editor?: DayEditor; dragId: string | null; setDragId(id: string | null): void }) {
+function Day({ day, today, locationId, editor, dragId }: { day: ViewDay; today: string; locationId: string; editor?: DayEditor; dragId: string | null }) {
   const short = day.short > 0
   const canEdit = !!editor && day.hasRoster && editor.editable(locationId, day.date)
   const canAsk = !canEdit && !!editor && day.hasRoster && editor.canRequest(locationId, day.date)
-  const [over, setOver] = useState(false)
   // Cards that arrive after the first paint (added, or moved here from another day) fade in once; the first paint is covered by the page enter.
   const key = day.shifts.map((x) => x.id).join("|")
   const [known, setKnown] = useState({ key, ids: new Set(day.shifts.map((x) => x.id)), fresh: new Set<string>() })
@@ -106,26 +117,17 @@ function Day({ day, today, locationId, editor, dragId, setDragId }: { day: ViewD
   const fresh = known.fresh
   const dragged = dragId && editor ? editor.shiftInfo(dragId) : undefined
   const droppable = canEdit && !!dragged && dragged.locationId === locationId && dragged.date !== day.date
+  // Same drop target as a kanban column: tinted while a card is held, the hovered one lit up (drag.css / rosters.css).
+  const { setNodeRef, isOver } = useDroppable({ id: day.date, disabled: !droppable })
   return (
     <section
+      ref={setNodeRef}
       className="ros-day"
       data-today={day.date === today || undefined}
       data-short={short || undefined}
-      data-over={over && droppable ? "ok" : undefined}
+      data-target={droppable || undefined}
+      data-over={droppable && isOver ? "" : undefined}
       aria-label={formatDate(day.date)}
-      onDragOver={(e) => {
-        if (!droppable) return
-        e.preventDefault()
-        setOver(true)
-      }}
-      onDragLeave={() => setOver(false)}
-      onDrop={(e) => {
-        e.preventDefault()
-        setOver(false)
-        const id = e.dataTransfer.getData("text/plain") || dragId
-        setDragId(null)
-        if (id && droppable) editor?.onMove(id, day.date)
-      }}
     >
       <header className="ros-day-head">
         <span className="ros-day-name">{formatDate(day.date)}</span>
@@ -144,27 +146,59 @@ function Day({ day, today, locationId, editor, dragId, setDragId }: { day: ViewD
         )}
       </header>
       {day.shifts.length > 0 ? (
-        <ul className="ros-shifts" onDragEnd={() => { setDragId(null); setOver(false) }}>
+        <ul className="ros-shifts">
           {day.shifts.map((s) => (
-            <ShiftLine key={s.id} s={s} fresh={fresh.has(s.id)} onEdit={canEdit ? () => editor?.onEdit(s.id) : undefined} onRequest={canAsk ? () => editor?.onRequest(s.id) : undefined} onDragStart={() => setDragId(s.id)} />
+            <ShiftLine key={s.id} s={s} card fresh={fresh.has(s.id)} onEdit={canEdit ? () => editor?.onEdit(s.id) : undefined} onRequest={canAsk ? () => editor?.onRequest(s.id) : undefined} />
           ))}
         </ul>
       ) : (
-        <span className="ros-none">{day.hasRoster ? "No shifts" : "No roster"}</span>
+        <span className="ros-none" data-drop={droppable || undefined}>{droppable ? "Drop here" : day.hasRoster ? "No shifts" : "No roster"}</span>
       )}
     </section>
   )
 }
 
 export function DayBoard({ block, today, view, firstWeekday, editor }: { block: ViewBlock; today: string; view: RosterViewKind; firstWeekday: number; editor?: DayEditor }) {
+  const reduce = !!useReducedMotion()
   const [dragId, setDragId] = useState<string | null>(null)
-  return (
+  const [origin, setOrigin] = useState("50% 50%")
+  const sensors = useDragSensors(moveBetweenTargets)
+  const held = dragId ? block.days.flatMap((d) => d.shifts).find((x) => x.id === dragId) : undefined
+  const dayName = (id: unknown) => formatDate(String(id))
+  const who = (id: unknown) => block.days.flatMap((d) => d.shifts).find((x) => x.id === id)?.person || "Shift"
+  const announcements: Announcements = {
+    onDragStart: ({ active }) => `Picked up the shift of ${who(active.id)}. Use the arrow keys to choose a day, Space to drop.`,
+    onDragOver: ({ active, over }) => (over ? `${who(active.id)} is over ${dayName(over.id)}.` : `${who(active.id)} is not over a day.`),
+    onDragEnd: ({ active, over }) => (over ? `${who(active.id)} moved to ${dayName(over.id)}.` : `${who(active.id)} dropped, not moved.`),
+    onDragCancel: ({ active }) => `Move cancelled. ${who(active.id)} stays on the same day.`,
+  }
+  const board = (
     <div className="ros-board" data-view={view}>
       {block.days.map((d, i) => (
         <div key={d.date} className="ros-cell" style={i === 0 && view === "month" ? { gridColumnStart: firstWeekday + 1 } : undefined}>
-          <Day day={d} today={today} locationId={block.locationId} editor={editor} dragId={dragId} setDragId={setDragId} />
+          <Day day={d} today={today} locationId={block.locationId} editor={editor} dragId={dragId} />
         </div>
       ))}
     </div>
+  )
+  if (!editor) return board
+  const end = ({ active, over }: DragEndEvent) => {
+    setDragId(null)
+    if (over) editor.onMove(String(active.id), String(over.id))
+  }
+  return (
+    <DndContext
+      sensors={sensors}
+      collisionDetection={rectIntersection}
+      accessibility={{ announcements }}
+      onDragStart={({ active, activatorEvent }: DragStartEvent) => { setDragId(String(active.id)); setOrigin(originOf(activatorEvent, ".ros-card")) }}
+      onDragCancel={() => setDragId(null)}
+      onDragEnd={end}
+    >
+      {board}
+      <DragLayer show={!!held} reduce={reduce} className="ros-shift ros-card" origin={origin}>
+        {held && <Lines s={held} />}
+      </DragLayer>
+    </DndContext>
   )
 }

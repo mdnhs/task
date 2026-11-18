@@ -110,12 +110,35 @@
 .ros-add:focus-visible,.ros-shift-btn:focus-visible{outline:2px solid var(--brand);outline-offset:1px}
 .ros-day-head .ros-count{margin-left:auto}
 .ros-day-head .ros-count + .ros-add{margin-left:8px}
-.ros-shift[draggable="true"]{cursor:grab}
-.ros-shift[draggable="true"]:active{cursor:grabbing}
-.ros-shift-btn{display:flex;flex-direction:column;gap:1px;min-width:0;width:100%;padding:0;border:0;background:none;font:inherit;text-align:left;color:inherit;cursor:inherit}
+.ros-shift-btn{display:flex;flex-direction:column;gap:2px;min-width:0;width:100%;padding:0;border:0;border-radius:inherit;background:none;font:inherit;text-align:left;color:inherit;cursor:inherit;touch-action:manipulation}
 .ros-shift-btn:hover .ros-who{color:var(--brand-deep)}
 .ros-shift[data-open] .ros-shift-btn:hover .ros-who{color:var(--warn)}
-.ros-day[data-over]{background:var(--brand-soft)}
+:root[data-theme="dark"] .ros-shift-btn:hover .ros-who{color:var(--brand-3)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .ros-shift-btn:hover .ros-who{color:var(--brand-3)}}
+:root[data-theme="dark"] .ros-shift[data-open] .ros-shift-btn:hover .ros-who{color:var(--warn)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .ros-shift[data-open] .ros-shift-btn:hover .ros-who{color:var(--warn)}}
+
+/* Shift cards on the day columns: the same card as the recruitment kanban (.rec-card): --card surface, --r-md, 12px padding, name 14/700, then the detail lines.
+   Drag affordance (grab cursor, grip, ghost, lifted card) comes from the shared drag.css; only editable cards carry it. */
+.ros-card{position:relative;gap:2px;padding:12px;border-radius:var(--r-md);background:var(--card);color:var(--ink);list-style:none}
+.ros-card[data-edit]{padding:0}
+.ros-card[data-edit] .ros-shift-btn{padding:12px}
+.ros-card[data-edit] .ros-who{padding-right:14px}
+.ros-card .ros-who{font-size:14px;font-weight:700;line-height:20px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;transition:color var(--dur-fast) var(--ease)}
+.ros-card .ros-time{font-size:12.5px;line-height:18px}
+.ros-card .ros-role{font-size:12px;line-height:17px}
+.ros-card .ros-req-btn{margin-top:4px}
+/* Day column = kanban column: while a card is held every valid day is tinted, the hovered one lights up like a hovered .rec-col. */
+.ros-day{transition:background var(--dur-fast) var(--ease)}
+.ros-day[data-target]{background:color-mix(in srgb,var(--brand-soft) 40%,var(--mute-bg))}
+.ros-day[data-today][data-target]{background:color-mix(in srgb,var(--brand-soft) 80%,var(--mute-bg))}
+.ros-day[data-over],.ros-day[data-today][data-over]{background:var(--brand-soft)}
+.ros-day[data-over] .ros-day-name{color:var(--brand-deep)}
+:root[data-theme="dark"] .ros-day[data-over] .ros-day-name{color:var(--brand-3)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .ros-day[data-over] .ros-day-name{color:var(--brand-3)}}
+.ros-day .ros-none{padding:14px 4px;font-size:12.5px;line-height:19px}
+.ros-day .ros-none[data-drop]{color:var(--ink-2)}
+@media (prefers-reduced-motion:reduce){.ros-day{transition:none}}
 .ros-dialog{width:min(760px,calc(calc(100vw / var(--text-scale,1)) - 24px))}
 .ros-dialog .od-form-cols{gap:16px 32px}
 .ros-dialog .od-form-foot .ros-remove{margin-right:auto;color:var(--bad);border-color:var(--bad)}

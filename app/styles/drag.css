@@ -1,0 +1,9 @@
+/* ===== Shared drag-and-drop card look (lib/drag-card.tsx): recruitment kanban + roster day columns ===== */
+.dnd-card{cursor:grab;touch-action:manipulation}
+.dnd-card:active{cursor:grabbing}
+.dnd-card[data-dragging]{opacity:.4}
+.dnd-lifted{cursor:grabbing;box-shadow:0 14px 34px rgba(0,0,0,.22),0 3px 8px rgba(0,0,0,.12);pointer-events:none}
+/* Drag handle: six dots, drawn in CSS so the icon set can change; shown on editable cards only. */
+.dnd-grip{position:absolute;top:10px;right:8px;width:8px;height:14px;color:var(--ink-3);opacity:.55;pointer-events:none;transition:opacity var(--dur-fast) var(--ease),color var(--dur-fast) var(--ease);background:radial-gradient(circle,currentColor 1.1px,transparent 1.5px) 0 0/4px 5px}
+.dnd-card:hover .dnd-grip,.dnd-card:focus-within .dnd-grip{opacity:1;color:var(--ink-2)}
+@media (prefers-reduced-motion:reduce){.dnd-grip{transition:none}}
