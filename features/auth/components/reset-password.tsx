@@ -4,7 +4,7 @@ import Link from "next/link"
 import { useEffect, useState, useTransition } from "react"
 
 import { Field } from "@/components/field"
-import { Input } from "@/components/ui/input"
+import { SecretInput } from "@/components/secret-input"
 import { resetPassword } from "@/lib/auth-client"
 import { resetStep } from "@/lib/auth-flow"
 import { stripQueryFromAddressBar } from "@/lib/strip-token"
@@ -71,7 +71,7 @@ export function ResetPassword({ token }: { token: string }) {
         <p>Choose a new password for your account.</p>
       </header>
       <Field label="New password" htmlFor="rp-password" error={errors.password} required>
-        <Input id="rp-password" type="password" autoComplete="new-password" value={password} onChange={(e) => { setPassword(e.target.value); setErrors({}) }} />
+        <SecretInput noun="password" id="rp-password" autoComplete="new-password" value={password} onChange={(e) => { setPassword(e.target.value); setErrors({}) }} />
       </Field>
       <div className="auth-strength">
         <div suppressHydrationWarning className="progress" role="progressbar" aria-label="Password strength" aria-valuemin={0} aria-valuemax={PASSWORD_RULES.length} aria-valuenow={score} data-score={score}>
@@ -90,7 +90,7 @@ export function ResetPassword({ token }: { token: string }) {
         </ul>
       </div>
       <Field label="Confirm password" htmlFor="rp-confirm" error={errors.confirm} required>
-        <Input id="rp-confirm" type="password" autoComplete="new-password" value={confirm} onChange={(e) => { setConfirm(e.target.value); setErrors({}) }} />
+        <SecretInput noun="password" id="rp-confirm" autoComplete="new-password" value={confirm} onChange={(e) => { setConfirm(e.target.value); setErrors({}) }} />
       </Field>
       <button type="submit" className="btn btn-primary auth-submit" disabled={pending}>
         {pending ? "Saving…" : "Set new password"}

@@ -5,6 +5,7 @@ import { Copy, Smartphone } from "lucide-react"
 import { toast } from "sonner"
 
 import { Field } from "@/components/field"
+import { SecretInput } from "@/components/secret-input"
 import { Input } from "@/components/ui/input"
 import { enableTotp, verifyTotp } from "@/lib/auth-client"
 import { copyText } from "@/lib/clipboard"
@@ -75,7 +76,7 @@ export function TotpSetup({ account, onDone }: { account: string; onDone(): void
       <form className="mfa-steps" onSubmit={begin} noValidate>
         <p>Confirm your password for {account} to start.</p>
         <Field label="Password" htmlFor="mfa-pw" error={error} required>
-          <Input id="mfa-pw" type="password" autoComplete="current-password" value={password} onChange={(e) => { setPassword(e.target.value); setError(undefined) }} />
+          <SecretInput noun="password" id="mfa-pw" autoComplete="current-password" value={password} onChange={(e) => { setPassword(e.target.value); setError(undefined) }} />
         </Field>
         <div><button type="submit" className="btn btn-primary" disabled={pending}>Continue</button></div>
       </form>

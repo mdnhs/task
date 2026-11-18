@@ -7,6 +7,7 @@ import { Field } from "@/components/field"
 import { Icon } from "@/components/icons"
 import { PageHead } from "@/components/page-head"
 import { StretchIndicator } from "@/components/stretch-indicator"
+import { SecretInput } from "@/components/secret-input"
 import { Input } from "@/components/ui/input"
 import type { LiveBilling, LiveEmail, LiveStorage } from "../adapters"
 import { dateTimeUtc } from "../format"
@@ -70,7 +71,7 @@ export function LiveSettings({ email, storage, billing, canWrite, section: initi
       <div {...panel("email")}><section className="card pf-card" aria-labelledby="pf-set-email">
         <div className="card-head"><div><h2 id="pf-set-email">Email</h2><div className="sub">{email.configured ? `Resend · updated ${dateTimeUtc(email.updatedAt)}` : "Not set up"}</div></div></div>
         <form className="pf-form od-form pf-set" onSubmit={(ev) => { ev.preventDefault(); void act("save:email", () => client.saveEmail(e), "Email settings saved").then((r) => r.ok && setE((x) => ({ ...x, apiKey: "" }))) }}>
-          <Field label="API key" htmlFor="pf-e-key" hint={hint(email.configured, email.configured ? email.keyHint : undefined)}><Input id="pf-e-key" placeholder="re_…" type="password" autoComplete="off" value={e.apiKey} disabled={ro} onChange={(ev) => setE({ ...e, apiKey: ev.target.value })} /></Field>
+          <Field label="API key" htmlFor="pf-e-key" hint={hint(email.configured, email.configured ? email.keyHint : undefined)}><SecretInput id="pf-e-key" placeholder="re_…" autoComplete="off" value={e.apiKey} disabled={ro} onChange={(ev) => setE({ ...e, apiKey: ev.target.value })} /></Field>
           <Field label="From address" htmlFor="pf-e-from" required><Input id="pf-e-from" placeholder="noreply@example.com" type="email" value={e.fromAddress} disabled={ro} onChange={(ev) => setE({ ...e, fromAddress: ev.target.value })} /></Field>
           <Field label="From name" htmlFor="pf-e-name" required><Input id="pf-e-name" placeholder="Company name" value={e.fromName} disabled={ro} onChange={(ev) => setE({ ...e, fromName: ev.target.value })} /></Field>
           {canWrite && <div className="pf-set-acts"><button type="submit" className="btn btn-primary">Save email</button></div>}
@@ -92,7 +93,7 @@ export function LiveSettings({ email, storage, billing, canWrite, section: initi
           <Field label="Account ID" htmlFor="pf-s-acc" required><Input id="pf-s-acc" placeholder="Cloudflare account ID" value={s.accountId} disabled={ro} onChange={(ev) => setS({ ...s, accountId: ev.target.value })} /></Field>
           <Field label="Bucket" htmlFor="pf-s-bucket" required><Input id="pf-s-bucket" placeholder="bucket-name" value={s.bucket} disabled={ro} onChange={(ev) => setS({ ...s, bucket: ev.target.value })} /></Field>
           <Field label="Access key ID" htmlFor="pf-s-key" required><Input id="pf-s-key" placeholder="Access key ID" value={s.accessKeyId} disabled={ro} onChange={(ev) => setS({ ...s, accessKeyId: ev.target.value })} /></Field>
-          <Field label="Secret access key" htmlFor="pf-s-secret" hint={hint(storage.configured, storage.configured ? storage.secretHint : undefined)}><Input id="pf-s-secret" placeholder="Secret access key" type="password" autoComplete="off" value={s.secretAccessKey} disabled={ro} onChange={(ev) => setS({ ...s, secretAccessKey: ev.target.value })} /></Field>
+          <Field label="Secret access key" htmlFor="pf-s-secret" hint={hint(storage.configured, storage.configured ? storage.secretHint : undefined)}><SecretInput id="pf-s-secret" placeholder="Secret access key" autoComplete="off" value={s.secretAccessKey} disabled={ro} onChange={(ev) => setS({ ...s, secretAccessKey: ev.target.value })} /></Field>
           {canWrite && (
             <>
               <div className="pf-set-acts">
@@ -109,8 +110,8 @@ export function LiveSettings({ email, storage, billing, canWrite, section: initi
       <div {...panel("billing")}><section className="card pf-card" aria-labelledby="pf-set-billing">
         <div className="card-head"><div><h2 id="pf-set-billing">Billing</h2><div className="sub">{billing.configured ? `Stripe · updated ${dateTimeUtc(billing.updatedAt)}` : "Not set up"}</div></div></div>
         <form className="pf-form od-form pf-set" onSubmit={(ev) => { ev.preventDefault(); void act("save:billing", () => client.saveBilling(b), "Billing settings saved").then((r) => r.ok && setB((x) => ({ ...x, secretKey: "", webhookSecret: "" }))) }}>
-          <Field label="Secret key" htmlFor="pf-b-sk" hint={hint(billing.configured, billing.configured ? billing.secretHint : undefined)}><Input id="pf-b-sk" placeholder="Secret key" type="password" autoComplete="off" value={b.secretKey} disabled={ro} onChange={(ev) => setB({ ...b, secretKey: ev.target.value })} /></Field>
-          <Field label="Webhook secret" htmlFor="pf-b-wh" hint={hint(billing.configured, billing.configured ? billing.webhookHint : undefined)}><Input id="pf-b-wh" placeholder="Signing secret" type="password" autoComplete="off" value={b.webhookSecret} disabled={ro} onChange={(ev) => setB({ ...b, webhookSecret: ev.target.value })} /></Field>
+          <Field label="Secret key" htmlFor="pf-b-sk" hint={hint(billing.configured, billing.configured ? billing.secretHint : undefined)}><SecretInput id="pf-b-sk" placeholder="Secret key" autoComplete="off" value={b.secretKey} disabled={ro} onChange={(ev) => setB({ ...b, secretKey: ev.target.value })} /></Field>
+          <Field label="Webhook secret" htmlFor="pf-b-wh" hint={hint(billing.configured, billing.configured ? billing.webhookHint : undefined)}><SecretInput id="pf-b-wh" placeholder="Signing secret" autoComplete="off" value={b.webhookSecret} disabled={ro} onChange={(ev) => setB({ ...b, webhookSecret: ev.target.value })} /></Field>
           <Field label="Publishable key" htmlFor="pf-b-pk" hint="pk_test_… or pk_live_…: sets the Test / Live pill"><Input id="pf-b-pk" value={b.publishableKey} disabled={ro} onChange={(ev) => setB({ ...b, publishableKey: ev.target.value })} /></Field>
           {billing.configured && <p className="pf-note pf-note-info">Webhook URL: <span className="num">{billing.webhookUrl}</span></p>}
           {canWrite && <div className="pf-set-acts"><button type="submit" className="btn btn-primary">Save billing</button></div>}

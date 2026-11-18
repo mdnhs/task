@@ -5,6 +5,7 @@ import { useEffect, useState, useTransition } from "react"
 
 import { afterSignIn } from "@/app/actions/session"
 import { Field } from "@/components/field"
+import { SecretInput } from "@/components/secret-input"
 import { Input } from "@/components/ui/input"
 import { resendVerification, signInEmail, signInSocial, verifyBackupCode, verifyTotp } from "@/lib/auth-client"
 import { clearClientStores } from "@/lib/client-stores"
@@ -156,7 +157,7 @@ export function SignInForm({ providers, next, expired = false }: { providers: Au
         <Input id="si-email" type="email" autoComplete="username" value={email} placeholder="name@company.com" onChange={(e) => { setEmail(e.target.value); setErrors((x) => ({ ...x, email: "" })) }} />
       </Field>
       <Field label="Password" htmlFor="si-password" error={errors.password} required>
-        <Input id="si-password" type="password" autoComplete="current-password" value={password} onChange={(e) => { setPassword(e.target.value); setErrors((x) => ({ ...x, password: "" })) }} />
+        <SecretInput noun="password" id="si-password" autoComplete="current-password" value={password} onChange={(e) => { setPassword(e.target.value); setErrors((x) => ({ ...x, password: "" })) }} />
       </Field>
       <div className="auth-row">
         <Link href="/forgot-password" className="auth-link">

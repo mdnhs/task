@@ -11,7 +11,7 @@ import { DataPagination } from "@/components/data-pagination"
 import { Field } from "@/components/field"
 import { Icon } from "@/components/icons"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
+import { SecretInput } from "@/components/secret-input"
 import { Switch } from "@/components/ui/switch"
 import { When } from "@/components/when"
 import { AlertDialog, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
@@ -223,7 +223,7 @@ export function SecurityPanel({
           </DialogHeader>
           <form className="mfa-steps" onSubmit={(e) => { e.preventDefault(); applyMfaOff() }} noValidate>
             <Field label="Password" htmlFor="mfa-off-pw" error={disableError} required>
-              <Input id="mfa-off-pw" type="password" autoComplete="current-password" value={disablePw} onChange={(e) => { setDisablePw(e.target.value); setDisableError(undefined) }} />
+              <SecretInput noun="password" id="mfa-off-pw" autoComplete="current-password" value={disablePw} onChange={(e) => { setDisablePw(e.target.value); setDisableError(undefined) }} />
             </Field>
             <div><button type="submit" className="btn btn-danger" disabled={pending}>Turn off</button></div>
           </form>
