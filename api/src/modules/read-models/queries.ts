@@ -1,7 +1,7 @@
 import { and, asc, desc, eq, gte, inArray, isNotNull, lt, ne, sql, type SQL } from "drizzle-orm"
 import { shiftReports, taskAssignees, taskComments, taskEvidence, tasks, teams } from "../../db/schema"
 import type { TenantTx } from "../../db/tenant-tx"
-import { buildListQuery, OPEN_STATUSES, taskScopeWhere, type TaskCtx } from "../tasks"
+import { buildListQuery, OPEN_STATUSES, taskScopeWhere, teamTaskWhere, type TaskCtx } from "../tasks"
 import { reportScopeWhere, type ReportCtx } from "../shift-reports"
 import { dayBounds } from "./days"
 
@@ -20,7 +20,7 @@ const WORKING = ["not_started", "in_progress", "changes_requested"]
 // ---------------------------------------------------------------- dashboard
 
 /** open, overdue, due today, awaiting review (someone else's submitted task) and the status mix, in ONE pass over the scope's live tasks. `day` is the tenant-local day (its bounds are wall midnights, so a DST day is 23 or 25 h). */
-export function dashboardSummaryQuery(tx: TenantTx, ctx: TaskCtx, day: string) {
+export function dashboardSummaryQuery(tx: TenantTx, ctx: TaskCtx, day: string, teamId?: string) {
   const { start, end } = dayBounds(day, ctx.tz)
   const now = sql`${ts(ctx.now)}::timestamptz`
   return tx
@@ -38,23 +38,23 @@ export function dashboardSummaryQuery(tx: TenantTx, ctx: TaskCtx, day: string) {
       cancelled: count(eq(tasks.status, "cancelled")),
     })
     .from(tasks)
-    .where(and(...live(ctx), taskScopeWhere(ctx.scope, ctx.reports)))
+    .where(and(...live(ctx), taskScopeWhere(ctx.scope, ctx.reports), teamId ? teamTaskWhere(teamId) : undefined))
 }
 
 /** Evidence items waiting for a review decision on live tasks in scope (the gallery index `task_evidence_gallery_idx`: tenant, review, created_at, id). */
-export function pendingEvidenceQuery(tx: TenantTx, ctx: TaskCtx) {
+export function pendingEvidenceQuery(tx: TenantTx, ctx: TaskCtx, teamId?: string) {
   return tx
     .select({ n: sql<number>`count(*)::int` })
     .from(taskEvidence)
     .innerJoin(tasks, and(eq(tasks.tenantId, taskEvidence.tenantId), eq(tasks.id, taskEvidence.taskId)))
-    .where(and(eq(taskEvidence.tenantId, ctx.tenantId), eq(taskEvidence.review, "pending"), sql`${tasks.archivedAt} is null`, taskScopeWhere(ctx.scope, ctx.reports)))
+    .where(and(eq(taskEvidence.tenantId, ctx.tenantId), eq(taskEvidence.review, "pending"), sql`${tasks.archivedAt} is null`, taskScopeWhere(ctx.scope, ctx.reports), teamId ? teamTaskWhere(teamId) : undefined))
 }
 
 /**
  * Completions per tenant-local day for `days` (consecutive, oldest first), grouped by bucket and primary assignee ("closer"): `tasks_closed_idx` for the window, then the scope. The bucket is the
  * index of the day whose [midnight, next midnight) holds the instant (`width_bucket` over the day-start instants), so a 23 h or 25 h day is exact. At most days × members rows.
  */
-export function tasksClosedQuery(tx: TenantTx, ctx: TaskCtx, days: string[]) {
+export function tasksClosedQuery(tx: TenantTx, ctx: TaskCtx, days: string[], teamId?: string) {
   const bounds = days.map((d) => dayBounds(d, ctx.tz))
   const edges = [...bounds.map((b) => b.start), bounds[bounds.length - 1].end].map((ms) => ms / 1000)
   if (!edges.every(Number.isFinite)) throw new Error("bad day bounds")
@@ -67,14 +67,14 @@ export function tasksClosedQuery(tx: TenantTx, ctx: TaskCtx, days: string[]) {
       and(
         ...live(ctx), sql`${tasks.completedAt} is not null`, eq(tasks.status, "completed"),
         gte(tasks.completedAt, new Date(bounds[0].start)), lt(tasks.completedAt, new Date(bounds[bounds.length - 1].end)),
-        taskScopeWhere(ctx.scope, ctx.reports),
+        taskScopeWhere(ctx.scope, ctx.reports), teamId ? teamTaskWhere(teamId) : undefined,
       ),
     )
     .groupBy(sql`1`, taskAssignees.userId)
 }
 
 /** GET /v1/dashboard/team-tasks: the open tasks of the scope, due first: exactly the task list's `status=open` query (so the same rows, in the same order, with the same cursor). */
-export const teamTasksQuery = (tx: TenantTx, ctx: TaskCtx, take: number, after?: { at: Date; id: string }) => buildListQuery(tx, ctx, { status: "open", after }, take)
+export const teamTasksQuery = (tx: TenantTx, ctx: TaskCtx, take: number, after?: { at: Date; id: string }, teamId?: string) => buildListQuery(tx, ctx, { status: "open", after, teamId }, take)
 
 // ---------------------------------------------------------------- attention
 
@@ -105,7 +105,7 @@ export function awaitingReviewQuery(tx: TenantTx, ctx: TaskCtx, limit: number) {
 }
 
 /** The exact size of each task kind in scope (the lists above are capped). The owner (primary assignee) of the rows is read for the page only, in one batch (assigneesOf). */
-export function attentionCountsQuery(tx: TenantTx, ctx: TaskCtx) {
+export function attentionCountsQuery(tx: TenantTx, ctx: TaskCtx, teamId?: string) {
   return tx
     .select({
       overdue: count(sql`${inArray(tasks.status, WORKING)} and ${tasks.dueAt} < ${ts(ctx.now)}::timestamptz`),
@@ -113,64 +113,66 @@ export function attentionCountsQuery(tx: TenantTx, ctx: TaskCtx) {
       review: count(sql`${tasks.status} = 'submitted' and not ${iMine(ctx.me)}`),
     })
     .from(tasks)
-    .where(and(...live(ctx), inArray(tasks.status, ["not_started", "in_progress", "changes_requested", "blocked", "submitted"]), taskScopeWhere(ctx.scope, ctx.reports)))
+    .where(and(...live(ctx), inArray(tasks.status, ["not_started", "in_progress", "changes_requested", "blocked", "submitted"]), taskScopeWhere(ctx.scope, ctx.reports), teamId ? teamTaskWhere(teamId) : undefined))
 }
 
 // ---------------------------------------------------------------- reports (F5 scope)
 
 /** Open reports (draft or returned) due on or after `since`, per team, with the next due time: `shift_reports_open_idx` (tenant, due_at) where status in ('draft','returned'). */
-export function openReportsQuery(tx: TenantTx, ctx: ReportCtx, since: Date) {
+export function openReportsQuery(tx: TenantTx, ctx: ReportCtx, since: Date, teamId?: string) {
   return tx
     .select({ teamId: shiftReports.teamId, open: sql<number>`count(*)::int`, nextDue: sql<Date | null>`min(${shiftReports.dueAt}) filter (where ${shiftReports.dueAt} >= ${ts(ctx.now)}::timestamptz)` })
     .from(shiftReports)
-    .where(and(eq(shiftReports.tenantId, ctx.tenantId), sql`${shiftReports.status} in ('draft','returned')`, gte(shiftReports.dueAt, since), isNotNull(shiftReports.userId), reportScopeWhere(ctx)))
+    .where(and(eq(shiftReports.tenantId, ctx.tenantId), sql`${shiftReports.status} in ('draft','returned')`, gte(shiftReports.dueAt, since), isNotNull(shiftReports.userId), reportScopeWhere(ctx), teamId ? eq(shiftReports.teamId, teamId) : undefined))
     .groupBy(shiftReports.teamId)
     .limit(100)
 }
 
 /** Submitted reports waiting for a review decision, shift date in [from, to]: `shift_reports_inbox_idx` (tenant, shift_date desc). */
-export function awaitingReportsQuery(tx: TenantTx, ctx: ReportCtx, from: string, to: string) {
+export function awaitingReportsQuery(tx: TenantTx, ctx: ReportCtx, from: string, to: string, teamId?: string) {
   return tx
     .select({ n: sql<number>`count(*)::int` })
     .from(shiftReports)
-    .where(and(eq(shiftReports.tenantId, ctx.tenantId), gte(shiftReports.shiftDate, from), sql`${shiftReports.shiftDate} <= ${to}`, eq(shiftReports.status, "submitted"), isNotNull(shiftReports.userId), ne(shiftReports.userId, ctx.me), reportScopeWhere(ctx))) // not my own: review.ts refuses self_review
+    .where(and(eq(shiftReports.tenantId, ctx.tenantId), gte(shiftReports.shiftDate, from), sql`${shiftReports.shiftDate} <= ${to}`, eq(shiftReports.status, "submitted"), isNotNull(shiftReports.userId), ne(shiftReports.userId, ctx.me), reportScopeWhere(ctx), teamId ? eq(shiftReports.teamId, teamId) : undefined)) // not my own: review.ts refuses self_review
 }
 
 // ---------------------------------------------------------------- the member's own (staff dashboard, Today)
 
 /** My open, overdue, waiting-for-review and returned counts: tasks I am an assignee of (`task_assignees_user_idx`). */
-export function myCountsQuery(tx: TenantTx, tenantId: string, me: string, now: Date) {
+export function myCountsQuery(tx: TenantTx, tenantId: string, me: string, now: Date, teamId?: string) {
   return tx
     .select({
       open: count(isOpen), overdue: count(sql`${isOpen} and ${tasks.dueAt} < ${ts(now)}::timestamptz`), review: count(eq(tasks.status, "submitted")), returned: count(eq(tasks.status, "changes_requested")),
     })
     .from(taskAssignees)
     .innerJoin(tasks, and(eq(tasks.tenantId, taskAssignees.tenantId), eq(tasks.id, taskAssignees.taskId)))
-    .where(and(eq(taskAssignees.tenantId, tenantId), eq(taskAssignees.userId, me), sql`${tasks.archivedAt} is null`))
+    .where(and(eq(taskAssignees.tenantId, tenantId), eq(taskAssignees.userId, me), sql`${tasks.archivedAt} is null`, teamId ? teamTaskWhere(teamId) : undefined))
 }
 
 /** My open tasks, due first (bounded). */
-export function myOpenTasksQuery(tx: TenantTx, tenantId: string, me: string, limit: number) {
+export function myOpenTasksQuery(tx: TenantTx, tenantId: string, me: string, limit: number, teamId?: string) {
   return tx
     .select({
       id: tasks.id, refNo: tasks.refNo, title: tasks.title, priority: tasks.priority, status: tasks.status, dueAt: tasks.dueAt, evidenceRule: tasks.evidenceRule, client: tasks.client, teamName: teams.name,
+      // a voice note the caller can play: the task is one of their own (this query), the file is clean (a pending, infected or deleted one cannot be played). Only a flag: never the file id
+      hasVoice: sql<boolean>`exists (select 1 from files vf where vf.tenant_id = ${tasks.tenantId} and vf.id = ${tasks.voiceFileId} and vf.status = 'clean')`,
     })
     .from(taskAssignees)
     .innerJoin(tasks, and(eq(tasks.tenantId, taskAssignees.tenantId), eq(tasks.id, taskAssignees.taskId)))
     .leftJoin(teams, and(eq(teams.tenantId, tasks.tenantId), eq(teams.id, tasks.teamId)))
-    .where(and(eq(taskAssignees.tenantId, tenantId), eq(taskAssignees.userId, me), sql`${tasks.archivedAt} is null`, inArray(tasks.status, OPEN_STATUSES)))
+    .where(and(eq(taskAssignees.tenantId, tenantId), eq(taskAssignees.userId, me), sql`${tasks.archivedAt} is null`, inArray(tasks.status, OPEN_STATUSES), teamId ? teamTaskWhere(teamId) : undefined))
     .orderBy(asc(tasks.dueAt), asc(tasks.id))
     .limit(limit)
 }
 
 /** The latest comments by other people on tasks I am an assignee of (live tasks, not deleted comments). */
-export function myCommentsQuery(tx: TenantTx, tenantId: string, me: string, limit: number) {
+export function myCommentsQuery(tx: TenantTx, tenantId: string, me: string, limit: number, teamId?: string) {
   return tx
     .select({ id: taskComments.id, taskId: tasks.id, refNo: tasks.refNo, taskTitle: tasks.title, authorId: taskComments.authorId, body: taskComments.body, at: taskComments.createdAt })
     .from(taskAssignees)
     .innerJoin(tasks, and(eq(tasks.tenantId, taskAssignees.tenantId), eq(tasks.id, taskAssignees.taskId)))
     .innerJoin(taskComments, and(eq(taskComments.tenantId, tasks.tenantId), eq(taskComments.taskId, tasks.id)))
-    .where(and(eq(taskAssignees.tenantId, tenantId), eq(taskAssignees.userId, me), sql`${tasks.archivedAt} is null`, sql`${taskComments.deletedAt} is null`, sql`${taskComments.authorId} is distinct from ${me}`))
+    .where(and(eq(taskAssignees.tenantId, tenantId), eq(taskAssignees.userId, me), sql`${tasks.archivedAt} is null`, sql`${taskComments.deletedAt} is null`, sql`${taskComments.authorId} is distinct from ${me}`, teamId ? teamTaskWhere(teamId) : undefined))
     .orderBy(desc(taskComments.createdAt), desc(taskComments.id))
     .limit(limit)
 }
@@ -185,4 +187,32 @@ export function teamOverdueQuery(tx: TenantTx, ctx: TaskCtx, limit: number) {
     .where(and(...live(ctx), isOpen, sql`${tasks.dueAt} < ${ts(ctx.now)}::timestamptz`, sql`not ${iMine(ctx.me)}`, taskScopeWhere(ctx.scope, ctx.reports)))
     .orderBy(desc(tasks.priority), asc(tasks.dueAt), asc(tasks.refNo))
     .limit(limit)
+}
+
+// ---------------------------------------------------------------- grouped by team
+
+/**
+ * The open tasks of the scope grouped by team, the S8 way: a task belongs to a team when it is FILED under it or ASSIGNED to one of its members (the same rule as `teamTaskWhere`, so a row here equals
+ * the list it opens). A task counts once per team (never twice in one), a person who is in two teams is counted in both (`people` = distinct assignees that are members of the team), and the dashboard's
+ * totals do not come from this statement (they count every task once). `teamId` keeps one team. At most one row per team.
+ */
+export async function teamBreakdownQuery(tx: TenantTx, ctx: TaskCtx, teamId?: string) {
+  const base = and(...live(ctx), isOpen, taskScopeWhere(ctx.scope, ctx.reports))
+  const rows = await tx.execute(sql`
+    select g.team_id as "teamId", count(distinct g.id)::int as open,
+           count(distinct g.id) filter (where g.due_at < ${ts(ctx.now)}::timestamptz)::int as overdue,
+           count(distinct g.person)::int as people
+    from (
+      select ${tasks.id} as id, ${tasks.dueAt} as due_at, ${tasks.teamId} as team_id, null::text as person from ${tasks} where ${base} and ${tasks.teamId} is not null
+      union all
+      select ${tasks.id}, ${tasks.dueAt}, tm.team_id, ta.user_id
+        from ${tasks}
+        join task_assignees ta on ta.tenant_id = ${tasks.tenantId} and ta.task_id = ${tasks.id}
+        join team_members tm on tm.tenant_id = ta.tenant_id and tm.user_id = ta.user_id
+       where ${base}
+    ) g
+    ${teamId ? sql`where g.team_id = ${teamId}::uuid` : sql``}
+    group by g.team_id
+    limit 200`)
+  return (rows.rows ?? rows) as unknown as { teamId: string; open: number; overdue: number; people: number }[]
 }

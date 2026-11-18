@@ -94,6 +94,10 @@ export type InboxRow = {
   submissions: number
   itemCount: number
   doneCount: number
+  /** Real minutes the first submission came after the due time (or now minus due while unsubmitted); 0 when on time. */
+  minutesLate: number
+  /** Real minutes from the end of the shift to the first submission (or to now). */
+  minutesOpen: number
   submittedAt?: string
   submittedAtIso?: string
   reviewedAt?: string

@@ -108,7 +108,7 @@ export function toReport(dto: unknown, tz: string): ShiftReport {
 
 const INBOX_KEYS = [
   "id", "key", "userId", "person", "patternId", "teamId", "shiftName", "team", "date", "start", "end", "due", "startAt", "endAt", "dueAt", "status", "state", "version", "submissions", "itemCount",
-  "doneCount", "submittedAt", "reviewedAt", "reviewedBy",
+  "doneCount", "submittedAt", "reviewedAt", "reviewedBy", "minutesLate", "minutesOpen",
 ] as const
 
 /** One row of `GET /v1/shift-reports`. A virtual row has `id: null` and a `key` (open it with POST /v1/shift-reports/open before reading or writing). */
@@ -148,6 +148,8 @@ export function toInboxRow(dto: unknown, tz: string): InboxRow {
     submissions: R.int(r, "submissions"),
     itemCount: R.int(r, "itemCount"),
     doneCount: R.int(r, "doneCount"),
+    minutesLate: R.int(r, "minutesLate"),
+    minutesOpen: R.int(r, "minutesOpen"),
     ...(submittedAtIso ? { submittedAt: wall(submittedAtIso, tz), submittedAtIso } : {}),
     ...(reviewedAtIso ? { reviewedAt: wall(reviewedAtIso, tz) } : {}),
     ...(reviewedBy ? { reviewedBy } : {}),

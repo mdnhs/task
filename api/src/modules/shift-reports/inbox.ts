@@ -73,21 +73,48 @@ export function buildInboxQuery(tx: TenantTx, tenantId: string, scope: InboxScop
       version: shiftReports.version, submissions: shiftReports.submissions, submittedAt: shiftReports.submittedAt, reviewedAt: shiftReports.reviewedAt, reviewedBy: shiftReports.reviewedBy,
     })
     .from(shiftReports)
-    .where(
-      and(
-        eq(shiftReports.tenantId, tenantId),
-        gte(shiftReports.shiftDate, f.from), lte(shiftReports.shiftDate, f.to),
-        isNotNull(shiftReports.userId),
-        reportScopeWhere(scope),
-        f.team ? eq(shiftReports.teamId, f.team) : undefined,
-        f.person ? eq(shiftReports.userId, f.person) : undefined,
-        stateWhere(f.status, now),
-        f.after ? afterWhere(f.after) : undefined,
-      ),
-    )
+    .where(and(inboxWhere(tenantId, scope, f), stateWhere(f.status, now), f.after ? afterWhere(f.after) : undefined))
     .orderBy(desc(shiftReports.shiftDate), asc(userC), asc(shiftReports.patternId))
     .limit(limit)
 }
+
+/** The rows of the window in the caller's scope under the team and person filters: what the list and the counts have in common (never the status or the cursor). */
+const inboxWhere = (tenantId: string, scope: InboxScope, f: Pick<InboxFilter, "from" | "to" | "team" | "person">): SQL | undefined =>
+  and(
+    eq(shiftReports.tenantId, tenantId),
+    gte(shiftReports.shiftDate, f.from), lte(shiftReports.shiftDate, f.to),
+    isNotNull(shiftReports.userId),
+    reportScopeWhere(scope),
+    f.team ? eq(shiftReports.teamId, f.team) : undefined,
+    f.person ? eq(shiftReports.userId, f.person) : undefined,
+  )
+
+export type InboxCounts = { all: number; open: number; missing: number; late: number; returned: number; accepted: number }
+
+/**
+ * The tab counts of the window: how many items each state has under the SAME scope, window, team and person filters as the list (not the status filter, not the cursor), so a count equals the length of
+ * the list it opens. ONE aggregate statement over the stored rows (`filter (where ...)` with the states of `stateWhere`), plus the shifts nobody reported on yet (virtual rows: `missing` past their
+ * due time, `open` before it), which the same scope cut produced. `open` = a draft not yet due + a report submitted on time and not yet reviewed; the five parts add up to `all`.
+ */
+export async function inboxCounts(tx: TenantTx, ctx: ReportCtx, f: InboxFilter): Promise<InboxCounts> {
+  const n = (w: SQL | undefined) => (w ? sql<number>`(count(*) filter (where ${w}))::int` : sql<number>`count(*)::int`)
+  const [row] = await tx
+    .select({
+      all: n(undefined), draft: n(stateWhere("draft", ctx.now)), submitted: n(stateWhere("submitted", ctx.now)), missing: n(stateWhere("missing", ctx.now)), late: n(stateWhere("late", ctx.now)),
+      returned: n(stateWhere("returned", ctx.now)), accepted: n(stateWhere("accepted", ctx.now)),
+    })
+    .from(shiftReports)
+    .where(inboxWhere(ctx.tenantId, ctx, f))
+  let virtualOpen = 0
+  let virtualMissing = 0
+  const nowMs = ctx.now.getTime()
+  for (const v of await virtualRows(tx, ctx, { ...f, status: "all", after: undefined }, Number.MAX_SAFE_INTEGER)) (nowMs > v.dueAt.getTime() ? virtualMissing++ : virtualOpen++)
+  const open = row.draft + row.submitted + virtualOpen
+  const missing = row.missing + virtualMissing
+  return { all: open + missing + row.late + row.returned + row.accepted, open, missing, late: row.late, returned: row.returned, accepted: row.accepted }
+}
+
+const minutes = (ms: number): number => Math.max(0, Math.floor(ms / 60_000))
 
 type Row = Awaited<ReturnType<typeof buildInboxQuery>>[number]
 /** The key of a row for ordering and cursors. */
@@ -138,7 +165,7 @@ export async function virtualRows(tx: TenantTx, ctx: ReportCtx, f: InboxFilter, 
 }
 
 /** GET /v1/shift-reports: stored and virtual rows of the window in ONE ordered stream, one keyset page (limit + 1 of each, merged), scope applied to both. */
-export async function inboxPage(tx: TenantTx, ctx: ReportCtx, f: InboxFilter, limit: number): Promise<{ items: InboxItemDto[]; nextCursor: string | null }> {
+export async function inboxPage(tx: TenantTx, ctx: ReportCtx, f: InboxFilter, limit: number): Promise<{ items: InboxItemDto[]; nextCursor: string | null; counts: InboxCounts }> {
   const stored: Row[] = await buildInboxQuery(tx, ctx.tenantId, ctx, f, ctx.now, limit + 1)
   let virtual: Virtual[] = []
   if (f.status === "all" || f.status === "draft" || f.status === "missing") {
@@ -179,13 +206,17 @@ export async function inboxPage(tx: TenantTx, ctx: ReportCtx, f: InboxFilter, li
     const state = r ? stateOf(r, ctx.now) : ctx.now.getTime() > dueAt.getTime() ? "missing" : "draft"
     const c = r ? countOf.get(r.id) : undefined
     const teamId = r?.teamId ?? v!.teamId
+    // real minutes between INSTANTS (never wall-clock differences, which are wrong across a clock change): past due = first submission (or now, while there is none) minus the due time; open = the same
+    // end point minus the end of the shift
+    const filedAt = (r?.firstSubmittedAt ?? (r && r.status !== "draft" ? r.submittedAt : null))?.getTime() ?? ctx.now.getTime()
     return {
       id: r?.id ?? null, key: `${e.key.userId}:${e.key.patternId}:${e.key.date}`, userId: e.key.userId, person: nameOf(e.key.userId), patternId: e.key.patternId, teamId,
       shiftName: free(r?.shiftName ?? v!.shiftName), team: free(teamName.get(teamId) ?? ""), date: e.key.date,
       start: wall(startAt), end: wall(endAt), due: wall(dueAt), startAt: startAt.toISOString(), endAt: endAt.toISOString(), dueAt: dueAt.toISOString(),
+      minutesLate: minutes(filedAt - dueAt.getTime()), minutesOpen: minutes(filedAt - endAt.getTime()),
       status: (r?.status ?? "draft") as InboxItemDto["status"], state, version: r?.version ?? 0, submissions: r?.submissions ?? 0,
       itemCount: c?.n ?? 0, doneCount: c?.done ?? 0, submittedAt: r?.submittedAt?.toISOString() ?? null, reviewedAt: r?.reviewedAt?.toISOString() ?? null, reviewedBy: r?.reviewedBy ? nameOf(r.reviewedBy) : null,
     }
   })
-  return { items, nextCursor: more && last ? encodeInboxCursor(last.key) : null }
+  return { items, nextCursor: more && last ? encodeInboxCursor(last.key) : null, counts: await inboxCounts(tx, ctx, f) }
 }

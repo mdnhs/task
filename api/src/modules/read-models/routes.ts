@@ -13,7 +13,7 @@ import { withTenant, type TenantTx } from "../../db/tenant-tx"
 import { applyTaskUpdate, mutate, taskScopeWhere, TaskNotFound, wallOf } from "../tasks"
 import { readModelKey, readModelTtl } from "./cache"
 import { localDay } from "./days"
-import { AttentionOut, AttentionQuery, DashboardOut, StaffOut, TeamTasksOut, TeamTasksQuery, TodayOut, TodayQuery, TodayUpdateBody, TodayUpdateOut } from "./dto"
+import { AttentionOut, AttentionQuery, DashboardOut, DashboardQuery, StaffOut, StaffQuery, TeamTasksOut, TeamTasksQuery, TodayOut, TodayQuery, TodayUpdateBody, TodayUpdateOut } from "./dto"
 import { attentionPage, loadAttention, loadDashboard, loadStaff, loadToday, loadTeamTasks } from "./service"
 import { rmScope, scopeKeyOf, type RmScope } from "./scope"
 
@@ -34,18 +34,18 @@ async function readModel<T>(c: Context<AppEnv>, model: string | null, personal: 
 }
 
 const dashboardR = createRoute({
-  method: "get", path: "/v1/dashboard", middleware: guard("dashboard", "read"),
+  method: "get", path: "/v1/dashboard", middleware: guard("dashboard", "read"), request: { query: DashboardQuery },
   responses: {
-    200: json(DashboardOut, "The manager home bundle for the caller's scope (D5 tasks, F5 reports): summary (open, overdue, due today, completed today with a 7-day trend, awaiting review, evidence pending), tasks closed per tenant-local day (count, late, top closer), the status mix, the report deadline card (the caller's own next report; per-team counts for a manager) and the attention count (null without attention access). Cached 30 s per tenant and scope; never for a support session"),
+    200: json(DashboardOut, "The manager home bundle for the caller's scope (D5 tasks, F5 reports; `teamId` narrows to one team's tasks, filed under it or assigned to its members, S8): summary (open, overdue, due today, completed today with a 7-day trend, awaiting review, evidence pending), tasks closed per tenant-local day (count, late, top closer), the status mix, the open tasks grouped by team (filed under OR assigned to a member: a person in two teams is in both, the totals count each task once), the report deadline card (the caller's own next report; per-team counts for a manager) and the attention count (null without attention access). Cached 30 s per user, scope and team filter; never for a support session"),
   },
 })
 const teamTasksR = createRoute({
   method: "get", path: "/v1/dashboard/team-tasks", middleware: guard("tasks", "read"), request: { query: TeamTasksQuery },
-  responses: { 200: json(TeamTasksOut, "Open tasks in the caller's scope, due first (the task list's own `status=open` order): the home table. Cursor paged (`limit` 1-100, 400 invalid_cursor)") },
+  responses: { 200: json(TeamTasksOut, "Open tasks in the caller's scope, due first (the task list's own `status=open` order): the home table. `teamId` keeps one team's (filed under it or assigned to its members). Cursor paged (`limit` 1-100, 400 invalid_cursor)") },
 })
 const staffR = createRoute({
-  method: "get", path: "/v1/dashboard/staff", middleware: guard("dashboard", "read"),
-  responses: { 200: json(StaffOut, "The caller's OWN home (an API key: its creator's): my tasks (open, overdue, waiting for review, returned) and the open list, evidence waiting and returned with the reviewer's reason, the latest comments by others on my tasks, my next report. Personal: cached per user. 403 for a support session") },
+  method: "get", path: "/v1/dashboard/staff", middleware: guard("dashboard", "read"), request: { query: StaffQuery },
+  responses: { 200: json(StaffOut, "The caller's OWN home (an API key: its creator's): my tasks (open, overdue, waiting for review, returned) and the open list, evidence waiting and returned with the reviewer's reason, the latest comments by others on my tasks, my next report. `teamId` narrows to my tasks of that team. Personal: cached per user and filter. 403 for a support session") },
 })
 const attentionR = createRoute({
   method: "get", path: "/v1/attention", middleware: guard("attention", "read"), request: { query: AttentionQuery },
@@ -65,9 +65,15 @@ const todayUpdateR = createRoute({
 
 export const readModelRoutes = newRouter()
   // Every model is cached per user: "me" is in the numbers (awaiting review leaves out my own submitted tasks, the deadline card is my own next shift), so two people of the same scope must not share an entry.
-  .openapi(dashboardR, async (c) => c.json(await readModel(c, "dashboard", true, loadDashboard), 200))
+  .openapi(dashboardR, async (c) => {
+    const q = c.req.valid("query")
+    return c.json(await readModel(c, `dashboard:${q.teamId ?? ""}`, true, (tx, s) => loadDashboard(tx, s, q)), 200)
+  })
   .openapi(teamTasksR, async (c) => c.json(await readModel(c, null, false, (tx, s) => loadTeamTasks(tx, s, c.req.valid("query"))), 200))
-  .openapi(staffR, async (c) => c.json(await readModel(c, "staff", true, loadStaff), 200))
+  .openapi(staffR, async (c) => {
+    const q = c.req.valid("query")
+    return c.json(await readModel(c, `staff:${q.teamId ?? ""}`, true, (tx, s) => loadStaff(tx, s, q)), 200)
+  })
   .openapi(attentionR, async (c) => {
     const q = c.req.valid("query")
     const feed = await readModel(c, "attention", true, loadAttention)

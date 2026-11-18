@@ -14,7 +14,7 @@ import { dayBounds, lastDays, localDay } from "./days"
 import type { AttentionDto, AttentionItemDto, DashboardDto, ReportDeadlineDto, StaffDto, TeamTasksDto, TodayDto } from "./dto"
 import {
   attentionCountsQuery, attentionQuery, awaitingReportsQuery, awaitingReviewQuery, dashboardSummaryQuery, myCommentsQuery, myCountsQuery, myOpenTasksQuery, openReportsQuery, pendingEvidenceQuery,
-  tasksClosedQuery, teamOverdueQuery, teamTasksQuery,
+  tasksClosedQuery, teamBreakdownQuery, teamOverdueQuery, teamTasksQuery,
 } from "./queries"
 import { freeText, type RmScope } from "./scope"
 
@@ -144,7 +144,7 @@ export function attentionPage(feed: { total: number; items: Ranked[] }, limit: n
 
 // ---------------------------------------------------------------- the report deadline card
 
-async function reportDeadline(tx: TenantTx, s: RmScope, alerts: ReportAlert[]): Promise<ReportDeadlineDto> {
+async function reportDeadline(tx: TenantTx, s: RmScope, alerts: ReportAlert[], teamId?: string): Promise<ReportDeadlineDto> {
   const ctx = s.rctx
   if (!ctx) return { member: null, team: null }
   const member = await currentItem(tx, ctx)
@@ -152,9 +152,9 @@ async function reportDeadline(tx: TenantTx, s: RmScope, alerts: ReportAlert[]): 
   const today = localDay(s.now, s.tz)
   const range = inboxRange(s.now, s.tz, {})
   const since = new Date(dayBounds(range.from, s.tz).start)
-  const [open, [awaiting]] = await Promise.all([openReportsQuery(tx, ctx, since), awaitingReportsQuery(tx, ctx, addDays(today, -30), today)])
+  const [open, [awaiting]] = await Promise.all([openReportsQuery(tx, ctx, since, teamId), awaitingReportsQuery(tx, ctx, addDays(today, -30), today, teamId)])
   const missingBy = new Map<string, number>()
-  for (const a of alerts) if (a.kind === "report_missing") missingBy.set(a.teamId, (missingBy.get(a.teamId) ?? 0) + 1)
+  for (const a of alerts) if (a.kind === "report_missing" && (!teamId || a.teamId === teamId)) missingBy.set(a.teamId, (missingBy.get(a.teamId) ?? 0) + 1)
   const ids = [...new Set([...open.map((o) => o.teamId), ...missingBy.keys()])]
   const names = ids.length ? new Map((await tx.select({ id: teams.id, name: teams.name }).from(teams).where(and(eq(teams.tenantId, ctx.tenantId), inArray(teams.id, ids)))).map((t) => [t.id, t.name])) : new Map<string, string>()
   const rows = ids.map((id) => {
@@ -170,13 +170,22 @@ async function reportDeadline(tx: TenantTx, s: RmScope, alerts: ReportAlert[]): 
 
 // ---------------------------------------------------------------- dashboard
 
-export async function loadDashboard(tx: TenantTx, s: RmScope): Promise<DashboardDto> {
+/** The grouped view: open tasks per team (filed under it or assigned to one of its members), named, by name. One statement for the numbers and one for the names. */
+async function teamRows(tx: TenantTx, t: NonNullable<RmScope["tctx"]>, teamId?: string): Promise<DashboardDto["teams"]> {
+  const rows = await teamBreakdownQuery(tx, t, teamId)
+  if (rows.length === 0) return []
+  const names = new Map((await tx.select({ id: teams.id, name: teams.name }).from(teams).where(and(eq(teams.tenantId, t.tenantId), inArray(teams.id, rows.map((r) => r.teamId))))).map((x) => [x.id, x.name]))
+  return rows.map((r) => ({ teamId: r.teamId, team: names.get(r.teamId) ?? "", open: r.open, overdue: r.overdue, people: r.people })).sort((a, b) => cmp(a.team, b.team) || cmp(a.teamId, b.teamId))
+}
+
+export async function loadDashboard(tx: TenantTx, s: RmScope, q: { teamId?: string } = {}): Promise<DashboardDto> {
+  const teamId = q.teamId
   const t = s.tctx
   const day = localDay(s.now, s.tz)
   const days = lastDays(day, 7)
-  const sum = t ? ((await dashboardSummaryQuery(tx, t, day))[0] ?? zero) : { ...zero }
-  const pending = t ? ((await pendingEvidenceQuery(tx, t))[0]?.n ?? 0) : 0
-  const closedRows = t ? await tasksClosedQuery(tx, t, days) : []
+  const sum = t ? ((await dashboardSummaryQuery(tx, t, day, teamId))[0] ?? zero) : { ...zero }
+  const pending = t ? ((await pendingEvidenceQuery(tx, t, teamId))[0]?.n ?? 0) : 0
+  const closedRows = t ? await tasksClosedQuery(tx, t, days, teamId) : []
   const by = days.map(() => ({ count: 0, late: 0, closers: new Map<string, number>() }))
   for (const r of closedRows) {
     const d = by[r.bucket - 1]
@@ -190,9 +199,9 @@ export async function loadDashboard(tx: TenantTx, s: RmScope): Promise<Dashboard
   const alerts = await loadReportAlerts(tx, s)
   let attentionCount: number | null = null
   if (s.attention) {
-    const [c] = t ? await attentionCountsQuery(tx, t) : [{ overdue: 0, blocked: 0, review: 0 }]
-    attentionCount = c.overdue + c.blocked + c.review + alerts.length
-    const rctx = s.roster ? await s.roster() : null
+    const [c] = t ? await attentionCountsQuery(tx, t, teamId) : [{ overdue: 0, blocked: 0, review: 0 }]
+    attentionCount = c.overdue + c.blocked + c.review + (teamId ? alerts.filter((a) => a.teamId === teamId).length : alerts.length)
+    const rctx = s.roster && !teamId ? await s.roster() : null // roster items belong to a site, not to a team: a team view leaves them out
     if (rctx) attentionCount += await countRosterAttention(tx, rctx)
   }
   const trend = by.map((d) => d.count)
@@ -208,18 +217,19 @@ export async function loadDashboard(tx: TenantTx, s: RmScope): Promise<Dashboard
       percent: denom > 0 ? Math.round((sum.completed / denom) * 100) : 0,
       mix: { not_started: sum.notStarted, in_progress: sum.inProgress, blocked: sum.blocked, submitted: sum.submitted, changes_requested: sum.changesRequested, completed: sum.completed, cancelled: sum.cancelled },
     },
-    reportDeadline: await reportDeadline(tx, s, alerts),
+    reportDeadline: await reportDeadline(tx, s, alerts, teamId),
     attentionCount,
+    teams: t ? await teamRows(tx, t, teamId) : [],
   }
 }
 
 // ---------------------------------------------------------------- team tasks
 
-export async function loadTeamTasks(tx: TenantTx, s: RmScope, q: { limit: number; cursor?: string }): Promise<TeamTasksDto> {
+export async function loadTeamTasks(tx: TenantTx, s: RmScope, q: { limit: number; cursor?: string; teamId?: string }): Promise<TeamTasksDto> {
   const t = s.tctx
   if (!t) return { items: [], nextCursor: null }
   const free = freeText(s, withholdDriveText)
-  const rows = await teamTasksQuery(tx, t, q.limit + 1, q.cursor ? decodeCursor(q.cursor) : undefined)
+  const rows = await teamTasksQuery(tx, t, q.limit + 1, q.cursor ? decodeCursor(q.cursor) : undefined, q.teamId)
   const page = rows.slice(0, q.limit)
   const people = await assigneesOf(tx, t.tenantId, page.map((r) => r.id))
   const teamIds = [...new Set(page.flatMap((r) => (r.teamId ? [r.teamId] : [])))]
@@ -240,20 +250,20 @@ export async function loadTeamTasks(tx: TenantTx, s: RmScope, q: { limit: number
 
 // ---------------------------------------------------------------- the member's own (staff dashboard)
 
-export async function loadStaff(tx: TenantTx, s: RmScope): Promise<StaffDto> {
+export async function loadStaff(tx: TenantTx, s: RmScope, q: { teamId?: string } = {}): Promise<StaffDto> {
   const free = freeText(s, withholdDriveText)
   const empty = { myTasks: { open: 0, overdue: 0, review: 0, returned: 0, items: [] }, evidence: { awaitingReview: 0, returned: [] }, comments: [] }
   const member = s.rctx ? await currentItem(tx, s.rctx) : null
   if (!s.tctx) return { ...empty, reportDeadline: { member, team: null } }
-  const [counts] = await myCountsQuery(tx, s.tenantId, s.me, s.now)
-  const rows = await myOpenTasksQuery(tx, s.tenantId, s.me, 50)
+  const [counts] = await myCountsQuery(tx, s.tenantId, s.me, s.now, q.teamId)
+  const rows = await myOpenTasksQuery(tx, s.tenantId, s.me, 50, q.teamId)
   const returned = rows.filter((r) => r.status === "changes_requested").slice(0, 20)
   const reasons = returned.length
     ? await tx.select({ taskId: taskEvidence.taskId, reason: taskEvidence.reason }).from(taskEvidence).where(and(eq(taskEvidence.tenantId, s.tenantId), inArray(taskEvidence.taskId, returned.map((r) => r.id)), eq(taskEvidence.review, "rejected"))).orderBy(desc(taskEvidence.reviewedAt), desc(taskEvidence.id))
     : []
   const reasonOf = new Map<string, string>()
   for (const r of reasons) if (!reasonOf.has(r.taskId)) reasonOf.set(r.taskId, r.reason ?? "")
-  const comments = await myCommentsQuery(tx, s.tenantId, s.me, 10)
+  const comments = await myCommentsQuery(tx, s.tenantId, s.me, 10, q.teamId)
   const nameOf = await namesOf(tx, comments.flatMap((c) => (c.authorId ? [c.authorId] : [])))
   return {
     myTasks: {
@@ -313,7 +323,7 @@ export async function loadToday(tx: TenantTx, s: RmScope, mode: DayMode): Promis
     workingDay: await workingDay(tx, s),
     order: order.map((i) => {
       const r = idOf.get(i.task.ref)!
-      return { taskId: r.id, ref: i.task.ref, title: i.task.title, priority: i.task.priority, status: i.task.status, dueAt: r.dueAt.toISOString(), due: i.task.due, evidenceRequired: i.task.evidenceRequired, project: i.task.project, group: i.group, reason: i.reason }
+      return { taskId: r.id, ref: i.task.ref, title: i.task.title, priority: i.task.priority, status: i.task.status, dueAt: r.dueAt.toISOString(), due: i.task.due, evidenceRequired: i.task.evidenceRequired, project: i.task.project, hasVoice: r.hasVoice, group: i.group, reason: i.reason }
     }),
     summary: { headline: summary.headline, lines: summary.lines.slice(0, 101), spoken: summary.spoken.length > 8000 ? summary.lines.slice(0, 101).map((l) => l.text).join(" ") : summary.spoken },
     ...(team ? { team } : {}),

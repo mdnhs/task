@@ -9,6 +9,9 @@ const STATUS = z.enum(["not_started", "in_progress", "blocked", "submitted", "ch
 const nullable = <T extends z.ZodType>(s: T) => s.nullable()
 
 // ---------- dashboard ----------
+const TEAM_ID = z.uuid().optional().openapi({ description: "Narrow to one team: its tasks are those FILED under it or ASSIGNED to one of its members (ruling S8, the same rule as GET /v1/tasks?teamId=), inside the caller's scope. A team the caller cannot reach or that does not exist is just empty (200), never a 404", example: TID })
+export const DashboardQuery = z.object({ teamId: TEAM_ID })
+export const StaffQuery = z.object({ teamId: TEAM_ID })
 const Summary = z.object({
   open: z.number().int(), overdue: z.number().int(), dueToday: z.number().int(), completedToday: z.number().int(), trend: z.array(z.number().int()), awaitingReview: z.number().int(), evidencePending: z.number().int(),
 })
@@ -26,8 +29,15 @@ const ReportDeadline = z.object({ member: nullable(MemberDeadline), team: nullab
 const MEMBER_EX = { key: `${UID}:${TID}:2026-11-19`, shiftName: "Night", shiftDate: "2026-11-19", startAt: "2026-11-19T22:00:00.000Z", endAt: "2026-11-20T06:00:00.000Z", dueAt: "2026-11-20T07:00:00.000Z", state: "draft", reportId: null }
 const DEADLINE_EX = { member: MEMBER_EX, team: { open: 3, missing: 1, awaitingReview: 2, nextDueAt: "2026-11-20T07:00:00.000Z", teams: [{ teamId: TID, team: "Night team", open: 3, missing: 1, nextDueAt: "2026-11-20T07:00:00.000Z" }] } }
 
+const TeamRow = z.object({
+  teamId: z.uuid(), team: z.string(), open: z.number().int(), overdue: z.number().int(),
+  people: z.number().int().openapi({ description: "Distinct assignees of those open tasks who are members of the team" }),
+})
 export const DashboardOut = z
-  .object({ asOf: z.string(), day: z.string(), summary: Summary, tasksClosed: z.object({ days: z.array(ClosedDay) }), progress: Progress, reportDeadline: ReportDeadline, attentionCount: nullable(z.number().int()) })
+  .object({
+    asOf: z.string(), day: z.string(), summary: Summary, tasksClosed: z.object({ days: z.array(ClosedDay) }), progress: Progress, reportDeadline: ReportDeadline, attentionCount: nullable(z.number().int()),
+    teams: z.array(TeamRow).openapi({ description: "Open tasks grouped by team, by FILING team and by ASSIGNEE membership: a task counts once per team it belongs to, a person who is in two teams is counted in both, while `summary` and `progress` count every task once. Sorted by team name; only teams with open tasks in the caller's scope" }),
+  })
   .openapi({
     example: {
       asOf: "2026-11-20T12:00:00.000Z", day: "2026-11-20",
@@ -35,10 +45,11 @@ export const DashboardOut = z
       tasksClosed: { days: [{ date: "2026-11-20", count: 5, late: 1, topCloser: { userId: UID, name: "Ann Byrne", count: 2 } }] },
       progress: { total: 60, percent: 40, mix: { not_started: 10, in_progress: 12, blocked: 2, submitted: 2, changes_requested: 1, completed: 30, cancelled: 3 } },
       reportDeadline: DEADLINE_EX, attentionCount: 9,
+      teams: [{ teamId: TID, team: "Cleaning", open: 12, overdue: 2, people: 4 }],
     },
   })
 
-export const TeamTasksQuery = z.object({ limit: z.coerce.number().int().min(1).max(100).default(25), cursor: z.string().max(300).optional() })
+export const TeamTasksQuery = z.object({ limit: z.coerce.number().int().min(1).max(100).default(25), cursor: z.string().max(300).optional(), teamId: TEAM_ID })
 const TeamTask = z.object({
   id: z.uuid(), ref: z.string(), title: z.string(), assigneeId: z.string(), assignee: z.string(), dept: z.string(), priority: z.number().int().min(1).max(3), dueAt: z.string(), due: z.string(), late: z.boolean(), status: STATUS,
 })
@@ -83,6 +94,7 @@ export const AttentionOut = z
 export const TodayQuery = z.object({ mode: z.enum(["all", "high-and-overdue"]).default("all") })
 const DayItem = z.object({
   taskId: z.uuid(), ref: z.string(), title: z.string(), priority: z.number().int().min(1).max(3), status: z.string(), dueAt: z.string(), due: z.string(), evidenceRequired: z.boolean(), project: z.string(),
+  hasVoice: z.boolean().openapi({ description: "The task has a voice note the caller can play now (the file is clean). Only a flag: play it through GET /v1/tasks/{id}/voice-note" }),
   group: z.enum(["overdue", "high-today", "today"]), reason: z.string(),
 })
 export const TodayOut = z
@@ -100,7 +112,7 @@ export const TodayOut = z
     example: {
       counts: { overdue: 1, dueToday: 2, high: 1, review: 0, reports: 1, blocked: 0 },
       workingDay: { key: "2026-11-20", startsAt: "2026-11-20T04:00:00.000Z", hasShift: false },
-      order: [{ taskId: TID, ref: "TSK-1001", title: "Check fire exits", priority: 3, status: "in_progress", dueAt: UTC, due: WALL, evidenceRequired: false, project: "Cleaning", group: "overdue", reason: "overdue by 1 day; high priority" }],
+      order: [{ taskId: TID, ref: "TSK-1001", title: "Check fire exits", priority: 3, status: "in_progress", dueAt: UTC, due: WALL, evidenceRequired: false, project: "Cleaning", hasVoice: false, group: "overdue", reason: "overdue by 1 day; high priority" }],
       summary: { headline: "1 overdue", lines: [{ ref: null, text: "Today you have 1 overdue." }], spoken: "Today you have 1 overdue." },
       reports: 1, roster: 2, openShifts: 1,
     },

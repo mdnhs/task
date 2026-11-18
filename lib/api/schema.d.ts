@@ -12154,8 +12154,22 @@ export interface paths {
                                 submittedAt: string | null;
                                 reviewedAt: string | null;
                                 reviewedBy: string | null;
+                                /** @description Real minutes (between instants, right across a clock change) the first submission came after the due time; a report not submitted yet counts up to now; 0 when on time or not due yet */
+                                minutesLate: number;
+                                /** @description Real minutes from the end of the shift to the first submission (or to now while there is none); 0 while the shift is still running */
+                                minutesOpen: number;
                             }[];
                             nextCursor: string | null;
+                            /** @description How many items of each state the window has under the same scope, team and person filters as the list (not the status filter, not the cursor); open + missing + late + returned + accepted = all */
+                            counts: {
+                                all: number;
+                                /** @description A draft not yet due plus a report submitted on time and not reviewed yet */
+                                open: number;
+                                missing: number;
+                                late: number;
+                                returned: number;
+                                accepted: number;
+                            };
                         };
                     };
                 };
@@ -13363,14 +13377,17 @@ export interface paths {
         };
         get: {
             parameters: {
-                query?: never;
+                query?: {
+                    /** @description Narrow to one team: its tasks are those FILED under it or ASSIGNED to one of its members (ruling S8, the same rule as GET /v1/tasks?teamId=), inside the caller's scope. A team the caller cannot reach or that does not exist is just empty (200), never a 404 */
+                    teamId?: string;
+                };
                 header?: never;
                 path?: never;
                 cookie?: never;
             };
             requestBody?: never;
             responses: {
-                /** @description The manager home bundle for the caller's scope (D5 tasks, F5 reports): summary (open, overdue, due today, completed today with a 7-day trend, awaiting review, evidence pending), tasks closed per tenant-local day (count, late, top closer), the status mix, the report deadline card (the caller's own next report; per-team counts for a manager) and the attention count (null without attention access). Cached 30 s per tenant and scope; never for a support session */
+                /** @description The manager home bundle for the caller's scope (D5 tasks, F5 reports; `teamId` narrows to one team's tasks, filed under it or assigned to its members, S8): summary (open, overdue, due today, completed today with a 7-day trend, awaiting review, evidence pending), tasks closed per tenant-local day (count, late, top closer), the status mix, the open tasks grouped by team (filed under OR assigned to a member: a person in two teams is in both, the totals count each task once), the report deadline card (the caller's own next report; per-team counts for a manager) and the attention count (null without attention access). Cached 30 s per user, scope and team filter; never for a support session */
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -13439,6 +13456,16 @@ export interface paths {
                                 } | null;
                             };
                             attentionCount: number | null;
+                            /** @description Open tasks grouped by team, by FILING team and by ASSIGNEE membership: a task counts once per team it belongs to, a person who is in two teams is counted in both, while `summary` and `progress` count every task once. Sorted by team name; only teams with open tasks in the caller's scope */
+                            teams: {
+                                /** Format: uuid */
+                                teamId: string;
+                                team: string;
+                                open: number;
+                                overdue: number;
+                                /** @description Distinct assignees of those open tasks who are members of the team */
+                                people: number;
+                            }[];
                         };
                     };
                 };
@@ -13464,6 +13491,8 @@ export interface paths {
                 query?: {
                     limit?: number;
                     cursor?: string;
+                    /** @description Narrow to one team: its tasks are those FILED under it or ASSIGNED to one of its members (ruling S8, the same rule as GET /v1/tasks?teamId=), inside the caller's scope. A team the caller cannot reach or that does not exist is just empty (200), never a 404 */
+                    teamId?: string;
                 };
                 header?: never;
                 path?: never;
@@ -13471,7 +13500,7 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description Open tasks in the caller's scope, due first (the task list's own `status=open` order): the home table. Cursor paged (`limit` 1-100, 400 invalid_cursor) */
+                /** @description Open tasks in the caller's scope, due first (the task list's own `status=open` order): the home table. `teamId` keeps one team's (filed under it or assigned to its members). Cursor paged (`limit` 1-100, 400 invalid_cursor) */
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -13516,14 +13545,17 @@ export interface paths {
         };
         get: {
             parameters: {
-                query?: never;
+                query?: {
+                    /** @description Narrow to one team: its tasks are those FILED under it or ASSIGNED to one of its members (ruling S8, the same rule as GET /v1/tasks?teamId=), inside the caller's scope. A team the caller cannot reach or that does not exist is just empty (200), never a 404 */
+                    teamId?: string;
+                };
                 header?: never;
                 path?: never;
                 cookie?: never;
             };
             requestBody?: never;
             responses: {
-                /** @description The caller's OWN home (an API key: its creator's): my tasks (open, overdue, waiting for review, returned) and the open list, evidence waiting and returned with the reviewer's reason, the latest comments by others on my tasks, my next report. Personal: cached per user. 403 for a support session */
+                /** @description The caller's OWN home (an API key: its creator's): my tasks (open, overdue, waiting for review, returned) and the open list, evidence waiting and returned with the reviewer's reason, the latest comments by others on my tasks, my next report. `teamId` narrows to my tasks of that team. Personal: cached per user and filter. 403 for a support session */
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -13711,6 +13743,8 @@ export interface paths {
                                 due: string;
                                 evidenceRequired: boolean;
                                 project: string;
+                                /** @description The task has a voice note the caller can play now (the file is clean). Only a flag: play it through GET /v1/tasks/{id}/voice-note */
+                                hasVoice: boolean;
                                 /** @enum {string} */
                                 group: "overdue" | "high-today" | "today";
                                 reason: string;

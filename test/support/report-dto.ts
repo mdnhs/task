@@ -21,7 +21,7 @@ export const reportDto = (over: Record<string, unknown> = {}) => ({
 export const inboxDto = (over: Record<string, unknown> = {}) => ({
   id: RID, key: `${ME}:${PID}:2026-10-24`, userId: ME, person: "Ann Byrne", patternId: PID, teamId: TEAM, shiftName: "Night", team: "Security", date: "2026-10-24",
   start: "2026-10-24T22:00", end: "2026-10-25T06:00", due: "2026-10-25T07:00", startAt: "2026-10-24T21:00:00.000Z", endAt: "2026-10-25T06:00:00.000Z", dueAt: "2026-10-25T07:00:00.000Z",
-  status: "submitted", state: "submitted", version: 2, submissions: 1, itemCount: 4, doneCount: 3, submittedAt: "2026-10-25T06:20:00.000Z", reviewedAt: null, reviewedBy: null, ...over,
+  status: "submitted", state: "submitted", version: 2, submissions: 1, itemCount: 4, doneCount: 3, submittedAt: "2026-10-25T06:20:00.000Z", reviewedAt: null, reviewedBy: null, minutesLate: 0, minutesOpen: 0, ...over,
 })
 
 export const shiftsDto = () => ({
@@ -43,7 +43,7 @@ export const dashboardDto = (over: Record<string, unknown> = {}) => ({
   tasksClosed: { days: [{ date: "2026-10-24", count: 5, late: 1, topCloser: { userId: ME, name: "Ann Byrne", count: 2 } }, { date: "2026-10-25", count: 0, late: 0, topCloser: null }] },
   progress: { total: 60, percent: 40, mix: { not_started: 10, in_progress: 12, blocked: 2, submitted: 2, changes_requested: 1, completed: 30, cancelled: 3 } },
   reportDeadline: { member: null, team: { open: 3, missing: 1, awaitingReview: 2, nextDueAt: "2026-10-25T07:00:00.000Z", teams: [{ teamId: TEAM, team: "Security", open: 3, missing: 1, nextDueAt: "2026-10-25T07:00:00.000Z" }] } },
-  attentionCount: 9, ...over,
+  attentionCount: 9, teams: [{ teamId: "5e1c0d52-8d3a-4b7e-9c41-2a5b7e90d3f8", team: "Security", open: 3, overdue: 1, people: 2 }], ...over,
 })
 export const memberDeadlineDto = (over: Record<string, unknown> = {}) => ({ ...MEMBER, ...over })
 
@@ -57,7 +57,7 @@ export const staffDto = (over: Record<string, unknown> = {}) => ({
 export const todayDto = (over: Record<string, unknown> = {}) => ({
   counts: { overdue: 1, dueToday: 2, high: 1, review: 0, reports: 1, blocked: 0 },
   workingDay: { key: "2026-10-24", startsAt: "2026-10-24T21:00:00.000Z", hasShift: true },
-  order: [{ taskId: TASK, ref: "TSK-1001", title: "Check fire exits", priority: 3, status: "in_progress", dueAt: "2026-10-25T03:00:00.000Z", due: "2026-10-25T03:00:00", evidenceRequired: false, project: "Security", group: "overdue", reason: "overdue by 1 day; high priority" }],
+  order: [{ taskId: TASK, ref: "TSK-1001", title: "Check fire exits", priority: 3, status: "in_progress", dueAt: "2026-10-25T03:00:00.000Z", due: "2026-10-25T03:00:00", evidenceRequired: false, project: "Security", hasVoice: false, group: "overdue", reason: "overdue by 1 day; high priority" }],
   summary: { headline: "1 overdue", lines: [{ ref: null, text: "Today you have 1 overdue." }], spoken: "Today you have 1 overdue." },
   reports: 1, ...over,
 })

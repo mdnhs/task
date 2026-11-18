@@ -95,7 +95,11 @@ export type ManagerHome = {
 /** `GET /v1/dashboard`. */
 export function toDashboard(dto: unknown, ctx: { tz: string; nowAt?: string; tzLabel?: string; dueAfterMinutes?: number }): ManagerHome {
   const r = R.rec(dto, "dashboard")
-  R.exact(r, ["asOf", "day", "summary", "tasksClosed", "progress", "reportDeadline", "attentionCount"])
+  R.exact(r, ["asOf", "day", "summary", "tasksClosed", "progress", "reportDeadline", "attentionCount", "teams"])
+  for (const t of R.arr(r, "teams")) { // B8 T15: open tasks grouped by team (filing team and assignee membership); the screen does not use it yet, the shape is still checked
+    const x = R.rec(t, "team row")
+    R.exact(x, ["teamId", "team", "open", "overdue", "people"])
+  }
   const s = R.rec(r.summary, "summary")
   R.exact(s, ["open", "overdue", "dueToday", "completedToday", "trend", "awaitingReview", "evidencePending"])
   const p = R.rec(r.progress, "progress")
@@ -305,7 +309,7 @@ export function toStaff(dto: unknown, ctx: { tz: string }): StaffHome {
 /** `GET /v1/today`. The day key is the SERVER's working day (H6); counts, order and the written summary are the server's. */
 export function toToday(dto: unknown, ctx: { meId: string; subject?: string; tz: string; nowAt: string; now: string; tzLabel: string; mode: TodayMode }): TodayData {
   const r = R.rec(dto, "today")
-  R.exact(r, ["counts", "workingDay", "order", "summary", "reports"], ["team", "roster"])
+  R.exact(r, ["counts", "workingDay", "order", "summary", "reports"], ["team", "roster", "openShifts"])
   const c = R.rec(r.counts, "counts")
   R.exact(c, ["overdue", "dueToday", "high", "review", "reports", "blocked"])
   const wd = R.rec(r.workingDay, "workingDay")
@@ -326,7 +330,8 @@ export function toToday(dto: unknown, ctx: { meId: string; subject?: string; tz:
     counts: { overdue: R.int(c, "overdue"), dueToday: R.int(c, "dueToday"), high: R.int(c, "high"), review: R.int(c, "review"), reports: R.int(c, "reports"), blocked: R.int(c, "blocked") },
     order: R.arr(r, "order").map((v): TodayItem => {
       const x = R.rec(v, "today item")
-      R.exact(x, ["taskId", "ref", "title", "priority", "status", "dueAt", "due", "evidenceRequired", "project", "group", "reason"])
+      R.exact(x, ["taskId", "ref", "title", "priority", "status", "dueAt", "due", "evidenceRequired", "project", "hasVoice", "group", "reason"])
+      R.bool(x, "hasVoice") // B8 T15: a note the caller can play; the player is wired by the web task that restores it (Task 24)
       const priority = R.int(x, "priority")
       return {
         task: {

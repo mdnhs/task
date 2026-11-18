@@ -165,22 +165,29 @@ export type InboxItemDto = {
   start: string; end: string; due: string; startAt: string; endAt: string; dueAt: string
   status: "draft" | "submitted" | "accepted" | "returned"; state: "draft" | "submitted" | "late" | "missing" | "accepted" | "returned"; version: number; submissions: number
   itemCount: number; doneCount: number; submittedAt: string | null; reviewedAt: string | null; reviewedBy: string | null
+  minutesLate: number; minutesOpen: number
 }
 const InboxItem = z.object({
   id: z.string().nullable(), key: z.string(), userId: z.string(), person: z.string(), patternId: z.string(), teamId: z.string(), shiftName: z.string(), team: z.string(), date: z.string(),
   start: z.string(), end: z.string(), due: z.string(), startAt: z.string(), endAt: z.string(), dueAt: z.string(),
   status: z.enum(["draft", "submitted", "accepted", "returned"]), state: z.enum(["draft", "submitted", "late", "missing", "accepted", "returned"]), version: z.number(), submissions: z.number(),
   itemCount: z.number(), doneCount: z.number(), submittedAt: z.string().nullable(), reviewedAt: z.string().nullable(), reviewedBy: z.string().nullable(),
+  minutesLate: z.number().int().openapi({ description: "Real minutes (between instants, right across a clock change) the first submission came after the due time; a report not submitted yet counts up to now; 0 when on time or not due yet" }),
+  minutesOpen: z.number().int().openapi({ description: "Real minutes from the end of the shift to the first submission (or to now while there is none); 0 while the shift is still running" }),
 })
+const InboxCountsOut = z.object({
+  all: z.number().int(), open: z.number().int().openapi({ description: "A draft not yet due plus a report submitted on time and not reviewed yet" }), missing: z.number().int(), late: z.number().int(), returned: z.number().int(), accepted: z.number().int(),
+}).openapi({ description: "How many items of each state the window has under the same scope, team and person filters as the list (not the status filter, not the cursor); open + missing + late + returned + accepted = all" })
 export const InboxOut = z
-  .object({ items: z.array(InboxItem), nextCursor: z.string().nullable() })
+  .object({ items: z.array(InboxItem), nextCursor: z.string().nullable(), counts: InboxCountsOut })
   .openapi({
     example: {
       items: [
-        { id: RID, key: `usr_8Kq2mZ4tW1:${PID}:2026-10-24`, userId: "usr_8Kq2mZ4tW1", person: "Alex Byrne", patternId: PID, teamId: "5e1c0d52-8d3a-4b7e-9c41-2a5b7e90d3f8", shiftName: "Night", team: "Security", date: "2026-10-24", start: "2026-10-24T22:00", end: "2026-10-25T06:00", due: "2026-10-25T07:00", startAt: "2026-10-24T21:00:00.000Z", endAt: "2026-10-25T06:00:00.000Z", dueAt: "2026-10-25T07:00:00.000Z", status: "submitted", state: "submitted", version: 2, submissions: 1, itemCount: 4, doneCount: 3, submittedAt: "2026-10-25T06:20:00.000Z", reviewedAt: null, reviewedBy: null },
-        { id: null, key: `usr_3Zt9pQ7rLm:${PID}:2026-10-24`, userId: "usr_3Zt9pQ7rLm", person: "Sam Doyle", patternId: PID, teamId: "5e1c0d52-8d3a-4b7e-9c41-2a5b7e90d3f8", shiftName: "Night", team: "Security", date: "2026-10-24", start: "2026-10-24T22:00", end: "2026-10-25T06:00", due: "2026-10-25T07:00", startAt: "2026-10-24T21:00:00.000Z", endAt: "2026-10-25T06:00:00.000Z", dueAt: "2026-10-25T07:00:00.000Z", status: "draft", state: "missing", version: 0, submissions: 0, itemCount: 0, doneCount: 0, submittedAt: null, reviewedAt: null, reviewedBy: null },
+        { id: RID, key: `usr_8Kq2mZ4tW1:${PID}:2026-10-24`, userId: "usr_8Kq2mZ4tW1", person: "Alex Byrne", patternId: PID, teamId: "5e1c0d52-8d3a-4b7e-9c41-2a5b7e90d3f8", shiftName: "Night", team: "Security", date: "2026-10-24", start: "2026-10-24T22:00", end: "2026-10-25T06:00", due: "2026-10-25T07:00", startAt: "2026-10-24T21:00:00.000Z", endAt: "2026-10-25T06:00:00.000Z", dueAt: "2026-10-25T07:00:00.000Z", status: "submitted", state: "submitted", version: 2, submissions: 1, itemCount: 4, doneCount: 3, submittedAt: "2026-10-25T06:20:00.000Z", reviewedAt: null, reviewedBy: null, minutesLate: 0, minutesOpen: 0 },
+        { id: null, key: `usr_3Zt9pQ7rLm:${PID}:2026-10-24`, userId: "usr_3Zt9pQ7rLm", person: "Sam Doyle", patternId: PID, teamId: "5e1c0d52-8d3a-4b7e-9c41-2a5b7e90d3f8", shiftName: "Night", team: "Security", date: "2026-10-24", start: "2026-10-24T22:00", end: "2026-10-25T06:00", due: "2026-10-25T07:00", startAt: "2026-10-24T21:00:00.000Z", endAt: "2026-10-25T06:00:00.000Z", dueAt: "2026-10-25T07:00:00.000Z", status: "draft", state: "missing", version: 0, submissions: 0, itemCount: 0, doneCount: 0, submittedAt: null, reviewedAt: null, reviewedBy: null, minutesLate: 45, minutesOpen: 105 },
       ],
       nextCursor: null,
+      counts: { all: 2, open: 1, missing: 1, late: 0, returned: 0, accepted: 0 },
     },
   })
 
