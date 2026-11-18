@@ -180,6 +180,11 @@ const SPECS: Record<string, Spec> = {
   "POST /v1/leave/{id}/decide": { actor: "owner", expect: "leave_not_found" },
   // B8 T8: the check of a roster week (control: 200 with no violations). A week of another tenant or a site the caller cannot see, a missing one and a non-uuid id are one plain 404 not_found.
   "POST /v1/roster/weeks/{id}/check": { actor: "owner", expect: "not_found" },
+  // B8 T9: a week and its shifts (controls: GET 200, add 422 ineligible/invalid_shift_type for the example's unknown people and type, PATCH 200, DELETE 204). Hidden, missing, another tenant's and non-uuid ids are one plain 404 not_found.
+  "GET /v1/roster/weeks/{id}": { actor: "owner", expect: "not_found" },
+  "POST /v1/roster/weeks/{id}/shifts": { actor: "owner", expect: "not_found" },
+  "PATCH /v1/roster/shifts/{id}": { actor: "owner", expect: "not_found" },
+  "DELETE /v1/roster/shifts/{id}": { actor: "owner", expect: "not_found" },
   "PATCH /v1/task-templates/{id}": { actor: "owner", expect: "template_not_found" },
   "DELETE /v1/task-templates/{id}": { actor: "owner", expect: "template_not_found" },
   // T5.1: shift patterns (control: PATCH 200, DELETE 204), assignments (control: PATCH 200 with an end date after the fixture's start, DELETE 204 for the future one),

@@ -163,3 +163,59 @@ export const CheckOut = z
       blocking: 0,
     },
   })
+
+// ------------------------------------------------------------------ weeks and shifts (FR-RS-10, 20..22)
+
+const SHIFT_ID = "9a1c6b3e-2d4f-4e58-b7a9-1f3c5d7e9b02"
+const instantEx = "2026-11-02T08:00:00.000Z"
+export const ShiftOut = z.object({
+  id: z.uuid(), weekId: z.uuid(), locationId: z.uuid(), date: z.string(), userId: z.string().nullable(), shiftTypeId: z.uuid(), role: z.string(), start: z.string(), end: z.string(),
+  unpaidBreakMin: z.number().int(), startAt: z.string(), endAt: z.string(), confirmedAt: z.string().nullable(), version: z.number().int(),
+})
+export type ShiftDto = z.infer<typeof ShiftOut>
+const shiftEx = { id: SHIFT_ID, weekId: WEEK_ID, locationId: LID, date: "2026-11-02", userId: UID, shiftTypeId: STID, role: "Security officer", start: "08:00", end: "16:00", unpaidBreakMin: 30, startAt: instantEx, endAt: "2026-11-02T16:00:00.000Z", confirmedAt: null, version: 1 }
+export const ShiftSchema = ShiftOut.openapi({ example: shiftEx })
+
+const DayOut = z.object({ date: z.string(), shiftIds: z.array(z.uuid()), count: z.number().int(), target: z.number().int(), short: z.number().int(), over: z.number().int() })
+export const WeekOut = z.object({
+  id: z.uuid(), locationId: z.uuid(), weekStart: z.string(), status: z.enum(["draft", "published"]), publishedAt: z.string().nullable(), publishedBy: z.string().nullable(), autoRepeatDays: z.number().int().nullable(),
+  version: z.number().int(), days: z.array(DayOut),
+})
+export type WeekDto = z.infer<typeof WeekOut>
+const weekEx = {
+  id: WEEK_ID, locationId: LID, weekStart: "2026-11-02", status: "draft", publishedAt: null, publishedBy: null, autoRepeatDays: null, version: 1,
+  days: [{ date: "2026-11-02", shiftIds: [SHIFT_ID], count: 1, target: 2, short: 1, over: 0 }],
+}
+export const WeekSchema = WeekOut.openapi({ example: weekEx })
+const MemberOut = z.object({ userId: z.string(), name: z.string(), active: z.boolean(), homeLocationId: z.uuid().nullable() })
+export const WeeksOut = z
+  .object({ range: z.object({ from: z.string(), to: z.string(), view: z.enum(["day", "week", "fortnight", "month"]) }), weeks: z.array(WeekOut), shifts: z.array(ShiftOut), shiftTypes: z.array(ShiftTypeOut), members: z.array(MemberOut) })
+  .openapi({ example: { range: { from: "2026-11-02", to: "2026-11-08", view: "week" }, weeks: [weekEx], shifts: [shiftEx], shiftTypes: [shiftTypeEx], members: [{ userId: UID, name: "Aoife Byrne", active: true, homeLocationId: LID }] } })
+export type WeeksDto = z.infer<typeof WeeksOut>
+export const WeeksQuery = z.object({
+  locationId: z.string().max(64).optional().openapi({ description: "One location (404 when the caller may not see it); omitted: every location the caller sees", example: LID }),
+  from: z.string().max(10).optional().openapi({ description: "Anchor date YYYY-MM-DD (default: today in the tenant zone)", example: "2026-11-02" }),
+  to: z.string().max(10).optional().openapi({ description: "Explicit last date (at most 62 days after `from`); without it the `view` decides", example: "2026-11-30" }),
+  view: z.string().max(12).optional().openapi({ description: "day | week | fortnight | month (default week); anything else is 422 invalid_view", example: "week" }),
+})
+export const CreateWeekBody = z.object({ locationId: z.string().max(64), weekStart: z.string().max(10) }).openapi({ example: { locationId: LID, weekStart: "2026-11-09" } })
+const Reason = z.string().max(2000)
+export const AddShiftsBody = z
+  .object({
+    shifts: z
+      .array(z.object({ date: z.string().max(10), userIds: z.array(z.string().max(128).nullable()).max(50), shiftTypeId: z.string().max(64), role: z.string().max(200).optional(), start: z.string().max(10).optional(), end: z.string().max(10).optional(), unpaidBreakMin: z.number().optional() }))
+      .max(50),
+    reason: Reason.optional(),
+  })
+  .openapi({ example: { shifts: [{ date: "2026-11-02", userIds: [UID, null], shiftTypeId: STID, start: "08:00", end: "16:00" }] } })
+export const AddShiftsOut = z
+  .object({ shifts: z.array(ShiftOut), violations: z.array(ViolationOut) })
+  .openapi({ example: { shifts: [shiftEx], violations: [] } })
+export const PatchShiftBody = z
+  .object({ version: z.number().int().min(1), patch: z.record(z.string().max(40), z.unknown()), reason: Reason.optional() })
+  .openapi({ example: { version: 1, patch: { start: "09:00", end: "17:00" } } })
+export const PatchShiftOut = z.object({ shift: ShiftOut, violations: z.array(ViolationOut) }).openapi({ example: { shift: shiftEx, violations: [] } })
+export const DeleteShiftQuery = z.object({
+  version: z.string().max(9).optional().openapi({ description: "The shift version the editor saw; a stale one is 409 version_conflict", example: "1" }),
+  reason: z.string().max(2000).optional().openapi({ description: "Why (required from an office role on a published week)", example: "Cover found" }),
+})

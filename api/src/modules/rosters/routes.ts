@@ -8,6 +8,9 @@ import { archiveLocation, archiveShiftType, createLocation, createShiftType, get
 import { AvailabilityBody, AvailabilityOut, CreateLeaveBody, DecideLeaveBody, LeaveListOut, LeaveQuery, LeaveSchema } from "./dto"
 import { CheckOut, RulesBody, RulesHeaders, RulesOut } from "./dto"
 import { checkWeek, putRules, readRules, rulesEtag } from "./rules"
+import { AddShiftsBody, AddShiftsOut, CreateWeekBody, DeleteShiftQuery, PatchShiftBody, PatchShiftOut, WeekSchema, WeeksOut, WeeksQuery } from "./dto"
+import { addShifts, deleteShift, patchShift } from "./shifts"
+import { createWeek, getWeek, listWeeks } from "./weeks"
 import { cancelLeave, createLeave, decideLeave, getAvailability, listLeave, putAvailability } from "./leave"
 import { setHomeLocation } from "./people"
 import { getQualifications, setQualifications } from "./qualifications"
@@ -122,6 +125,32 @@ const checkR = createRoute({
   responses: { 200: json(CheckOut, "A dry run: the rule violations on the people's shifts of that week, with the tenant's severities. A clash with a shift at a site the caller cannot see reads \"Already rostered elsewhere\" (no site, time or shift id) and leave, availability and hour totals carry no detail. Writes nothing. 404 not_found for a week of a site the caller may not see, a missing or another tenant's week and an id that is not a uuid.") },
 })
 
+const WEEK_HIDDEN = "404 not_found for a week or shift of a site the caller may not see, a missing or another tenant's one and an id that is not a uuid (all the same answer)"
+const weeksR = createRoute({
+  method: "get", path: "/v1/roster/weeks", middleware: guard("read"), request: { query: WeeksQuery },
+  responses: { 200: json(WeeksOut, "The weeks of the range with their 7 day columns (count against target, short and over), shifts with each person's own start and end, the shift types with targets of their locations, and the members the caller may pick from (a supervisor gets no home location). Only locations the caller sees; staff get an empty cut. 404 not_found for a location the caller may not see; 422 invalid_view | invalid_range") },
+})
+const weekCreateR = createRoute({
+  method: "post", path: "/v1/roster/weeks", middleware: guard("write"), request: { body: body(CreateWeekBody) },
+  responses: { 201: json(WeekSchema, "An empty draft week (a supervisor of the site or an office role). 404 not_found for a site the caller may not see; 409 week_exists (the existing id is in `weekId`) | location_archived; 422 invalid_week_start (a real Monday).") },
+})
+const weekGetR = createRoute({
+  method: "get", path: "/v1/roster/weeks/{id}", middleware: guard("read"), request: { params: RosterIdParam },
+  responses: { 200: json(WeeksOut, `One week in the same payload as the list. ${WEEK_HIDDEN}`) },
+})
+const shiftsAddR = createRoute({
+  method: "post", path: "/v1/roster/weeks/{id}/shifts", middleware: guard("write"), request: { params: RosterIdParam, body: body(AddShiftsBody) },
+  responses: { 201: json(AddShiftsOut, `Assigns several people at once, all or nothing (null = an open shift; start, end, break and role default from the shift type and may differ per entry; an end at or before the start runs into the next day). Rule warnings (and, for an office role with a reason, overridden blocks) come back in violations. ${WEEK_HIDDEN}; 403 roster_locked (a supervisor on a published week); 409 shift_exists | week_published | location_archived; 422 invalid_shift | invalid_shift_type | ineligible (left, qualification missing or expired) | rule_blocked | reason_required`) },
+})
+const shiftPatchR = createRoute({
+  method: "patch", path: "/v1/roster/shifts/{id}", middleware: guard("write"), request: { params: RosterIdParam, body: body(PatchShiftBody) },
+  responses: { 200: json(PatchShiftOut, `Moves, retimes, reassigns or retypes one shift inside its week (patch keys: date, start, end, unpaidBreakMin, userId, shiftTypeId, role). ${WEEK_HIDDEN}; 403 roster_locked; 409 version_conflict | shift_exists | week_published; 422 cannot_move_week | invalid_patch | invalid_shift | ineligible | rule_blocked | reason_required`) },
+})
+const shiftDeleteR = createRoute({
+  method: "delete", path: "/v1/roster/shifts/{id}", middleware: guard("write"), request: { params: RosterIdParam, query: DeleteShiftQuery },
+  responses: { 204: { description: `The shift is removed; history keeps it whole. ${WEEK_HIDDEN}; 403 roster_locked; 409 version_conflict | week_published; 422 reason_required` } },
+})
+
 export const rosterRoutes = newRouter()
   .openapi(listR, async (c) => c.json(await rosterRead(c, (tx, ctx) => listLocations(tx, ctx, { includeArchived: c.req.valid("query").includeArchived === "true" })), 200))
   .openapi(createR, async (c) => c.json(await rosterWrite(c, (tx, ctx) => createLocation(tx, ctx, c.req.valid("json"))), 201))
@@ -167,3 +196,12 @@ export const rosterRoutes = newRouter()
       200,
     ),
   )
+  .openapi(weeksR, async (c) => c.json(await rosterRead(c, (tx, ctx) => listWeeks(tx, ctx, c.req.valid("query"))), 200))
+  .openapi(weekCreateR, async (c) => c.json(await rosterWrite(c, (tx, ctx) => createWeek(tx, ctx, c.req.valid("json"))), 201))
+  .openapi(weekGetR, async (c) => c.json(await rosterRead(c, (tx, ctx) => getWeek(tx, ctx, c.req.valid("param").id)), 200))
+  .openapi(shiftsAddR, async (c) => c.json(await rosterWrite(c, (tx, ctx, env) => addShifts(tx, ctx, env, c.req.valid("param").id, c.req.valid("json"))), 201))
+  .openapi(shiftPatchR, async (c) => c.json(await rosterWrite(c, (tx, ctx, env) => patchShift(tx, ctx, env, c.req.valid("param").id, c.req.valid("json"))), 200))
+  .openapi(shiftDeleteR, async (c) => {
+    await rosterWrite(c, (tx, ctx, env) => deleteShift(tx, ctx, env, c.req.valid("param").id, c.req.valid("query")))
+    return c.body(null, 204)
+  })

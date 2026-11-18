@@ -9893,6 +9893,464 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/roster/weeks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    /** @description One location (404 when the caller may not see it); omitted: every location the caller sees */
+                    locationId?: string;
+                    /** @description Anchor date YYYY-MM-DD (default: today in the tenant zone) */
+                    from?: string;
+                    /** @description Explicit last date (at most 62 days after `from`); without it the `view` decides */
+                    to?: string;
+                    /** @description day | week | fortnight | month (default week); anything else is 422 invalid_view */
+                    view?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The weeks of the range with their 7 day columns (count against target, short and over), shifts with each person's own start and end, the shift types with targets of their locations, and the members the caller may pick from (a supervisor gets no home location). Only locations the caller sees; staff get an empty cut. 404 not_found for a location the caller may not see; 422 invalid_view | invalid_range */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            range: {
+                                from: string;
+                                to: string;
+                                /** @enum {string} */
+                                view: "day" | "week" | "fortnight" | "month";
+                            };
+                            weeks: {
+                                /** Format: uuid */
+                                id: string;
+                                /** Format: uuid */
+                                locationId: string;
+                                weekStart: string;
+                                /** @enum {string} */
+                                status: "draft" | "published";
+                                publishedAt: string | null;
+                                publishedBy: string | null;
+                                autoRepeatDays: number | null;
+                                version: number;
+                                days: {
+                                    date: string;
+                                    shiftIds: string[];
+                                    count: number;
+                                    target: number;
+                                    short: number;
+                                    over: number;
+                                }[];
+                            }[];
+                            shifts: {
+                                /** Format: uuid */
+                                id: string;
+                                /** Format: uuid */
+                                weekId: string;
+                                /** Format: uuid */
+                                locationId: string;
+                                date: string;
+                                userId: string | null;
+                                /** Format: uuid */
+                                shiftTypeId: string;
+                                role: string;
+                                start: string;
+                                end: string;
+                                unpaidBreakMin: number;
+                                startAt: string;
+                                endAt: string;
+                                confirmedAt: string | null;
+                                version: number;
+                            }[];
+                            shiftTypes: {
+                                /** Format: uuid */
+                                id: string;
+                                /** Format: uuid */
+                                locationId: string;
+                                name: string;
+                                start: string;
+                                end: string;
+                                unpaidBreakMin: number;
+                                role: string;
+                                requires: string[];
+                                targets: {
+                                    weekday: number;
+                                    count: number;
+                                }[];
+                                archived: boolean;
+                                version: number;
+                            }[];
+                            members: {
+                                userId: string;
+                                name: string;
+                                active: boolean;
+                                /** Format: uuid */
+                                homeLocationId: string | null;
+                            }[];
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        locationId: string;
+                        weekStart: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description An empty draft week (a supervisor of the site or an office role). 404 not_found for a site the caller may not see; 409 week_exists (the existing id is in `weekId`) | location_archived; 422 invalid_week_start (a real Monday). */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** Format: uuid */
+                            id: string;
+                            /** Format: uuid */
+                            locationId: string;
+                            weekStart: string;
+                            /** @enum {string} */
+                            status: "draft" | "published";
+                            publishedAt: string | null;
+                            publishedBy: string | null;
+                            autoRepeatDays: number | null;
+                            version: number;
+                            days: {
+                                date: string;
+                                shiftIds: string[];
+                                count: number;
+                                target: number;
+                                short: number;
+                                over: number;
+                            }[];
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/roster/weeks/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description One week in the same payload as the list. 404 not_found for a week or shift of a site the caller may not see, a missing or another tenant's one and an id that is not a uuid (all the same answer) */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            range: {
+                                from: string;
+                                to: string;
+                                /** @enum {string} */
+                                view: "day" | "week" | "fortnight" | "month";
+                            };
+                            weeks: {
+                                /** Format: uuid */
+                                id: string;
+                                /** Format: uuid */
+                                locationId: string;
+                                weekStart: string;
+                                /** @enum {string} */
+                                status: "draft" | "published";
+                                publishedAt: string | null;
+                                publishedBy: string | null;
+                                autoRepeatDays: number | null;
+                                version: number;
+                                days: {
+                                    date: string;
+                                    shiftIds: string[];
+                                    count: number;
+                                    target: number;
+                                    short: number;
+                                    over: number;
+                                }[];
+                            }[];
+                            shifts: {
+                                /** Format: uuid */
+                                id: string;
+                                /** Format: uuid */
+                                weekId: string;
+                                /** Format: uuid */
+                                locationId: string;
+                                date: string;
+                                userId: string | null;
+                                /** Format: uuid */
+                                shiftTypeId: string;
+                                role: string;
+                                start: string;
+                                end: string;
+                                unpaidBreakMin: number;
+                                startAt: string;
+                                endAt: string;
+                                confirmedAt: string | null;
+                                version: number;
+                            }[];
+                            shiftTypes: {
+                                /** Format: uuid */
+                                id: string;
+                                /** Format: uuid */
+                                locationId: string;
+                                name: string;
+                                start: string;
+                                end: string;
+                                unpaidBreakMin: number;
+                                role: string;
+                                requires: string[];
+                                targets: {
+                                    weekday: number;
+                                    count: number;
+                                }[];
+                                archived: boolean;
+                                version: number;
+                            }[];
+                            members: {
+                                userId: string;
+                                name: string;
+                                active: boolean;
+                                /** Format: uuid */
+                                homeLocationId: string | null;
+                            }[];
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/roster/weeks/{id}/shifts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        shifts: {
+                            date: string;
+                            userIds: (string | null)[];
+                            shiftTypeId: string;
+                            role?: string;
+                            start?: string;
+                            end?: string;
+                            unpaidBreakMin?: number;
+                        }[];
+                        reason?: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Assigns several people at once, all or nothing (null = an open shift; start, end, break and role default from the shift type and may differ per entry; an end at or before the start runs into the next day). Rule warnings (and, for an office role with a reason, overridden blocks) come back in violations. 404 not_found for a week or shift of a site the caller may not see, a missing or another tenant's one and an id that is not a uuid (all the same answer); 403 roster_locked (a supervisor on a published week); 409 shift_exists | week_published | location_archived; 422 invalid_shift | invalid_shift_type | ineligible (left, qualification missing or expired) | rule_blocked | reason_required */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            shifts: {
+                                /** Format: uuid */
+                                id: string;
+                                /** Format: uuid */
+                                weekId: string;
+                                /** Format: uuid */
+                                locationId: string;
+                                date: string;
+                                userId: string | null;
+                                /** Format: uuid */
+                                shiftTypeId: string;
+                                role: string;
+                                start: string;
+                                end: string;
+                                unpaidBreakMin: number;
+                                startAt: string;
+                                endAt: string;
+                                confirmedAt: string | null;
+                                version: number;
+                            }[];
+                            violations: {
+                                /** @enum {string} */
+                                rule: "double_booking" | "approved_leave" | "unavailable" | "daily_rest" | "weekly_rest" | "avg_48h" | "expired_licence" | "left" | "elsewhere";
+                                shiftId: string;
+                                personId: string;
+                                /** @enum {string} */
+                                severity: "block" | "warn";
+                                message: string;
+                                otherShiftIds: string[];
+                            }[];
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/roster/shifts/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: {
+            parameters: {
+                query?: {
+                    /** @description The shift version the editor saw; a stale one is 409 version_conflict */
+                    version?: string;
+                    /** @description Why (required from an office role on a published week) */
+                    reason?: string;
+                };
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The shift is removed; history keeps it whole. 404 not_found for a week or shift of a site the caller may not see, a missing or another tenant's one and an id that is not a uuid (all the same answer); 403 roster_locked; 409 version_conflict | week_published; 422 reason_required */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        version: number;
+                        patch: {
+                            [key: string]: unknown;
+                        };
+                        reason?: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Moves, retimes, reassigns or retypes one shift inside its week (patch keys: date, start, end, unpaidBreakMin, userId, shiftTypeId, role). 404 not_found for a week or shift of a site the caller may not see, a missing or another tenant's one and an id that is not a uuid (all the same answer); 403 roster_locked; 409 version_conflict | shift_exists | week_published; 422 cannot_move_week | invalid_patch | invalid_shift | ineligible | rule_blocked | reason_required */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            shift: {
+                                /** Format: uuid */
+                                id: string;
+                                /** Format: uuid */
+                                weekId: string;
+                                /** Format: uuid */
+                                locationId: string;
+                                date: string;
+                                userId: string | null;
+                                /** Format: uuid */
+                                shiftTypeId: string;
+                                role: string;
+                                start: string;
+                                end: string;
+                                unpaidBreakMin: number;
+                                startAt: string;
+                                endAt: string;
+                                confirmedAt: string | null;
+                                version: number;
+                            };
+                            violations: {
+                                /** @enum {string} */
+                                rule: "double_booking" | "approved_leave" | "unavailable" | "daily_rest" | "weekly_rest" | "avg_48h" | "expired_licence" | "left" | "elsewhere";
+                                shiftId: string;
+                                personId: string;
+                                /** @enum {string} */
+                                severity: "block" | "warn";
+                                message: string;
+                                otherShiftIds: string[];
+                            }[];
+                        };
+                    };
+                };
+            };
+        };
+        trace?: never;
+    };
     "/v1/members/{userId}/deactivate": {
         parameters: {
             query?: never;

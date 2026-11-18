@@ -1,0 +1,146 @@
+import { and, asc, between, eq, inArray, or, sql } from "drizzle-orm"
+import { dayColumns, rosterRange, type RosterShift, type RosterWeek, type ShiftTemplate, type StaffingTarget } from "@opsdesk/domain/rosters"
+import { addDays, weekdayOf, weekStart as mondayOf, type Weekday } from "@opsdesk/domain/shifts"
+import { AppError, Conflict, Forbidden, NotFound } from "../../core/errors"
+import { locations, memberships, rosterShifts, rosterWeeks, shiftTypes, shiftTypeTargets, user } from "../../db/schema"
+import type { TenantTx } from "../../db/tenant-tx"
+import type { ShiftDto, ShiftTypeDto, WeekDto, WeeksDto } from "./dto"
+import { realDate, todayOf } from "./qualifications"
+import { assertLocation, inScopeSql, type RosterCtx } from "./scope"
+import { auditRoster, isUuid, writeHistory } from "./write"
+
+const unprocessable = (code: string) => new AppError(422, code, "Unprocessable Entity")
+
+export type WeekRow = typeof rosterWeeks.$inferSelect
+export type ShiftRow = typeof rosterShifts.$inferSelect
+
+/** A shift as the API shows it: wall strings plus the stored instants (R8-2). */
+export const shiftDto = (r: ShiftRow): ShiftDto => ({
+  id: r.id, weekId: r.weekId, locationId: r.locationId, date: r.date, userId: r.userId, shiftTypeId: r.shiftTypeId, role: r.role, start: r.startTime, end: r.endTime,
+  unpaidBreakMin: r.unpaidBreakMin, startAt: r.startAt.toISOString(), endAt: r.endAt.toISOString(), confirmedAt: r.confirmedAt?.toISOString() ?? null, version: r.version,
+})
+
+/** What history, audit and events keep of a shift: ids and wall values only, never a name (R8-13). */
+export const shiftSnap = (r: ShiftRow) => ({ shiftId: r.id, weekId: r.weekId, date: r.date, userId: r.userId, shiftTypeId: r.shiftTypeId, role: r.role, start: r.startTime, end: r.endTime, unpaidBreakMin: r.unpaidBreakMin })
+
+export type LoadedWeek = { week: WeekRow; zone: string; archived: boolean }
+
+/**
+ * The week the caller may see, with its location's zone. A non-uuid id never reaches SQL; a missing, another tenant's and a hidden week are the same plain 404 (R8-4).
+ * The visibility check runs on an unlocked read, THEN the row is locked FOR UPDATE and re-read (a hidden week is never locked on the caller's behalf).
+ */
+export async function loadWeek(tx: TenantTx, ctx: RosterCtx, id: string, lock: boolean): Promise<LoadedWeek> {
+  if (!isUuid(id)) throw NotFound()
+  const base = () =>
+    tx
+      .select({ w: rosterWeeks, zone: locations.timeZone, archivedAt: locations.archivedAt })
+      .from(rosterWeeks)
+      .innerJoin(locations, and(eq(locations.tenantId, rosterWeeks.tenantId), eq(locations.id, rosterWeeks.locationId)))
+      .where(and(eq(rosterWeeks.tenantId, ctx.tenantId), eq(rosterWeeks.id, id)))
+  const [first] = await base()
+  if (!first) throw NotFound()
+  assertLocation(ctx, first.w.locationId)
+  if (!lock) return { week: first.w, zone: first.zone ?? ctx.tz, archived: first.archivedAt !== null }
+  const [row] = await base().for("update", { of: rosterWeeks })
+  if (!row) throw NotFound()
+  return { week: row.w, zone: row.zone ?? ctx.tz, archived: row.archivedAt !== null }
+}
+
+/** Monday of a real calendar date, or 422 invalid_week_start. */
+const isMonday = (d: string): boolean => realDate(d) && weekdayOf(d) === 1
+
+/** POST /v1/roster/weeks: an empty draft week of a location the caller may edit. A second create for the same Monday is 409 week_exists carrying the existing id. */
+export async function createWeek(tx: TenantTx, ctx: RosterCtx, input: { locationId: string; weekStart: string }): Promise<WeekDto> {
+  if (!ctx.access.editDraft) throw Forbidden("forbidden") // the route guard already answered; fail closed
+  assertLocation(ctx, input.locationId) // not a uuid, hidden, another tenant's and missing: one 404, before the id reaches SQL
+  if (!isMonday(input.weekStart)) throw unprocessable("invalid_week_start")
+  const [loc] = await tx.select({ archivedAt: locations.archivedAt }).from(locations).where(and(eq(locations.tenantId, ctx.tenantId), eq(locations.id, input.locationId))).for("share")
+  if (!loc) throw NotFound()
+  if (loc.archivedAt) throw Conflict("location_archived")
+  const [existing] = await tx.select({ id: rosterWeeks.id }).from(rosterWeeks).where(and(eq(rosterWeeks.tenantId, ctx.tenantId), eq(rosterWeeks.locationId, input.locationId), eq(rosterWeeks.weekStart, input.weekStart)))
+  if (existing) throw new AppError(409, "week_exists", "Conflict", { weekId: existing.id })
+  const [row] = await tx.insert(rosterWeeks).values({ tenantId: ctx.tenantId, locationId: input.locationId, weekStart: input.weekStart, createdAt: ctx.now, updatedAt: ctx.now }).returning()
+  await writeHistory(tx, ctx, { locationId: row.locationId, weekId: row.id, action: "week_created", after: { weekId: row.id, weekStart: row.weekStart } })
+  await auditRoster(tx, ctx, { action: "roster.week_created", entity: "roster_week", entityId: row.id, before: null, after: { locationId: row.locationId, weekStart: row.weekStart } })
+  return weekDto(row, [], [], [])
+}
+
+const VIEWS = ["day", "week", "fortnight", "month"] as const
+type View = (typeof VIEWS)[number]
+const MAX_RANGE_DAYS = 62
+
+const targetsOf = (rows: { shiftTypeId: string; weekday: number; count: number }[], types: { id: string; locationId: string }[]): StaffingTarget[] => {
+  const loc = new Map(types.map((t) => [t.id, t.locationId]))
+  return rows.map((r) => ({ locationId: loc.get(r.shiftTypeId)!, templateId: r.shiftTypeId, weekday: r.weekday as Weekday, count: r.count }))
+}
+
+function weekDto(w: WeekRow, shifts: ShiftRow[], types: { id: string; locationId: string; name: string; start: string; end: string; unpaidBreakMin: number; role: string; requires: string[] }[], targets: StaffingTarget[]): WeekDto {
+  const domainWeek: RosterWeek = { id: w.id, locationId: w.locationId, weekStart: w.weekStart, status: w.status as "draft" | "published", publishedAt: null, publishedBy: null, autoRepeatDays: w.autoRepeatDays }
+  const domainShifts: RosterShift[] = shifts.map((s) => ({ id: s.id, weekId: s.weekId, locationId: s.locationId, date: s.date, personId: s.userId, templateId: s.shiftTypeId, role: s.role, start: s.startTime, end: s.endTime, unpaidBreakMin: s.unpaidBreakMin, confirmedAt: null }))
+  const templates: ShiftTemplate[] = types.map((t) => ({ id: t.id, locationId: t.locationId, name: t.name, start: t.start, end: t.end, unpaidBreakMin: t.unpaidBreakMin, role: t.role, requires: t.requires }))
+  const days = dayColumns(domainWeek, domainShifts, targets, templates).map((d) => ({ date: d.date, shiftIds: d.shifts.map((s) => s.id), count: d.count, target: d.target, short: d.short, over: d.over }))
+  return { id: w.id, locationId: w.locationId, weekStart: w.weekStart, status: domainWeek.status, publishedAt: w.publishedAt?.toISOString() ?? null, publishedBy: w.publishedBy, autoRepeatDays: w.autoRepeatDays, version: w.version, days }
+}
+
+/**
+ * The read payload of a set of weeks: weeks with their seven day columns (the domain `dayColumns`), their shifts, the shift types of their locations with targets,
+ * and the members the caller may pick from. Everything is cut by `inScopeSql` / the weeks' own locations, so another location never appears in any array.
+ * Members: active people homed at a visible location (a role that sees every site also those homed nowhere) and everyone on a shown shift; a supervisor never gets a home
+ * location, anyone else only a visible one.
+ */
+async function payload(tx: TenantTx, ctx: RosterCtx, weeks: WeekRow[], range: WeeksDto["range"]): Promise<WeeksDto> {
+  const weekIds = weeks.map((w) => w.id)
+  const locationIds = [...new Set(weeks.map((w) => w.locationId))]
+  const shifts = weekIds.length
+    ? await tx.select().from(rosterShifts).where(and(eq(rosterShifts.tenantId, ctx.tenantId), inArray(rosterShifts.weekId, weekIds))).orderBy(asc(rosterShifts.date), asc(rosterShifts.startTime), asc(rosterShifts.id))
+    : []
+  const types = locationIds.length
+    ? await tx.select().from(shiftTypes).where(and(eq(shiftTypes.tenantId, ctx.tenantId), inArray(shiftTypes.locationId, locationIds))).orderBy(asc(shiftTypes.startTime), sql`lower(${shiftTypes.name})`, asc(shiftTypes.id))
+    : []
+  const targetRows = types.length ? await tx.select().from(shiftTypeTargets).where(and(eq(shiftTypeTargets.tenantId, ctx.tenantId), inArray(shiftTypeTargets.shiftTypeId, types.map((t) => t.id)))).orderBy(asc(shiftTypeTargets.weekday)) : []
+  const flat = types.map((t) => ({ id: t.id, locationId: t.locationId, name: t.name, start: t.startTime, end: t.endTime, unpaidBreakMin: t.unpaidBreakMin, role: t.role, requires: t.requires }))
+  const targets = targetsOf(targetRows, flat)
+  const onShifts = [...new Set(shifts.map((s) => s.userId).filter((u): u is string => u !== null))]
+  const homeCut = ctx.access.scope === "all" ? sql`(${memberships.homeLocationId} is null or ${inScopeSql(ctx, memberships.homeLocationId)})` : inScopeSql(ctx, memberships.homeLocationId)
+  const members = await tx
+    .select({ userId: memberships.userId, name: user.name, erased: user.erasedAt, status: memberships.status, home: memberships.homeLocationId })
+    .from(memberships)
+    .innerJoin(user, eq(user.id, memberships.userId))
+    .where(and(eq(memberships.tenantId, ctx.tenantId), or(and(eq(memberships.status, "active"), homeCut), onShifts.length ? inArray(memberships.userId, onShifts) : undefined)))
+    .orderBy(asc(memberships.userId))
+  const seesHome = ctx.access.scope === "all"
+  const typeDtos: ShiftTypeDto[] = types.map((t) => ({
+    id: t.id, locationId: t.locationId, name: t.name, start: t.startTime, end: t.endTime, unpaidBreakMin: t.unpaidBreakMin, role: t.role, requires: t.requires,
+    targets: targetRows.filter((r) => r.shiftTypeId === t.id).map((r) => ({ weekday: r.weekday, count: r.count })), archived: t.archivedAt !== null, version: t.version,
+  }))
+  return {
+    range,
+    weeks: weeks.map((w) => weekDto(w, shifts.filter((s) => s.weekId === w.id), flat.filter((t) => t.locationId === w.locationId), targets.filter((t) => t.locationId === w.locationId))),
+    shifts: shifts.map(shiftDto),
+    shiftTypes: typeDtos,
+    members: members.map((m) => ({ userId: m.userId, name: m.erased ? "Erased user" : m.name, active: m.status === "active", homeLocationId: seesHome && m.home && ctx.access.locationIds?.includes(m.home) ? m.home : null })),
+  }
+}
+
+/** GET /v1/roster/weeks?locationId=&from=&to=&view=: the weeks of the range for the caller's visible locations. A caller with no location view (staff) gets an empty cut, never someone else's roster. */
+export async function listWeeks(tx: TenantTx, ctx: RosterCtx, q: { locationId?: string; from?: string; to?: string; view?: string }): Promise<WeeksDto> {
+  const view = q.view ?? "week"
+  if (!(VIEWS as readonly string[]).includes(view)) throw unprocessable("invalid_view")
+  const anchor = q.from ?? todayOf(ctx)
+  if (!realDate(anchor) || (q.to !== undefined && (!realDate(q.to) || q.to < anchor))) throw unprocessable("invalid_range")
+  const range = q.to ? { from: anchor, to: q.to } : rosterRange(view as View, anchor)
+  if (Date.parse(`${range.to}T00:00:00Z`) - Date.parse(`${range.from}T00:00:00Z`) > MAX_RANGE_DAYS * 86_400_000) throw unprocessable("invalid_range")
+  if (q.locationId !== undefined) assertLocation(ctx, q.locationId)
+  const weeks = await tx
+    .select()
+    .from(rosterWeeks)
+    .where(and(eq(rosterWeeks.tenantId, ctx.tenantId), inScopeSql(ctx, rosterWeeks.locationId), q.locationId ? eq(rosterWeeks.locationId, q.locationId) : undefined, between(rosterWeeks.weekStart, mondayOf(range.from), range.to)))
+    .orderBy(asc(rosterWeeks.weekStart), asc(rosterWeeks.locationId), asc(rosterWeeks.id))
+  return payload(tx, ctx, weeks, { ...range, view: view as View })
+}
+
+/** GET /v1/roster/weeks/{id}: the same payload for one week. */
+export async function getWeek(tx: TenantTx, ctx: RosterCtx, id: string): Promise<WeeksDto> {
+  const { week } = await loadWeek(tx, ctx, id, false)
+  return payload(tx, ctx, [week], { from: week.weekStart, to: addDays(week.weekStart, 6), view: "week" })
+}
