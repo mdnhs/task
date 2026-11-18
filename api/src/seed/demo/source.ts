@@ -1,6 +1,13 @@
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
+import { fileURLToPath } from "node:url"
 import { SeedRefused } from "./guards"
+
+// The three task files (tasks, projects, templates) live next to the seed, not in public/data: the web no longer reads them (B6 T6.8) and
+// public/ is what the web serves and ships. Same shapes as before; the seed is their only reader.
+export const SEED_FIXTURES = fileURLToPath(new URL("./fixtures/", import.meta.url))
+const FIXTURE_FILES = new Set(["tasks/tasks.json", "tasks/projects.json", "tasks/templates.json"])
+export const sourcePath = (dir: string, path: string): string => (FIXTURE_FILES.has(path) ? join(SEED_FIXTURES, path.slice("tasks/".length)) : join(dir, path))
 
 // The mock JSON the seed reads. Shapes are the mock's own (public/data/<feature>/*.json); only the fields the seed uses are typed.
 export type MockUser = { id: string; name: string; email: string; role: string; dept: string; status: string }
@@ -61,7 +68,7 @@ export function loadSource(dir: string): Source {
   const loaded: string[] = []
   const read = <T>(path: string): T => {
     try {
-      const v = JSON.parse(readFileSync(join(dir, path), "utf8")) as T
+      const v = JSON.parse(readFileSync(sourcePath(dir, path), "utf8")) as T
       loaded.push(path)
       return v
     } catch {

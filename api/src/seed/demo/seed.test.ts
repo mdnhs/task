@@ -9,9 +9,10 @@ import { countAll, DEMO_PASSWORD, demoOptions, PUBLIC_DATA } from "../../../test
 import { verifyChain } from "../../modules/audit"
 import { withTenant } from "../../db/tenant-tx"
 import { seedDemo, type SeedReport } from "./index"
+import { sourcePath } from "./source"
 
 type Json = Record<string, any> // eslint-disable-line @typescript-eslint/no-explicit-any
-const read = <T = Json>(path: string): T => JSON.parse(readFileSync(join(PUBLIC_DATA, path), "utf8")) as T
+const read = <T = Json>(path: string): T => JSON.parse(readFileSync(sourcePath(PUBLIC_DATA, path), "utf8")) as T
 const n = async (sqlText: string, params: unknown[] = []) => Number((await ownerQuery(sqlText, params))[0].n)
 const tenantId = async (slug: string) => String((await ownerQuery("select id from tenants where slug = $1", [slug]))[0].id)
 const nIn = async (slug: string, sqlText: string) => Number((await ownerTenantQuery(await tenantId(slug), sqlText))[0].n)
