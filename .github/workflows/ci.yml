@@ -25,6 +25,9 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm -w api run typecheck
+      # B7 Task 14: the isolation gate on its own step, so a failure reads as "isolation" (AC-M0-01 walker, route inventory, platform walk).
+      - name: Isolation gate (AC-M0-01 walker, route inventory, platform walk)
+        run: npm -w api test -- isolation route-inventory platform-isolation
       # Testcontainers starts Postgres through the Docker daemon on the runner.
       - run: npm -w api test
 

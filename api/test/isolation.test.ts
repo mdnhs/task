@@ -5,6 +5,8 @@ import { ownerTenantQuery, ownerQuery } from "./db"
 import { makeMember, makeTenant, signIn } from "./factories"
 import { actorIn, fixtureFutureUntil, fixtureIds, ROUTE_PARAMS, type Actor, type World } from "./route-fixtures"
 import { memberships, roles } from "../src/db/schema"
+import { HASHED_TABLES, TABLE_EXEMPT } from "./isolation-tables"
+import { ROUTE_CLASSIFICATION } from "./route-classification"
 
 /**
  * AC-M0-01: cross-tenant isolation walker. It gates every release.
@@ -17,6 +19,13 @@ import { memberships, roles } from "../src/db/schema"
  *    the body validates and the handler really reaches the lookup);
  *  - B's 404 must carry the same error code as a never-existing id (B's data is indistinguishable from absent);
  *  - B's data (row hashes) must be identical before and after the walk (no cross-tenant write got through).
+ *
+ * Completeness (B7 Task 14), so the gate cannot be outrun:
+ *  - route-inventory.test.ts derives every route from the OpenAPI document and requires a classification (route-classification.ts);
+ *    the "tenant-record" routes there must be EXACTLY the SPECS + NOT_APPLICABLE keys of this file (test below), so a new route
+ *    with a tenant record id fails until it has a spec;
+ *  - the hashed table list (isolation-tables.ts) must equal every table with a tenant_id column (the RLS-guard list);
+ *  - platform routes: platform-isolation.test.ts (ruling C4), blocking in CI like this file.
  */
 
 type Json = Record<string, any> // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -197,8 +206,7 @@ const bodyExample = (op: Json): { present: boolean; example?: unknown } => {
 
 const substitute = (path: string, params: Record<string, string>) => path.replace(/\{(\w+)\}/g, (_, p) => encodeURIComponent(params[p]))
 
-/** Tenant tables whose rows are hashed before and after the walk: any change in the OTHER tenant is a cross-tenant mutation. */
-const HASHED_TABLES = ["roles", "memberships", "teams", "team_members", "reporting_lines", "devices", "device_policies", "invites", "audit_events", "tenant_settings", "notifications", "notification_preferences", "push_tokens", "notification_deliveries", "files", "integration_connections", "oauth_states", "public_holidays", "data_requests", "support_grants", "api_keys", "webhook_endpoints", "webhook_deliveries", "tasks", "task_assignees", "task_history", "task_time_entries", "task_counters", "task_checklist_items", "task_comments", "task_files", "task_templates", "task_voice_access", "projects", "project_milestones", "task_dependencies", "task_evidence", "shift_patterns", "shift_assignments", "shift_reporting_teams", "shift_reporting_people", "shift_reports", "shift_report_items", "shift_report_versions", "shift_report_comments", "shift_report_files", "shift_report_alerts", "report_exports"]
+/** Tenant tables whose rows are hashed before and after the walk: any change in the OTHER tenant is a cross-tenant mutation. The list lives in isolation-tables.ts (route-inventory.test.ts requires it to equal every tenant_id table). */
 
 async function hashes(tenantId: string): Promise<Record<string, string>> {
   const out: Record<string, string> = {}
@@ -226,9 +234,11 @@ beforeAll(async () => {
 
 type Op = { method: string; path: string; key: string; op: Json; params: string[] }
 /**
- * Ruling C4: /v1/platform/* is NOT walked. Platform routes are not tenant-scoped (no X-Tenant, no tenant record id in the
- * path: `{userId}` is a platform staff user id). They are covered by platform.test.ts instead: every one answers 404
- * not_found to a non-staff caller (no existence oracle), role/MFA gates, and audit entries in the platform chain.
+ * Ruling C4: /v1/platform/* is NOT walked with A's owner here. Platform routes are not tenant-scoped (no X-Tenant, no tenant
+ * record id in the path: `{userId}` is a platform staff user id) and the staff-by-design ones cannot be called as a tenant owner.
+ * The replacement walk is platform-isolation.test.ts (B7 Task 14, blocking in CI like this file): as a non-staff owner of A
+ * every platform route is the same 404 as a never-existing route; as staff, `{tenantId}` routes 404 a nil uuid and no secret
+ * appears in any body. platform.test.ts keeps the role/MFA gates and the platform audit chain.
  * The route-registration test below still includes them (they must be in the OpenAPI doc).
  */
 const PLATFORM = (path: string) => path.startsWith("/v1/platform/")
@@ -241,11 +251,17 @@ const operations = (): Op[] =>
   })
 
 describe("AC-M0-01 cross-tenant isolation walker", () => {
-  test("every M1 task/project/shift/report tenant table (migrations 0027-0038 and later) is in the mutation-hash list", async () => {
-    const rows = await ownerQuery("select table_name from information_schema.columns where table_schema = 'public' and column_name = 'tenant_id' and table_name ~ '^(tasks?|task_.*|projects?|project_.*|shift_.*|report_.*)$' order by 1")
+  test("every tenant table (any table with a tenant_id column) is in the mutation-hash list or exempt with a reason", async () => {
+    const rows = await ownerQuery("select table_name from information_schema.columns where table_schema = 'public' and column_name = 'tenant_id' order by 1")
     const tenantTables = rows.map((r) => String((r as { table_name: string }).table_name))
-    expect(tenantTables.length).toBeGreaterThanOrEqual(25)
-    expect(tenantTables.filter((x) => !HASHED_TABLES.includes(x))).toEqual([])
+    expect(tenantTables.length).toBeGreaterThanOrEqual(50)
+    expect(tenantTables.filter((x) => !HASHED_TABLES.includes(x) && !(x in TABLE_EXEMPT))).toEqual([])
+  })
+
+  test("the SPECS are exactly the manifest's tenant-record routes (a new tenant-record route fails until it has a SPECS entry)", () => {
+    const manifest = Object.entries(ROUTE_CLASSIFICATION).filter(([, [c]]) => c === "tenant-record").map(([k]) => k)
+    expect(Object.keys(SPECS).sort()).toEqual(manifest.sort())
+    for (const k of Object.keys(NOT_APPLICABLE)) expect(ROUTE_CLASSIFICATION[k]?.[0], `${k}: NOT_APPLICABLE routes have only static params, so the manifest says tenant-static`).toBe("tenant-static")
   })
 
   test("the walk is not vacuous: parameterised routes exist, every one has fixtures and a body example", () => {

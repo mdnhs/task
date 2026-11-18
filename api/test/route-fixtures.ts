@@ -245,3 +245,31 @@ export async function fixtureIds(t: { app: AppType; deps: Deps }, tenant: { id: 
   }
   return { fixtures, resources, marks: [tenant.id, tenant.slug, String(integ.id), `drive-${uniq}@example.com`, team.id, device.id, file.fileId, dsr.id, `Fix ${uniq}`, `Support ${uniq}`, String(sg.id), `File ${uniq}.pdf`, staff.userId, owner.userId, `Team ${uniq}`, `Device ${uniq}`, apiKey.id, apiKey.prefix, `Key ${uniq}`, hook.id, `hooks-${uniq}.example.com`, task.id, `Task ${uniq}`, `Desc ${uniq}`, item.id!, comment.id!, taskFile.fileId!, `Item ${uniq}`, `Comment ${uniq}`, `Attach ${uniq}.pdf`, project.id, milestone.id, template.id, `Template ${uniq}`, `Blueprint ${uniq}`, `Steps ${uniq}`, evItem.id!, evFile.fileId!, `Evid ${uniq}.pdf`, `Project ${uniq}`, `Plan ${uniq}`, pattern.id, assignment.id, `Pattern ${uniq}`, rpat.id, `Report pattern ${uniq}`, report.id, reportFile.fileId, reportExport.id, `Shot ${uniq}.pdf`, `Milestone ${uniq}`, String(sess.id), invite.id, invite.email] }
 }
+
+// ---- B7 Task 14: the route inventory ----
+import { ROUTE_CLASSIFICATION, type Classification } from "./route-classification"
+
+export type InventoryEntry = { method: string; path: string; key: string; source: "openapi" | "registered"; classification?: Classification; reason?: string }
+const OPENAPI_METHODS = ["get", "put", "post", "delete", "patch"]
+
+/**
+ * Every route the app serves, never hand-listed: the OpenAPI operations plus the registered routes that are NOT in the document
+ * (health, Better Auth, the provider webhook, the test probes). `classification` comes from route-classification.ts and is
+ * `undefined` for a route nobody classified, which route-inventory.test.ts turns into a failure by name.
+ * (`method` is upper case; middleware registered with ALL is not a route.)
+ */
+export function routeInventory(app: AppType): InventoryEntry[] {
+  const doc = app.getOpenAPI31Document({ openapi: "3.1.0", info: { title: "t", version: "1" } })
+  const seen = new Set<string>()
+  const out: InventoryEntry[] = []
+  const add = (method: string, path: string, source: InventoryEntry["source"]) => {
+    const key = `${method} ${path}`
+    if (seen.has(key)) return
+    seen.add(key)
+    const hit = ROUTE_CLASSIFICATION[key]
+    out.push({ method, path, key, source, classification: hit?.[0], reason: hit?.[1] })
+  }
+  for (const [path, item] of Object.entries(doc.paths ?? {})) for (const m of OPENAPI_METHODS) if ((item as Record<string, unknown>)[m]) add(m.toUpperCase(), path, "openapi")
+  for (const r of app.routes) if (r.method !== "ALL") add(r.method, r.path.replace(/:(\w+)/g, "{$1}"), "registered")
+  return out.sort((x, y) => x.key.localeCompare(y.key))
+}
