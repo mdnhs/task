@@ -1,0 +1,12 @@
+[
+  {
+    "advisory": "GHSA-fc5q-39xc-vjpf",
+    "reason": "picomatch ReDoS (extglob patterns), no patched release exists (latest 4.0.7 is the top of the affected range). npm reports it in the production tree only through vitest, vite and tinyglobby (an optional peer of better-auth, present in the API image's node_modules but never imported at runtime) and the shadcn CLI (build-time CSS import, not in either run image); the rest of the chain is dev tooling. Re-triage on the expiry date or when a fixed picomatch ships. See .claude/docs/deploy/audit-triage.md.",
+    "expires": "2026-12-18"
+  },
+  {
+    "advisory": "GHSA-w5hq-g745-h8pq",
+    "reason": "uuid missing buffer bounds check in v3, v5 and v6 when a buffer is passed. exceljs 4.4.0 uses only uuid v4 without a buffer (node_modules/exceljs/lib/xlsx/xform/sheet/cf-ext/cf-rule-ext-xform.js), so the advisory is not reached. Moderate, listed for the record. See .claude/docs/deploy/audit-triage.md.",
+    "expires": "2027-02-16"
+  }
+]

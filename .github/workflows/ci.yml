@@ -109,7 +109,12 @@ jobs:
       # B7 Task 18: no committed secret (token prefixes, private keys, high-entropy values on secret-like names). No service, no dependency.
       - run: node scripts/check-secrets.mjs
       - run: npm ci
+      # B7 Task 20 (ruling S15): the blocking gate is the PRODUCTION tree (`npm audit --omit=dev`): any high or critical advisory fails unless scripts/audit-allow.json has a reasoned,
+      # unexpired entry. Development-tooling findings are printed as a table and do not fail. Triage: .claude/docs/deploy/audit-triage.md
+      - run: node scripts/audit-gate.mjs
+      # Informational: the full tree, reported and never failing the build.
       - run: npm audit --audit-level=high
+        continue-on-error: true
 
   image:
     runs-on: ubuntu-latest

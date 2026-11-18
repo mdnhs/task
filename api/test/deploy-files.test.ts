@@ -126,8 +126,7 @@ describe("deploy docs", () => {
     for (const f of ["dokploy.md", "env-matrix.md", "backup-restore.md", "migrations.md", "rollback.md", "runbook-go-live.md", "security-review.md"]) expect(DEPLOY_DOCS, f).toContain(f)
   })
 
-  // Paths whose files a LATER task creates (task 20 removes this list).
-  const LATER = new Set<string>(["scripts/audit-gate.mjs", "scripts/audit-allow.json", ".claude/docs/deploy/audit-triage.md"])
+  const LATER = new Set<string>() // paths a later task will create (empty: nothing is pending)
   test("docs reference no file path that does not exist", () => {
     const top = new Set(readdirSync(ROOT))
     const missing: string[] = []
