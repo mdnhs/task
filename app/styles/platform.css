@@ -498,14 +498,13 @@ button.pf-arrow:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
 .pf-fieldset:disabled :is(input,textarea){opacity:1;color:var(--ink-2);-webkit-text-fill-color:var(--ink-2);cursor:default}
 /* Settings cards (live-settings.tsx): .od-form gives the 16px field rhythm; the form stays at a readable width, buttons keep their own size instead of stretching. */
 .pf-set{max-width:640px}
-.pf-set>.btn,.pf-set-row>.btn{justify-content:center;padding:0 20px;cursor:pointer;border:1.6px solid transparent;flex:none}
-.pf-set>.btn-outline,.pf-set-row>.btn-outline{border-color:var(--brand)}
+.pf-set-acts>.btn,.pf-set-row>.btn{justify-content:center;padding:0 20px;cursor:pointer;border:1.6px solid transparent;flex:none}
+.pf-set-acts>.btn-outline,.pf-set-row>.btn-outline{border-color:var(--brand)}
 .pf-set .btn:disabled{opacity:.5;cursor:not-allowed}
 .pf-set .btn-primary:disabled:hover{background:var(--brand)}
 .pf-set .btn-outline:disabled:hover{background:transparent}
-.pf-set>.btn{align-self:flex-start}
-.pf-set>.btn-primary{margin-top:4px}
-.pf-set .st{align-self:flex-start;white-space:normal;overflow-wrap:anywhere}
+.pf-set-acts{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-top:4px}
+.pf-set .st{white-space:normal;overflow-wrap:anywhere}
 .pf-set-test{display:flex;flex-direction:column;gap:12px;margin-top:20px}
 .pf-set-row{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap}
 .pf-set-row>.od-field{flex:1 1 260px}
