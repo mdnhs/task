@@ -1,0 +1,106 @@
+/* WhatsApp notifications (MOCK UI): the Integrations card, its connect dialog, the management page and the Account section. Tokens only, borderless. */
+
+/* ---------- Integrations card (rides on .set-int) ---------- */
+.wa-active{display:flex;flex-direction:column;gap:10px;margin:2px 0 4px}
+.wa-number{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px;margin:0;font-size:13px;color:var(--ink-2)}
+.wa-number b{font-size:15px;font-weight:700;color:var(--ink)}
+.wa-counts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:0}
+.wa-count{display:flex;flex-direction:column-reverse;gap:2px;min-width:0;padding:10px 12px;border-radius:var(--r-md);background:var(--card)}
+.wa-count dd{margin:0;font-size:20px;font-weight:700;line-height:26px;color:var(--ink)}
+.wa-count dt{font-size:12px;font-weight:600;line-height:16px;color:var(--ink-3)}
+.wa-count[data-bad] dd{color:var(--bad)}
+.wa-spin{animation:wa-spin 1s linear infinite}
+@keyframes wa-spin{to{transform:rotate(360deg)}}
+.set-int-foot .btn:disabled{opacity:.7;cursor:not-allowed}
+.set-int-foot .btn-primary:disabled:hover{background:var(--brand)}
+.set-int-foot a.btn{cursor:pointer}
+
+/* ---------- Connect dialog ---------- */
+.wa-dialog{width:min(520px,calc(calc(100vw / var(--text-scale,1)) - 24px))}
+.wa-points{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:12px}
+.wa-points li{display:flex;align-items:flex-start;gap:12px}
+.wa-point-ico{display:grid;place-items:center;width:36px;height:36px;border-radius:50%;background:var(--brand-soft);color:var(--brand);flex:none}
+.wa-point-ico .ico{width:18px;height:18px}
+.wa-points li div{display:flex;flex-direction:column;gap:2px;min-width:0}
+.wa-points b{font-size:14px;font-weight:700;color:var(--ink);line-height:20px}
+.wa-points span:not(.wa-point-ico){font-size:13px;line-height:1.45;color:var(--ink-2)}
+.wa-steps{list-style:none;margin:0;padding:0;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.wa-steps li{display:inline-flex;align-items:center;gap:8px;padding:5px 12px 5px 5px;border-radius:var(--r-pill);background:var(--mute-bg);font-size:12.5px;font-weight:600;color:var(--ink-3)}
+.wa-steps li[data-state="now"]{color:var(--ink)}
+.wa-steps li[data-state="done"]{color:var(--brand-deep)}
+:root[data-theme="dark"] .wa-steps li[data-state="done"]{color:var(--brand-3)}
+.wa-step-dot{display:grid;place-items:center;width:22px;height:22px;border-radius:50%;background:var(--card);font-size:12px;font-weight:700;line-height:1;flex:none}
+.wa-steps li[data-state="now"] .wa-step-dot{background:var(--brand);color:var(--on-brand)}
+.wa-steps li[data-state="done"] .wa-step-dot{background:var(--brand-soft);color:var(--brand)}
+.wa-dialog .od-form-foot .btn{cursor:pointer}
+.wa-dialog .od-form-foot .btn:disabled{opacity:.7;cursor:not-allowed}
+
+/* ---------- Management page ---------- */
+.wa-hero{display:flex;flex-direction:column;gap:16px}
+.wa-hero-main{display:flex;align-items:center;gap:14px;min-width:0}
+.wa-hero-text{display:flex;flex-direction:column;gap:6px;min-width:0;flex:1}
+.wa-hero-text h2{margin:0;font-size:18px;font-weight:700;line-height:26px}
+.wa-hero-meta{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;font-size:13px;color:var(--ink-2)}
+.wa-hero .wa-counts{max-width:520px}
+.wa-hero .wa-count{background:var(--shell)}
+.wa-off{flex:none;cursor:pointer}
+.wa-scope{display:inline-flex;align-items:center;padding:4px 10px;border-radius:calc(8px * var(--radius-scale,1));background:var(--mute-bg);font-size:12px;font-weight:600;line-height:16px;color:var(--ink-2)}
+.wa-tpl{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px;color:var(--ink);background:none;padding:0}
+.wa-status-cell{display:flex;flex-direction:column;align-items:flex-start;gap:4px}
+.wa-status-cell .tm{font-size:12px}
+.wa-delivery{margin:0;padding:0;border:0;min-width:0}
+.wa-delivery .od-filters{flex-wrap:nowrap}
+.wa-delivery .seg.od-seg button{height:34px;padding:0 12px}
+.wa-delivery:disabled .seg.od-seg button,.wa-delivery:disabled .seg.od-seg{cursor:not-allowed}
+.wa-delivery:disabled .seg.od-seg{opacity:.6}
+.wa-delivery[data-off] .seg.od-seg{opacity:.45}
+.wa-switch{display:inline-flex;align-items:center;gap:10px}
+.wa-switch .set-req{margin-left:0}
+.wa-kinds th:nth-child(2),.wa-kinds td:nth-child(2){min-width:180px}
+@media (max-width:640px){
+  .wa-hero-main{flex-wrap:wrap}
+  .wa-off{width:100%}
+  .wa-delivery .od-filters{justify-content:flex-end}
+}
+
+/* ---------- Account section ---------- */
+.wa-acc .wa-form{gap:14px}
+.wa-lead{margin:0;font-size:14px;line-height:1.5;color:var(--ink-2)}
+.wa-lead b{color:var(--ink);font-weight:700}
+.wa-phone-row{display:grid;grid-template-columns:minmax(0,220px) minmax(0,1fr);gap:14px;align-items:start}
+.wa-phone-row .od-filters{display:block}
+.wa-phone-row [data-slot="select-trigger"].od-filter-select{width:100%;min-width:0}
+.wa-code{letter-spacing:.3em;font-weight:700;max-width:220px}
+.wa-consent{display:flex;align-items:flex-start;gap:12px;font-size:13.5px;line-height:1.5;color:var(--ink-2);cursor:pointer}
+.wa-acc [data-slot="checkbox"].wa-check{width:24px;height:24px;margin-top:0;border:0;border-radius:8px;background:var(--mute-bg);box-shadow:inset 0 0 0 1.6px color-mix(in srgb,var(--ink-3) 55%,transparent);flex:none;cursor:pointer;transition:background-color var(--dur-fast) var(--ease)}
+.wa-acc [data-slot="checkbox"].wa-check[data-checked]{background:var(--brand);color:var(--on-brand);box-shadow:none}
+.wa-acc [data-slot="checkbox"].wa-check:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+.wa-actions{display:flex;flex-wrap:wrap;align-items:center;gap:10px}
+.wa-actions .btn{cursor:pointer}
+.wa-actions .btn:disabled{opacity:.5;cursor:not-allowed}
+.wa-actions .btn-primary:disabled:hover{background:var(--brand)}
+.wa-actions .btn-outline:disabled:hover{background:transparent}
+.wa-gate{font-size:12.5px}
+.wa-change{font-size:13.5px;font-weight:600;color:var(--ink-2);padding:8px 4px;cursor:pointer;transition:color var(--dur-fast) var(--ease)}
+.wa-change:hover{color:var(--brand-deep)}
+:root[data-theme="dark"] .wa-change:hover{color:var(--brand-3)}
+.wa-note{display:flex;align-items:center;gap:12px;padding:14px 16px;border-radius:var(--r-md);background:var(--shell)}
+.wa-note p{margin:0;font-size:13.5px;line-height:1.5;color:var(--ink-2)}
+.wa-note-ico{display:grid;place-items:center;width:36px;height:36px;border-radius:50%;background:var(--mute-bg);color:var(--ink-3);flex:none}
+.wa-note-ico .ico{width:18px;height:18px}
+.wa-verified{display:flex;align-items:center;gap:14px;padding:14px 16px;border-radius:var(--r-md);background:var(--shell)}
+.wa-verified-text{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1}
+.wa-verified-text .tt{font-size:15px;font-weight:700}
+.wa-remove{flex:none;cursor:pointer}
+.wa-stop{display:flex;align-items:center;gap:8px;margin:0;font-size:13px;font-weight:600;color:var(--ink-2)}
+.wa-stop .ico{color:var(--ink-3);flex:none}
+.wa-chan{display:flex;flex-direction:column;gap:10px}
+.wa-chan-h{margin:0;font-size:14px;font-weight:700;color:var(--ink)}
+.wa-empty{margin:0}
+.wa-acc[data-off] .wa-stop{margin-top:0}
+@media (max-width:640px){
+  .wa-phone-row{grid-template-columns:1fr}
+  .wa-verified{flex-wrap:wrap}
+  .wa-remove{width:100%}
+  .wa-code{max-width:none}
+}

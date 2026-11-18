@@ -7,7 +7,9 @@ import {
 } from "@/features/account"
 import type { AccountTabId } from "@/features/account"
 import { getUser } from "@/features/shell"
+import { WhatsAppAccountSection, WhatsAppError, getWhatsApp } from "@/features/whatsapp"
 import { getMfaState } from "@/lib/device-session"
+import { mockEnabled } from "@/lib/mock-registry"
 import { getOrg } from "@/lib/org"
 import { getPeople } from "@/lib/people"
 import { todaySubject } from "@/lib/today-prefs"
@@ -39,10 +41,19 @@ export default async function Page({ params }: { params: Promise<{ tab: string }
   const role = session.role.label
   const department = org.departments.find((d) => people.some((p) => p.id === session.user.id && p.dept === d)) ?? people.find((p) => p.id === session.user.id)?.dept ?? ""
 
+  // MOCK (no backend yet): the WhatsApp section of the notification tab, demo deployments only.
+  const wa = mockEnabled() ? await getWhatsApp().catch(() => null) : null
+  const waSection = !mockEnabled() ? null : wa ? <WhatsAppAccountSection initial={wa} scope={session.tenant.id} /> : <WhatsAppError title="Could not load WhatsApp settings" />
+
   const panels: Record<AccountTabId, React.ReactNode> = {
     profile: <ProfilePanel data={profile} name={user.name} email={user.email} initials={user.initials} role={role} tzLabel={org.tzLabel} department={department} />,
     security: <SecurityPanel data={security} mfaRequired={mfa.required} email={user.email} today={org.today} tzLabel={org.tzLabel} device={{ label: session.device.label, registered: session.device.id !== null }} ownDevices={ownDevices} />,
-    notifications: <AccountNotificationsPanel data={prefs} todayUser={todaySubject(session.tenant.slug, session.user.id)} />,
+    notifications: (
+      <>
+        <AccountNotificationsPanel data={prefs} todayUser={todaySubject(session.tenant.slug, session.user.id)} />
+        {waSection}
+      </>
+    ),
   }
 
   // All panels render up front so the client switches tabs in place.

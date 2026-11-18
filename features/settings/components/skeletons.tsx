@@ -436,7 +436,7 @@ function Notifications({ canWrite, data, deadline, tzLabel, today, log }: { canW
 }
 
 // One card with Google Drive, the only integration the API has (not connected, the typical new company).
-function Integrations({ canWrite }: { canWrite: boolean }) {
+function Integrations({ canWrite, extra }: { canWrite: boolean; extra?: React.ReactNode }) {
   return (
     <section className="card set-card">
       <CardHead title={110} sub={120} />
@@ -451,6 +451,7 @@ function Integrations({ canWrite }: { canWrite: boolean }) {
           <Sk w={280} h={11} lh={20} />
           {canWrite && <div className="set-int-foot"><Sk w={110} h={48} r={14} /></div>}
         </li>
+        {extra}
       </ul>
     </section>
   )
@@ -609,11 +610,14 @@ export function SettingsBodySkeleton({
   counts,
   canWrite,
   billing,
+  extras,
 }: {
   tab: SettingsTabId
   counts: SettingsCounts
   canWrite: boolean
   billing?: React.ReactNode
+  /** More cards the route composes in (a feature does not import another feature): the mock WhatsApp card of the Integrations grid. */
+  extras?: { integrations?: React.ReactNode }
 }) {
   switch (tab) {
     case "organisation":
@@ -642,7 +646,7 @@ export function SettingsBodySkeleton({
     case "integrations":
       return (
         <>
-          <Integrations canWrite={canWrite} />
+          <Integrations canWrite={canWrite} extra={extras?.integrations} />
           <DevicePolicies canWrite={canWrite} policies={counts.data?.devicePolicies ?? []} />
         </>
       )
@@ -662,11 +666,13 @@ export function SettingsSkeleton({
   counts,
   canWrite = true,
   billing,
+  extras,
 }: {
   tab: SettingsTabId
   counts: SettingsCounts
   canWrite?: boolean
   billing?: React.ReactNode
+  extras?: { integrations?: React.ReactNode }
 }) {
   return (
     <SkGroup label="Loading settings" className="sk-page">
@@ -686,6 +692,7 @@ export function SettingsSkeleton({
             counts={counts}
             canWrite={canWrite}
             billing={billing}
+            extras={extras}
           />
         </div>
       </div>

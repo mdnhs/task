@@ -1,0 +1,12 @@
+{
+  "templates": [
+    { "id": "t1", "name": "task_assigned_v2", "kind": "Task assigned", "language": "en", "status": "approved", "reason": null },
+    { "id": "t2", "name": "task_due_digest_v1", "kind": "Task due or overdue", "language": "en", "status": "approved", "reason": null },
+    { "id": "t3", "name": "report_due_v1", "kind": "Shift report due", "language": "en", "status": "approved", "reason": null },
+    { "id": "t4", "name": "report_returned_v1", "kind": "Report returned", "language": "en", "status": "approved", "reason": null },
+    { "id": "t5", "name": "security_alert_v1", "kind": "Security", "language": "en", "status": "approved", "reason": null },
+    { "id": "t6", "name": "roster_changed_v1", "kind": "Roster published or changed", "language": "en", "status": "pending", "reason": null },
+    { "id": "t7", "name": "leave_decided_v1", "kind": "Leave decided", "language": "en", "status": "pending", "reason": null },
+    { "id": "t8", "name": "billing_notice_v1", "kind": "Billing notice", "language": "en", "status": "rejected", "reason": "Variable at the start of the text" }
+  ]
+}

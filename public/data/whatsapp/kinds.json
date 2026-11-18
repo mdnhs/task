@@ -1,0 +1,12 @@
+{
+  "kinds": [
+    { "id": "task_assigned", "label": "Task assigned", "hint": "A task is given to someone", "scope": "The assignee", "enabled": true, "delivery": "instant", "locked": false },
+    { "id": "task_due", "label": "Task due or overdue", "hint": "Due soon, or past its date", "scope": "Assignees and their team lead", "enabled": true, "delivery": "digest", "locked": false },
+    { "id": "report_due", "label": "Shift report due", "hint": "Before the deadline", "scope": "People on that shift", "enabled": true, "delivery": "instant", "locked": false },
+    { "id": "report_returned", "label": "Report returned", "hint": "A reviewer asks for changes", "scope": "The report's author", "enabled": true, "delivery": "instant", "locked": false },
+    { "id": "roster_changed", "label": "Roster published or changed", "hint": "Shifts added, moved or removed", "scope": "People on that location's roster", "enabled": false, "delivery": "digest", "locked": false },
+    { "id": "leave_decided", "label": "Leave decided", "hint": "Approved or declined", "scope": "The person who asked", "enabled": false, "delivery": "instant", "locked": false },
+    { "id": "billing", "label": "Billing notice", "hint": "Plan and payment notices", "scope": "Owners and admins", "enabled": false, "delivery": "digest", "locked": false },
+    { "id": "security", "label": "Security", "hint": "Sign-ins and device changes", "scope": "The person it is about", "enabled": true, "delivery": "instant", "locked": true }
+  ]
+}

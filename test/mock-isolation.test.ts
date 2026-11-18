@@ -105,7 +105,7 @@ describe("4. mock routes exist only behind ENABLE_MOCK_MODULES=1", () => {
   test("the nav drops every mock entry with the flag unset and keeps them all with it set; real entries stay", () => {
     const all = [...navigation.menu, ...navigation.general]
     const mockHrefs = all.filter((n) => isMockRoute(n.href)).map((n) => n.href)
-    expect(mockHrefs.length).toBeGreaterThanOrEqual(MOCK_ROUTES.length) // every mock route has a nav entry
+    expect(mockHrefs.length).toBeGreaterThanOrEqual(MOCK_ROUTES.filter((r) => !r.prefix.startsWith("/settings/")).length) // every mock route has a nav entry (sub-pages of Settings are reached from their card)
     vi.stubEnv("ENABLE_MOCK_MODULES", "")
     expect(hideMockNav(all).map((n) => n.href)).toEqual(["/", "/tasks", "/daily-reports", "/shifts", "/settings", "/audit-log"])
     expect(hideMockNav(all).some((n) => "badge" in n)).toBe(false) // the seed's badge counts are mock numbers

@@ -11,6 +11,7 @@ import {
 import { LOGO_UPLOAD_ENABLED } from "@/features/settings/constants"
 import type { SettingsTabId } from "@/features/settings"
 import { AccessRestricted } from "@/features/shell"
+import { WhatsAppCard, WhatsAppCardError, WhatsAppCount, getWhatsApp } from "@/features/whatsapp"
 import { hasModule } from "@/lib/entitlements"
 import { mockEnabled } from "@/lib/mock-registry"
 import { getOrg } from "@/lib/org"
@@ -87,9 +88,13 @@ export default async function Page({ params, searchParams }: { params: Promise<{
       case "integrations": {
         const [integrations, policies] = await Promise.all([readable(() => loadIntegrations(api, org.timezone)), readable(() => loadPolicies(api))])
         if (!integrations) return null
+        // MOCK (no backend yet): the WhatsApp card and the "N of M connected" counter, demo deployments only.
+        const wa = mockEnabled() ? await getWhatsApp().catch(() => null) : null
+        const extra = !mockEnabled() ? undefined : wa ? <WhatsAppCard initial={wa} scope={tenant.id} today={org.today} tzLabel={org.tzLabel} canWrite={write} /> : <WhatsAppCardError />
+        const counter = wa ? <WhatsAppCount initial={wa} scope={tenant.id} base={integrations.filter((i) => i.status === "connected").length} total={Math.max(integrations.length, 1) + 1} /> : undefined
         return (
           <>
-            <IntegrationsPanel integrations={integrations} flash={flash} today={org.today} tzLabel={org.tzLabel} canWrite={write} />
+            <IntegrationsPanel integrations={integrations} flash={flash} today={org.today} tzLabel={org.tzLabel} canWrite={write} extra={extra} counter={counter} />
             {policies && <DevicePolicyCard policies={policies} canWrite={write} />}
           </>
         )

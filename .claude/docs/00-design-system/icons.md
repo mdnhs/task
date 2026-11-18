@@ -74,6 +74,7 @@ Counts are files that contain the quoted name (TSX/TS/JSON), so a few include lo
 | `BellRing` | `bell-ring` | `Notification03Icon` | 1 |
 | `Blocks` | `blocks` | `BlocksIcon` | 1 |
 | `Bookmark` | `bookmark` | `Bookmark01Icon` | 1 |
+| `BubbleChat` | `bubble-chat` | `BubbleChatIcon` | 3 |
 | `Building2` | `building` | `Building03Icon` | 3 |
 | `CalendarCheck` | `calendar-check` | `CalendarCheck01Icon` | 1 |
 | `CalendarClock` | `calendar-clock` | `CalendarClockIcon` | 6 |
@@ -168,6 +169,7 @@ Counts are files that contain the quoted name (TSX/TS/JSON), so a few include lo
 
 Hugeicons free has an equivalent for every glyph; these are the ones where the look or the exact meaning is only close:
 
+- `bubble-chat` (BubbleChatIcon): the WhatsApp card chip. The free Hugeicons pack has no WhatsApp brand glyph, so the plain chat bubble stands in.
 - `brand` (Tick02Icon): Hugeicons has no logo-check mark; the plain tick is the nearest (the in-house mark was a tick with a short bar).
 - `badge` (IdentityCardIcon): Sprite was an ID badge with a face; IdentityCard is the closest card glyph.
 - `history` (Time01Icon): Sprite was a clock with a back arrow; Time01 is a plain clock face.

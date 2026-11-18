@@ -19,9 +19,10 @@ const STATUS: Record<IntegrationStatus, Status> = {
   error: { tone: "bad", label: "Error" },
 }
 
+// `extra` / `counter`: more cards for the grid and the header counter, composed by the route (a feature does not import another feature). Today only the mock WhatsApp card (demo flag).
 // Integrations (GET /v1/integrations): Google Drive is the only one the API has. "Connect" asks the API for the consent URL and follows it (only on Google's own host);
 // Google sends the person back to /settings/integrations?status=connected|error, shown once as a toast. "Disconnect" revokes at Google and erases the stored tokens.
-export function IntegrationsPanel({ integrations, flash, today, tzLabel, canWrite }: { integrations: Integration[]; flash?: { status: "connected" | "error" }; today: string; tzLabel: string; canWrite: boolean }) {
+export function IntegrationsPanel({ integrations, flash, today, tzLabel, canWrite, extra, counter }: { integrations: Integration[]; flash?: { status: "connected" | "error" }; today: string; tzLabel: string; canWrite: boolean; extra?: React.ReactNode; counter?: React.ReactNode }) {
   const run = useApiAction()
   const client = makeSettingsClient(apiBrowser, { go: (u) => window.location.assign(u) })
   const [confirm, setConfirm] = useState<Integration | null>(null)
@@ -40,7 +41,7 @@ export function IntegrationsPanel({ integrations, flash, today, tzLabel, canWrit
       <div className="card-head">
         <div>
           <h2 id="set-int-h">Integrations</h2>
-          <div className="sub">{stored.filter((i) => i.status === "connected").length} of {stored.length} connected</div>
+          <div className="sub">{counter ?? <>{stored.filter((i) => i.status === "connected").length} of {stored.length} connected</>}</div>
         </div>
       </div>
       <ul className="set-int-grid">
@@ -72,6 +73,7 @@ export function IntegrationsPanel({ integrations, flash, today, tzLabel, canWrit
             )}
           </li>
         ))}
+        {extra}
       </ul>
       <ConfirmDialog
         open={!!confirm}
