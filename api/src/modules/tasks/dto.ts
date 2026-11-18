@@ -10,6 +10,9 @@ import type { HistoryDto } from "./history"
 import { taskScopeWhere, type TaskCtx, type TaskRow } from "./scope"
 import { wallOf } from "./time"
 
+/** Most "Blocks" a task detail lists (the visible reverse edges, by due then id); the rest is counted in hiddenBlocks (ruling S8). */
+export const BLOCKS_CAP = 50
+
 const TID = "6f1c0d52-8d3a-4b7e-9c41-2a5b7e90d3f8"
 const UID = "usr_8Kq2mZ4tW1"
 const WALL_EX = "2026-11-20T17:00:00"
@@ -148,21 +151,31 @@ export async function taskDtos(tx: TenantTx, ctx: TaskCtx, rows: TaskRow[], time
         .groupBy(taskDependencies.taskId)
     : []
   const allDepCount = new Map(allDeps.map((r) => [r.taskId, r.n]))
-  // The reverse edges (tasks waiting on these): the same scope rule, with the visible rows and a count of the rest (task_deps_on_idx).
-  const blockRows = ids.length
+  // The reverse edges (tasks waiting on these): the same scope rule. At most BLOCKS_CAP visible ones per task, taken by due then id (task_deps_on_idx);
+  // the rest (out of scope, archived ones are not edges at all, and the overflow) is one count per task: a number, never a name.
+  const ranked = ids.length
+    ? tx
+        .select({
+          onId: taskDependencies.dependsOnId, id: tasks.id, refNo: tasks.refNo, title: tasks.title, status: tasks.status, dueAt: tasks.dueAt,
+          rn: sql<number>`row_number() over (partition by ${taskDependencies.dependsOnId} order by ${tasks.dueAt}, ${tasks.id})`.as("rn"),
+        })
+        .from(taskDependencies)
+        .innerJoin(tasks, and(eq(tasks.tenantId, taskDependencies.tenantId), eq(tasks.id, taskDependencies.taskId)))
+        .where(and(eq(taskDependencies.tenantId, ctx.tenantId), inArray(taskDependencies.dependsOnId, ids), sql`${tasks.archivedAt} is null`, taskScopeWhere(ctx.scope, ctx.reports)))
+        .as("ranked")
+    : null
+  const blockRows = ranked ? await tx.select().from(ranked).where(sql`${ranked.rn} <= ${BLOCKS_CAP}`).orderBy(asc(ranked.dueAt), asc(ranked.id)) : []
+  const blockTotals = ids.length
     ? await tx
-        .select({ onId: taskDependencies.dependsOnId, id: tasks.id, refNo: tasks.refNo, title: tasks.title, status: tasks.status, visible: sql<boolean>`${taskScopeWhere(ctx.scope, ctx.reports)}` })
+        .select({ onId: taskDependencies.dependsOnId, n: sql<number>`count(*)::int` })
         .from(taskDependencies)
         .innerJoin(tasks, and(eq(tasks.tenantId, taskDependencies.tenantId), eq(tasks.id, taskDependencies.taskId)))
         .where(and(eq(taskDependencies.tenantId, ctx.tenantId), inArray(taskDependencies.dependsOnId, ids), sql`${tasks.archivedAt} is null`))
-        .orderBy(asc(tasks.refNo))
+        .groupBy(taskDependencies.dependsOnId)
     : []
   const blocks = new Map<string, { id: string; ref: string; title: string; status: z.infer<typeof Status> }[]>()
-  const hiddenBlocks = new Map<string, number>()
-  for (const b of blockRows) {
-    if (b.visible) blocks.set(b.onId, [...(blocks.get(b.onId) ?? []), { id: b.id, ref: ref(b.refNo), title: free(b.title), status: b.status as z.infer<typeof Status> }])
-    else hiddenBlocks.set(b.onId, (hiddenBlocks.get(b.onId) ?? 0) + 1)
-  }
+  for (const b of blockRows) blocks.set(b.onId, [...(blocks.get(b.onId) ?? []), { id: b.id, ref: ref(b.refNo), title: free(b.title), status: b.status as z.infer<typeof Status> }])
+  const hiddenBlocks = new Map(blockTotals.map((t) => [t.onId, t.n - (blocks.get(t.onId)?.length ?? 0)]))
   // Evidence of the whole page in ONE query (and one names lookup); items that are still scanning, infected or deleted do not count toward the state (ruling D10).
   const evidenceBy = await loadEvidence(tx, ctx.tenantId, ids)
   const evidenceDto = new Map((await evidenceDtos(tx, ctx, [...evidenceBy.values()].flat())).map((d) => [d.id, d]))
@@ -255,6 +268,7 @@ export const ListQuery = z.object({
   ref: z.string().regex(/^(tsk-)?\d{1,9}$/i).optional(),
   label: z.string().trim().min(1).max(40).optional(),
   evidence: z.enum(EVIDENCE_FILTERS).optional(),
+  teamId: z.uuid().optional().openapi({ description: "Tasks filed under this department or assigned to one of its members, inside the caller's scope; a team the caller cannot reach or that does not exist is an empty list" }),
 })
 export type ListQueryInput = z.infer<typeof ListQuery>
 export const HistoryQuery = z.object({ limit: z.coerce.number().int().min(1).max(100).default(25), cursor: z.string().max(300).optional() })

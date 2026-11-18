@@ -195,6 +195,8 @@ export function listConditions(ctx: TaskCtx, f: Partial<ListQueryInput> & { afte
   }
   if (f.priority) conds.push(eq(tasks.priority, Number(f.priority)))
   if (f.assignee) conds.push(sql`exists (select 1 from task_assignees ta where ta.task_id = ${tasks.id} and ta.user_id = ${f.assignee})`)
+  // Ruling S8: filed under the department OR assigned to one of its members. It only narrows (the scope predicate above is untouched), so an unknown or unreachable team is just empty.
+  if (f.teamId) conds.push(sql`(${tasks.teamId} = ${f.teamId}::uuid or exists (select 1 from task_assignees ta join team_members tm on tm.tenant_id = ta.tenant_id and tm.user_id = ta.user_id where ta.task_id = ${tasks.id} and tm.team_id = ${f.teamId}::uuid))`)
   if (f.project) conds.push(f.project === "none" ? sql`${tasks.projectId} is null` : eq(tasks.projectId, f.project))
   if (f.repeat) conds.push(sql`(${tasks.repeat} is not null or ${tasks.seriesId} is not null)`)
   if (f.label) conds.push(sql`${tasks.labels} @> array[${f.label.trim().toLowerCase()}]::text[]`)

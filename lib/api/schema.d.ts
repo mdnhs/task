@@ -1134,6 +1134,8 @@ export interface paths {
                     ref?: string;
                     label?: string;
                     evidence?: "verified" | "awaiting" | "rejected" | "missing";
+                    /** @description Tasks filed under this department or assigned to one of its members, inside the caller's scope; a team the caller cannot reach or that does not exist is an empty list */
+                    teamId?: string;
                     /** @description Page ONE column: with `cursor` (that column's nextCursor) */
                     column?: "not_started" | "in_progress" | "blocked" | "submitted" | "changes_requested" | "completed" | "cancelled";
                     cursor?: string;
@@ -1282,6 +1284,8 @@ export interface paths {
                     ref?: string;
                     label?: string;
                     evidence?: "verified" | "awaiting" | "rejected" | "missing";
+                    /** @description Tasks filed under this department or assigned to one of its members, inside the caller's scope; a team the caller cannot reach or that does not exist is an empty list */
+                    teamId?: string;
                 };
                 header?: never;
                 path?: never;

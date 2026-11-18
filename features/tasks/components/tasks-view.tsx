@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 
 import { EmptyState } from "@/components/empty-state"
@@ -56,6 +56,7 @@ export function TasksView({
   initialFilters = EMPTY_FILTERS,
   staff,
   projects = [],
+  departments = [],
 }: {
   /** The first page the API returned for these filters. */
   tasks: Task[]
@@ -70,25 +71,46 @@ export function TasksView({
   staff: boolean
   /** FR-M1-04 projects for the filter. */
   projects?: Project[]
+  /** Department teams: the shell's department (a name) becomes the API's `teamId`. */
+  departments?: { id: string; name: string }[]
 }) {
   const dept = useDept()
   const { filters, set, reset, pending } = useUrlFilters<TasksFilters>(initialFilters, EMPTY_FILTERS)
+  const teamId = dept === "all" ? undefined : departments.find((d) => d.name === dept)?.id
   // Pages after the first come from the API with the cursor; a new server page (filters changed) starts over.
   const [more, setMore] = useState<{ base: Task[]; rows: Task[]; cursor: string | null }>({ base: tasks, rows: [], cursor: nextCursor })
+  // A department is the API's filter too (teamId): its own first page replaces the server's, and Load more keeps it.
+  const [scoped, setScoped] = useState<{ teamId: string; base: Task[]; rows: Task[]; cursor: string | null } | null>(null)
   const [loading, setLoading] = useState(false)
+  const scopedNow = teamId && scoped?.teamId === teamId && scoped.base === tasks ? scoped : null
+  const waitingTeam = !!teamId && !scopedNow
+  const filterKey = JSON.stringify(filters)
+  useEffect(() => {
+    if (!teamId) return
+    let live = true
+    apiBrowser
+      .get("/v1/tasks", { query: { ...listQuery(filters, teamId), limit: TASKS_PAGE_SIZE } as never })
+      .then((page) => live && setScoped({ teamId, base: tasks, rows: page.items.map((d) => toTask(d)), cursor: page.nextCursor }))
+      .catch((e) => live && toast.error(userMessage(e).text))
+    return () => {
+      live = false
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- filterKey stands for filters (a fresh object each render)
+  }, [teamId, tasks, filterKey])
   const fresh = more.base === tasks
-  const loaded = useMemo(() => (fresh ? [...tasks, ...more.rows] : tasks), [fresh, tasks, more.rows])
-  const cursor = fresh ? more.cursor : nextCursor
+  const loaded = useMemo(() => (scopedNow ? scopedNow.rows : waitingTeam ? [] : fresh ? [...tasks, ...more.rows] : tasks), [scopedNow, waitingTeam, fresh, tasks, more.rows])
+  const cursor = scopedNow ? scopedNow.cursor : waitingTeam ? null : fresh ? more.cursor : nextCursor
   const peopleById = useMemo(() => new Map(people.map((p) => [p.id, p])), [people])
-  // The department switcher is the shell's, and the API has no department filter: it narrows the loaded rows only.
-  const rows = dept === "all" ? loaded : loaded.filter((t) => t.dept === dept)
+  const rows = loaded
 
   async function loadMore() {
     if (!cursor || loading) return
     setLoading(true)
     try {
-      const page = await apiBrowser.get("/v1/tasks", { query: { ...listQuery(filters), limit: TASKS_PAGE_SIZE, cursor } as never })
-      setMore({ base: tasks, rows: [...(fresh ? more.rows : []), ...page.items.map((d) => toTask(d))], cursor: page.nextCursor })
+      const page = await apiBrowser.get("/v1/tasks", { query: { ...listQuery(filters, teamId), limit: TASKS_PAGE_SIZE, cursor } as never })
+      const next = page.items.map((d) => toTask(d))
+      if (scopedNow) setScoped({ ...scopedNow, rows: [...scopedNow.rows, ...next], cursor: page.nextCursor })
+      else setMore({ base: tasks, rows: [...(fresh ? more.rows : []), ...next], cursor: page.nextCursor })
     } catch (e) {
       toast.error(userMessage(e).text)
     } finally {
@@ -113,7 +135,7 @@ export function TasksView({
         }
       />
       <TaskViewTabs active="list" />
-      <div className="card tasks-card" aria-busy={pending || undefined}>
+      <div className="card tasks-card" aria-busy={pending || waitingTeam || undefined}>
         <FilterBar>
           <FilterSelect label="Status" value={filters.status} options={staff ? STATUSES : [...STATUSES.slice(0, 3), REVIEW_STATUS, ...STATUSES.slice(3)]} onChange={(v) => set("status", v)} />
           <FilterSelect label="Priority" value={filters.priority} options={PRIORITIES} onChange={(v) => set("priority", v)} />
@@ -154,13 +176,6 @@ export function TasksView({
               ) : undefined
             }
           />
-        )}
-        {rows.length === 0 && cursor && (
-          // The department switcher narrows only the rows loaded so far: more pages may hold matches, so the result must not look complete.
-          <div className="tasks-more">
-            <p className="td-muted">Only the tasks loaded so far were checked.</p>
-            <button type="button" className="btn btn-outline" disabled={loading} onClick={() => void loadMore()}>{loading ? "Loading…" : "Load more"}</button>
-          </div>
         )}
       </div>
     </>

@@ -62,8 +62,9 @@ export function matchesStatus(t: Task, status: string, today: string, reviewerId
   return t.status === status
 }
 
-/** The list's query for a set of filters: "all" means no filter. The API does the filtering and the paging (cursor); the page never re-scopes. */
-export const listQuery = (f: TasksFilters) => ({
+/** The list's query for a set of filters: "all" means no filter. `teamId` is the shell's department as a team id (the API filters, ruling S8). The API does the filtering and the paging (cursor); the page never re-scopes. */
+export const listQuery = (f: TasksFilters, teamId?: string) => ({
+  ...(teamId ? { teamId } : {}),
   ...(f.status !== "all" ? { status: f.status } : {}),
   ...(f.due !== "all" ? { due: f.due } : {}),
   ...(f.priority !== "all" ? { priority: f.priority } : {}),

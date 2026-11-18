@@ -14,6 +14,7 @@ import { withTenant } from "../../db/tenant-tx"
 import { clearModuleOverride } from "../entitlements"
 import { applyTaskUpdate, buildListQuery, registerTasks, type TaskCtx } from "."
 import { NO_EVIDENCE } from "@opsdesk/domain/task-evidence"
+import { BLOCKS_CAP } from "./dto"
 
 type Json = Record<string, any> // eslint-disable-line @typescript-eslint/no-explicit-any
 beforeEach(resetDb)
@@ -2270,6 +2271,76 @@ describe("b4 fix wave (I1, I4, M8)", () => {
     const viaKey = await w.json(await call(w.app, "GET", `/v1/tasks/${a.id}`, { headers: { authorization: `Bearer ${key.key}` } }))
     expect(viaKey.hiddenDependencies).toBe(1)
     expect(fields(viaKey)).not.toContain(c.ref)
+  })
+
+  test("B7 T10: teamId filters to tasks assigned to members of that team (or filed under it) within the caller's scope", async () => {
+    const w = await world()
+    const dept = await w.json(await w.req("POST", "/v1/teams", w.owner, { name: "Cleaning", kind: "department" }))
+    const other = await w.json(await w.req("POST", "/v1/teams", w.owner, { name: "Kitchen", kind: "department" }))
+    expect((await w.req("PUT", `/v1/teams/${dept.id}/members`, w.owner, { userIds: [w.staff.userId] })).status).toBe(200)
+    expect((await w.req("PUT", `/v1/teams/${other.id}/members`, w.owner, { userIds: [w.staff2.userId] })).status).toBe(200)
+    await w.mk(w.ops, { title: "By member", primary: w.staff.userId })
+    await w.mk(w.ops, { title: "By filing", primary: w.staff2.userId, teamId: dept.id })
+    await w.mk(w.ops, { title: "Other team", primary: w.staff2.userId })
+    const titles = async (qs: string, as: Who = w.ops) => ((await w.json(await w.req("GET", `/v1/tasks?${qs}`, as))).items as Json[]).map((i) => i.title as string).sort()
+    expect(await titles(`teamId=${dept.id}`)).toEqual(["By filing", "By member"])
+    expect(await titles(`teamId=${other.id}`)).toEqual(["By filing", "Other team"])
+    // a team manager cannot widen their reach with another team's id: only the tasks inside their scope come back
+    await w.manages(w.manager, w.staff)
+    expect(await titles(`teamId=${other.id}`, w.manager)).toEqual([])
+    expect(await titles(`teamId=${dept.id}`, w.manager)).toEqual(["By member"])
+  })
+
+  test("B7 T10: a team the caller cannot reach (or that does not exist) is an empty list, never a 404", async () => {
+    const w = await world()
+    const dept = await w.json(await w.req("POST", "/v1/teams", w.owner, { name: "Kitchen", kind: "department" }))
+    expect((await w.req("PUT", `/v1/teams/${dept.id}/members`, w.owner, { userIds: [w.staff2.userId] })).status).toBe(200)
+    await w.mk(w.ops, { title: "Secret", primary: w.staff2.userId })
+    const asStaff = await w.req("GET", `/v1/tasks?teamId=${dept.id}`, w.staff)
+    expect(asStaff.status).toBe(200)
+    expect((await w.json(asStaff)).items).toEqual([])
+    const unknown = await w.req("GET", "/v1/tasks?teamId=6f1c0d52-8d3a-4b7e-9c41-2a5b7e90d3f8", w.ops)
+    expect(unknown.status).toBe(200)
+    expect((await w.json(unknown)).items).toEqual([])
+    expect((await w.req("GET", "/v1/tasks?teamId=nope", w.ops)).status).toBe(400)
+  })
+
+  test("B7 T10: teamId combines with status, cursor and limit and pages without gaps", async () => {
+    const w = await world()
+    const dept = await w.json(await w.req("POST", "/v1/teams", w.owner, { name: "Cleaning", kind: "department" }))
+    expect((await w.req("PUT", `/v1/teams/${dept.id}/members`, w.owner, { userIds: [w.staff.userId] })).status).toBe(200)
+    for (let i = 0; i < 7; i++) await w.mk(w.ops, { title: `In ${i}`, primary: w.staff.userId, due: `2026-11-2${i}T17:00:00` })
+    for (let i = 0; i < 4; i++) await w.mk(w.ops, { title: `Out ${i}`, primary: w.staff2.userId, due: `2026-11-2${i}T18:00:00` })
+    const seen: string[] = []
+    let cursor = ""
+    for (let page = 0; page < 5; page++) {
+      const r = await w.json(await w.req("GET", `/v1/tasks?teamId=${dept.id}&status=open&limit=3${cursor ? `&cursor=${cursor}` : ""}`, w.ops))
+      seen.push(...(r.items as Json[]).map((i) => i.title as string))
+      if (!r.nextCursor) break
+      cursor = r.nextCursor as string
+    }
+    expect(seen).toEqual(["In 0", "In 1", "In 2", "In 3", "In 4", "In 5", "In 6"])
+    const done = await w.json(await w.req("GET", `/v1/tasks?teamId=${dept.id}&status=completed`, w.ops))
+    expect(done.items).toEqual([])
+  })
+
+  test("B7 T10: a task blocking 120 others returns 50 blocks and hiddenBlocks 70, ordered by due then id", async () => {
+    const w = await world()
+    const root = await w.mk(w.ops, { title: "Root" })
+    await w.q(
+      `insert into tasks (tenant_id, ref_no, title, evidence_rule, start_at, due_at, created_at, updated_at, creator_id)
+       select $1::uuid, 3000 + g, 'Blocked ' || g, $2::jsonb, now(), '2026-12-01T00:00:00Z'::timestamptz + ((g / 2) || ' minutes')::interval, now(), now(), $3 from generate_series(1, 120) g`,
+      [w.tenant.id, JSON.stringify(NO_EVIDENCE), w.owner.userId],
+    )
+    await w.q("insert into task_dependencies (tenant_id, task_id, depends_on_id) select tenant_id, id, $1::uuid from tasks where ref_no > 3000", [root.id])
+    const t = await w.json(await w.req("GET", `/v1/tasks/${root.id}`, w.ops))
+    expect(t.blocks).toHaveLength(BLOCKS_CAP)
+    expect(BLOCKS_CAP).toBe(50)
+    expect(t.hiddenBlocks).toBe(70)
+    const expected = (
+      await w.q<{ id: string }>("select id from tasks where ref_no > 3000 order by due_at, id limit 50")
+    ).map((r) => r.id)
+    expect((t.blocks as Json[]).map((b) => b.id)).toEqual(expected)
   })
 
   test("M8: an assignee needs tasks:read (422 invalid_assignee): a role without it cannot be assigned, on create or reassign", async () => {

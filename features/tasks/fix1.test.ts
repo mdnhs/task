@@ -5,6 +5,7 @@ import { renderToStaticMarkup } from "react-dom/server"
 import { describe, expect, test, vi } from "vitest"
 import { ApiError, userMessage } from "@/lib/api/problem"
 import { toTask } from "./adapters"
+import { EMPTY_FILTERS, listQuery } from "./filters"
 import { canOpenEvidence, evidencePath, openEvidence } from "./client"
 import { dto } from "@/test/support/task-dto"
 
@@ -80,19 +81,20 @@ describe("N2: Waiting on and Blocks from the DTO", () => {
   })
 })
 
-describe("N3: an empty department filter does not hide Load more", () => {
-  test("no rows loaded but a cursor remains: the empty state shows Load more and a truncation hint", async () => {
+describe("N3 -> B7 T10: the department filter is the API's (teamId), Load more keeps it", () => {
+  test("no rows and no cursor: the plain empty state, no 'loaded so far' hint", async () => {
     const { TasksView } = await import("./components/tasks-view")
-    const html = renderToStaticMarkup(createElement(TasksView, { tasks: [], nextCursor: "c1", people: [], today: "2026-11-18T09:00:00", tzLabel: "GMT", canCreate: true, staff: false }))
+    const html = renderToStaticMarkup(createElement(TasksView, { tasks: [], nextCursor: null, people: [], today: "2026-11-18T09:00:00", tzLabel: "GMT", canCreate: true, staff: false }))
     expect(html).toMatch(/No tasks match/)
-    expect(html).toMatch(/Load more/)
-    expect(html).toMatch(/loaded so far/)
-    const done = renderToStaticMarkup(createElement(TasksView, { tasks: [], nextCursor: null, people: [], today: "2026-11-18T09:00:00", tzLabel: "GMT", canCreate: true, staff: false }))
-    expect(done).not.toMatch(/Load more/)
+    expect(html).not.toMatch(/Load more|loaded so far/)
   })
-  test("Load more asks the API with the cursor and the same filters; the board has the same rule", () => {
+  test("the team filter sends teamId and Load more keeps the filter", () => {
+    expect(listQuery({ ...EMPTY_FILTERS, status: "open" }, "team-1")).toEqual({ teamId: "team-1", status: "open" })
+    expect(listQuery(EMPTY_FILTERS)).toEqual({})
     const src = read("features/tasks/components/tasks-view.tsx")
-    expect(src).toMatch(/\{ \.\.\.listQuery\(filters\), limit: TASKS_PAGE_SIZE, cursor \}/)
+    expect(src).toMatch(/\{ \.\.\.listQuery\(filters, teamId\), limit: TASKS_PAGE_SIZE, cursor \}/)
+    expect(src).toMatch(/listQuery\(filters, teamId\), limit: TASKS_PAGE_SIZE \}/)
+    expect(src).not.toMatch(/t\.dept === dept/)
     expect(read("features/tasks/components/task-board.tsx")).toMatch(/loaded so far/)
   })
 })
