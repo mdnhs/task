@@ -10,7 +10,7 @@ import { createApiKey, listApiKeys, revokeApiKey, type ApiKeyView } from "./serv
 
 const KID = "6f1c0d52-8d3a-4b7e-9c41-2a5b7e90d3f8"
 const NOW = "2026-11-17T09:00:00.000Z"
-const KEY_EXAMPLE = "odk_Ab3dE5gH_Zm9yX2tL0pQ7rS4uV6wY8aB1cD3eF5gH7iJ"
+const KEY_EXAMPLE = "odk_Ab3dE5gH_Zm9yX2tL0pQ7rS4uV6wY8aB1cD3eF5gH7iJ" // check-secrets:allow invented OpenAPI example, not a credential
 
 const Key = z.object({
   id: z.string(), name: z.string(), prefix: z.string(), scopes: z.array(z.string()), createdBy: z.string(),

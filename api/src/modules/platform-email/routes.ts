@@ -10,7 +10,7 @@ const Settings = z.union([
 ])
 const PutBody = z
   .object({ apiKey: z.string().max(200).optional(), fromAddress: z.string().max(320), fromName: z.string().max(200) })
-  .openapi({ example: { apiKey: "re_AbCdEf1234567890abcdef", fromAddress: "no-reply@opsdesk.example", fromName: "OpsDesk" } })
+  .openapi({ example: { apiKey: "re_AbCdEf1234567890abcdef", fromAddress: "no-reply@opsdesk.example", fromName: "OpsDesk" } }) // check-secrets:allow invented OpenAPI example, not a credential
 const TestBody = z.object({ to: z.string().max(320) }).openapi({ example: { to: "ops@opsdesk.example" } })
 const TestResult = z.union([z.object({ ok: z.literal(true) }), z.object({ ok: z.literal(false), error: z.string() })])
 

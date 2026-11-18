@@ -106,6 +106,8 @@ jobs:
         with:
           node-version: 22
           cache: npm
+      # B7 Task 18: no committed secret (token prefixes, private keys, high-entropy values on secret-like names). No service, no dependency.
+      - run: node scripts/check-secrets.mjs
       - run: npm ci
       - run: npm audit --audit-level=high
 

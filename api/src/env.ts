@@ -12,6 +12,18 @@ const secretsKey = z.preprocess(
 
 const unsetIfEmpty = (v: unknown) => (v === "" ? undefined : v)
 
+/** Example strings that ship in docs, tests, CI and compose files: none may be a production secret. */
+const SECRET_DENY = ["changeme", "change_me", "change-me", "replace", "example", "placeholder", "your-secret", "your_secret", "yoursecret", "test-secret", "load-secret", "dev-secret", "secret-secret", "password", "default", "123456789", "xxxx"]
+function weakSecret(v: string): boolean {
+  const lower = v.toLowerCase()
+  if (SECRET_DENY.some((d) => lower.includes(d))) return true
+  return new Set(v).size < 12 // a repeated pattern ("x" * 32, "abcabc...") has few distinct characters; 32 random base64 characters have about 25
+}
+/** The role name in a postgres URL ("" when absent or unparsable, so two unnamed URLs also count as the same role). */
+function dbUser(url: string): string {
+  try { return decodeURIComponent(new URL(url).username) } catch { return "" }
+}
+
 const schema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   PORT: z.preprocess((v) => (v === "" ? Number.NaN : v), z.coerce.number().int().min(1).max(65535)).default(8787),
@@ -72,6 +84,10 @@ const schema = z.object({
   METRICS_PORT: z.preprocess(unsetIfEmpty, z.coerce.number().int().min(1).max(65535).optional()),
   WORKER_METRICS_PORT: z.preprocess(unsetIfEmpty, z.coerce.number().int().min(1).max(65535).optional()),
   METRICS_HOST: z.preprocess(unsetIfEmpty, z.string().min(1).default("127.0.0.1")),
+  // B7 Task 18. Deploy switches that must NOT be set in production: the boot refuses them there (see superRefine).
+  ALLOW_NO_PROXY: optional, // "1" lets production run with TRUST_PROXY_HOPS=0 (the API is reached directly, no proxy in front)
+  ALLOW_DEMO_SEED: optional,
+  SEED_DEMO_PASSWORD: optional,
   LOG_LEVEL: z.preprocess(unsetIfEmpty, z.enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"]).default("info")),
 }).superRefine((e, ctx) => {
   if (e.SECRETS_KEYS) {
@@ -96,6 +112,13 @@ const schema = z.object({
     ctx.addIssue({ code: "custom", path: ["AUTH_RATE_LIMIT_PER_MIN"], message: "at most 300 in production (a higher value is no limit)" })
   }
   if (e.NODE_ENV === "production") {
+    const refuse = (path: string, message: string) => ctx.addIssue({ code: "custom", path: [path], message })
+    if (weakSecret(e.BETTER_AUTH_SECRET)) refuse("BETTER_AUTH_SECRET", "must be a long random value in production (an example, placeholder or low-variety string is refused)")
+    if (!/^https:\/\/[^/\s]+/i.test(e.APP_URL)) refuse("APP_URL", "must be an https origin in production")
+    if (dbUser(e.DATABASE_URL) === dbUser(e.DATABASE_OWNER_URL)) refuse("DATABASE_OWNER_URL", "must use a different database role than DATABASE_URL (app_owner vs app_user)")
+    if ((e.TRUST_PROXY_HOPS ?? 1) === 0 && e.ALLOW_NO_PROXY !== "1") refuse("TRUST_PROXY_HOPS", "0 ignores x-forwarded-for; set the proxy count, or ALLOW_NO_PROXY=1 when no proxy is in front")
+    if (e.ALLOW_DEMO_SEED) refuse("ALLOW_DEMO_SEED", "must not be set in production")
+    if (e.SEED_DEMO_PASSWORD) refuse("SEED_DEMO_PASSWORD", "must not be set in production")
     // S3_* are only a bootstrap fallback: the platform admin configures R2 in the DB (storage fails closed with 503 otherwise)
     for (const k of ["CLAMD_HOST"] as const) {
       if (!e[k]) ctx.addIssue({ code: "custom", path: [k], message: "required in production" })

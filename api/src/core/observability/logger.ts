@@ -67,14 +67,46 @@ function walk(v: unknown, depth: number, seen: WeakSet<object>): unknown {
 /** A cleaned COPY of what is about to be logged (never mutates the caller's object). */
 export const scrub = (o: object): Record<string, unknown> => walk(o, 0, new WeakSet()) as Record<string, unknown>
 
-/** The structured JSON logger of the API, the worker and the seed: redaction, scrubbing and a class-name-only error serializer. */
-export function makeLogger(o: { level?: string; service?: string; destination?: DestinationStream } = {}): Logger {
+/**
+ * The deploy secrets by VALUE (B7 Task 18). Key-name redaction cannot catch a secret that a careless message or a free-text field carries, so every string
+ * that is logged (the message included) has these exact values replaced. Values shorter than 8 characters are ignored (they would mask ordinary words).
+ */
+export const secretValuesOf = (env: Record<string, unknown>): string[] => {
+  const names = ["BETTER_AUTH_SECRET", "SECRETS_KEY", "SECRETS_KEYS", "STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET", "RESEND_API_KEY", "S3_SECRET_ACCESS_KEY", "GOOGLE_CLIENT_SECRET", "GOOGLE_INTEGRATION_CLIENT_SECRET", "MICROSOFT_CLIENT_SECRET"]
+  const out: string[] = []
+  for (const n of names) {
+    const v = env[n]
+    if (typeof v !== "string" || v.length < 8) continue
+    out.push(v)
+    if (n === "SECRETS_KEYS") {
+      try { for (const k of Object.values(JSON.parse(v) as Record<string, unknown>)) if (typeof k === "string" && k.length >= 8) out.push(k) } catch { /* not JSON: the whole string is already listed */ }
+    }
+  }
+  return out
+}
+
+const maskIn = (v: unknown, values: string[]): unknown => {
+  if (typeof v === "string") { let s = v; for (const x of values) s = s.split(x).join(CENSOR); return s }
+  if (Array.isArray(v)) return v.map((x) => maskIn(x, values))
+  if (v && typeof v === "object" && !(v instanceof Date)) {
+    const out: Record<string, unknown> = {}
+    for (const k of Object.keys(v)) Object.defineProperty(out, k, { value: maskIn((v as Record<string, unknown>)[k], values), enumerable: true, writable: true, configurable: true })
+    return out
+  }
+  return v
+}
+
+/** The structured JSON logger of the API, the worker and the seed: redaction, scrubbing and a class-name-only error serializer. `secretValues` are masked wherever they appear in text. */
+export function makeLogger(o: { level?: string; service?: string; destination?: DestinationStream; secretValues?: string[] } = {}): Logger {
+  const values = (o.secretValues ?? []).filter((x) => x.length >= 8)
+  const clean = values.length ? (x: Record<string, unknown>) => maskIn(scrub(x), values) as Record<string, unknown> : scrub
   return pino(
     {
       level: o.level ?? "info",
       base: { service: o.service ?? "api" },
       redact: { paths: LOG_REDACT_PATHS, censor: CENSOR },
-      formatters: { log: scrub, bindings: (b) => scrub(b) },
+      formatters: { log: clean, bindings: (b) => clean(b) },
+      ...(values.length ? { hooks: { logMethod(args, method) { method.apply(this, args.map((a) => (typeof a === "string" ? maskIn(a, values) : a)) as Parameters<typeof method>) } } } : {}),
       serializers: { err: (e: unknown) => errorInfo(e) },
     },
     o.destination,

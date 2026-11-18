@@ -25,7 +25,7 @@ const PutBody = z
   })
   .openapi({
     example: {
-      secretKey: "sk_test_51ExampleSecretKeyAbCdEf1234567890", webhookSecret: "whsec_ExampleWebhookSigningSecret1234567890",
+      secretKey: "sk_test_51ExampleSecretKeyAbCdEf1234567890", webhookSecret: "whsec_ExampleWebhookSigningSecret1234567890", // check-secrets:allow invented OpenAPI example, not a credential
       publishableKey: "pk_test_51ExamplePublishableKey", priceMap: { starter: "price_1StarterEx", business: "price_1BusinessEx" },
     },
   })

@@ -10,7 +10,7 @@ const Settings = z.union([
 ])
 const PutBody = z
   .object({ accountId: z.string().max(64), bucket: z.string().max(100), accessKeyId: z.string().max(200), secretAccessKey: z.string().max(200).optional() })
-  .openapi({ example: { accountId: "0123456789abcdef0123456789abcdef", bucket: "opsdesk-files", accessKeyId: "AKIAR2EXAMPLEKEY0001", secretAccessKey: "r2-secret-access-key-ABCDEFGHIJKLMNOP9876" } })
+  .openapi({ example: { accountId: "0123456789abcdef0123456789abcdef", bucket: "opsdesk-files", accessKeyId: "AKIAR2EXAMPLEKEY0001", secretAccessKey: "r2-secret-access-key-ABCDEFGHIJKLMNOP9876" } }) // check-secrets:allow invented OpenAPI example, not a credential
 const TestResult = z.union([z.object({ ok: z.literal(true) }), z.object({ ok: z.literal(false), error: z.string() })])
 
 const view = (s: StorageSettings) => (s.configured ? { ...s, updatedAt: s.updatedAt.toISOString() } : s)

@@ -17,6 +17,7 @@
     "api:types:check": "node scripts/api-types.mjs --check",
     "test:contract": "vitest run --config vitest.contract.config.ts",
     "check:bundle": "node scripts/check-bundle.mjs",
+    "check:secrets": "node scripts/check-secrets.mjs",
     "load:prepare": "npm -w api exec -- tsx scripts/load-prepare.ts",
     "load:smoke": "k6 run load/k6/smoke.js",
     "e2e:stack": "docker compose -f docker-compose.e2e.yml up -d --wait",

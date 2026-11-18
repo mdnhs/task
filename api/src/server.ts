@@ -16,14 +16,14 @@ import { makeNet } from "./core/net/net"
 import { makeReadModelCache, makeRedisCacheStamp } from "./modules/read-models"
 import { makeRedisRateLimiter } from "./core/middleware/rate-limit"
 import { makeLogErrorReporter } from "./core/observability/error-reporter"
-import { makeLogger } from "./core/observability/logger"
+import { makeLogger, secretValuesOf } from "./core/observability/logger"
 import { readiness } from "./core/observability/readiness"
 import { makeMetrics, startMetricsServer } from "./core/observability/metrics"
 import { errorInfo } from "./core/safe-error"
 import { parseEnv, type Env } from "./env"
 
 export function makeDeps(env: Env, o: { service?: "api" | "worker" } = {}): Deps {
-  const logger = makeLogger({ level: env.LOG_LEVEL, service: o.service ?? "api" })
+  const logger = makeLogger({ level: env.LOG_LEVEL, service: o.service ?? "api", secretValues: secretValuesOf(env) })
   const db = makeDb(env.DATABASE_URL, { logger })
   const clock = { now: () => new Date() }
   const metrics = makeMetrics()

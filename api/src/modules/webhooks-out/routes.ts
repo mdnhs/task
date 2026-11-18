@@ -14,7 +14,7 @@ const URL_EX = "https://hooks.example.com/opsdesk"
 const Endpoint = z.object({ id: z.string(), url: z.string(), events: z.array(z.string()), active: z.boolean(), createdBy: z.string(), createdAt: z.string(), failingSince: z.string().nullable() })
 const EndpointExample = { id: WID, url: URL_EX, events: ["team.created", "file.uploaded"], active: true, createdBy: "usr_8Kq2mZ4tW1", createdAt: NOW, failingSince: null }
 const EndpointDto = Endpoint.openapi({ example: EndpointExample })
-const Created = Endpoint.extend({ secret: z.string() }).openapi({ example: { ...EndpointExample, secret: "whsec_Zm9yX2tL0pQ7rS4uV6wY8aB1cD3eF5gH7iJ9kL2mN4o" } })
+const Created = Endpoint.extend({ secret: z.string() }).openapi({ example: { ...EndpointExample, secret: "whsec_Zm9yX2tL0pQ7rS4uV6wY8aB1cD3eF5gH7iJ9kL2mN4o" } }) // check-secrets:allow invented OpenAPI example, not a credential
 const EndpointList = z.object({ items: z.array(Endpoint) }).openapi({ example: { items: [EndpointExample] } })
 // url / events are checked by the service (422 invalid_webhook_url | unsafe_webhook_url | invalid_events), not by zod (which would answer 400).
 const CreateBody = z.object({
