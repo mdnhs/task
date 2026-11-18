@@ -201,7 +201,7 @@
 
 **Files:** Modify `api/src/core/messaging/templates.ts`; add `api/src/modules/messaging/templates-sync.ts` and job `messaging.templates.sync` (daily). Test: `api/src/modules/messaging/templates.test.ts`.
 
-**Template list** (English `en` first; `bn` slots registered with `enabled: false` until the product ships Bengali; generic typed variables only, W-8):
+**Template list** (English `en` only: the product is for an Ireland client, so there is no other language and no language slots; generic typed variables only, W-8):
 
 | Key | Category | Used for | Variables |
 |---|---|---|---|
@@ -469,7 +469,7 @@ Tabs: Defaults (per-kind tenant default and admin switch, dedupe choice, burst t
 2. **Whose WhatsApp number/account.** Default: one platform-owned WABA and number (model P) with a per-tenant on/off; model T (each tenant brings its own account) deferred but designed for. Reason: one verification and one template set; tenants need no Meta knowledge. Flag: the sender is the platform's name, not each client's brand.
 3. **Kinds that go to WhatsApp first.** Default pilot set: `task` (assigned, overdue), `report` (due, returned), `roster` (published, changed, leave decided), `security` (as an extra channel). `billing` and `invite` stay email-only for now. Everything is off per user until they opt in.
 4. **Budget per message and who pays.** Default: the platform pays Meta's utility-template fees; a monthly per-tenant cap per plan (Business: 1,000 messages a month, Starter: not included); overage is skipped, not billed; revisit pass-through after the pilot cost data. The owner must confirm a per-message budget ceiling (Meta pricing varies by country and changes: check the current rate card before launch).
-5. **Languages.** Default: English only at launch; Bengali slots registered but disabled until the product has Bengali UI and the owner supplies approved texts.
+5. **Languages.** DECIDED by the owner (2026-11-18): English only. This is an Ireland client's project; the product has no other language, so no `bn` (or any other) template slots, no language selector, no per-user language field.
 6. **Consent text and privacy wording approval.** Default: engineers ship a DRAFT in Task 21; **nothing is shown to real users until the owner's legal advisor approves it** (plus DPA/subprocessor and DPIA updates). This cannot proceed on a default for real users; fake-provider work can.
 7. **Quiet hours and digest.** Default: reuse each user's quiet window; digest threshold 3 messages in 10 minutes; `security` ignores both.
 8. **Cross-channel dedupe.** Default `prefer_whatsapp` for task/report/roster (email skipped once WhatsApp is delivered); never for billing and security.
