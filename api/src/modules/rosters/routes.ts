@@ -6,8 +6,8 @@ import {
 } from "./dto"
 import { archiveLocation, archiveShiftType, createLocation, createShiftType, getLocation, listLocations, listShiftTypes, patchLocation, patchShiftType, setOfficeLimit, setSupervisors, setTargets } from "./locations"
 import { AvailabilityBody, AvailabilityOut, CreateLeaveBody, DecideLeaveBody, LeaveListOut, LeaveQuery, LeaveSchema } from "./dto"
-import { CheckOut, RulesBody, RulesOut } from "./dto"
-import { checkWeek, putRules, readRules } from "./rules"
+import { CheckOut, RulesBody, RulesHeaders, RulesOut } from "./dto"
+import { checkWeek, putRules, readRules, rulesEtag } from "./rules"
 import { cancelLeave, createLeave, decideLeave, getAvailability, listLeave, putAvailability } from "./leave"
 import { setHomeLocation } from "./people"
 import { getQualifications, setQualifications } from "./qualifications"
@@ -15,6 +15,7 @@ import { rosterGuard } from "./scope"
 import { rosterRead, rosterWrite } from "./write"
 
 const guard = (need: "read" | "write") => rosterGuard(need)
+const ETAG_HEADER = { ETag: { description: "Strong ETag of the stored rule settings", schema: { type: "string" as const, example: '"3f2a9c0d1b7e4a58c6d2e9f01a4b7c3d"' } } }
 const json = <S extends Parameters<typeof Object>[0]>(schema: S, description: string) => ({ description, content: { "application/json": { schema } } })
 const body = <S extends Parameters<typeof Object>[0]>(schema: S) => ({ content: { "application/json": { schema } }, required: true as const })
 
@@ -110,11 +111,11 @@ const availPutR = createRoute({
 
 const rulesGetR = createRoute({
   method: "get", path: "/v1/roster/rules", middleware: guard("read"),
-  responses: { 200: json(RulesOut, "The tenant's rule severities (block | warn | ignore per rule) and the averaging window in weeks. Anyone with roster read; defaults until an admin changes them.") },
+  responses: { 200: { ...json(RulesOut, "The tenant's rule severities (block | warn per rule; ignore only for the non-statutory rules) and the averaging window in weeks. Anyone with roster read; defaults until an admin changes them. The strong ETag header is what PUT sends back as If-Match."), headers: ETAG_HEADER } },
 })
 const rulesPutR = createRoute({
-  method: "put", path: "/v1/roster/rules", middleware: guard("write"), request: { body: body(RulesBody) },
-  responses: { 200: json(RulesOut, "The settings after the change (admin or owner: 403 forbidden otherwise; audit roster.rules_changed; an unchanged set writes nothing). A rule left out gets its default. 422 invalid_rules (unknown rule id or severity) | invalid_avg_weeks (1..52).") },
+  method: "put", path: "/v1/roster/rules", middleware: guard("write"), request: { body: body(RulesBody), headers: RulesHeaders },
+  responses: { 200: { ...json(RulesOut, "The settings after the change, PATCH-like: a rule or the window left out keeps its stored value (admin or owner: 403 forbidden otherwise; audit roster.rules_changed; an unchanged set writes nothing). ignore is refused for daily_rest, weekly_rest and avg_48h. 422 invalid_rules (unknown rule id or severity) | invalid_avg_weeks (1..52). 428 precondition_required (no If-Match), 412 precondition_failed (stale; the current ETag in the ETag header). The new ETag is in the ETag header."), headers: ETAG_HEADER } },
 })
 const checkR = createRoute({
   method: "post", path: "/v1/roster/weeks/{id}/check", middleware: guard("write"), request: { params: RosterIdParam },
@@ -142,12 +143,21 @@ export const rosterRoutes = newRouter()
   .openapi(limitR, async (c) => c.json(await rosterWrite(c, (tx, ctx) => setOfficeLimit(tx, ctx, c.req.valid("param").userId, c.req.valid("json").except)), 200))
   .openapi(leaveListR, async (c) => c.json(await rosterRead(c, (tx, ctx) => listLeave(tx, ctx, c.req.valid("query"))), 200))
   .openapi(leaveCreateR, async (c) => c.json(await rosterWrite(c, (tx, ctx, env) => createLeave(tx, ctx, env, c.req.valid("json")), "self"), 201))
-  .openapi(leaveCancelR, async (c) => c.json(await rosterWrite(c, (tx, ctx) => cancelLeave(tx, ctx, c.req.valid("param").id), "self"), 200))
+  .openapi(leaveCancelR, async (c) => c.json(await rosterWrite(c, (tx, ctx, env) => cancelLeave(tx, ctx, env, c.req.valid("param").id), "self"), 200))
   .openapi(leaveDecideR, async (c) => c.json(await rosterWrite(c, (tx, ctx, env) => decideLeave(tx, ctx, env, c.req.valid("param").id, c.req.valid("json"))), 200))
   .openapi(availGetR, async (c) => c.json(await rosterRead(c, (tx, ctx) => getAvailability(tx, ctx)), 200))
   .openapi(availPutR, async (c) => c.json(await rosterWrite(c, (tx, ctx) => putAvailability(tx, ctx, c.req.valid("json").windows), "self"), 200))
-  .openapi(rulesGetR, async (c) => c.json(await rosterRead(c, (tx, ctx) => readRules(tx, ctx.tenantId)), 200))
-  .openapi(rulesPutR, async (c) => c.json(await rosterWrite(c, (tx, ctx) => putRules(tx, ctx, c.req.valid("json"))), 200))
+  .openapi(rulesGetR, async (c) => {
+    const rules = await rosterRead(c, (tx, ctx) => readRules(tx, ctx.tenantId))
+    c.header("ETag", rulesEtag(rules))
+    return c.json(rules, 200)
+  })
+  .openapi(rulesPutR, async (c) => {
+    const ifMatch = c.req.header("if-match")?.trim()
+    const rules = await rosterWrite(c, (tx, ctx) => putRules(tx, ctx, c.req.valid("json"), ifMatch))
+    c.header("ETag", rulesEtag(rules))
+    return c.json(rules, 200)
+  })
   .openapi(checkR, async (c) =>
     c.json(
       await rosterRead(c, async (tx, ctx) => {

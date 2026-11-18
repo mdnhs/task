@@ -231,7 +231,7 @@ describe("supervisor grants (FR-RS-03, FR-RS-34)", () => {
     expect((await w.events("location.supervisors_changed"))[1].payload).toEqual({ locationId: loc.id, added: [], removed: [s2] })
     // history (user ids only) and the notices for the people added and removed
     expect((await w.rows("select action, after from roster_history where location_id = $1 and action = 'supervisors_changed' order by created_at, id", [loc.id])).length).toBe(2)
-    expect((await w.rows("select user_id from notifications where title = 'You now supervise a location' order by user_id")).map((r) => r.user_id)).toEqual([s1, s2].sort())
+    expect((await w.rows("select user_id from notifications where title = 'You now supervise a location'")).map((r) => r.user_id).sort()).toEqual([s1, s2].sort()) // sorted in JS: the DB collation orders mixed-case ids differently
     expect((await w.rows("select user_id from notifications where title = 'Location supervision ended'")).map((r) => r.user_id)).toEqual([s2])
     // the DTO and the scope follow the grant
     expect((await w.ok("GET", `/v1/locations/${loc.id}`, w.p.owner)).supervisorIds).toEqual([s1])

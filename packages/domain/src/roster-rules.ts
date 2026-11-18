@@ -10,7 +10,9 @@ export const RULE_IDS = ["double_booking", "approved_leave", "unavailable", "dai
 
 /** What the tenant decided for a rule: `block` stops publishing, `warn` only tells, `ignore` switches the rule off (nothing is reported). */
 export type RuleSeverity = "block" | "warn" | "ignore"
-export type RuleViolation = { rule: RuleId; shiftId: string; personId: string; severity: "block" | "warn"; message: string; otherShiftIds: string[] }
+/** `elsewhere` is the one generic rule a caller gets for everything derived from a site they cannot see (AD3); it is not a setting. */
+export type ViolationRule = RuleId | "elsewhere"
+export type RuleViolation = { rule: ViolationRule; shiftId: string; personId: string; severity: "block" | "warn"; message: string; otherShiftIds: string[] }
 export type LeaveRequest = { id: string; personId: string; from: string; to: string; kind: string; status: "requested" | "approved" | "rejected"; decidedBy: string | null; decidedAt: string | null }
 /** The person is NOT available in this window. */
 export type Availability = { personId: string; weekday: Weekday; from: string; to: string }
@@ -79,6 +81,13 @@ export function checkShifts(target: RosterShift[], ctx: RuleContext): RuleViolat
       const severity = ctx.severity[rule]
       if (severity !== "ignore") out.push({ rule, shiftId: s.id, personId: pid, severity, message, otherShiftIds: others })
     }
+    // Everything derived from a shift at a site the caller cannot see is collected here and reported as ONE generic line carrying the worst severity (AD3): no rule
+    // wording, hours, dates, counts or ids of the hidden shifts, so the output cannot tell a hidden overlap from a hidden rest or hour total.
+    const fromHidden: ("block" | "warn")[] = []
+    const hide = (rule: RuleId) => {
+      const severity = ctx.severity[rule]
+      if (severity !== "ignore") fromHidden.push(severity)
+    }
     const others = mine.filter((o) => o.s.id !== s.id)
 
     // double booking: any overlap with the same person's other shifts
@@ -86,22 +95,20 @@ export function checkShifts(target: RosterShift[], ctx: RuleContext): RuleViolat
     const seen = (o: Span) => ctx.visibleLocationIds === null || ctx.visibleLocationIds.includes(o.s.locationId)
     for (const o of clash.filter(seen))
       add("double_booking", `${name} is already on ${label(o.s)}, which overlaps ${label(s)}`, [o.s.id])
-    if (clash.some((o) => !seen(o))) add("double_booking", HIDDEN)
+    if (clash.some((o) => !seen(o))) hide("double_booking")
 
     // daily rest: gap to the nearest neighbour on each side. A neighbour at a site the caller can't see gets a generic message.
-    let hiddenRest = false
     for (const o of others) {
       const gap = o.end <= me.start ? me.start - o.end : me.end <= o.start ? o.start - me.end : -1
       if (gap >= 0 && gap < MIN_DAILY_REST_H * HOUR_MS) {
         if (!seen(o)) {
-          hiddenRest = true
+          hide("daily_rest")
           continue
         }
         const rest = Math.round(gap / MIN_MS)
         add("daily_rest", `${name} has only ${Math.floor(rest / 60)}h${String(rest % 60).padStart(2, "0")} rest between ${label(o.s)} and ${label(s)}`, [o.s.id])
       }
     }
-    if (hiddenRest) add("daily_rest", `${name} has less than ${MIN_DAILY_REST_H}h rest between shifts`)
 
     // weekly rest: two rolling 7-day windows per shift, [start, start+7d] and [end-7d, end]. Gap scan counts the edges, clipped to the
     // window; needs 2+ shifts in the window. A breach overlapping one already reported for this person is not reported again.
@@ -119,7 +126,8 @@ export function checkShifts(target: RosterShift[], ctx: RuleContext): RuleViolat
       const done = reportedWeekly.get(pid) ?? []
       if (done.some(([a, b]) => a < w1 && w0 < b)) continue
       reportedWeekly.set(pid, [...done, [w0, w1]])
-      add("weekly_rest", `${name} has no 24h rest in the 7 days around ${label(s)}`, inWin.filter((o) => o.s.id !== s.id && seen(o)).map((o) => o.s.id))
+      if (inWin.some((o) => !seen(o))) hide("weekly_rest")
+      else add("weekly_rest", `${name} has no 24h rest in the 7 days around ${label(s)}`, inWin.filter((o) => o.s.id !== s.id).map((o) => o.s.id))
     }
 
     // 48h average: paid hours in the reference window / number of weeks. The window is the full `avgWeekReferenceWeeks` weeks
@@ -129,10 +137,14 @@ export function checkShifts(target: RosterShift[], ctx: RuleContext): RuleViolat
       const ws = weekStart(s.date)
       const from = addDays(ws, -(weeks - 1) * 7)
       const to = addDays(ws, 7)
-      const minutes = mine.filter((o) => o.s.date >= from && o.s.date < to).reduce((n, o) => n + shiftMinutes(o.s, zoneOf(ctx, o.s)), 0)
+      const counted = mine.filter((o) => o.s.date >= from && o.s.date < to)
+      const minutes = counted.reduce((n, o) => n + shiftMinutes(o.s, zoneOf(ctx, o.s)), 0)
       const avg = minutes / 60 / weeks
-      // The hours add up shifts at every site, so a caller who does not see every location gets the finding without the total, the window and the limit.
-      if (avg > MAX_AVG_H) add("avg_48h", masked ? `${name} averages more than the weekly hours limit` : `${name} averages ${avg.toFixed(1)}h a week over ${weeks} weeks (limit ${MAX_AVG_H}h)`)
+      // The hours add up shifts at every site: when a hidden site's shift is in the sum the finding is the generic line; otherwise a cut caller still gets no total.
+      if (avg > MAX_AVG_H) {
+        if (counted.some((o) => !seen(o))) hide("avg_48h")
+        else add("avg_48h", masked ? `${name} averages more than the weekly hours limit` : `${name} averages ${avg.toFixed(1)}h a week over ${weeks} weeks (limit ${MAX_AVG_H}h)`)
+      }
     }
 
     // approved leave covers the shift date
@@ -166,6 +178,8 @@ export function checkShifts(target: RosterShift[], ctx: RuleContext): RuleViolat
     }
 
     if (m?.leftOn && s.date >= m.leftOn) add("left", `${name} left on ${m.leftOn}; shift on ${s.date}`)
+
+    if (fromHidden.length > 0) out.push({ rule: "elsewhere", shiftId: s.id, personId: pid, severity: fromHidden.includes("block") ? "block" : "warn", message: HIDDEN, otherShiftIds: [] })
   }
   return out
 }

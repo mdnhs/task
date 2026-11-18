@@ -249,14 +249,14 @@ describe("weekCheck with the caller's own shifts (D9)", () => {
 
   it("a shift created in this session that double-books a person at a hidden site is blocked, with no site, time or id", () => {
     const v = weekCheck(sup, "wA", [posted()], data(), "Europe/Dublin")
-    const hit = v.find((x) => x.rule === "double_booking")
+    const hit = v.find((x) => x.rule === "elsewhere") // one generic rule id for anything derived from a hidden site (AD3)
     expect(hit).toMatchObject({ shiftId: "new1", severity: "block", message: "Already rostered elsewhere", otherShiftIds: [] })
     const json = JSON.stringify(v)
     for (const bad of ["hidden1", "08:00", "16:00", "wB", '"B"']) expect(json).not.toContain(bad)
   })
   it("an unknown week answers for the posted shifts", () => {
     const v = weekCheck(sup, "wk-new", [posted({ date: "2026-11-03" })], data({ shifts: [sh("hidden2", "wB", "B", "a", "2026-11-03", "08:00", "16:00")] }), "Europe/Dublin")
-    expect(v.some((x) => x.rule === "double_booking" && x.shiftId === "new1")).toBe(true)
+    expect(v.some((x) => x.rule === "elsewhere" && x.shiftId === "new1")).toBe(true)
     expect(weekCheck(sup, "wk-new", undefined, data(), "Europe/Dublin")).toEqual([])
   })
   it("a posted shift at a location the caller can't see, an unknown person, or a date outside the week is ignored", () => {
@@ -279,9 +279,9 @@ describe("weekCheck with the caller's own shifts (D9)", () => {
     const d = data({ rules: { avgWeekReferenceWeeks: 1, severity: { ...sev } }, shifts: heavy })
     const office: RosterAccess = { scope: "all", locationIds: ["A"], editDraft: true, editPublished: true, approve: true }
     for (const a of [sup, office]) {
-      const v = weekCheck(a, "wA", post, d, "Europe/Dublin").filter((x) => x.rule === "avg_48h")
+      const v = weekCheck(a, "wA", post, d, "Europe/Dublin").filter((x) => x.rule === "elsewhere") // the hours include a hidden site: the one generic line (AD3)
       expect(v.length).toBeGreaterThan(0)
-      for (const x of v) expect(x.message).toBe("A is over the 48-hour weekly average")
+      for (const x of v) expect(x.message).toBe("Already rostered elsewhere")
     }
     const full = weekCheck({ scope: "all", locationIds: ["A", "B"], editDraft: true, editPublished: true, approve: true }, "wA", post, d, "Europe/Dublin").filter((x) => x.rule === "avg_48h")
     expect(full[0].message).toMatch(/\d+\.\dh/)

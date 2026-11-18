@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto"
 import { and, asc, between, eq, gte, inArray, lte, or, sql } from "drizzle-orm"
 import { alias, QueryBuilder } from "drizzle-orm/pg-core"
 import type { WorkforceMember } from "@opsdesk/domain/contracts"
@@ -9,7 +10,7 @@ import { addDays, epochToWall, weekStart, type Weekday } from "@opsdesk/domain/s
 import { AppError, Forbidden, NotFound } from "../../core/errors"
 import { leaveRequests, locations, memberships, publicHolidays, rosterAvailability, rosterShifts, rosterWeeks, shiftTypes, user } from "../../db/schema"
 import type { TenantTx } from "../../db/tenant-tx"
-import { readSetting, writeSetting } from "../settings"
+import { ifMatchHolds, readSetting, writeSetting } from "../settings"
 import { assertLocation, type RosterCtx } from "./scope"
 import { auditRoster, isUuid } from "./write"
 
@@ -29,6 +30,9 @@ export const DEFAULT_SEVERITY: Record<RuleId, RuleSeverity> = {
 export const DEFAULT_AVG_WEEKS = 17
 const MAX_AVG_WEEKS = 52
 const SEVERITIES: readonly string[] = ["block", "warn", "ignore"]
+/** The statutory rules (11 h daily rest, 24 h weekly rest, the 48 h average): a tenant may make them warn or block, never switch them off (AD5). */
+export const STATUTORY_RULES: readonly RuleId[] = ["daily_rest", "weekly_rest", "avg_48h"]
+const allowed = (rule: RuleId, s: string): boolean => SEVERITIES.includes(s) && !(s === "ignore" && STATUTORY_RULES.includes(rule))
 
 export type RuleSettings = { severity: Record<RuleId, RuleSeverity>; avgWeekReferenceWeeks: number }
 
@@ -40,25 +44,32 @@ export async function readRules(tx: TenantTx, tenantId: string): Promise<RuleSet
   const severity = { ...DEFAULT_SEVERITY }
   for (const r of RULE_IDS) {
     const s = v?.severity?.[r]
-    if (typeof s === "string" && SEVERITIES.includes(s)) severity[r] = s as RuleSeverity
+    if (typeof s === "string" && SEVERITIES.includes(s)) severity[r] = (s === "ignore" && STATUTORY_RULES.includes(r) ? "warn" : s) as RuleSeverity // a stored ignore on a statutory rule reads as warn
   }
   return { severity, avgWeekReferenceWeeks: isWeeks(v?.avgWeekReferenceWeeks) ? v.avgWeekReferenceWeeks : DEFAULT_AVG_WEEKS }
 }
 
+/** The strong ETag of the settings the engine reads (normalised, fixed key order), so a stored value that normalises to the same reading has the same tag. */
+export const rulesEtag = (r: RuleSettings): string =>
+  `"${createHash("sha256").update(JSON.stringify({ severity: RULE_IDS.map((id) => [id, r.severity[id]]), avgWeekReferenceWeeks: r.avgWeekReferenceWeeks })).digest("hex").slice(0, 32)}"`
+
 /**
- * PUT /v1/roster/rules (admin or owner: roster write AND settings write): severity per rule (block | warn | ignore; a rule left out gets its default), the averaging window
- * 1..52 weeks. An unknown rule id or a bad severity is 422 invalid_rules, a bad window 422 invalid_avg_weeks. An unchanged set writes nothing.
+ * PUT /v1/roster/rules (admin or owner: roster write AND settings write), with If-Match (428 without it, a stale one is 412, both decided under the roster lock). PATCH-like: a rule or the window left out KEEPS its stored value. Severity per rule is block | warn | ignore, except the statutory rules (daily_rest, weekly_rest,
+ * avg_48h), which take only warn | block. An unknown rule id or a bad severity is 422 invalid_rules, a bad window 422 invalid_avg_weeks (1..52). An unchanged set writes nothing.
  */
-export async function putRules(tx: TenantTx, ctx: RosterCtx, input: { severity: Record<string, string>; avgWeekReferenceWeeks: number }): Promise<RuleSettings> {
-  if (!can(ctx.role, "settings", "write")) throw Forbidden("forbidden")
-  const severity = { ...DEFAULT_SEVERITY }
+export async function putRules(tx: TenantTx, ctx: RosterCtx, input: { severity: Record<string, string>; avgWeekReferenceWeeks?: number }, ifMatch: string | undefined): Promise<RuleSettings> {
+  if (!can(ctx.role, "settings", "write")) throw Forbidden("forbidden") // the permission first: a caller who may not change the rules learns nothing about preconditions
+  if (!ifMatch) throw new AppError(428, "precondition_required", "Precondition Required")
+  const old = await readRules(tx, ctx.tenantId)
+  const current = rulesEtag(old)
+  if (!ifMatchHolds(ifMatch, current)) throw new AppError(412, "precondition_failed", "Precondition Failed", undefined, { ETag: current })
+  const severity = { ...old.severity }
   for (const [rule, s] of Object.entries(input.severity)) {
-    if (!(RULE_IDS as readonly string[]).includes(rule) || !SEVERITIES.includes(s)) throw unprocessable("invalid_rules")
+    if (!(RULE_IDS as readonly string[]).includes(rule) || !allowed(rule as RuleId, s)) throw unprocessable("invalid_rules")
     severity[rule as RuleId] = s as RuleSeverity
   }
-  if (!isWeeks(input.avgWeekReferenceWeeks)) throw unprocessable("invalid_avg_weeks")
-  const next: RuleSettings = { severity, avgWeekReferenceWeeks: input.avgWeekReferenceWeeks }
-  const old = await readRules(tx, ctx.tenantId)
+  if (input.avgWeekReferenceWeeks !== undefined && !isWeeks(input.avgWeekReferenceWeeks)) throw unprocessable("invalid_avg_weeks")
+  const next: RuleSettings = { severity, avgWeekReferenceWeeks: input.avgWeekReferenceWeeks ?? old.avgWeekReferenceWeeks }
   if (JSON.stringify(old) === JSON.stringify(next)) return old
   await writeSetting(tx, ctx.tenantId, RULES_SETTING, next)
   await auditRoster(tx, ctx, { action: "roster.rules_changed", entity: "roster_rules", entityId: ctx.tenantId, before: old, after: next })

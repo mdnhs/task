@@ -110,13 +110,17 @@ const leaveEx = {
   id: LEAVE_ID, userId: UID, from: "2026-12-01", to: "2026-12-05", kind: "annual", status: "requested", note: "Family trip", decidedBy: null, decidedAt: null, decisionNote: null, createdAt: "2026-11-16T09:00:00.000Z",
 }
 export const LeaveSchema = LeaveOut.openapi({ example: leaveEx })
-export const LeaveListOut = z.object({ items: z.array(LeaveOut) }).openapi({ example: { items: [leaveEx] } })
+export const LeaveListOut = z
+  .object({ items: z.array(LeaveOut), nextCursor: z.string().nullable() })
+  .openapi({ example: { items: [leaveEx], nextCursor: "MjAyNi0xMS0xNlQwOTowMDowMC4wMDBafDNmMmI4YzFkLTZhNDctNGUwYi05ZDE1LTJjN2U1YTliNGYxMA" } })
 // Loose strings: the service validates and answers 422 with a specific code instead of the generic 400.
 export const LeaveQuery = z.object({
   status: z.string().max(20).optional().openapi({ description: "requested | approved | rejected | cancelled", example: "requested" }),
   userId: z.string().max(128).optional().openapi({ example: UID }),
   from: z.string().max(10).optional().openapi({ description: "Leave that ends on or after this date (YYYY-MM-DD)", example: "2026-12-01" }),
   to: z.string().max(10).optional().openapi({ description: "Leave that starts on or before this date (YYYY-MM-DD)", example: "2026-12-31" }),
+  limit: z.string().max(5).optional().openapi({ description: "Page size 1..200 (default 50); anything else is 422 invalid_filter", example: "50" }),
+  cursor: z.string().max(200).optional().openapi({ description: "The nextCursor of the previous page (newest first, keyset on creation time and id); garbage is 400 invalid_cursor", example: "MjAyNi0xMS0xNlQwOTowMDowMC4wMDBafDNmMmI4YzFkLTZhNDctNGUwYi05ZDE1LTJjN2U1YTliNGYxMA" }),
 })
 export const CreateLeaveBody = z
   .object({ from: z.string().max(10), to: z.string().max(10), kind: z.string().max(100), note: z.string().max(2000).optional() })
@@ -141,10 +145,13 @@ export const RulesOut = z
 export type RulesDto = z.infer<typeof RulesOut>
 // Loose on purpose: the service answers 422 invalid_rules / invalid_avg_weeks with a specific code instead of the generic 400.
 export const RulesBody = z
-  .object({ severity: z.record(z.string().max(40), z.string().max(20)), avgWeekReferenceWeeks: z.number() })
-  .openapi({ example: { severity: { ...severityEx, daily_rest: "block" }, avgWeekReferenceWeeks: 26 } })
+  .object({ severity: z.record(z.string().max(40), z.string().max(20)), avgWeekReferenceWeeks: z.number().optional() })
+  .openapi({ example: { severity: { daily_rest: "block" }, avgWeekReferenceWeeks: 26 } })
+export const RulesHeaders = z.object({
+  "if-match": z.string().optional().openapi({ description: "The ETag of the settings the edit started from (GET /v1/roster/rules). Required: missing is 428 precondition_required, stale is 412 precondition_failed (the current ETag in the ETag header). Strong comparison; a weak tag or * never matches", example: '"3f2a9c0d1b7e4a58c6d2e9f01a4b7c3d"' }),
+})
 const ViolationOut = z.object({
-  rule: z.enum(["double_booking", "approved_leave", "unavailable", "daily_rest", "weekly_rest", "avg_48h", "expired_licence", "left"]), shiftId: z.string(), personId: z.string(),
+  rule: z.enum(["double_booking", "approved_leave", "unavailable", "daily_rest", "weekly_rest", "avg_48h", "expired_licence", "left", "elsewhere"]), shiftId: z.string(), personId: z.string(),
   severity: z.enum(["block", "warn"]), message: z.string(), otherShiftIds: z.array(z.string()),
 })
 export const CheckOut = z

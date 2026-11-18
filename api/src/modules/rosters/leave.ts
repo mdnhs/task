@@ -1,7 +1,9 @@
-import { and, asc, eq, gte, inArray, lte, notExists, or, sql, type SQL } from "drizzle-orm"
+import { and, asc, desc, eq, gte, inArray, lt, lte, notExists, or, sql, type SQL } from "drizzle-orm"
 import { canSeeLocation } from "@opsdesk/domain/roster-access"
+import { epochToWall } from "@opsdesk/domain/shifts"
+import { decodeCursor, encodeCursor } from "../../core/cursor"
 import { AppError, Conflict, Forbidden, NotFound } from "../../core/errors"
-import { leaveRequests, locationSupervisors, memberships, roles, rosterAvailability, rosterOfficeLimits } from "../../db/schema"
+import { leaveRequests, locations, locationSupervisors, memberships, roles, rosterAvailability, rosterOfficeLimits } from "../../db/schema"
 import type { TenantTx } from "../../db/tenant-tx"
 import { notify } from "../notifications"
 import type { AvailabilityDto, LeaveDto } from "./dto"
@@ -12,6 +14,8 @@ import { auditRoster, isUuid, publishRoster, type RosterEnv } from "./write"
 // Leave requests and availability (FR-RS-41, R8-7). A request is the person's own; it is decided (D8) by a supervisor of the person's HOME location, or by an
 // office role whose scope covers that home (a person homed nowhere: any office role; a Roster Manager with an `except` never decides for the excepted site),
 // and never by the requester. A leave that is not visible to the caller is the same 404 `leave_not_found` as one that does not exist.
+// D8 deciders = the home supervisor OR an office role in scope (either may decide). The NOTIFICATION audience (a request, and the cancelling of an approved leave) is BOTH
+// groups when both exist; nobody is ever told about their own request.
 
 const unprocessable = (code: string) => new AppError(422, code, "Unprocessable Entity")
 const notFound = () => NotFound("leave_not_found")
@@ -53,19 +57,17 @@ function approverReach(ctx: RosterCtx): SQL {
   return sql`false`
 }
 
-/** The people to tell about a request: the supervisors of the home site, else the office roles that cover it (a Roster Manager excepted from the site is not told). */
-async function approversOf(tx: TenantTx, tenantId: string, home: string | null, requester: string): Promise<string[]> {
+/** The deciders to tell: the home site's supervisors AND the office roles that cover it (a Roster Manager excepted from the site is not told), never the requester. */
+async function decidersOf(tx: TenantTx, tenantId: string, home: string | null, requester: string): Promise<string[]> {
   const active = [eq(memberships.tenantId, tenantId), eq(memberships.status, "active"), sql`${memberships.userId} <> ${requester}`, eq(roles.tenantId, tenantId), sql`${roles.access}->>'roster' = 'write'`]
-  if (home) {
-    const sup = await tx
-      .select({ userId: memberships.userId })
-      .from(locationSupervisors)
-      .innerJoin(memberships, and(eq(memberships.tenantId, locationSupervisors.tenantId), eq(memberships.userId, locationSupervisors.userId)))
-      .innerJoin(roles, eq(roles.id, memberships.roleId))
-      .where(and(eq(locationSupervisors.tenantId, tenantId), eq(locationSupervisors.locationId, home), eq(roles.rosterLevel, "supervisor"), ...active))
-      .orderBy(asc(memberships.userId))
-    if (sup.length > 0) return sup.map((r) => r.userId)
-  }
+  const sup = home
+    ? await tx
+        .select({ userId: memberships.userId })
+        .from(locationSupervisors)
+        .innerJoin(memberships, and(eq(memberships.tenantId, locationSupervisors.tenantId), eq(memberships.userId, locationSupervisors.userId)))
+        .innerJoin(roles, eq(roles.id, memberships.roleId))
+        .where(and(eq(locationSupervisors.tenantId, tenantId), eq(locationSupervisors.locationId, home), eq(roles.rosterLevel, "supervisor"), ...active))
+    : []
   const office = await tx
     .select({ userId: memberships.userId })
     .from(memberships)
@@ -76,8 +78,7 @@ async function approversOf(tx: TenantTx, tenantId: string, home: string | null, 
         home ? notExists(tx.select({ one: sql`1` }).from(rosterOfficeLimits).where(and(eq(rosterOfficeLimits.tenantId, tenantId), eq(rosterOfficeLimits.userId, memberships.userId), eq(rosterOfficeLimits.locationId, home)))) : undefined,
       ),
     )
-    .orderBy(asc(memberships.userId))
-  return office.map((r) => r.userId)
+  return [...new Set([...sup, ...office].map((r) => r.userId))].sort()
 }
 
 /** POST /v1/leave (self): the caller's own request. Dates are whole days, inclusive. An overlap with the person's own open or approved leave is 409 leave_overlap. */
@@ -96,7 +97,7 @@ export async function createLeave(tx: TenantTx, ctx: RosterCtx, env: RosterEnv, 
     .values({ tenantId: ctx.tenantId, userId: ctx.me, fromDate: input.from, toDate: input.to, kind, note, createdAt: ctx.now, updatedAt: ctx.now })
     .returning()
   const [m] = await tx.select({ home: memberships.homeLocationId }).from(memberships).where(and(eq(memberships.tenantId, ctx.tenantId), eq(memberships.userId, ctx.me)))
-  for (const userId of await approversOf(tx, ctx.tenantId, m?.home ?? null, ctx.me)) {
+  for (const userId of await decidersOf(tx, ctx.tenantId, m?.home ?? null, ctx.me)) {
     // the requester is named through the subject token at read time (erasure-safe); no site name, no other person
     await notify(tx, ctx.tenantId, { userId, kind: "member", title: "Leave requested", body: `{{subject}} asked for leave from ${input.from} to ${input.to}.`, link: "/rosters", subjectUserId: ctx.me }, env.deps, env.enqueue)
   }
@@ -104,11 +105,16 @@ export async function createLeave(tx: TenantTx, ctx: RosterCtx, env: RosterEnv, 
   return view(row)
 }
 
-type Filter = { status?: string; userId?: string; from?: string; to?: string }
+type Filter = { status?: string; userId?: string; from?: string; to?: string; limit?: string; cursor?: string }
+const DEFAULT_LIMIT = 50
+const MAX_LIMIT = 200
 
-/** GET /v1/leave: the caller's own, plus (supervisor) people homed at their sites or (office) everyone within scope. Out of scope is simply absent. */
-export async function listLeave(tx: TenantTx, ctx: RosterCtx, q: Filter): Promise<{ items: LeaveDto[] }> {
+/** GET /v1/leave: the caller's own, plus (supervisor) people homed at their sites or (office) everyone within scope. Out of scope is simply absent. Newest first (created, then id), keyset cursor. */
+export async function listLeave(tx: TenantTx, ctx: RosterCtx, q: Filter): Promise<{ items: LeaveDto[]; nextCursor: string | null }> {
   if ((q.status !== undefined && !(STATUSES as readonly string[]).includes(q.status)) || (q.from !== undefined && !realDate(q.from)) || (q.to !== undefined && !realDate(q.to))) throw unprocessable("invalid_filter")
+  const limit = q.limit === undefined ? DEFAULT_LIMIT : /^\d{1,3}$/.test(q.limit) ? Number(q.limit) : 0
+  if (limit < 1 || limit > MAX_LIMIT) throw unprocessable("invalid_filter")
+  const after = q.cursor === undefined ? undefined : decodeCursor(q.cursor)
   const rows = await tx
     .select({ lr: leaveRequests })
     .from(leaveRequests)
@@ -121,11 +127,14 @@ export async function listLeave(tx: TenantTx, ctx: RosterCtx, q: Filter): Promis
         q.userId ? eq(leaveRequests.userId, q.userId) : undefined,
         q.from ? gte(leaveRequests.toDate, q.from) : undefined,
         q.to ? lte(leaveRequests.fromDate, q.to) : undefined,
+        after ? or(lt(leaveRequests.createdAt, after.at), and(eq(leaveRequests.createdAt, after.at), lt(leaveRequests.id, after.id))) : undefined,
       ),
     )
-    .orderBy(asc(leaveRequests.fromDate), asc(leaveRequests.createdAt), asc(leaveRequests.id))
-    .limit(500)
-  return { items: rows.map((r) => view(r.lr)) }
+    .orderBy(desc(leaveRequests.createdAt), desc(leaveRequests.id))
+    .limit(limit + 1)
+  const page = rows.slice(0, limit).map((r) => r.lr)
+  const last = page[page.length - 1]
+  return { items: page.map(view), nextCursor: rows.length > limit && last ? encodeCursor(last.createdAt, last.id) : null }
 }
 
 /** The leave row, locked, with its person's home site; the SAME 404 for a non-uuid id, a missing one, another tenant's and one the caller may not see. */
@@ -165,13 +174,26 @@ export async function decideLeave(tx: TenantTx, ctx: RosterCtx, env: RosterEnv, 
   return view(next)
 }
 
-/** POST /v1/leave/{id}/cancel: the requester withdraws an open or approved request. Someone who can see it but did not ask: 403; who cannot: 404. */
-export async function cancelLeave(tx: TenantTx, ctx: RosterCtx, id: string): Promise<LeaveDto> {
+/**
+ * POST /v1/leave/{id}/cancel: the requester withdraws an open or approved request. Someone who can see it but did not ask: 403; who cannot: 404. A leave that has already started
+ * (its first day is today or earlier in the person's site zone, else the tenant zone, on the injected clock) is 422 leave_started. Cancelling an APPROVED leave changes rostering,
+ * so it tells the deciders, publishes roster.leave_cancelled and audits; a pending one is silent.
+ */
+export async function cancelLeave(tx: TenantTx, ctx: RosterCtx, env: RosterEnv, id: string): Promise<LeaveDto> {
   const { row, home } = await lockLeave(tx, ctx, id)
   if (row.userId !== ctx.me) throw mayDecideFor(ctx, home) ? Forbidden("forbidden") : notFound()
   if (row.status !== "requested" && row.status !== "approved") throw Conflict("leave_not_open")
+  const [site] = home ? await tx.select({ zone: locations.timeZone }).from(locations).where(and(eq(locations.tenantId, ctx.tenantId), eq(locations.id, home))) : []
+  const today = epochToWall(ctx.now.getTime(), site?.zone ?? ctx.tz).slice(0, 10)
+  if (row.fromDate <= today) throw unprocessable("leave_started")
   const [next] = await tx.update(leaveRequests).set({ status: "cancelled", updatedAt: ctx.now }).where(and(eq(leaveRequests.tenantId, ctx.tenantId), eq(leaveRequests.id, row.id))).returning()
-  if (row.status === "approved") await auditRoster(tx, ctx, { action: "roster.leave_cancelled", entity: "leave_request", entityId: row.id, before: { status: row.status }, after: { status: "cancelled" } })
+  if (row.status === "approved") {
+    for (const userId of await decidersOf(tx, ctx.tenantId, home, ctx.me)) {
+      await notify(tx, ctx.tenantId, { userId, kind: "member", title: "Approved leave cancelled", body: `{{subject}} cancelled approved leave from ${row.fromDate} to ${row.toDate}.`, link: "/rosters", subjectUserId: ctx.me }, env.deps, env.enqueue)
+    }
+    await auditRoster(tx, ctx, { action: "roster.leave_cancelled", entity: "leave_request", entityId: row.id, before: { status: row.status }, after: { status: "cancelled", userId: row.userId, from: row.fromDate, to: row.toDate } })
+    await publishRoster(tx, ctx, "roster.leave_cancelled", { leaveId: row.id, userId: row.userId })
+  }
   return view(next)
 }
 

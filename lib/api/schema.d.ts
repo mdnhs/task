@@ -9487,6 +9487,10 @@ export interface paths {
                     from?: string;
                     /** @description Leave that starts on or before this date (YYYY-MM-DD) */
                     to?: string;
+                    /** @description Page size 1..200 (default 50); anything else is 422 invalid_filter */
+                    limit?: string;
+                    /** @description The nextCursor of the previous page (newest first, keyset on creation time and id); garbage is 400 invalid_cursor */
+                    cursor?: string;
                 };
                 header?: never;
                 path?: never;
@@ -9516,6 +9520,7 @@ export interface paths {
                                 decisionNote: string | null;
                                 createdAt: string;
                             }[];
+                            nextCursor: string | null;
                         };
                     };
                 };
@@ -9773,9 +9778,11 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description The tenant's rule severities (block | warn | ignore per rule) and the averaging window in weeks. Anyone with roster read; defaults until an admin changes them. */
+                /** @description The tenant's rule severities (block | warn per rule; ignore only for the non-statutory rules) and the averaging window in weeks. Anyone with roster read; defaults until an admin changes them. The strong ETag header is what PUT sends back as If-Match. */
                 200: {
                     headers: {
+                        /** @description Strong ETag of the stored rule settings */
+                        ETag?: string;
                         [name: string]: unknown;
                     };
                     content: {
@@ -9792,7 +9799,10 @@ export interface paths {
         put: {
             parameters: {
                 query?: never;
-                header?: never;
+                header?: {
+                    /** @description The ETag of the settings the edit started from (GET /v1/roster/rules). Required: missing is 428 precondition_required, stale is 412 precondition_failed (the current ETag in the ETag header). Strong comparison; a weak tag or * never matches */
+                    "if-match"?: string;
+                };
                 path?: never;
                 cookie?: never;
             };
@@ -9802,14 +9812,16 @@ export interface paths {
                         severity: {
                             [key: string]: string;
                         };
-                        avgWeekReferenceWeeks: number;
+                        avgWeekReferenceWeeks?: number;
                     };
                 };
             };
             responses: {
-                /** @description The settings after the change (admin or owner: 403 forbidden otherwise; audit roster.rules_changed; an unchanged set writes nothing). A rule left out gets its default. 422 invalid_rules (unknown rule id or severity) | invalid_avg_weeks (1..52). */
+                /** @description The settings after the change, PATCH-like: a rule or the window left out keeps its stored value (admin or owner: 403 forbidden otherwise; audit roster.rules_changed; an unchanged set writes nothing). ignore is refused for daily_rest, weekly_rest and avg_48h. 422 invalid_rules (unknown rule id or severity) | invalid_avg_weeks (1..52). 428 precondition_required (no If-Match), 412 precondition_failed (stale; the current ETag in the ETag header). The new ETag is in the ETag header. */
                 200: {
                     headers: {
+                        /** @description Strong ETag of the stored rule settings */
+                        ETag?: string;
                         [name: string]: unknown;
                     };
                     content: {
@@ -9861,7 +9873,7 @@ export interface paths {
                             weekId: string;
                             violations: {
                                 /** @enum {string} */
-                                rule: "double_booking" | "approved_leave" | "unavailable" | "daily_rest" | "weekly_rest" | "avg_48h" | "expired_licence" | "left";
+                                rule: "double_booking" | "approved_leave" | "unavailable" | "daily_rest" | "weekly_rest" | "avg_48h" | "expired_licence" | "left" | "elsewhere";
                                 shiftId: string;
                                 personId: string;
                                 /** @enum {string} */

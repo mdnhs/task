@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs"
 import pg from "pg"
 import { afterAll, beforeEach, describe, expect, test } from "vitest"
 import { ownerTenantQuery } from "../../../test/db"
-import { makeMember, makeTenant, signIn } from "../../../test/factories"
+import { makeApiKey, makeMember, makeTenant, signIn } from "../../../test/factories"
 import { call, resetDb, testApp } from "../../../test/harness"
 
 // B8 Task 7: leave requests, approval (D8) and availability (FR-RS-41, R8-7).
@@ -245,34 +245,79 @@ describe("leave requests (FR-RS-41)", () => {
     }
   })
 
-  test("notification to approvers names no other site's people: supervisors of the home site if any (else office roles that cover it), the requester only through the subject token", async () => {
+  test("notification to approvers names no other site's people: BOTH the home site's supervisors and the office roles that cover it (AD2d), the requester only through the subject token, nobody is told of their own request", async () => {
     const w = await sites()
     const rm = w.p["roster-manager"]
     await w.ok("PUT", `/v1/roster/office-limits/${rm.userId}`, w.p.owner, { except: [w.b] })
     await w.home(w.staff2, w.b)
     await w.ask(w.p.employee, "2026-12-01", "2026-12-02") // homed at Alpha
-    const who = async (title: string) => (await w.rows("select user_id, body, subject_user_id, kind, link from notifications where title = $1 order by user_id", [title])).map((r) => r.user_id).sort()
-    expect(await who("Leave requested")).toEqual([w.p["location-supervisor"].userId]) // the Alpha supervisor; not the Bravo one, not an office role while a supervisor exists
+    const who = async (subject: string) => (await w.rows("select user_id from notifications where title = 'Leave requested' and subject_user_id = $1", [subject])).map((r) => r.user_id).sort()
+    expect(await who(w.p.employee.userId)).toEqual([w.p["location-supervisor"].userId, w.p.admin.userId, w.p.owner.userId, rm.userId].sort()) // not the Bravo supervisor
     const [n] = await w.rows("select body, subject_user_id from notifications where title = 'Leave requested'")
     expect(n.subject_user_id).toBe(w.p.employee.userId)
     expect(n.body).toContain("{{subject}}")
     expect(n.body).not.toContain("Alpha")
     expect(n.body).not.toContain("Bravo")
-    // a site with no supervisor: the office roles that cover it, minus anyone excepted from it
+    // a site with no supervisor: the office roles that cover it
     const c = await w.loc("Charlie")
     const third = await makeMember(w.deps, w.tenant.id, "employee")
     await w.home(third, c)
     await w.ask(third, "2026-12-01", "2026-12-02")
-    expect((await who("Leave requested")).includes(w.sup2.userId)).toBe(false)
-    const forC = (await w.rows("select user_id from notifications where title = 'Leave requested' and subject_user_id = $1", [third.userId])).map((r) => r.user_id).sort()
-    expect(forC).toEqual([w.p.admin.userId, w.p.owner.userId, rm.userId].sort())
-    // homed at the site rm is excepted from (none supervised): rm is not told
-    await ownerTenantQuery(w.tenant.id, "delete from location_supervisors where location_id = $1", [w.b])
+    expect(await who(third.userId)).toEqual([w.p.admin.userId, w.p.owner.userId, rm.userId].sort())
+    // homed at the site rm is excepted from: Bravo's supervisor and the unrestricted office roles, not rm
     await w.ask(w.staff2, "2026-12-01", "2026-12-02")
-    const forB = (await w.rows("select user_id from notifications where title = 'Leave requested' and subject_user_id = $1", [w.staff2.userId])).map((r) => r.user_id).sort()
-    expect(forB).toEqual([w.p.admin.userId, w.p.owner.userId].sort())
-    // the requester never gets their own request notice
-    expect(forB).not.toContain(w.staff2.userId)
+    expect(await who(w.staff2.userId)).toEqual([w.sup2.userId, w.p.admin.userId, w.p.owner.userId].sort())
+    // nobody is told of their own request (an office role asking for leave: the other office roles, never themselves)
+    await w.ask(w.p.admin, "2026-12-01", "2026-12-02")
+    const own = await who(w.p.admin.userId)
+    expect(own).not.toContain(w.p.admin.userId)
+    expect(own).toContain(w.p.owner.userId)
+  })
+
+  test("AD2b: cancelling an APPROVED leave tells the deciders (home supervisor and in-scope office), publishes roster.leave_cancelled and audits; cancelling a pending one stays silent", async () => {
+    const w = await sites()
+    const rm = w.p["roster-manager"]
+    await w.ok("PUT", `/v1/roster/office-limits/${rm.userId}`, w.p.owner, { except: [w.b] })
+    await w.home(w.staff2, w.b)
+    const staff = w.p.employee
+    await w.home(staff, w.a)
+    const pending = await w.ask(staff, "2026-12-01", "2026-12-02")
+    const count = async (title: string) => (await w.rows("select user_id from notifications where title = $1", [title])).length
+    await w.ok("POST", `/v1/leave/${pending.id}/cancel`, staff)
+    expect(await count("Approved leave cancelled")).toBe(0)
+    expect(await w.rows("select 1 from domain_events where type = 'roster.leave_cancelled'")).toEqual([])
+    expect(await w.rows("select 1 from audit_events where action = 'roster.leave_cancelled'")).toEqual([])
+    const l = await w.ask(staff, "2026-12-01", "2026-12-02")
+    await w.ok("POST", `/v1/leave/${l.id}/decide`, w.p["location-supervisor"], { decision: "approve", note: "" })
+    await w.ok("POST", `/v1/leave/${l.id}/cancel`, staff)
+    const told = (await w.rows("select user_id, body, subject_user_id from notifications where title = 'Approved leave cancelled'"))
+    expect(told.map((r) => r.user_id).sort()).toEqual([w.p["location-supervisor"].userId, w.p.admin.userId, w.p.owner.userId, rm.userId].sort())
+    expect(told.every((r) => r.subject_user_id === staff.userId && r.body.includes("{{subject}}"))).toBe(true)
+    expect(told.map((r) => r.user_id)).not.toContain(staff.userId)
+    expect((await w.rows("select payload from domain_events where type = 'roster.leave_cancelled'")).map((e) => e.payload)).toEqual([{ leaveId: l.id, userId: staff.userId }])
+    expect(await w.rows("select 1 from audit_events where action = 'roster.leave_cancelled'")).toHaveLength(1)
+    // a site rm is excepted from: rm is not told
+    const b = await w.ask(w.staff2, "2026-12-01", "2026-12-02")
+    await w.ok("POST", `/v1/leave/${b.id}/decide`, w.p.admin, { decision: "approve", note: "" })
+    await w.ok("POST", `/v1/leave/${b.id}/cancel`, w.staff2)
+    const forB = (await w.rows("select user_id from notifications where title = 'Approved leave cancelled' and subject_user_id = $1", [w.staff2.userId])).map((r) => r.user_id)
+    expect(forB).not.toContain(rm.userId)
+    expect(forB).toContain(w.sup2.userId)
+  })
+
+  test("AD2c: cancelling a leave that has already started is 422 leave_started; one starting today or later (tenant zone, deps.clock) can still be cancelled", async () => {
+    const w = await sites() // the fake clock reads 2026-11-16 09:00 UTC (Europe/Dublin, same day)
+    const staff = w.p.employee
+    const started = await w.ask(staff, "2026-11-10", "2026-11-18") // began in the past, still running
+    expect(await w.code("POST", `/v1/leave/${started.id}/cancel`, staff, undefined, 422)).toBe("leave_started")
+    const today = await w.ask(w.staff2, "2026-11-16", "2026-11-17") // starts today: started
+    expect(await w.code("POST", `/v1/leave/${today.id}/cancel`, w.staff2, undefined, 422)).toBe("leave_started")
+    const tomorrow = await w.ask(w.p.owner, "2026-11-17", "2026-11-17")
+    expect((await w.ok("POST", `/v1/leave/${tomorrow.id}/cancel`, w.p.owner)).status).toBe("cancelled")
+    expect((await w.rows("select status from leave_requests where id = $1", [started.id]))[0].status).toBe("requested")
+    w.clock.advance({ days: 2 }) // now 18 Nov: tomorrow's would have started
+    const later = await w.ask(w.p.admin, "2026-11-19", "2026-11-20")
+    expect((await w.ok("POST", `/v1/leave/${later.id}/cancel`, w.p.admin)).status).toBe("cancelled")
   })
 })
 
@@ -318,6 +363,67 @@ describe("availability (FR-RS-41)", () => {
     expect((await w.req("PUT", "/v1/roster/availability", staff, { windows: [{ weekday: 3, from: "08:00", to: "09:00" }, { weekday: 4, from: "08:00", to: "09:00" }] })).status).toBeGreaterThanOrEqual(500)
     await ownerTenantQuery(w.tenant.id, "alter table roster_availability drop constraint test_block")
     expect((await w.ok("GET", "/v1/roster/availability", staff)).windows).toEqual([{ weekday: 2, from: "08:00", to: "09:00" }])
+  })
+})
+
+describe("AD2a: the leave list is newest first with a keyset cursor", () => {
+  test("pages of `limit` newest first (created, then id), nextCursor until the end, garbage cursor 400 invalid_cursor, limit bounds", async () => {
+    const w = await sites()
+    const staff = w.p.employee
+    const ids: string[] = []
+    for (let i = 0; i < 5; i++) {
+      const l = await w.ask(staff, `2026-12-${String(1 + i * 3).padStart(2, "0")}`, `2026-12-${String(2 + i * 3).padStart(2, "0")}`)
+      await w.rows("update leave_requests set created_at = $2 where id = $1", [l.id, new Date(Date.UTC(2026, 10, 1 + i)).toISOString()])
+      ids.push(l.id)
+    }
+    // a tie on the instant is broken by id descending
+    const [x, y] = [await w.ask(staff, "2027-02-01", "2027-02-02"), await w.ask(staff, "2027-02-05", "2027-02-06")]
+    for (const l of [x, y]) await w.rows("update leave_requests set created_at = $2 where id = $1", [l.id, new Date(Date.UTC(2026, 10, 9)).toISOString()])
+    const tie = [x.id, y.id].sort().reverse()
+    const expected = [...tie, ...ids.slice().reverse()]
+    const first = await w.ok("GET", "/v1/leave?limit=3", staff)
+    expect(first.items.map((i: Json) => i.id)).toEqual(expected.slice(0, 3))
+    expect(typeof first.nextCursor).toBe("string")
+    const second = await w.ok("GET", `/v1/leave?limit=3&cursor=${encodeURIComponent(first.nextCursor)}`, staff)
+    expect(second.items.map((i: Json) => i.id)).toEqual(expected.slice(3, 6))
+    const third = await w.ok("GET", `/v1/leave?limit=3&cursor=${encodeURIComponent(second.nextCursor)}`, staff)
+    expect(third.items.map((i: Json) => i.id)).toEqual(expected.slice(6))
+    expect(third.nextCursor).toBeNull()
+    expect((await w.ok("GET", "/v1/leave", staff)).items.map((i: Json) => i.id)).toEqual(expected) // default page holds them all
+    for (const bad of ["garbage", "!!!", Buffer.from("x|y").toString("base64url"), Buffer.from("2026-11-01T00:00:00.000Z|not-a-uuid").toString("base64url")]) expect(await w.code("GET", `/v1/leave?cursor=${encodeURIComponent(bad)}`, staff, undefined, 400), bad).toBe("invalid_cursor")
+    for (const lim of ["0", "-1", "201", "abc"]) expect([400, 422], lim).toContain((await w.req("GET", `/v1/leave?limit=${lim}`, staff)).status)
+    // the cursor never widens the scope: staff2 still sees only their own
+    expect((await w.ok("GET", `/v1/leave?cursor=${encodeURIComponent(first.nextCursor)}`, w.staff2)).items).toEqual([])
+  })
+})
+
+describe("AD1: a read-only API key cannot write the creator's own data", () => {
+  test("a roster:read key is 403 on leave create, cancel and availability PUT; a roster:write key and a human staff member with roster:read succeed", async () => {
+    const w = await sites()
+    const owner = w.p.owner
+    const readKey = (await makeApiKey(w.deps, w.tenant.id, owner.userId, ["roster:read"])).key
+    const writeKey = (await makeApiKey(w.deps, w.tenant.id, owner.userId, ["roster:read", "roster:write"])).key
+    const via = (key: string, method: string, path: string, body?: unknown) => call(w.app, method, path, { headers: { authorization: `Bearer ${key}` }, body })
+    const mine = await w.ask(owner, "2026-12-20", "2026-12-21") // the creator's own leave, filed by the human
+    const leaveBody = { from: "2026-12-01", to: "2026-12-02", kind: "annual", note: "" }
+    const avail = { windows: [{ weekday: 1, from: "09:00", to: "10:00" }] }
+    for (const [m, path, body] of [["POST", "/v1/leave", leaveBody], ["POST", `/v1/leave/${mine.id}/cancel`, undefined], ["PUT", "/v1/roster/availability", avail]] as const) {
+      const r = await via(readKey, m, path, body)
+      expect(r.status, `${m} ${path}`).toBe(403)
+      expect(((await r.json()) as Json).code).toBe("forbidden")
+    }
+    expect((await via(readKey, "GET", "/v1/leave")).status).toBe(200) // reading stays open
+    expect((await via(readKey, "GET", "/v1/roster/availability")).status).toBe(200)
+    expect(await w.rows("select 1 from leave_requests where from_date = '2026-12-01'")).toEqual([])
+    expect((await w.rows("select status from leave_requests where id = $1", [mine.id]))[0].status).toBe("requested")
+    expect(await w.rows("select 1 from roster_availability")).toEqual([])
+    // the write key acts for its creator
+    expect((await via(writeKey, "POST", "/v1/leave", leaveBody)).status).toBe(201)
+    expect((await via(writeKey, "POST", `/v1/leave/${mine.id}/cancel`)).status).toBe(200)
+    expect((await via(writeKey, "PUT", "/v1/roster/availability", avail)).status).toBe(200)
+    // a human with roster:read only (staff) still works
+    expect((await w.req("POST", "/v1/leave", w.staff2, leaveBody)).status).toBe(201)
+    expect((await w.req("PUT", "/v1/roster/availability", w.staff2, avail)).status).toBe(200)
   })
 })
 

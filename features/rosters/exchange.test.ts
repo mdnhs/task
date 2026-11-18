@@ -221,7 +221,7 @@ describe("assignmentCheck (server rule check)", () => {
   it("a clash at a site the caller can't see returns only the generic message", () => {
     const hidden = { ...sh("h1", "a", "2026-10-24", "20:00", "04:00", "B"), templateId: "tB" }
     const v = assignmentCheck(sup, pair, base({ shifts: [sh("o1", null, "2026-10-24"), hidden] }), "Europe/Dublin")
-    expect(v.some((x) => x.rule === "double_booking" && x.message === "Already rostered elsewhere" && x.severity === "block")).toBe(true)
+    expect(v.some((x) => x.rule === "elsewhere" && x.message === "Already rostered elsewhere" && x.severity === "block")).toBe(true)
     expect(JSON.stringify(v)).not.toMatch(/h1|20:00|04:00/)
   })
   it("leave dates, availability windows and hour totals are not spelled out for a location-scoped caller", () => {
@@ -236,9 +236,9 @@ describe("assignmentCheck (server rule check)", () => {
     const hours = base({ rules: { avgWeekReferenceWeeks: 1, severity: rules.severity }, shifts: [sh("o1", null, "2026-10-24"), ...week] })
     const o: RosterAccess = { ...office, locationIds: ["A"] } // office role whose except hides B
     for (const a of [sup, o]) {
-      const v = assignmentCheck(a, pair, hours, "Europe/Dublin").filter((x) => x.rule === "avg_48h")
+      const v = assignmentCheck(a, pair, hours, "Europe/Dublin").filter((x) => x.rule === "elsewhere") // hidden hours: the one generic line (AD3)
       expect(v.length).toBeGreaterThan(0)
-      for (const x of v) expect(x.message).toBe("A would go over the 48-hour weekly average")
+      for (const x of v) expect(x.message).toBe("Already rostered elsewhere")
     }
     const seesAll = assignmentCheck(office, pair, hours, "Europe/Dublin").filter((x) => x.rule === "avg_48h")
     expect(seesAll.length).toBeGreaterThan(0)

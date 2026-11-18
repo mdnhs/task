@@ -65,8 +65,9 @@ describe("daily_rest", () => {
   it("a hidden-site neighbour gives a generic message and no ids", () => {
     const a = shift("2026-11-02", "08:00", "16:00", { locationId: "b" })
     const b = shift("2026-11-03", "02:00", "10:00")
-    const v = checkShifts([b], ctx([a, b], { visibleLocationIds: ["a"] })).filter((x) => x.rule === "daily_rest")
+    const v = checkShifts([b], ctx([a, b], { visibleLocationIds: ["a"] })).filter((x) => x.rule === "elsewhere")
     expect(v).toHaveLength(1)
+    expect(v[0].message).toBe("Already rostered elsewhere")
     expect(v[0].message).not.toMatch(/2026-11-02|08:00|16:00|\bb\b/)
     expect(v[0].otherShiftIds).toEqual([])
   })
@@ -100,9 +101,9 @@ describe("weekly_rest across calendar weeks", () => {
   it("a hidden-site shift in the window leaks no ids", () => {
     const days = ["2026-11-02", "2026-11-03", "2026-11-04", "2026-11-05", "2026-11-06", "2026-11-07", "2026-11-08"]
     const s = days.map((d, i) => shift(d, "09:00", "17:00", i === 3 ? { locationId: "b" } : {}))
-    const v = checkShifts([s[0]], ctx(s, { visibleLocationIds: ["a"] })).filter((x) => x.rule === "weekly_rest")
+    const v = checkShifts([s[0]], ctx(s, { visibleLocationIds: ["a"] })).filter((x) => x.rule === "elsewhere")
     expect(v).toHaveLength(1)
-    expect(v[0].otherShiftIds).not.toContain(s[3].id)
+    expect(v[0].otherShiftIds).toEqual([])
   })
   it("one violation per person per breach, not per shift", () => {
     const days = ["2026-11-02", "2026-11-03", "2026-11-04", "2026-11-05", "2026-11-06", "2026-11-07", "2026-11-08"]
@@ -156,10 +157,10 @@ describe("double_booking", () => {
     const b = shift("2026-11-02", "16:00", "20:00")
     expect(rules([b], ctx([a, b]))).not.toContain("double_booking")
   })
-  it("Review Focus 4: a clash at an invisible site says only 'Already rostered elsewhere'", () => {
+  it("Review Focus 4: a clash at an invisible site says only 'Already rostered elsewhere' (one generic violation, AD3)", () => {
     const a = shift("2026-11-02", "18:00", "02:00", { locationId: "b" })
     const b = shift("2026-11-02", "20:00", "03:30")
-    const v = checkShifts([b], ctx([a, b], { visibleLocationIds: ["a"] })).find((x) => x.rule === "double_booking")!
+    const v = checkShifts([b], ctx([a, b], { visibleLocationIds: ["a"] })).find((x) => x.rule === "elsewhere")!
     expect(v.message).toBe("Already rostered elsewhere")
     expect(v.message).not.toMatch(/18:00|02:00|loc|\bb\b/)
     expect(v.otherShiftIds).toEqual([])
@@ -265,14 +266,13 @@ describe("avg_48h and a caller who does not see every location", () => {
     const s = over()
     const full = checkShifts([s[s.length - 1]], ctx(s, { visibleLocationIds: null })).find((x) => x.rule === "avg_48h")!
     expect(full.message).toMatch(/\d+\.\dh a week/)
-    const cut = checkShifts([s[s.length - 1]], ctx(s, { visibleLocationIds: ["a"] })).find((x) => x.rule === "avg_48h")!
-    expect(cut.message).not.toMatch(/\d/) // no number at all: not the total, the window or the limit
-    expect(cut.message).toContain("Aoife Byrne")
+    const cut = checkShifts([s[s.length - 1]], ctx(s, { visibleLocationIds: ["a"] })).find((x) => x.rule === "elsewhere")!
+    expect(cut.message).toBe("Already rostered elsewhere") // the hours include a hidden site: one generic line, no total, no window, no limit
     expect(cut.otherShiftIds).toEqual([])
   })
   it("a hidden site's hours still count towards the average", () => {
     const s = over()
-    expect(rules([s[s.length - 1]], ctx(s, { visibleLocationIds: ["a"] }))).toContain("avg_48h")
+    expect(rules([s[s.length - 1]], ctx(s, { visibleLocationIds: ["a"] }))).toContain("elsewhere")
   })
 })
 
@@ -286,6 +286,59 @@ describe("leave and availability wording for a caller who does not see every loc
     expect(text(ctx([s], { leave, visibleLocationIds: ["a"] }), "approved_leave")).toBe("Aoife Byrne has approved leave on that day")
     expect(text(ctx([s], { availability: away }), "unavailable")).toContain("12:00-18:00")
     expect(text(ctx([s], { availability: away, visibleLocationIds: ["a"] }), "unavailable")).toBe("Aoife Byrne is unavailable at that time")
+  })
+})
+
+describe("AD3: every violation derived from a hidden site's shift collapses into ONE generic violation", () => {
+  const view = { visibleLocationIds: ["a"] }
+  const hiddenShift = (date: string, start: string, end: string) => shift(date, start, end, { locationId: "b" })
+  /** What the caller gets for `target`: shape only (rule, message, others, severity). */
+  const out = (target: RosterShift, all: RosterShift[], o: Partial<RuleContext> = {}) => checkShifts([target], ctx(all, { ...view, ...o })).map((v) => ({ rule: v.rule, message: v.message, otherShiftIds: v.otherShiftIds, severity: v.severity }))
+  const generic = (severity: "block" | "warn") => [{ rule: "elsewhere", message: "Already rostered elsewhere", otherShiftIds: [], severity }]
+  const sev = (o: Partial<Record<RuleId, "block" | "warn" | "ignore">>) => ({ ...SEV, ...o })
+
+  it("overlap with a hidden shift", () => {
+    const t = shift("2026-11-02", "18:00", "23:00")
+    expect(out(t, [t, hiddenShift("2026-11-02", "20:00", "23:30")])).toEqual(generic("block"))
+  })
+  it("daily rest against a hidden neighbour: identical output, no hours", () => {
+    const t = shift("2026-11-03", "04:00", "12:00")
+    const r = out(t, [t, hiddenShift("2026-11-02", "14:00", "22:00")])
+    expect(r).toEqual(generic("warn"))
+    expect(JSON.stringify(r)).not.toMatch(/\d{2}:\d{2}|\dh|2026/)
+  })
+  it("weekly rest made short by hidden shifts", () => {
+    const t = shift("2026-11-02", "08:00", "20:00")
+    const hidden = ["2026-11-03", "2026-11-04", "2026-11-05", "2026-11-06", "2026-11-07", "2026-11-08"].map((d) => hiddenShift(d, "08:00", "20:00")) // 12 h between every pair: no 24 h rest in the week
+    const r = out(t, [t, ...hidden], { avgWeekReferenceWeeks: 17 })
+    expect(r).toEqual(generic("warn"))
+  })
+  it("the 48 h average built on hidden hours", () => {
+    const t = shift("2026-11-07", "08:00", "12:00")
+    const hidden = ["2026-11-02", "2026-11-03", "2026-11-04", "2026-11-05", "2026-11-06"].map((d) => hiddenShift(d, "08:00", "20:00")) // 60 h hidden
+    const r = out(t, [t, ...hidden], { avgWeekReferenceWeeks: 1, severity: sev({ weekly_rest: "ignore", daily_rest: "ignore" }) })
+    expect(r).toEqual(generic("warn"))
+    expect(JSON.stringify(r)).not.toMatch(/\d/)
+  })
+  it("several hidden-derived violations on one shift are ONE line carrying the WORST severity; each shape is the plain double-booking shape", () => {
+    const t = shift("2026-11-02", "18:00", "23:00")
+    const h = [hiddenShift("2026-11-02", "20:00", "23:30"), hiddenShift("2026-11-03", "02:00", "05:00")] // an overlap AND a short rest
+    expect(out(t, [t, ...h])).toEqual(generic("block"))
+    expect(out(t, [t, ...h], { severity: sev({ double_booking: "warn", daily_rest: "block" }) })).toEqual(generic("block"))
+    expect(out(t, [t, ...h], { severity: sev({ double_booking: "warn", daily_rest: "warn" }) })).toEqual(generic("warn"))
+    expect(out(t, [t, ...h], { severity: sev({ double_booking: "ignore", daily_rest: "ignore", weekly_rest: "ignore", avg_48h: "ignore" }) })).toEqual([]) // an ignored rule reports nothing
+  })
+  it("a visible neighbour keeps its own detailed line next to the generic one; a caller who sees every site gets the detail", () => {
+    const t = shift("2026-11-03", "04:00", "12:00")
+    const vis = shift("2026-11-02", "16:00", "22:00")
+    const hid = hiddenShift("2026-11-02", "14:00", "22:00")
+    const r = out(t, [t, vis, hid])
+    expect(r.filter((x) => x.rule === "daily_rest")).toHaveLength(1)
+    expect(r.filter((x) => x.rule === "elsewhere")).toEqual(generic("warn"))
+    expect(JSON.stringify(r)).not.toContain(hid.id)
+    const full = checkShifts([t], ctx([t, vis, hid], { visibleLocationIds: null }))
+    expect(full.every((x) => x.rule !== "elsewhere")).toBe(true)
+    expect(full.some((x) => x.otherShiftIds.includes(hid.id))).toBe(true)
   })
 })
 

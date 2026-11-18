@@ -6,7 +6,7 @@ import type { AppEnv, ResolvedRole } from "../../core/context"
 import { AppError, Forbidden, NotFound } from "../../core/errors"
 import { requireModule } from "../../core/middleware/module"
 import { requirePermission } from "../../core/middleware/permission"
-import { actorIdOf, subjectUserId } from "../../core/middleware/principal"
+import { actorIdOf, API_KEY_ACTOR_PREFIX, subjectUserId } from "../../core/middleware/principal"
 import { requireTenant } from "../../core/middleware/tenant"
 import { locationSupervisors, locations, roles, rosterOfficeLimits } from "../../db/schema"
 import type { TenantTx } from "../../db/tenant-tx"
@@ -51,9 +51,11 @@ export async function loadRosterCtx(c: Context<AppEnv>, tx: TenantTx, need: "rea
   const tenant = c.get("tenant")!
   const actorId = actorIdOf(c)
   if (need !== "read" && lockedTx.get(tx) !== tenant.id) throw new Error(`loadRosterCtx(${need}) requires lockRoster first (R8-5 lock order)`)
-  // "self": a write to the caller's OWN data (leave, availability): the same lock order and actor re-read, but roster READ is enough
-  const role = need === "read" ? c.get("role")! : await lockActor(tx, tenant.id, actorId, "roster", need === "write" ? "write" : "read")
-  if (!can(role, "roster", need === "write" ? "write" : "read")) throw Forbidden("forbidden") // the route guard already answered; fail closed
+  // "self": a write to the caller's OWN data (leave, availability): the same lock order and actor re-read, but roster READ is enough for a person. An API key acts for
+  // its creator, so it must hold roster:write (AD1): a read-only key may never file or cancel the creator's leave or replace their availability.
+  const needed = need === "write" || (need === "self" && actorId.startsWith(API_KEY_ACTOR_PREFIX)) ? "write" : "read"
+  const role = need === "read" ? c.get("role")! : await lockActor(tx, tenant.id, actorId, "roster", needed)
+  if (!can(role, "roster", need === "read" ? "read" : needed)) throw Forbidden("forbidden") // the route guard already answered; fail closed
   const me = subjectUserId(c)
   const [row] = await tx.select({ level: roles.rosterLevel }).from(roles).where(and(eq(roles.tenantId, tenant.id), eq(roles.id, role.id)))
   const level = row?.level === "office" || row?.level === "supervisor" ? row.level : undefined

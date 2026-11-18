@@ -33,7 +33,15 @@ async function world() {
     if (!cookies.has(who.email)) cookies.set(who.email, (await signIn(t.app, who.email, who.password)).cookie)
     return cookies.get(who.email)!
   }
-  const req = async (method: string, path: string, who: Who, body?: unknown) => call(t.app, method, path, { cookie: await cookie(who), tenant: "acme", body })
+  /** A PUT of the rules sends the ETag of what the caller just loaded (If-Match) unless `headers` says otherwise. */
+  const req = async (method: string, path: string, who: Who, body?: unknown, headers?: Record<string, string>) => {
+    const base = { cookie: await cookie(who), tenant: "acme" }
+    if (method === "PUT" && path === "/v1/roster/rules" && !headers) {
+      const etag = (await call(t.app, "GET", path, base)).headers.get("etag")
+      return call(t.app, method, path, { ...base, body, headers: etag ? { "if-match": etag } : {} })
+    }
+    return call(t.app, method, path, { ...base, body, headers })
+  }
   const ok = async (method: string, path: string, who: Who, body?: unknown, status = 200): Promise<Json> => {
     const r = await req(method, path, who, body)
     const text = await r.text()
@@ -79,7 +87,7 @@ async function world() {
       return fn(o.wrap ? o.wrap(tx) : tx, ctx)
     })
   }
-  return { ...t, tenant, other, p, sup2, staff2, req, ok, code, rows, loc, type, week, shift, check, violations, ctxOf }
+  return { ...t, tenant, other, p, sup2, staff2, cookies, req, ok, code, rows, loc, type, week, shift, check, violations, ctxOf }
 }
 
 /** Alpha (supervised by `location-supervisor`) and Bravo (supervised by sup2); nobody has a home location unless a test sets one. */
@@ -178,18 +186,21 @@ describe("the check endpoint (FR-RS-44)", () => {
     const res = await w.check(w.p["location-supervisor"], wk)
     expect(res.status).toBe(200)
     const body = (await res.json()) as Json
-    const clash = rule(body.violations, "double_booking")
+    const clash = rule(body.violations, "elsewhere").filter((x) => x.shiftId === mine)
     expect(clash).toHaveLength(1)
-    expect(clash[0]).toMatchObject({ shiftId: mine, severity: "block", message: "Already rostered elsewhere", otherShiftIds: [] })
+    expect(clash[0]).toMatchObject({ shiftId: mine, severity: "block", message: "Already rostered elsewhere", otherShiftIds: [] }) // one generic line: no rule-specific wording
+    expect(rule(body.violations, "double_booking").filter((x) => x.shiftId === mine)).toEqual([]) // the hidden overlap is not reported as a double booking
     const rest = rule(body.violations, "daily_rest").filter((x) => x.shiftId === nextDay)
     expect(rest.flatMap((x) => x.otherShiftIds)).toEqual([mine]) // the visible neighbour is named, the hidden one is not
-    expect(rest.map((x) => x.message)).toContain("Aoife Byrne has less than 11h rest between shifts")
-    expect(rest.find((x) => x.message.endsWith("between shifts"))!.otherShiftIds).toEqual([])
+    const gen = rule(body.violations, "elsewhere").filter((x) => x.shiftId === nextDay)
+    expect(gen).toHaveLength(1)
+    expect(gen[0]).toMatchObject({ message: "Already rostered elsewhere", otherShiftIds: [], severity: "warn" })
     const text = JSON.stringify(body)
     for (const secret of [hidden, w.b, bravoWeek, "Bravo", "18:00", "22:00", "2026-11-02 18"]) expect(text, `leaks ${secret}`).not.toContain(secret)
     // an office role that sees every site gets the detail
     const full = rule(await w.violations(w.p.admin, wk), "double_booking")
     expect(full.some((x) => x.otherShiftIds.includes(hidden) && x.message.includes("18:00-22:00"))).toBe(true)
+    expect(rule(await w.violations(w.p.admin, wk), "elsewhere")).toEqual([]) // a caller who sees every site gets the detail, never the generic line
     // an office Roster Manager excepted from Bravo is cut the same way as the supervisor
     await w.ok("PUT", `/v1/roster/office-limits/${w.p["roster-manager"].userId}`, w.p.owner, { except: [w.b] })
     const rmText = JSON.stringify(await w.ok("POST", `/v1/roster/weeks/${wk}/check`, w.p["roster-manager"]))
@@ -204,10 +215,12 @@ describe("the check endpoint (FR-RS-44)", () => {
     for (const d of ["2026-11-02", "2026-11-03", "2026-11-04", "2026-11-05", "2026-11-06"]) await w.shift({ loc: w.b, type: w.tb, user: staff.userId, date: d, start: "08:00", end: "18:00", weekStart: MON }) // 50 h at the hidden site
     await w.shift({ loc: w.a, type: w.ta, user: staff.userId, date: "2026-11-07", start: "08:00", end: "12:00", weekStart: MON })
     const wk = await w.week(w.a, MON)
-    const cut = rule(await w.violations(w.p["location-supervisor"], wk), "avg_48h")
-    expect(cut).toHaveLength(1)
-    expect(cut[0].message).toBe("Aoife Byrne averages more than the weekly hours limit")
-    expect(cut[0].message).not.toMatch(/\d/)
+    const all = await w.violations(w.p["location-supervisor"], wk)
+    const cut = rule(all, "elsewhere")
+    expect(cut).toHaveLength(1) // the average, the weekly rest and the rest all built on hidden hours are ONE line
+    expect(cut[0].message).toBe("Already rostered elsewhere")
+    expect(rule(all, "avg_48h")).toEqual([])
+    expect(JSON.stringify(all)).not.toMatch(/\d+\.\dh|54|limit/)
     const full = rule(await w.violations(w.p.admin, wk), "avg_48h")
     expect(full[0].message).toMatch(/54\.0h a week over 1 weeks \(limit 48h\)/)
   })
@@ -277,9 +290,58 @@ describe("settings: GET and PUT /v1/roster/rules", () => {
     await w.ok("PUT", "/v1/roster/rules", w.p.owner, good) // unchanged: no second audit line
     expect(await w.rows("select 1 from audit_events where action = 'roster.rules_changed'")).toHaveLength(1)
     // a rule left out falls back to its default
-    expect((await w.ok("PUT", "/v1/roster/rules", w.p.owner, { severity: { avg_48h: "ignore" }, avgWeekReferenceWeeks: 17 })).severity).toEqual({ ...DEFAULT_SEVERITY, avg_48h: "ignore" })
+    // AD4: a rule left out keeps its STORED value (here daily_rest block, 26 weeks), never the default; the window may be left out as well
+    expect(await w.ok("PUT", "/v1/roster/rules", w.p.owner, { severity: { unavailable: "ignore" } })).toEqual({ severity: { ...good.severity, unavailable: "ignore" }, avgWeekReferenceWeeks: 26 })
     // the setting is per tenant
     expect(await ownerQuery("select 1 from tenant_settings where key = 'roster.rules' and tenant_id <> $1", [w.tenant.id])).toEqual([])
+  })
+
+  test("AD4: GET carries an ETag, PUT needs If-Match (428 missing, 412 stale with the current ETag, nothing written), the response carries the new ETag", async () => {
+    const w = await sites()
+    const put = (who: Who, body: unknown, headers?: Record<string, string>) => call(w.app, "PUT", "/v1/roster/rules", { cookie: w.cookies.get(who.email)!, tenant: "acme", body, headers })
+    await w.req("GET", "/v1/roster/rules", w.p.admin)
+    const body = { severity: { daily_rest: "block" }, avgWeekReferenceWeeks: 20 }
+    const g1 = await w.req("GET", "/v1/roster/rules", w.p.admin)
+    const e1 = g1.headers.get("etag")!
+    expect(e1).toMatch(/^"[0-9a-f]{32}"$/)
+    expect((await w.req("GET", "/v1/roster/rules", w.staff2)).headers.get("etag")).toBe(e1) // same state, same tag for every reader
+    const none = await put(w.p.admin, body)
+    expect([none.status, ((await none.json()) as Json).code]).toEqual([428, "precondition_required"])
+    expect(await w.rows("select 1 from tenant_settings where key = 'roster.rules'")).toEqual([])
+    const ok1 = await put(w.p.admin, body, { "if-match": e1 })
+    expect(ok1.status).toBe(200)
+    const e2 = ok1.headers.get("etag")!
+    expect(e2).not.toBe(e1)
+    expect((await w.req("GET", "/v1/roster/rules", w.p.admin)).headers.get("etag")).toBe(e2)
+    const stale = await put(w.p.owner, { severity: { daily_rest: "warn" }, avgWeekReferenceWeeks: 5 }, { "if-match": e1 })
+    expect([stale.status, ((await stale.json()) as Json).code]).toEqual([412, "precondition_failed"])
+    expect(stale.headers.get("etag")).toBe(e2)
+    expect(await w.ok("GET", "/v1/roster/rules", w.p.owner)).toMatchObject({ severity: { daily_rest: "block" }, avgWeekReferenceWeeks: 20 })
+    for (const bad of [`W/${e2}`, "*", "nonsense", `"zz", "yy"`]) expect((await put(w.p.admin, body, { "if-match": bad })).status, bad).toBe(412)
+    expect((await put(w.p.admin, body, { "if-match": `"zz", ${e2}` })).status).toBe(200) // a list holding the current tag matches
+    // two concurrent PUTs from the same tag: one 200, one 412
+    const e3 = (await w.req("GET", "/v1/roster/rules", w.p.admin)).headers.get("etag")!
+    const rs = await Promise.all([put(w.p.admin, { severity: { left: "block" } }, { "if-match": e3 }), put(w.p.owner, { severity: { left: "ignore" } }, { "if-match": e3 })])
+    expect(rs.map((r) => r.status).sort()).toEqual([200, 412])
+    // the ETag follows what the engine reads: a stored ignore on a statutory rule reads as warn (AD5), so the tag is the tag of the normalised settings
+    const rules = (await w.rows("select value from tenant_settings where key = 'roster.rules'"))[0].value
+    expect(rules.severity.daily_rest).toBe("block")
+  })
+
+  test("AD5: ignore is only for non-statutory rules (daily_rest, weekly_rest and avg_48h accept warn|block, 422 invalid_rules); a stored ignore on them reads as warn", async () => {
+    const w = await sites()
+    for (const r of ["daily_rest", "weekly_rest", "avg_48h"]) {
+      expect(await w.code("PUT", "/v1/roster/rules", w.p.admin, { severity: { [r]: "ignore" }, avgWeekReferenceWeeks: 17 }, 422), r).toBe("invalid_rules")
+      expect((await w.ok("PUT", "/v1/roster/rules", w.p.admin, { severity: { [r]: "block" }, avgWeekReferenceWeeks: 17 })).severity[r]).toBe("block")
+      expect((await w.ok("PUT", "/v1/roster/rules", w.p.admin, { severity: { [r]: "warn" }, avgWeekReferenceWeeks: 17 })).severity[r]).toBe("warn")
+    }
+    for (const r of ["double_booking", "approved_leave", "unavailable", "expired_licence", "left"]) expect((await w.ok("PUT", "/v1/roster/rules", w.p.admin, { severity: { [r]: "ignore" } })).severity[r], r).toBe("ignore")
+    // a value stored before the rule existed (or written by hand) is read as warn for the statutory rules, in GET and in the engine
+    await w.rows("update tenant_settings set value = jsonb_set(jsonb_set(value, '{severity,daily_rest}', '\"ignore\"'), '{severity,avg_48h}', '\"ignore\"') where key = 'roster.rules'")
+    expect(await w.ok("GET", "/v1/roster/rules", w.p.owner)).toMatchObject({ severity: { daily_rest: "warn", avg_48h: "warn", weekly_rest: "warn" } })
+    await w.shift({ loc: w.a, type: w.ta, user: w.p.employee.userId, date: MON, start: "08:00", end: "16:00", weekStart: MON })
+    await w.shift({ loc: w.a, type: w.ta, user: w.p.employee.userId, date: "2026-11-03", start: "02:00", end: "10:00", weekStart: MON })
+    expect(rule(await w.violations(w.p.owner, await w.week(w.a, MON)), "daily_rest").length).toBeGreaterThan(0)
   })
 
   test("the rules routes are 403 module_not_entitled without M1A", async () => {
@@ -304,7 +366,7 @@ describe("the context loader", () => {
     const [approved, rejected, open] = [await ask("2026-11-03", "2026-11-03"), await ask("2026-11-04", "2026-11-04"), await ask("2026-11-05", "2026-11-05")]
     await w.ok("POST", `/v1/leave/${approved}/decide`, w.p["location-supervisor"], { decision: "approve", note: "" })
     await w.ok("POST", `/v1/leave/${rejected}/decide`, w.p["location-supervisor"], { decision: "reject", note: "" })
-    const cancelled = await ask("2026-11-06", "2026-11-06")
+    const cancelled = await ask("2026-11-20", "2026-11-20")
     await w.ok("POST", `/v1/leave/${cancelled}/cancel`, staff)
     await w.shift({ loc: w.a, type: w.ta, user: staff.userId, date: "2026-11-03", start: "08:00", end: "16:00", weekStart: MON })
     const wk = await w.week(w.a, MON)

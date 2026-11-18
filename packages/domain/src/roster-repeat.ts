@@ -1,4 +1,4 @@
-import { checkShifts, type RuleContext, type RuleId } from "./roster-rules"
+import { checkShifts, type RuleContext, type ViolationRule } from "./roster-rules"
 import type { RosterShift, RosterWeek } from "./rosters"
 import { addDays, weekStart } from "./shifts"
 
@@ -6,7 +6,7 @@ import { addDays, weekStart } from "./shifts"
 // shift plus a conflict; a warn-severity break or a public holiday is only an info conflict and the person stays. The check of each copy includes the copies
 // already made in this repeat and the shifts of every other week in ctx, so two copies can clash with each other.
 
-export type RepeatConflict = { shiftId: string; personId: string; reason: RuleId | "public_holiday" | "not_in_location"; open: boolean; message: string }
+export type RepeatConflict = { shiftId: string; personId: string; reason: ViolationRule | "public_holiday" | "not_in_location"; open: boolean; message: string }
 export type RepeatResult = { week: RosterWeek; shifts: RosterShift[]; conflicts: RepeatConflict[] }
 /** One shift of a template: `day` is days after the week's Monday (0..6). */
 export type WeekTemplateShift = { day: number; personId: string | null; templateId: string; role: string; start: string; end: string; unpaidBreakMin: number }
