@@ -296,7 +296,7 @@ export function toStaff(dto: unknown, ctx: { tz: string }): StaffHome {
 // ---- Today ----
 
 /** `GET /v1/today`. The day key is the SERVER's working day (H6); counts, order and the written summary are the server's. */
-export function toToday(dto: unknown, ctx: { meId: string; tz: string; nowAt: string; now: string; tzLabel: string; mode: TodayMode }): TodayData {
+export function toToday(dto: unknown, ctx: { meId: string; subject?: string; tz: string; nowAt: string; now: string; tzLabel: string; mode: TodayMode }): TodayData {
   const r = R.rec(dto, "today")
   R.exact(r, ["counts", "workingDay", "order", "summary", "reports"], ["team"])
   const c = R.rec(r.counts, "counts")
@@ -309,6 +309,7 @@ export function toToday(dto: unknown, ctx: { meId: string; tz: string; nowAt: st
   if (team) R.exact(team, ["count", "items"])
   return {
     meId: ctx.meId,
+    subject: ctx.subject ?? ctx.meId,
     tz: ctx.tz,
     day: { key: R.str(wd, "key"), startsAt: wall(R.str(wd, "startsAt"), ctx.tz), hasShift: R.bool(wd, "hasShift") },
     now: ctx.now,

@@ -9,6 +9,7 @@ import { mockEnabled } from "@/lib/mock-registry"
 import { getOrg } from "@/lib/org"
 import { can } from "@/lib/permissions"
 import { requireMfaOk } from "@/lib/session"
+import { todaySubject } from "@/lib/today-prefs"
 import { TODAY_COOKIE_AUTO, TODAY_COOKIE_DISMISSED } from "@/lib/today"
 
 // The home screen on the API's read models (B6 T6.7, F17, F18): the manager or the staff dashboard, the attention feed and the Today card. The figures are the API's (cached 30 s per user on the
@@ -30,12 +31,13 @@ export default async function Page() {
     .then(async ([{ api, people }, org, jar]) => {
       const cookie = { auto: jar.get(TODAY_COOKIE_AUTO)?.value, dismissed: readCookie(jar.get(TODAY_COOKIE_DISMISSED)?.value) }
       const meId = session.user.id
+      const subject = todaySubject(session.tenant.slug, meId)
       if (session.role.home === "staff") {
-        const [home, todayCard] = await Promise.all([loadStaffHome(api, { org }), loadToday(api, { meId, org, cookies: cookie })])
+        const [home, todayCard] = await Promise.all([loadStaffHome(api, { org }), loadToday(api, { meId, subject, org, cookies: cookie })])
         return { ok: true as const, org, staff: { home, todayCard } }
       }
       const perms = getDashboardPerms(session)
-      const [home, todayCard] = await Promise.all([loadManagerHome(api, { org, people, perms, withAttention: can(session.role, "attention") }), loadToday(api, { meId, org, cookies: cookie })])
+      const [home, todayCard] = await Promise.all([loadManagerHome(api, { org, people, perms, withAttention: can(session.role, "attention") }), loadToday(api, { meId, subject, org, cookies: cookie })])
       return { ok: true as const, org, manager: { home, todayCard, perms } }
     })
     .catch((e: unknown) => ({ ok: false as const, e }))
@@ -72,6 +74,7 @@ export default async function Page() {
       perms={perms}
       coverage={demo ? await getCoverage() : undefined}
       remind={demo}
+      queue={demo}
       clock={{ tz: org.timezone, today: org.today }}
       newTask={
         <NewTaskButton className="btn btn-primary" from="/">

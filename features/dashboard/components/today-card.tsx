@@ -34,7 +34,7 @@ export function TodayCard({ data: initial }: { data: TodayData }) {
     setBase(initial)
     setData(initial)
   }
-  const { meId, day } = data
+  const { meId, subject, day } = data
   const [open, setOpen] = useState(initial.mode === "card")
   const [summaryOn, setSummaryOn] = useState(false)
   const [player, setPlayer] = useState<{ autoplay: boolean } | null>(null)
@@ -51,16 +51,16 @@ export function TodayCard({ data: initial }: { data: TodayData }) {
 
   // The saved choice (this browser) decides when it disagrees with the cookie the server saw.
   useEffect(() => {
-    const want = readAuto(meId) && !readDismissed(meId, day.key)
+    const want = readAuto(subject) && !readDismissed(subject, day.key)
     // eslint-disable-next-line react-hooks/set-state-in-effect -- reconciles with browser storage once after mount
     setOpen((o) => (o === want ? o : want))
-  }, [meId, day.key])
+  }, [subject, day.key])
 
   // Snoozed earlier this working day in this browser (the server keeps only the history line, so the card remembers which tasks to leave out).
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- reads browser storage once after mount
-    setSnoozed(new Set(readSnoozed(meId, day.key)))
-  }, [meId, day.key])
+    setSnoozed(new Set(readSnoozed(subject, day.key)))
+  }, [subject, day.key])
 
   const live = useMemo(() => data.order.filter((i) => !done.has(i.task.id)), [data.order, done])
   const queue = useMemo(() => live.filter((i) => !snoozed.has(i.task.ref)), [live, snoozed])
@@ -79,7 +79,7 @@ export function TodayCard({ data: initial }: { data: TodayData }) {
   /** Fetch the card again (for a mode, or after a write): the server's numbers replace the card's. */
   async function refetch(m: DayMode = mode) {
     try {
-      const fresh = toToday(await client.load(m), { meId, tz: data.tz, nowAt: data.nowAt, now: data.now, tzLabel: data.tzLabel, mode: data.mode })
+      const fresh = toToday(await client.load(m), { meId, subject, tz: data.tz, nowAt: data.nowAt, now: data.now, tzLabel: data.tzLabel, mode: data.mode })
       if (mounted.current) setData(fresh)
     } catch (e) {
       toast.error(userMessage(e).text)
@@ -87,7 +87,7 @@ export function TodayCard({ data: initial }: { data: TodayData }) {
   }
 
   const toggle = (next: boolean) => {
-    writeDismissed(meId, day.key, !next)
+    writeDismissed(subject, day.key, !next)
     setOpen(next)
     if (!next) setPlayer(null)
   }
@@ -140,7 +140,7 @@ export function TodayCard({ data: initial }: { data: TodayData }) {
       if (r.kind === "snoozed" || r.kind === "duplicate") {
         const next = new Set(snoozed).add(item.task.ref)
         setSnoozed(next)
-        writeSnoozed(meId, day.key, [...next])
+        writeSnoozed(subject, day.key, [...next])
         toast(`${item.task.ref} snoozed for today`)
       } else if (r.kind === "stale_day") {
         toast("The day changed. Refreshing.")

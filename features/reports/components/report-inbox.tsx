@@ -20,6 +20,7 @@ import { reportStateAt, isLateAt } from "../time"
 import { useUrlFilters } from "@/hooks/use-url-filters"
 import { REPORT_PAGE_SIZE, REPORT_STATE, REPORT_STATE_ORDER } from "../types"
 import type { InboxRow, ReportFilters, ReportsData } from "../types"
+import type { ExportRequest } from "../export"
 import { ExportMenu } from "./export-menu"
 
 const STATUSES = [{ value: "all", label: "All statuses" }, ...REPORT_STATE_ORDER.map((s) => ({ value: s, label: REPORT_STATE[s].label }))]
@@ -68,7 +69,7 @@ export function ReportInbox({
     if (!cursor || loading) return
     setLoading(true)
     try {
-      const page = await apiBrowser.get("/v1/shift-reports", { query: inboxQuery(filters, data.teams, { cursor, limit: REPORT_PAGE_SIZE }) as never })
+      const page = await apiBrowser.get("/v1/shift-reports", { query: inboxQuery(filters, data.teams, { cursor, limit: REPORT_PAGE_SIZE }) })
       setMore({ base: data.rows, rows: [...(fresh ? more.rows : []), ...page.items.map((d) => toInboxRow(d, tz))], cursor: page.nextCursor })
     } catch (e) {
       toast.error(userMessage(e).text)
@@ -77,12 +78,13 @@ export function ReportInbox({
     }
   }
 
-  const exportReq = {
+  const teamId = filters.team !== "all" ? data.teams.find((t) => t.name === filters.team)?.id : undefined
+  const exportReq: Omit<ExportRequest, "format"> = {
     from: filters.from || data.range.from,
     to: filters.to || data.range.to,
-    ...(filters.team !== "all" ? { team: data.teams.find((t) => t.name === filters.team)?.id } : {}),
+    ...(teamId ? { team: teamId } : {}),
     ...(filters.person !== "all" ? { person: filters.person } : {}),
-    ...(filters.status !== "all" ? { status: filters.status as never } : {}),
+    ...(filters.status !== "all" ? { status: filters.status as NonNullable<ExportRequest["status"]> } : {}),
   }
 
   return (

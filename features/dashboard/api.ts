@@ -15,13 +15,14 @@ import { todayMode } from "@/lib/today"
 type Reader = Pick<ApiClient, "get">
 
 /** The Today read model; a 403 (a support session) is `null` so the card is left out. */
-export async function loadToday(api: Reader, o: { meId: string; org: Org; mode?: "all" | "high-and-overdue"; cookies: { auto?: string; dismissed?: string } }): Promise<TodayData | null> {
+export async function loadToday(api: Reader, o: { meId: string; subject?: string; org: Org; mode?: "all" | "high-and-overdue"; cookies: { auto?: string; dismissed?: string } }): Promise<TodayData | null> {
   const nowAt = o.org.nowAt ?? ""
   try {
     const dto = await api.get("/v1/today", { query: { mode: o.mode ?? "all" } })
     // card or chip at first paint: the two cookies the browser mirrors its choice into, keyed by the SERVER's working day
-    const card = todayMode(o.cookies.auto, o.cookies.dismissed, o.meId, dto.workingDay.key)
-    return toToday(dto, { meId: o.meId, tz: o.org.timezone, nowAt, now: o.org.today, tzLabel: o.org.tzLabel, mode: card })
+    const subject = o.subject ?? o.meId
+    const card = todayMode(o.cookies.auto, o.cookies.dismissed, subject, dto.workingDay.key)
+    return toToday(dto, { meId: o.meId, subject, tz: o.org.timezone, nowAt, now: o.org.today, tzLabel: o.org.tzLabel, mode: card })
   } catch (e) {
     if (e instanceof ApiError && e.status === 403) return null
     throw e

@@ -9,7 +9,8 @@ import type { AccountTabId } from "@/features/account"
 import { getUser } from "@/features/shell"
 import { getMfaState } from "@/lib/device-session"
 import { getOrg } from "@/lib/org"
-import { getPeople, todayUserId } from "@/lib/people"
+import { getPeople } from "@/lib/people"
+import { todaySubject } from "@/lib/today-prefs"
 import { requireMfaOk } from "@/lib/session"
 
 export const dynamicParams = false
@@ -41,7 +42,7 @@ export default async function Page({ params }: { params: Promise<{ tab: string }
   const panels: Record<AccountTabId, React.ReactNode> = {
     profile: <ProfilePanel data={profile} name={user.name} email={user.email} initials={user.initials} role={role} tzLabel={org.tzLabel} department={department} />,
     security: <SecurityPanel data={security} mfaRequired={mfa.required} email={user.email} today={org.today} tzLabel={org.tzLabel} device={{ label: session.device.label, registered: session.device.id !== null }} ownDevices={ownDevices} />,
-    notifications: <AccountNotificationsPanel data={prefs} todayUser={todayUserId(session, people, user.name)} />,
+    notifications: <AccountNotificationsPanel data={prefs} todayUser={todaySubject(session.tenant.slug, session.user.id)} />,
   }
 
   // All panels render up front so the client switches tabs in place.

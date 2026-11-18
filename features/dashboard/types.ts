@@ -117,6 +117,8 @@ export type TodayItem = { task: TodayItemTask; group: DayGroup; reason: string }
 /** The Today card as the UI holds it: the numbers, the order and the written summary are the SERVER's (cached 30 s per user; the card refreshes after its own writes). */
 export type TodayData = {
   meId: string
+  /** The owner of this card's browser preferences: tenant slug and user id (lib/today-prefs todaySubject). */
+  subject: string
   day: WorkingDay
   /** The tenant's IANA zone (the card refetches with it). */
   tz: string

@@ -127,3 +127,5 @@
 :root[data-theme="dark"] .sr-open{color:var(--brand-3)}
 :root[data-theme="dark"] .sr-open:hover{color:var(--ink)}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .sr-open{color:var(--brand-3)}:root:not([data-theme="light"]) .sr-open:hover{color:var(--ink)}}
+/* Conflict banner actions (Keep mine / Reload theirs). */
+.sr-banner-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}

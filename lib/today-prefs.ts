@@ -4,6 +4,9 @@ import { TODAY_COOKIE_AUTO, TODAY_COOKIE_DISMISSED, dismissedValue } from "./tod
 // The Today card reads it on the home screen; Account → Notifications writes the two switches. Every access is guarded:
 // storage can be blocked (private window, site data off), and the app must still work without it.
 
+/** The owner of every Today preference: the tenant slug AND the user id, so one person in two companies keeps two choices. Old keys (the bare user id) are simply not read, no migration. */
+export const todaySubject = (tenantSlug: string, userId: string): string => `${tenantSlug}:${userId}`
+
 const K = (name: string, userId: string) => `opsdesk:today:${name}:${userId}`
 
 function get(key: string): string | null {

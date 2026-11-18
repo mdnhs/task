@@ -109,8 +109,8 @@ describe("T6.7 report scope and writes", () => {
   })
   test("the editor reaches the API through the autosave hook and the idempotent submitter only", () => {
     const e = strip(read("features/reports/components/report-editor.tsx"))
-    expect(e).toContain("useDraftAutosave(")
-    expect(e).toContain("makeSubmitter(")
+    expect(e).toContain("makeDraftSession(")
+    expect(read("features/reports/session.ts")).toContain("makeSubmitter(")
     expect(e).not.toMatch(/crypto\.randomUUID\(\)(?!\.slice)/) // the request id is made inside the submitter, once per attempt
     expect(e).not.toMatch(/saveDraft\(/) // saves go through the debounced saver
   })

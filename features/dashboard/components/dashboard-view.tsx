@@ -2,6 +2,7 @@ import type { ReactNode } from "react"
 
 import type { ManagerHome } from "../adapters"
 import type { CoverageData, DashboardPerms, HeaderData, ManagerAttentionData, ReportDeadlineCardData, TeamTasksData, TodayData } from "../types"
+import { DeptNote } from "./dept-note"
 import { CoverageFiles } from "./coverage-files"
 import { ManagerAttention } from "./manager-attention"
 import { PageHeader } from "./page-header"
@@ -28,6 +29,7 @@ export function DashboardView({
   deadline,
   coverage,
   remind = false,
+  queue = false,
   clock,
 }: {
   header: HeaderData
@@ -46,6 +48,8 @@ export function DashboardView({
   coverage?: CoverageData
   /** The "Remind N missing" button (a mock until reminders have a backend): shown on a demo deployment only. */
   remind?: boolean
+  /** The "View queue" link to the mock Manager Attention page: a demo deployment only. */
+  queue?: boolean
   /** The tenant zone and wall "now" the table's date words use when it loads more rows. */
   clock: { tz: string; today: string }
 }) {
@@ -53,6 +57,7 @@ export function DashboardView({
     <>
       <PageHeader data={header} perms={perms} newTask={newTask} />
       {today && <TodayCard data={today} />}
+      <DeptNote />
       <SectionCards data={data.summary} />
       <section className="grid-3 dash-fix dash-fix-a">
         <TasksClosedChart data={data.tasksClosed} />
@@ -61,7 +66,7 @@ export function DashboardView({
       </section>
       {(attention || coverage) && (
         <section className="grid-2 dash-fix dash-fix-c" style={coverage ? undefined : { gridTemplateColumns: "minmax(0,1fr)" }}>
-          {attention && <ManagerAttention data={attention} />}
+          {attention && <ManagerAttention data={attention} queue={queue} />}
           {coverage && <CoverageFiles data={coverage} />}
         </section>
       )}

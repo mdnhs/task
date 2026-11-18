@@ -14,7 +14,7 @@ import type { AttentionRow, ManagerAttentionData } from "../types"
  * derives it from the tasks and reports in the caller's scope; it has no department on a row, so the topbar department filter does not narrow it. The manager can still drag rows to set their own
  * priority order (this view only). The decide-and-carry-forward queue is the mock /manager-attention page (G1).
  */
-export function ManagerAttention({ data }: { data: ManagerAttentionData }) {
+export function ManagerAttention({ data, queue = false }: { data: ManagerAttentionData; /** The mock /manager-attention queue exists only on a demo deployment (ENABLE_MOCK_MODULES, J2): no link otherwise. */ queue?: boolean }) {
   const [base, setBase] = useState(data.items)
   const [order, setOrder] = useState<AttentionRow[]>(data.items)
   const [dragging, setDragging] = useState<string | null>(null)
@@ -32,10 +32,12 @@ export function ManagerAttention({ data }: { data: ManagerAttentionData }) {
           <h2>{data.title}</h2>
           <div className="sub">{data.subtitle}</div>
         </div>
-        <Link href="/manager-attention" className="pill-btn">
-          <Icon name="flag" />
-          View queue
-        </Link>
+        {queue && (
+          <Link href="/manager-attention" className="pill-btn">
+            <Icon name="flag" />
+            View queue
+          </Link>
+        )}
       </div>
       <Reorder.Group as="div" axis="y" values={order} onReorder={setOrder} className="list" id="attention">
         <AnimatePresence initial={false}>

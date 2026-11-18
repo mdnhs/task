@@ -238,11 +238,11 @@ export function ReportDeadlineSkeleton({ data, canRemind, typical }: { data?: Re
 }
 
 // Real titles and notes as ghost text: they wrap to 2 or 3 lines on phones.
-export function ManagerAttentionSkeleton({ data }: { data?: ManagerAttentionData }) {
+export function ManagerAttentionSkeleton({ data, queue = false }: { data?: ManagerAttentionData; queue?: boolean }) {
   const items = data?.items ?? Array.from({ length: 4 }, () => null)
   return (
     <div className="card">
-      <CardHead action={129} subW={47} />
+      <CardHead action={queue ? 129 : undefined} subW={47} />
       <div className="list">
         {items.map((it, i) => (
           <div key={i} className="item">
@@ -409,7 +409,7 @@ export function DashboardSkeleton({ perms = ALL, teamTasks = [], noteWraps, note
         <ReportDeadlineSkeleton data={deadline} canRemind={perms.reports} typical="team" />
       </section>
       <section className="grid-2 dash-fix dash-fix-c" style={withCoverage || coverage ? undefined : { gridTemplateColumns: "minmax(0,1fr)" }}>
-        <ManagerAttentionSkeleton data={attention} />
+        <ManagerAttentionSkeleton data={attention} queue={withCoverage} />
         {(withCoverage || coverage) && <CoverageFilesSkeleton items={coverage} />}
       </section>
       <TeamTasksSkeleton canAssign={perms.tasks} tasks={teamTasks} rows={teamRows} total={teamTotal} />

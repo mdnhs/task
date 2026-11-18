@@ -159,8 +159,9 @@ export function makeAutosaver<F, S extends { version: number }>(o: AutosaverOpti
         o.onSaved(saved)
       } catch (e) {
         if (e instanceof ApiError && e.code === "version_conflict") {
+          // the user's text is NOT dropped: it stays pending (a newer edit wins) until they choose Keep mine or Reload theirs
           stopped = true
-          pending = null
+          if (!pending) pending = { form }
           o.onConflict()
         } else {
           o.onError(e)
@@ -176,8 +177,8 @@ export function makeAutosaver<F, S extends { version: number }>(o: AutosaverOpti
 
   return {
     schedule(form: F): void {
-      if (stopped) return
       pending = { form }
+      if (stopped) return
       if (timer !== null) clearTimer(timer)
       timer = setTimer(() => {
         timer = null
@@ -200,7 +201,15 @@ export function makeAutosaver<F, S extends { version: number }>(o: AutosaverOpti
       timer = null
       pending = null
     },
-    /** After the report was reloaded (a conflict): start again from the server's version. */
+    /** Keep mine: continue on the server's NEW version; the pending local text is saved at once. */
+    keep(v: number): void {
+      version = v
+      stopped = false
+      if (pending) void run()
+    },
+    /** Saving is paused by a conflict, waiting for the user's choice. */
+    isStopped: (): boolean => stopped,
+    /** After the report was reloaded (Reload theirs): start again from the server's version, local text dropped. */
     resume(v: number): void {
       version = v
       stopped = false

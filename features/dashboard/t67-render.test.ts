@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server"
 import { describe, expect, test, vi } from "vitest"
 import { ME, MGR, TASK, TZ, dashboardDto, memberDeadlineDto, staffDto, todayDto } from "@/test/support/report-dto"
 import { toAttention, toDashboard, toDeadlineCard, toStaff, toTeamTasks, toToday } from "./adapters"
+import { DeptContext } from "@/hooks/use-dept"
 import { DashboardView } from "./components/dashboard-view"
 import { StaffDashboardView } from "./components/staff-dashboard-view"
 import { DashboardSkeleton, StaffDashboardSkeleton } from "./components/skeletons"
@@ -59,6 +60,21 @@ describe("the home screens render the API's numbers", () => {
     expect(mgr).toContain("reports to review")
     expect(mgr).toContain("Waiting for my review")
     void memberDeadlineDto
+  })
+  test("O2: the 'View queue' link (the mock /manager-attention page) shows only on a demo deployment", () => {
+    const home = toDashboard(dashboardDto(), { tz: TZ, nowAt: org.nowAt, tzLabel: "Irish time", dueAfterMinutes: 60 })
+    const attention = toAttention({ items: [], total: 0, nextCursor: null })
+    const base = { header: { title: "Dashboard", subtitle: "x" }, data: home, teamTasks: null, attention, perms: { tasks: true, reports: true, attention: true }, clock: { tz: TZ, today: org.today } }
+    expect(renderToStaticMarkup(createElement(DashboardView, base))).not.toContain("View queue")
+    expect(renderToStaticMarkup(createElement(DashboardView, base))).not.toContain('href="/manager-attention"')
+    expect(renderToStaticMarkup(createElement(DashboardView, { ...base, queue: true }))).toContain('href="/manager-attention"')
+  })
+  test("O2: a department picked in the topbar shows why the summary does not change; 'all' shows nothing", () => {
+    const home = toDashboard(dashboardDto(), { tz: TZ, nowAt: org.nowAt, tzLabel: "Irish time", dueAfterMinutes: 60 })
+    const props = { header: { title: "Dashboard", subtitle: "x" }, data: home, teamTasks: null, attention: null, perms: { tasks: true, reports: true, attention: true }, clock: { tz: TZ, today: org.today } }
+    const render = (dep: string) => renderToStaticMarkup(createElement(DeptContext.Provider, { value: dep }, createElement(DashboardView, props)))
+    expect(render("all")).not.toContain("all departments")
+    expect(render("Security")).toContain("Figures and attention show all departments.")
   })
   test("the skeletons render the typical home for a manager and for staff (no data in)", () => {
     expect(renderToStaticMarkup(createElement(DashboardSkeleton, { today: { mode: "chip", tiles: 5, team: true }, cards: 4, teamRows: 5, teamTotal: 25 }))).toContain("Loading dashboard")

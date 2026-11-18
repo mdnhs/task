@@ -19,8 +19,8 @@ import { classifyApiError, userMessage } from "@/lib/api/problem"
 import { formatDate, formatTime } from "@/lib/dates"
 import { extraSections, isRequired, sectionOn, validateReport, windowLabel } from "@/lib/shift-report"
 import { fieldErrorsOf, forValidation } from "../adapters"
-import { ReportFileRefused, makeReportsClient, makeSubmitter } from "../client"
-import { useDraftAutosave } from "../use-draft-autosave"
+import { ReportFileRefused, makeReportsClient } from "../client"
+import { makeDraftSession, type SessionSnapshot } from "../session"
 import { reportStateAt } from "../time"
 import { ITEM_STATUS, ITEM_STATUS_ORDER } from "../types"
 import type { ItemStatus, ReportItem, ShiftReport, TemplateSection } from "../types"
@@ -34,7 +34,7 @@ const rowId = () => `u-${crypto.randomUUID().slice(0, 8)}`
 /**
  * The member's report (FR-M1-23/24) on the API (B6 T6.7): one row per shift task (status, time, note), summary, blockers, unplanned work, attachments and the team template's extra fields.
  *  - Edits autosave through a debounced (800 ms) PUT …/draft that carries the report `version` and adopts the one the server answers with; "Save draft" flushes it at once. A 409
- *    version_conflict (another tab, or a manager) reloads the report and says so.
+ *    version_conflict (another tab, or a manager) KEEPS the typed text and shows "Someone changed this report. Your text is kept." with Keep mine / Reload theirs (session.ts).
  *  - Submit flushes the draft, validates against the team template, then sends { version, requestId }. The request id is made once per attempt and REUSED on a retry (F7), so a network
  *    error followed by another tap can never submit twice; a double tap sends one request. A submit locks the report (FR-M1-27); the API updates the tasks of the rows (FR-M1-26).
  *  - Row notes stay in the report (H4); task history only gets a neutral line from the API.
@@ -57,24 +57,18 @@ export function ReportEditor({
 }) {
   const router = useRouter()
   const client = useState(() => makeReportsClient(apiBrowser, tz))[0]
-  const submitter = useState(() => makeSubmitter(client))[0]
-  const [r, setForm] = useState<ShiftReport>(report)
-  const form = useRef<ShiftReport>(report)
+  const [snap, setSnap] = useState<SessionSnapshot>({ form: report, conflict: null })
+  // the session owns the form, the debounced autosave and the idempotent submit; a 409 never discards the user's text (banner: Keep mine / Reload theirs)
+  const [session] = useState(() => makeDraftSession({ client, report, onChange: setSnap, onError: (e) => toast.error(`Draft not saved. ${userMessage(e).text}`) }))
+  const r = snap.form
+  const conflict = snap.conflict
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [summaryOpen, setSummaryOpen] = useState(false)
-  const [notice, setNotice] = useState<string | null>(null)
   const [uploading, setUploading] = useState<string[]>([])
   const summaryRef = useRef<HTMLDivElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const live = useRef(true)
   const state = reportStateAt(r, nowAt)
-
-  const auto = useDraftAutosave({
-    client,
-    version: report.version,
-    onConflict: () => void reload("This report was changed somewhere else. It was reloaded: check your last edit."),
-    onError: (e) => toast.error(`Draft not saved. ${userMessage(e).text}`),
-  })
 
   useEffect(() => {
     live.current = true
@@ -83,19 +77,8 @@ export function ReportEditor({
       live.current = false
     }
   }, [summaryOpen])
-
-  async function reload(message: string) {
-    try {
-      const fresh = await client.get(report.reportId ?? "")
-      form.current = fresh
-      setForm(fresh)
-      auto.resume(fresh.version)
-      setNotice(message)
-      if (fresh.status !== "draft" && fresh.status !== "returned") router.refresh()
-    } catch (e) {
-      toast.error(userMessage(e).text)
-    }
-  }
+  // leaving the page: save what is pending (the request outlives the page)
+  useEffect(() => () => session.leave(), [session])
 
   const touch = (key: string, fn: (r: ShiftReport) => ShiftReport) => {
     setErrors((e) => {
@@ -104,21 +87,18 @@ export function ReportEditor({
       delete rest[key]
       return rest
     })
-    const next = fn(form.current)
-    form.current = next
-    setForm(next)
-    auto.schedule(next)
+    session.edit(fn(session.snapshot().form))
   }
   const setItem = (ref: string, key: string, patch: Partial<ReportItem>) =>
     touch(key, (x) => ({ ...x, items: x.items.map((i) => (i.taskRef === ref ? { ...i, ...patch } : i)) }))
 
   const save = async () => {
-    if (!(await auto.flush())) return false
+    if (!(await session.flush())) return false
     toast.success("Draft saved")
   }
 
   const submit = async () => {
-    const errs = validateReport(forValidation(form.current), template)
+    const errs = validateReport(forValidation(session.snapshot().form), template)
     if (errs.length) {
       setErrors(Object.fromEntries(errs.map((e) => [e.key, e.message])))
       setSummaryOpen(true)
@@ -127,8 +107,13 @@ export function ReportEditor({
     setErrors({})
     setSummaryOpen(false)
     try {
-      if (!(await auto.flush())) return false
-      const sent = await submitter.submit({ ...form.current, version: auto.version() })
+      const res = await session.submit()
+      if (res.kind === "choose") {
+        toast("Choose Keep mine or Reload theirs first.")
+        return false
+      }
+      if (res.kind !== "ok") return false
+      const sent = res.report
       toast.success(`Report ${r.status === "returned" ? "resubmitted" : "submitted"} ${formatTime(sent.submittedAt ?? now)} ${tzLabel}`, {
         description: `${sent.items.length} ${sent.items.length === 1 ? "task" : "tasks"} updated. Your manager can see it now.`,
       })
@@ -140,8 +125,6 @@ export function ReportEditor({
       if (Object.keys(fields).length) {
         setErrors(fields)
         setSummaryOpen(true)
-      } else if (kind === "version_conflict") {
-        await reload("This report was changed somewhere else. It was reloaded: check it and submit again.")
       } else if (classifyApiError(e).code === "report_locked") {
         toast.error(userMessage(e).text)
         router.refresh()
@@ -164,7 +147,7 @@ export function ReportEditor({
       setUploading((u) => [...u, f.name])
       try {
         // the attachment needs the report's uuid: it was opened before this page rendered
-        const att = await client.upload(form.current, f)
+        const att = await client.upload(session.snapshot().form, f)
         touch("attachments", (x) => ({ ...x, attachments: [...x.attachments, att] }))
       } catch (e) {
         if (e instanceof ReportFileRefused) {
@@ -308,10 +291,14 @@ export function ReportEditor({
           <span>{Object.values(errors).filter((v, i, a) => a.indexOf(v) === i).join(" · ")}</span>
         </div>
       )}
-      {notice && (
-        <div className="td-state warn sr-banner" role="status">
-          <strong>Report reloaded</strong>
-          <span>{notice}</span>
+      {conflict && (
+        <div className="td-state warn sr-banner" role="alert">
+          <strong>Someone changed this report</strong>
+          <span>Your text is kept.</span>
+          <div className="sr-banner-actions">
+            <button type="button" className="btn btn-primary" onClick={() => void session.keepMine()}>Keep mine</button>
+            <button type="button" className="btn btn-outline" onClick={() => session.reloadTheirs()}>Reload theirs</button>
+          </div>
         </div>
       )}
       {returned && (

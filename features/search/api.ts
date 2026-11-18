@@ -1,5 +1,4 @@
 import { getData } from "@/lib/data"
-import type { TenantEntitlements } from "@/lib/entitlements"
 import { ME_ID } from "@/lib/people"
 import type { Module, Role } from "@/lib/types"
 import { mockSearchEnabled } from "./adapters"
@@ -37,7 +36,7 @@ async function getSources(): Promise<RawSources> {
 }
 
 /** The role-filtered index plus quick actions and popular searches. Call on the server only. */
-export async function getSearchData(role: Role, _session: { entitlements: TenantEntitlements }): Promise<{ items: SearchItem[]; config: SearchConfig }> {
+export async function getSearchData(role: Role): Promise<{ items: SearchItem[]; config: SearchConfig }> {
   // MOCK: no backend until B8 to B11. The mock-backed kinds are indexed only on a demo deployment (ENABLE_MOCK_MODULES=1); data hits come from the API as the user types.
   if (!mockSearchEnabled(process.env)) {
     const [popular, actions] = await Promise.all([
