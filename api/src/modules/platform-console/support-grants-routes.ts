@@ -5,9 +5,9 @@ import { Forbidden } from "../../core/errors"
 import { requirePlatformStaff } from "../../core/middleware/platform"
 import { SUPPORT_STAFF_ROLES } from "../../core/middleware/support"
 import { requireTenant } from "../../core/middleware/tenant"
-import { PLATFORM_ROLES } from "../platform-staff"
 import { newRouter } from "../../core/router"
-import { createSupportGrant, listSupportGrants, listSupportGrantsForStaff, type StaffGrantItem, revokeSupportGrantAsStaff, revokeSupportGrantAsTenant, type GrantView } from "./support-grants"
+import { PLATFORM_ROLES } from "../platform-staff"
+import { createSupportGrant, listSupportGrants, listSupportGrantsForStaff, revokeSupportGrantAsStaff, revokeSupportGrantAsTenant, type GrantView, type StaffGrantItem } from "./support-grants"
 
 const TID = "0b9d6f3e-5c1a-4f6e-9a57-2f1d3c8e7a10"
 const GID = "7c2e9a41-3b5d-4e8f-9a10-6d4c2b1e0f93"
@@ -32,11 +32,12 @@ const CreateBody = z.object({
 }).openapi({ example: { reason: "Ticket 4411: report totals look wrong", hours: 2 } })
 const StaffGrant = z.object({
   id: z.string(), tenantId: z.string(), tenantName: z.string(), grantedBy: z.string(), staffName: z.string().nullable(),
-  scope: z.literal("read_only"), reason: z.string(), status: z.enum(["active", "expired", "revoked"]),
+  scope: z.literal("read_only"), reason: z.string().nullable().openapi({ description: "Null for the viewer and billing roles (least privilege)" }), status: z.enum(["active", "expired", "revoked"]),
+  canRevoke: z.boolean().openapi({ description: "True when the caller may revoke it now: active, and the caller is the platform owner or the grantee" }),
   createdAt: z.string(), expiresAt: z.string(), revokedAt: z.string().nullable(),
 })
 const StaffGrantList = z.object({ items: z.array(StaffGrant), nextCursor: z.string().nullable() }).openapi({
-  example: { items: [{ id: GID, tenantId: TID, tenantName: "Coppers Cafe", grantedBy: SID, staffName: "Aoife Support", scope: "read_only", reason: GrantExample.reason, status: "active", createdAt: NOW, expiresAt: LATER, revokedAt: null }], nextCursor: null },
+  example: { items: [{ id: GID, tenantId: TID, tenantName: "Coppers Cafe", grantedBy: SID, staffName: "Aoife Support", scope: "read_only", reason: GrantExample.reason, status: "active", canRevoke: true, createdAt: NOW, expiresAt: LATER, revokedAt: null }], nextCursor: null },
 })
 const StaffListQuery = z.object({
   tenantId: z.string().max(64).optional().openapi({ example: TID }),
@@ -79,7 +80,7 @@ const revokeTenantRoute = createRoute({
 })
 
 const staffItem = (g: StaffGrantItem) => ({
-  id: g.id, tenantId: g.tenantId, tenantName: g.tenantName, grantedBy: g.grantedBy, staffName: g.staffName, scope: "read_only" as const, reason: g.reason, status: g.status,
+  id: g.id, tenantId: g.tenantId, tenantName: g.tenantName, grantedBy: g.grantedBy, staffName: g.staffName, scope: "read_only" as const, reason: g.reason, status: g.status, canRevoke: g.canRevoke,
   createdAt: g.startsAt.toISOString(), expiresAt: g.expiresAt.toISOString(), revokedAt: g.revokedAt?.toISOString() ?? null,
 })
 const iso = (g: GrantView) => ({ ...g, startsAt: g.startsAt.toISOString(), expiresAt: g.expiresAt.toISOString(), revokedAt: g.revokedAt?.toISOString() ?? null })

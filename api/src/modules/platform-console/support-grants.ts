@@ -139,7 +139,8 @@ export async function listSupportGrants(deps: Deps, tenantId: string): Promise<(
   return rows.map((r) => ({ ...view(r.g, now), staffName: r.staffName }))
 }
 
-export type StaffGrantItem = GrantView & { tenantName: string; staffName: string | null }
+const SEES_REASON: PlatformRole[] = ["owner", "support"]
+export type StaffGrantItem = Omit<GrantView, "reason"> & { reason: string | null; tenantName: string; staffName: string | null; canRevoke: boolean }
 
 /**
  * The staff list (read-only, every platform role): grants across tenants, newest first by (starts_at, id) with a keyset cursor (the tasks codec). RLS is never bypassed:
@@ -147,7 +148,7 @@ export type StaffGrantItem = GrantView & { tenantName: string; staffName: string
  * withTenant(), the status filter and cursor pushed into SQL and capped at limit+1 per tenant before the merge. O(tenants that ever held a grant) round trips, accepted for
  * Phase 1 (see eachTenant in tenants.ts for the scale limit). Writes no audit row (a read); one info log line names the staff member and how many tenants were read.
  */
-export async function listSupportGrantsForStaff(deps: Deps, staff: { userId: string }, q: { tenantId?: string; status?: GrantStatus; limit: number; cursor?: string }): Promise<{ items: StaffGrantItem[]; nextCursor: string | null }> {
+export async function listSupportGrantsForStaff(deps: Deps, staff: { userId: string; role: PlatformRole }, q: { tenantId?: string; status?: GrantStatus; limit: number; cursor?: string }): Promise<{ items: StaffGrantItem[]; nextCursor: string | null }> {
   const now = deps.clock.now()
   const after = q.cursor ? decodeCursor(q.cursor) : undefined
   let candidates: { id: string; name: string }[]
@@ -171,7 +172,11 @@ export async function listSupportGrantsForStaff(deps: Deps, staff: { userId: str
       tx.select({ g: supportGrants, staffName: user.name }).from(supportGrants).leftJoin(user, eq(user.id, supportGrants.staffUserId))
         .where(and(eq(supportGrants.tenantId, t.id), statusCond(), afterCond)).orderBy(desc(supportGrants.startsAt), desc(supportGrants.id)).limit(q.limit + 1),
     )
-    for (const r of rows) all.push({ ...view(r.g, now), tenantName: t.name, staffName: r.staffName })
+    for (const r of rows) {
+      const v = view(r.g, now)
+      // least privilege: the free-text reason (ticket numbers, customer names) goes to the roles that can grant access only; canRevoke mirrors revokeSupportGrantAsStaff
+      all.push({ ...v, reason: SEES_REASON.includes(staff.role) ? v.reason : null, tenantName: t.name, staffName: r.staffName, canRevoke: v.status === "active" && (staff.role === "owner" || v.staffUserId === staff.userId) })
+    }
   }
   all.sort((a, b) => b.startsAt.getTime() - a.startsAt.getTime() || (a.id < b.id ? 1 : a.id > b.id ? -1 : 0))
   const page = all.slice(0, q.limit)

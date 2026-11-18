@@ -92,7 +92,7 @@ describe("T6.8 contract (real API): the platform console", () => {
     const tenantApi = makeApiClient({ baseUrl: "http://api.test", fetch: async (i, init) => { const u = new URL(typeof i === "string" ? i : i instanceof URL ? i.href : i.url); const h = new Headers(init?.headers); h.set("cookie", cookie); h.set("x-tenant", "coppers"); return t.app.request(u.pathname + u.search, { method: init?.method ?? "GET", headers: h }) } })
     expect((await tenantApi.get("/v1/settings/support-grants")).items.map((x) => x.id)).toContain(g.id)
     const listed = await loadSupportGrants(o.api)
-    expect(listed.items).toMatchObject([{ id: g.id, tenantId: tenant.id, tenantName: "Coppers Cafe", status: "active", revokedAt: null }])
+    expect(listed.items).toMatchObject([{ id: g.id, tenantId: tenant.id, tenantName: "Coppers Cafe", status: "active", revokedAt: null, canRevoke: true, reason: "Ticket 4411" }])
     expect(noUndefined(listed)).toEqual([])
     await o.client.revokeGrant(g.id)
     expect((await loadSupportGrants(o.api, { status: "revoked" })).items.map((x) => x.id)).toEqual([g.id])

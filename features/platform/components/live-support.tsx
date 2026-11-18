@@ -14,10 +14,10 @@ import { GRANT_HOURS_MAX, REASON_MAX } from "../client"
 import { dateTimeUtc } from "../format"
 import { usePlatform } from "./use-platform"
 
-type Grant = Pick<LiveGrant, "id" | "tenantId" | "expiresAt" | "revokedAt"> & Partial<Pick<LiveGrant, "tenantName" | "status" | "staffName">>
+type Grant = Pick<LiveGrant, "id" | "tenantId" | "expiresAt" | "revokedAt"> & Partial<Pick<LiveGrant, "tenantName" | "status" | "staffName" | "canRevoke">>
 
 /**
- * Read-only support access for the CALLER (B6 T6.8): a reason (1 to 500) and hours (1 to 24). `grants` is the newest 50 from GET /v1/platform/support-grants (any status, any tenant), with Revoke on the active ones; a grant made here is added to the top.
+ * Read-only support access for the CALLER (B6 T6.8): a reason (1 to 500) and hours (1 to 24). `grants` is the newest 50 from GET /v1/platform/support-grants (any status, any tenant), with Revoke only where the API says the caller may (`canRevoke`: platform owner, or the grantee's own); the API stays the authority; a grant made here is added to the top.
  * The tenant's owners see every grant (and can revoke it) under Settings, Support access (/settings/support-access), and are told at once.
  */
 export function GrantForm({ tenants, tenantId: fixed, initial, grants: initialGrants = [] }: { tenants: { id: string; name: string }[]; tenantId?: string; initial?: string; grants?: Grant[] }) {
@@ -32,13 +32,13 @@ export function GrantForm({ tenants, tenantId: fixed, initial, grants: initialGr
     const r = await act(`grant:${tenantId}`, () => client.createGrant(tenantId, reason, Number(hours)), "Support access granted")
     if (r.ok) {
       const g = r.value
-      setGrants((l) => [{ id: g.id, tenantId: g.tenantId, expiresAt: g.expiresAt, revokedAt: g.revokedAt, status: g.status }, ...l])
+      setGrants((l) => [{ id: g.id, tenantId: g.tenantId, expiresAt: g.expiresAt, revokedAt: g.revokedAt, status: g.status, canRevoke: true }, ...l]) // a grant made here is the caller's own
       setReason("")
     }
   }
   async function revoke(g: Grant) {
     const r = await act(`revoke:${g.id}`, () => client.revokeGrant(g.id), "Access revoked")
-    if (r.ok) setGrants((l) => l.map((x) => (x.id === g.id ? { ...x, revokedAt: r.value.revokedAt } : x)))
+    if (r.ok) setGrants((l) => l.map((x) => (x.id === g.id ? { ...x, revokedAt: r.value.revokedAt, status: "revoked" as const, canRevoke: false } : x)))
   }
 
   return (
@@ -62,7 +62,7 @@ export function GrantForm({ tenants, tenantId: fixed, initial, grants: initialGr
                 <span className="tt">{name(g)}</span>
                 <span className="pf-modlist-d">{g.revokedAt ? "Revoked" : g.status === "expired" ? `Expired ${dateTimeUtc(g.expiresAt)}` : `Until ${dateTimeUtc(g.expiresAt)}`}{g.staffName ? ` · ${g.staffName}` : ""}</span>
               </div>
-              {!g.revokedAt && g.status !== "expired" && <button type="button" className="btn btn-outline pf-act" onClick={() => void revoke(g)}>Revoke</button>}
+              {g.canRevoke && !g.revokedAt && g.status === "active" && <button type="button" className="btn btn-outline pf-act" onClick={() => void revoke(g)}>Revoke</button>}
             </li>
           ))}
         </ul>

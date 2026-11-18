@@ -13111,9 +13111,12 @@ export interface paths {
                                 staffName: string | null;
                                 /** @enum {string} */
                                 scope: "read_only";
-                                reason: string;
+                                /** @description Null for the viewer and billing roles (least privilege) */
+                                reason: string | null;
                                 /** @enum {string} */
                                 status: "active" | "expired" | "revoked";
+                                /** @description True when the caller may revoke it now: active, and the caller is the platform owner or the grantee */
+                                canRevoke: boolean;
                                 createdAt: string;
                                 expiresAt: string;
                                 revokedAt: string | null;

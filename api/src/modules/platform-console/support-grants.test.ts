@@ -408,7 +408,7 @@ describe("GET /v1/platform/support-grants (staff list)", () => {
       expect(ids(body)).toEqual([b.id, a.id])
       expect(body.nextCursor).toBeNull()
       expect(body.items[0]).toEqual({
-        id: b.id, tenantId: w.other.id, tenantName: expect.any(String), grantedBy: w.platOwner.userId, staffName: expect.anything(), scope: "read_only", reason: b.reason, status: "active",
+        id: b.id, tenantId: w.other.id, tenantName: expect.any(String), grantedBy: w.platOwner.userId, staffName: expect.anything(), scope: "read_only", reason: role === "owner" || role === "support" ? b.reason : null, status: "active", canRevoke: expect.any(Boolean),
         createdAt: b.startsAt, expiresAt: b.expiresAt, revokedAt: null,
       })
     }
@@ -476,9 +476,45 @@ describe("GET /v1/platform/support-grants (staff list)", () => {
     const before = [(await tenantAudit(w.tenant.id)).length, (await platAudit()).length]
     const info = vi.spyOn(w.deps.logger, "info")
     const r = await w.req("GET", LIST, w.support.cookie)
-    expect(Object.keys(((await r.json()) as Json).items[0]).sort()).toEqual(["createdAt", "expiresAt", "grantedBy", "id", "reason", "revokedAt", "scope", "staffName", "status", "tenantId", "tenantName"])
+    expect(Object.keys(((await r.json()) as Json).items[0]).sort()).toEqual(["canRevoke", "createdAt", "expiresAt", "grantedBy", "id", "reason", "revokedAt", "scope", "staffName", "status", "tenantId", "tenantName"])
     expect([(await tenantAudit(w.tenant.id)).length, (await platAudit()).length]).toEqual(before)
     expect(info).toHaveBeenCalledWith(expect.objectContaining({ staffUserId: w.support.userId, tenants: 1, returned: 1 }), "support_grant.list")
     info.mockRestore()
+  })
+
+  test("reason is returned to owner and support only; viewer and billing get null (status and staffName stay)", async () => {
+    const w = await world()
+    await w.grant(w.support)
+    for (const role of ["owner", "support", "billing", "viewer"] as const) {
+      const s = role === "owner" ? w.platOwner : role === "support" ? w.support : await makeStaff(w.deps, role)
+      const it = (((await (await w.req("GET", LIST, s.cookie)).json()) as Json).items as Json[])[0]
+      expect(it.reason, role).toBe(role === "owner" || role === "support" ? "Ticket 4411: report totals look wrong" : null)
+      expect(it).toMatchObject({ status: "active", staffName: expect.anything() })
+    }
+  })
+
+  test("canRevoke: platform owner any active grant, support only their own, billing and viewer none, inactive none", async () => {
+    const w = await world()
+    const other = await makeStaff(w.deps, "support")
+    const mine = (await (await w.grant(w.support, w.tenant.id)).json()) as Json
+    const theirs = (await (await w.grant(other, w.other.id)).json()) as Json
+    const flags = async (s: { cookie: string }) => Object.fromEntries((((await (await w.req("GET", LIST, s.cookie)).json()) as Json).items as Json[]).map((i) => [i.id, i.canRevoke]))
+    expect(await flags(w.platOwner)).toEqual({ [mine.id]: true, [theirs.id]: true })
+    expect(await flags(w.support)).toEqual({ [mine.id]: true, [theirs.id]: false })
+    expect(await flags(await makeStaff(w.deps, "viewer"))).toEqual({ [mine.id]: false, [theirs.id]: false })
+    expect((await w.req("DELETE", `/v1/platform/support-grants/${theirs.id}`, w.support.cookie)).status).toBe(403) // the API stays the authority
+    await w.req("DELETE", `/v1/platform/support-grants/${mine.id}`, w.support.cookie)
+    expect(await flags(w.platOwner)).toEqual({ [mine.id]: false, [theirs.id]: true })
+  })
+
+  test("a deleted tenant (its index row cascades away) does not crash the list or the tenant filter", async () => {
+    const w = await world()
+    const g = (await (await w.grant(w.support, w.tenant.id)).json()) as Json
+    const gone = (await (await w.grant(w.support, w.other.id)).json()) as Json
+    await ownerQuery("delete from tenants where id = $1", [w.other.id])
+    expect(ids((await (await w.req("GET", LIST, w.support.cookie)).json()) as Json)).toEqual([g.id])
+    const filtered = await w.req("GET", `${LIST}?tenantId=${w.other.id}`, w.support.cookie)
+    expect([filtered.status, await code(filtered)]).toEqual([404, "tenant_not_found"])
+    expect(gone.id).toBeTruthy()
   })
 })

@@ -11,6 +11,8 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
   const g = await gate("support.request", "platform support access")
   if ("denied" in g) return g.denied
   const { request } = await searchParams
-  const r = await settle(apiServer({ tenant: null }).then(async (api) => ({ list: await loadTenantList(api), grants: await loadSupportGrants(api) })))
-  return r.ok ? <LiveSupport tenants={r.v.list.rows} grants={r.v.grants.items} requestFor={typeof request === "string" ? request : undefined} /> : refused(r.e, "platform support access")
+  const api = await apiServer({ tenant: null })
+  const [r, gr] = await Promise.all([settle(loadTenantList(api)), settle(loadSupportGrants(api))])
+  // the grants list is a nicety: if it fails the form still works
+  return r.ok ? <LiveSupport tenants={r.v.rows} grants={gr.ok ? gr.v.items : []} requestFor={typeof request === "string" ? request : undefined} /> : refused(r.e, "platform support access")
 }

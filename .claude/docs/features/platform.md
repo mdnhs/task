@@ -23,8 +23,8 @@ without the console's nav or search.
   Metadata only; the 360 is aggregates (counts, one date), never a member name or email.
 - **Modules**: the module catalogue and plan table come from the static `billing/entitlements.json`, which can drift from the API's plans table (the API stays the authority and refuses unknown modules). The tab drafts changes, then one `PUT .../modules` sends the FULL overrides array with the reason (the API replaces the list). Core modules can't be revoked.
 - **Support access**: `POST .../support-grants` (reason, hours) for the caller and `DELETE /v1/platform/support-grants/{id}`, and (B7 T7) `GET /v1/platform/support-grants?tenantId&status&limit&cursor` (every staff role, newest first, keyset cursor, items
-  `{ id, tenantId, tenantName, grantedBy, staffName, scope: "read_only", reason, status, createdAt, expiresAt, revokedAt }`; a read, so no audit row, one info log line).
-  `/platform/support` lists the newest 50 grants (any status) from it, with Revoke on active ones; the tenant owner sees every grant under `/settings/support-access`.
+  `{ id, tenantId, tenantName, grantedBy, staffName, scope: "read_only", reason (null for viewer and billing: least privilege), status, canRevoke (active and the caller is platform owner or the grantee), createdAt, expiresAt, revokedAt }`; a read, so no audit row, one info log line).
+  `/platform/support` lists the newest 50 grants (any status) from it, with Revoke only where `canRevoke` is true (the API check stays the authority); the tenant owner sees every grant under `/settings/support-access`.
 - **Settings** (owner only): email (Resend), storage (R2) and billing (Stripe). The forms start empty; an empty secret keeps the stored one; only the last 4 come back. The Test / Live pill comes from the
   Stripe publishable key prefix (`pk_test_` / `pk_live_`), owner only.
 - **Times** show in UTC (the console is not inside a company). Money is the API's integer minor units per currency.

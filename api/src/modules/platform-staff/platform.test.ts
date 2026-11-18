@@ -333,3 +333,10 @@ test("GET /v1/platform/session: non-staff gets 404 not_found", async () => {
   const r = await w.req("GET", "/v1/platform/session", cookie)
   expect([r.status, await codeOf(r)]).toEqual([404, "not_found"])
 })
+
+test("GET /v1/platform/session: a suspended staff user gets 404 not_found", async () => {
+  const w = await world()
+  const suspended = await makeStaff(w.deps, "owner", { status: "suspended" })
+  const r = await w.req("GET", "/v1/platform/session", suspended.cookie)
+  expect([r.status, await codeOf(r)]).toEqual([404, "not_found"])
+})

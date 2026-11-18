@@ -71,9 +71,9 @@ export const toDataRequests = (dto: DsrDto): LiveDataRequests => ({
 })
 
 /** A support grant as the console lists it (GET /v1/platform/support-grants): the tenant name comes with the row, never a secret. */
-export type LiveGrant = { id: string; tenantId: string; tenantName: string; staffName: string | null; reason: string; status: "active" | "expired" | "revoked"; createdAt: string; expiresAt: string; revokedAt: string | null }
+export type LiveGrant = { id: string; tenantId: string; tenantName: string; staffName: string | null; reason: string | null; status: "active" | "expired" | "revoked"; canRevoke: boolean; createdAt: string; expiresAt: string; revokedAt: string | null }
 export const toGrants = (dto: GrantsDto): { items: LiveGrant[]; nextCursor: string | null } => ({
-  items: dto.items.map((g) => ({ id: g.id, tenantId: g.tenantId, tenantName: g.tenantName, staffName: g.staffName, reason: g.reason, status: g.status, createdAt: g.createdAt, expiresAt: g.expiresAt, revokedAt: g.revokedAt })),
+  items: dto.items.map((g) => ({ id: g.id, tenantId: g.tenantId, tenantName: g.tenantName, staffName: g.staffName, reason: g.reason, status: g.status, canRevoke: g.canRevoke, createdAt: g.createdAt, expiresAt: g.expiresAt, revokedAt: g.revokedAt })),
   nextCursor: dto.nextCursor,
 })
 
