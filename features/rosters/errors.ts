@@ -21,6 +21,9 @@ export type RosterError = { refetch: boolean; toast: RosterToast | null; code: s
   | { state: "conflict" | "locked" | "reason_required" | "billing" | "not_entitled" | "forbidden" | "not_found" | "session_expired" | "precondition_required" | "mfa" | "rate_limited" | "network" | "error" }
   | { state: "rule_blocked"; violations: RuleViolation[]; /** The rule blocks and only an office role may go over it (403 rule_blocked_office_required). */ needsOffice: boolean }
 )
+/** A refusal worth trying again with the same input (a reason dialog stays open with its text): not one that makes the action moot (the week locked, the thing gone, not allowed, not in the plan). */
+export const retryable = (e: RosterError): boolean => !["locked", "not_found", "forbidden", "not_entitled", "billing", "rule_blocked"].includes(e.state)
+
 export type RosterWriteResult<T> = { ok: true; value: T } | { ok: false; error: RosterError }
 
 /** The violations of a `rule_blocked` answer; one that does not parse is dropped, so the panel never shows a half-made line. */

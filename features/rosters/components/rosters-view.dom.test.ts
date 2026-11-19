@@ -20,6 +20,7 @@ import type { RuleViolation } from "@/lib/roster-rules"
 import { mapRosterError } from "../errors"
 import { LID, PERSON, SHIFTS, WEEK_ID, lockedAccess, openAccess, payloadFixture } from "../fixtures"
 import type { ApiChangeRequest, ApiExchange, HistoryEntry, RepeatConflict, RosterPayload, WeekAccess } from "../types"
+import { ReasonDialog } from "./reason-dialog"
 import { RostersView, type RosterPanels } from "./rosters-view"
 import { useKeepFocus } from "../use-keep-focus"
 
@@ -112,6 +113,61 @@ describe("the reason dialog (FR-RS-35)", () => {
     expect(hist.textContent).toContain("Changed a shift")
     expect(hist.textContent).toContain("Cover for sickness")
     expect(hist.textContent).toContain("Ben Walsh")
+  })
+
+  it("m6: a refused edit keeps the dialog open with the reason typed; the retry sends it and closes the dialog", async () => {
+    m.deleteShift.mockResolvedValueOnce(fail(500, "boom")).mockResolvedValueOnce(ok(null))
+    m.reloadRoster.mockResolvedValue(fail(500, "boom"))
+    await mount(view(publishedPayload(officeReason)))
+    await click(byLabel("Edit shift, Ann Byrne, 08:00 to 16:00")!)
+    await click(byText("Remove shift")!)
+    const input = document.getElementById("rd-reason") as HTMLInputElement
+    await typeInto(input, "Cover for sickness")
+    await submit(input.form!)
+    await flush()
+    expect(m.deleteShift).toHaveBeenCalledTimes(1)
+    expect(m.toast.error).toHaveBeenCalled()
+    const kept = document.getElementById("rd-reason") as HTMLInputElement | null
+    expect(kept).not.toBeNull() // still open
+    expect(kept!.value).toBe("Cover for sickness") // and the reason is not lost
+    await submit(kept!.form!)
+    await flush()
+    expect(m.deleteShift).toHaveBeenCalledTimes(2)
+    expect(m.deleteShift).toHaveBeenLastCalledWith("sh-mon-ann", { version: 1, reason: "Cover for sickness" })
+    expect(document.getElementById("rd-reason")).toBeNull() // closed on success
+  })
+
+  it("m6: the dialog confirms once while its request is on its way, and again after a refusal", async () => {
+    const d = deferred<boolean>()
+    const onConfirm = vi.fn().mockReturnValueOnce(d.promise).mockReturnValueOnce(true)
+    await mount(createElement(ReasonDialog, { title: "Say why", description: "d", confirmLabel: "Save", onConfirm, onClose: () => {} }))
+    const input = document.getElementById("rd-reason") as HTMLInputElement
+    await typeInto(input, "Cover for sickness")
+    await act(async () => { input.form!.requestSubmit(); input.form!.requestSubmit() })
+    expect(onConfirm).toHaveBeenCalledTimes(1)
+    await act(async () => { d.resolve(false); await Promise.resolve() })
+    await flush()
+    await submit(input.form!)
+    expect(onConfirm).toHaveBeenCalledTimes(2)
+    expect(onConfirm).toHaveBeenLastCalledWith("Cover for sickness")
+  })
+
+  it("m6: an override decision that fails keeps its reason for the retry", async () => {
+    m.decideChange.mockResolvedValueOnce(fail(422, "rule_blocked", { violations: [blocked] })).mockResolvedValueOnce(fail(500, "boom")).mockResolvedValueOnce(ok({ request: { ...requestOf(), status: "approved" }, shift: null, violations: [] }))
+    await mount(view(publishedPayload(office), { ...none, requests: [requestOf()] }))
+    await click(byText("Approve")!)
+    await flush()
+    const input = document.getElementById("rd-reason") as HTMLInputElement
+    await typeInto(input, "Agreed with the client")
+    await submit(input.form!)
+    await flush()
+    expect(m.decideChange).toHaveBeenCalledTimes(2)
+    const kept = document.getElementById("rd-reason") as HTMLInputElement | null
+    expect(kept?.value).toBe("Agreed with the client")
+    await submit(kept!.form!)
+    await flush()
+    expect(m.decideChange).toHaveBeenCalledTimes(3)
+    expect(document.getElementById("rd-reason")).toBeNull()
   })
 })
 
@@ -250,28 +306,52 @@ describe("change requests (FR-RS-36/37)", () => {
 })
 
 describe("open shifts and swaps follow the approver matrix (R8-11)", () => {
-  const board = (access: WeekAccess, status: "draft" | "published", delegated = false, ex: ApiExchange[] = [claimOf()]) => {
+  const board = (access: WeekAccess, status: "draft" | "published", delegated = false, ex: ApiExchange[] = [claimOf()], me = PERSON.ben) => {
     const p = payloadFixture({ status, access })
     p.locations = [{ ...p.locations[0]!, swapApprovalDelegated: delegated }]
-    return view(p, { ...none, exchanges: ex })
+    return view(p, { ...none, exchanges: ex }, me)
   }
+  const CLAIM = "Claim Wed 4 Nov 08:00–16:00"
   const labels = () => [...document.querySelectorAll('[aria-label="Open shifts and swaps"] button')].map((b) => b.getAttribute("aria-label") ?? b.textContent)
   it("office approves and rejects on a published week; a supervisor only recommends; a delegated supervisor approves", async () => {
     await mount(board(office, "published"))
-    expect(labels()).toEqual(["Reject Cara Doyle", "Approve Cara Doyle"])
+    expect(labels()).toEqual([CLAIM, "Reject Cara Doyle", "Approve Cara Doyle"])
     await act(async () => { root!.unmount() }); root = null; host!.remove(); document.body.innerHTML = ""
     await mount(board(lockedAccess, "published"))
-    expect(labels()).toEqual(["Recommend Cara Doyle"])
+    expect(labels()).toEqual([CLAIM, "Recommend Cara Doyle"])
     await act(async () => { root!.unmount() }); root = null; host!.remove(); document.body.innerHTML = ""
     await mount(board(lockedAccess, "published", true))
-    expect(labels()).toEqual(["Reject Cara Doyle", "Approve Cara Doyle"])
+    expect(labels()).toEqual([CLAIM, "Reject Cara Doyle", "Approve Cara Doyle"])
   })
   it("a supervisor on a draft week approves; an open shift with nobody offering shows Claim on a published week only", async () => {
     await mount(board(openAccess, "draft"))
     expect(labels()).toEqual([]) // a draft week has no open shifts to claim and nothing to decide on a claim
     await act(async () => { root!.unmount() }); root = null; host!.remove(); document.body.innerHTML = ""
     await mount(board(lockedAccess, "published", false, []))
-    expect(labels()).toEqual(["Claim Wed 4 Nov 08:00–16:00"])
+    expect(labels()).toEqual([CLAIM])
+  })
+  it("I1: nobody is offered a decision or a recommendation on their own claim (the API answers 403 self_decision); m3: Claim stays while only others have claimed", async () => {
+    await mount(board(lockedAccess, "published", false, [claimOf()], PERSON.cara))
+    expect(labels()).toEqual([]) // Cara's own claim: no Recommend, and no second Claim
+    expect(document.querySelector('[aria-label="Open shifts and swaps"]')!.textContent).toContain("Your claim")
+    await act(async () => { root!.unmount() }); root = null; host!.remove(); document.body.innerHTML = ""
+    await mount(board(office, "published", false, [claimOf()], PERSON.cara))
+    expect(labels()).toEqual([]) // nor Approve or Reject for an office role
+    await act(async () => { root!.unmount() }); root = null; host!.remove(); document.body.innerHTML = ""
+    await mount(board(lockedAccess, "published", false, [claimOf({ status: "approved" }), claimOf({ id: "ex-2", fromUserId: PERSON.ann })], PERSON.cara))
+    expect(labels()).toEqual([CLAIM, "Recommend Ann Byrne"]) // Cara's claim was decided; Ann's open claim does not take Cara's Claim away
+  })
+  it("I1: a swap the caller is party to (either side) offers nothing to them", async () => {
+    const swap = (o: Partial<ApiExchange> = {}) => claimOf({ id: "ex-s", kind: "swap", shiftId: "sh-mon-ann", date: "2026-11-02", fromUserId: PERSON.ann, toUserId: PERSON.cara, ...o })
+    await mount(board(office, "published", false, [swap()], PERSON.cara))
+    expect(labels()).toEqual([CLAIM]) // only the open Wednesday shift's Claim
+    expect(document.querySelector('[aria-label="Open shifts and swaps"]')!.textContent).toContain("Your swap")
+    await act(async () => { root!.unmount() }); root = null; host!.remove(); document.body.innerHTML = ""
+    await mount(board(office, "published", false, [swap()], PERSON.ann))
+    expect(labels()).toEqual([CLAIM])
+    await act(async () => { root!.unmount() }); root = null; host!.remove(); document.body.innerHTML = ""
+    await mount(board(office, "published", false, [swap()], PERSON.ben))
+    expect(labels()).toEqual([CLAIM, "Reject swap, Ann Byrne", "Approve swap, Ann Byrne"])
   })
   it("approve is one request per click, and a recommendation is sent as such", async () => {
     const d = deferred<unknown>()

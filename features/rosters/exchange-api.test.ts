@@ -19,6 +19,10 @@ describe("approver matrix (R8-11): the buttons the roster page offers", () => {
     expect(act(null, "draft")).toEqual({ approve: false, reject: false, recommend: false })
     expect(act(null, "published", true)).toEqual({ approve: false, reject: false, recommend: false })
   })
+  it("I1: a party to the exchange is offered nothing, whatever their level (403 self_decision)", () => {
+    for (const level of ["office", "supervisor"] as const) for (const weekStatus of ["draft", "published"] as const) expect(exchangeActions({ level, weekStatus, delegated: true, status: "requested", expired: false, party: true })).toEqual({ approve: false, reject: false, recommend: false })
+    expect(exchangeActions({ level: "supervisor", weekStatus: "published", delegated: false, status: "requested", expired: false, party: true }).recommend).toBe(false)
+  })
   it("decided or cancelled offer nothing; an expired one can be rejected, not approved", () => {
     for (const s of ["approved", "rejected", "cancelled"] as const) expect(act("office", "draft", false, s)).toEqual({ approve: false, reject: false, recommend: false })
     expect(act("office", "published", false, "requested", true)).toEqual({ approve: false, reject: true, recommend: false })

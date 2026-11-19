@@ -6,7 +6,7 @@ import Link from "next/link"
 
 import { Icon } from "@/components/icon"
 import { formatDate } from "@/lib/dates"
-import { canClaim, exchangeActions, openExchanges } from "../exchange"
+import { canClaim, exchangeActions, isParty, openExchanges } from "../exchange"
 import type { ApiExchange, WeekAccess, WeekShift } from "../types"
 
 /** One open shift of a published week in view, with the place and what it needs to know about its week for the approver matrix. */
@@ -15,8 +15,10 @@ export type SwapRow = { exchange: ApiExchange; place: string; weekStatus: "draft
 
 // Open shifts of the shown range with who offered to take them, and swap requests waiting (FR-RS-38/42/43, D6, R8-11). Which buttons show is `exchangeActions` (the matrix); the API decides every one
 // again. Each open shift is also a derived gap in Staff & Rosters (D12): a plain link, features never import each other.
-export function OpenShiftsPanel({ gapsLink, level, today, open, swaps, exchanges, nameOf, busy, onClaim, onRecommend, onDecide }: {
+export function OpenShiftsPanel({ gapsLink, level, me, today, open, swaps, exchanges, nameOf, busy, onClaim, onRecommend, onDecide }: {
   gapsLink: boolean
+  /** The caller's user id (empty when unknown): nothing is offered on an exchange they are party to, and Claim goes once they have an open claim on the shift. */
+  me: string
   level: WeekAccess["level"]
   today: string
   open: OpenRow[]
@@ -34,8 +36,10 @@ export function OpenShiftsPanel({ gapsLink, level, today, open, swaps, exchanges
   if (!open.length && !waiting.length) return null
   const when = (date: string, start: string, end: string) => `${formatDate(date)} ${start}–${end}`
   const buttons = (x: ApiExchange, row: { weekStatus: "draft" | "published"; delegated: boolean }, label: string) => {
-    const a = exchangeActions({ level, weekStatus: row.weekStatus, delegated: row.delegated, status: x.status, expired: x.expired })
+    const party = isParty(x, me)
+    const a = exchangeActions({ level, weekStatus: row.weekStatus, delegated: row.delegated, status: x.status, expired: x.expired, party })
     const working = busy.has(x.id)
+    if (party) return <span className="ros-role">{x.kind === "claim" ? "Your claim" : "Your swap"}: a manager decides</span>
     if (!a.approve && !a.reject && !a.recommend) return <span className="ros-role">{x.status === "recommended" ? "Recommended: the office approves" : "A higher-level user approves"}</span>
     return (
       <span className="ros-req-act">
@@ -64,7 +68,7 @@ export function OpenShiftsPanel({ gapsLink, level, today, open, swaps, exchanges
                     <span className="ros-who"><Icon name="hand" className="ros-os-i" size={24} />{when(s.date, s.start, s.end)} · {s.role}</span>
                     <span className="ros-role">{row.place}{claims.length === 0 ? " · nobody has offered yet" : ""}</span>
                   </div>
-                  {canClaim(row.weekStatus, s.personId, s.date, today) && claims.length === 0 && (
+                  {canClaim(row.weekStatus, s.personId, s.date, today) && !claims.some((c) => !!me && c.fromUserId === me) && (
                     <button type="button" className="btn btn-outline" disabled={busy.has(s.id)} aria-label={`Claim ${when(s.date, s.start, s.end)}`} onClick={() => onClaim(s.id)}><Icon name="hand" size={24} />Claim</button>
                   )}
                 </div>

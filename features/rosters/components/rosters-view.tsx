@@ -18,7 +18,7 @@ import type { RuleViolation } from "@/lib/roster-rules"
 import type { Status } from "@/lib/types"
 import { overrideFields } from "../editing"
 import { EditQueue, pendingView, runEdit, type Ask, type Edit, type EditorApi, type EditorState, type EditResult } from "../editor"
-import type { RosterError } from "../errors"
+import { retryable, type RosterError } from "../errors"
 import { decideBody, publishBody } from "../publishing"
 import type { RepeatConflict, RepeatCounts, ApiChangeRequest, ApiExchange, HistoryEntry, Page, RosterPayload, RosterQuery, WeekTemplateSummary } from "../types"
 import { violationLines, weekViewData, type RosterGroup, type RosterViewData, type RosterViewKind, type ViewDay } from "../view"
@@ -48,7 +48,7 @@ const refOf = (ref: string | null) => (ref ? { description: `Ref ${ref}` } : und
 
 type Dialog = { kind: "add"; weekId: string; locationId: string; date: string; n: number } | { kind: "edit"; id: string; n: number }
 /** An edit waiting for its reason: the week is published (office), or the API asked for one (an override, a decision over a block). */
-type Reasoning = { title: string; description: string; confirmLabel: string; lines?: string[]; run(reason: string): void }
+type Reasoning = { title: string; description: string; confirmLabel: string; lines?: string[]; /** Resolves true when the dialog may close: it went through, or the answer leaves nothing to retry. */ run(reason: string): Promise<boolean> }
 type Gate = { reason?: string; overrideRuleIds?: string[] }
 type Publishing = { weekId: string; violations: RuleViolation[]; checking: boolean }
 
@@ -128,10 +128,11 @@ export function RostersView({ payload, query, today, templates = [], panels = no
   }
 
   /** One edit at a time, in order: the second sees the first's answer (and its new `version`), and every waiting edit shows at once. */
-  function run(edit0: Edit, ok: { what: string; description?: string }) {
+  function run(edit0: Edit, ok: { what: string; description?: string }): Promise<boolean> {
     const edit: Edit = edit0.kind === "add" ? { ...edit0, localKey: `${++seq.current}` } : edit0
     setPending((p) => [...p, edit])
-    void queue.current.add(
+    let close = true // the range was left: nothing to retry here
+    return queue.current.add(
       async (current) => {
         const res = await runEdit(live.current, edit, api)
         if (!current() && res.toast) toast.error(res.toast.text, refOf(res.toast.ref)) // the range was left: no state to settle, but a refusal is still said
@@ -144,8 +145,9 @@ export function RostersView({ payload, query, today, templates = [], panels = no
         setOverride(null)
         announce(res, ok.what, ok.description)
         if (res.ask) ask(res.ask, edit, ok)
+        close = res.ok || res.ask !== null || !res.toast // a refusal with a toast keeps a reason dialog open, with its text, for the retry
       },
-    )
+    ).then(() => close, () => false)
   }
 
   function ask(a: Ask, edit: Edit, ok: { what: string; description?: string }) {
@@ -179,12 +181,12 @@ export function RostersView({ payload, query, today, templates = [], panels = no
   }
 
   /** One request per key at a time: a second click on the same button while it runs does nothing. */
-  async function once(key: string, fn: () => Promise<void>) {
-    if (inflight.current.has(key)) return
+  async function once(key: string, fn: () => Promise<boolean | void>): Promise<boolean> {
+    if (inflight.current.has(key)) return false
     inflight.current.add(key)
     setWorking(new Set(inflight.current))
     try {
-      await fn()
+      return (await fn()) !== false
     } finally {
       inflight.current.delete(key)
       setWorking(new Set(inflight.current))
@@ -292,7 +294,7 @@ export function RostersView({ payload, query, today, templates = [], panels = no
   }
 
   /** A decision that a new block stopped: the office goes over it with a reason (reason and rule ids together); anyone else sees the rule lines and that only the office can. */
-  function blockedDecision(violations: RuleViolation[], again: (over: { reason: string; violations: RuleViolation[] }) => void, level: string | null) {
+  function blockedDecision(violations: RuleViolation[], again: (over: { reason: string; violations: RuleViolation[] }) => Promise<boolean>, level: string | null) {
     setState((s) => ({ ...s, violations }))
     if (level === "office") {
       setReasoning({ title: "Go over the rule", description: "A rule is broken. Say why. It is kept in the history.", confirmLabel: "Approve anyway", lines: violationText(violations), run: (reason) => again({ reason, violations }) })
@@ -301,8 +303,8 @@ export function RostersView({ payload, query, today, templates = [], panels = no
     setDecisionNeedsOffice(true)
   }
 
-  function decide(r: ApiChangeRequest, decision: "approve" | "reject", note: string, over?: { reason: string; violations: RuleViolation[] }) {
-    void once(r.id, async () => {
+  function decide(r: ApiChangeRequest, decision: "approve" | "reject", note: string, over?: { reason: string; violations: RuleViolation[] }): Promise<boolean> {
+    return once(r.id, async () => {
       const res = await decideChange(r.id, decideBody(decision, note, over))
       if (res.ok) {
         toast.success(decision === "approve" ? "Change approved" : "Change rejected")
@@ -313,12 +315,13 @@ export function RostersView({ payload, query, today, templates = [], panels = no
       }
       if (res.error.state === "rule_blocked") { blockedDecision(res.error.violations, (o) => decide(r, "approve", note, o), data?.access.level ?? null); return }
       report(res.error)
+      return !retryable(res.error)
     })
   }
 
   // ---------------------------------------------------------------- open shifts, claims, swaps (FR-RS-38/42/43)
-  function exchangeDecide(x: ApiExchange, decision: "approve" | "reject", over?: { reason: string; violations: RuleViolation[] }) {
-    void once(x.id, async () => {
+  function exchangeDecide(x: ApiExchange, decision: "approve" | "reject", over?: { reason: string; violations: RuleViolation[] }): Promise<boolean> {
+    return once(x.id, async () => {
       const res = await decideExchange(x.id, decideBody(decision, "", over))
       if (res.ok) {
         toast.success(decision === "approve" ? "Approved" : "Rejected")
@@ -329,6 +332,7 @@ export function RostersView({ payload, query, today, templates = [], panels = no
       }
       if (res.error.state === "rule_blocked") { blockedDecision(res.error.violations, (o) => exchangeDecide(x, "approve", o), data?.access.level ?? null); return }
       report(res.error)
+      return !retryable(res.error)
     })
   }
 
@@ -538,7 +542,7 @@ export function RostersView({ payload, query, today, templates = [], panels = no
       {repeated && <ConflictsPanel conflicts={repeated.conflicts} counts={repeated.counts} shiftOf={shiftOf} nameOf={nameOf} onOpen={(id) => setDialog({ kind: "edit", id, n: (dialog?.n ?? 0) + 1 })} onDismiss={() => setRepeated(null)} />}
       <RequestsPanel requests={panels.requests.filter((r) => weekById(r.weekId))} shiftOf={shiftOf} nameOf={nameOf} canDecide={level === "office"} busy={working} onDecide={(r, d, note) => decide(r, d, note)} />
       <OpenShiftsPanel
-        gapsLink={panels.gapsLink} level={level} today={today} open={openRows} swaps={swapRows} exchanges={panels.exchanges} nameOf={nameOf} busy={working}
+        gapsLink={panels.gapsLink} level={level} me={me} today={today} open={openRows} swaps={swapRows} exchanges={panels.exchanges} nameOf={nameOf} busy={working}
         onClaim={claim} onRecommend={recommend} onDecide={(x, d) => exchangeDecide(x, d)}
       />
       {anyEditable && (
@@ -565,7 +569,7 @@ export function RostersView({ payload, query, today, templates = [], panels = no
           onClose={() => setDialog(null)}
         />
       )}
-      {reasoning && <ReasonDialog title={reasoning.title} description={reasoning.description} confirmLabel={reasoning.confirmLabel} lines={reasoning.lines} onConfirm={(r) => { reasoning.run(r); setReasoning(null) }} onClose={() => setReasoning(null)} />}
+      {reasoning && <ReasonDialog title={reasoning.title} description={reasoning.description} confirmLabel={reasoning.confirmLabel} lines={reasoning.lines} onConfirm={async (r) => { const cur = reasoning; if (await cur.run(r)) setReasoning((x) => (x === cur ? null : x)) }} onClose={() => setReasoning(null)} />}
       {publishing && (
         <PublishDialog
           title={`${placeOfWeek(publishing.weekId)}, ${formatDate(weekById(publishing.weekId)?.weekStart ?? "")}`}

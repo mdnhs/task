@@ -2,29 +2,37 @@
 
 import { ActionButton } from "@/components/action-button"
 import { Icon } from "@/components/icon"
-import { useState } from "react"
+import { useRef, useState } from "react"
 
 import { Field } from "@/components/field"
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 
 // A one-line reason (FR-RS-35): office edits to a published roster must say why, and so must going over a blocked rule. `lines` are the rule breaks the reason covers (named by the API). At most 500
-// characters (the API's cap). Small enough for a dialog, no scrolling.
+// characters (the API's cap). Small enough for a dialog, no scrolling. The page closes it when `onConfirm` went through; a refusal leaves it open with the reason as typed, for the retry. One
+// confirm at a time: a second submit while the first is on its way does nothing.
 export function ReasonDialog({ title, description, confirmLabel, lines, onConfirm, onClose }: {
   title: string
   description: string
   confirmLabel: string
   lines?: string[]
-  onConfirm(reason: string): void
+  onConfirm(reason: string): unknown
   onClose(): void
 }) {
   const [reason, setReason] = useState("")
   const [error, setError] = useState("")
-  function submit(e: React.FormEvent) {
+  const sending = useRef(false)
+  async function submit(e: React.FormEvent) {
     e.preventDefault()
     const v = reason.trim()
     if (!v) { setError("Give a reason"); return }
-    onConfirm(v)
+    if (sending.current) return
+    sending.current = true
+    try {
+      await onConfirm(v)
+    } finally {
+      sending.current = false
+    }
   }
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
