@@ -11,7 +11,7 @@ import type { Req } from "@/lib/api/client"
 import { apiServer } from "@/lib/api/server"
 import { requireMfaOk } from "@/lib/session"
 import {
-  loadRosterData, runRosterWrite, toApplied, toChangeRequest, toExchange, toLeave, toLocation, toRepeat, toShift, toShiftType, toViolations, toWeek, type RosterWriteResult,
+  loadRosterData, loadWeekHistory, runRosterWrite, toApplied, toChangeRequest, toExchange, toLeave, toLocation, toRepeat, toShift, toShiftType, toViolations, toWeek, type RosterWriteResult,
 } from "@/features/rosters"
 
 type Paths = keyof import("@/lib/api/schema").paths
@@ -66,6 +66,11 @@ export async function setHomeLocation(userId: string, locationId: string | null)
 export async function reloadRoster(q: { locationId?: string; from?: string; to?: string; view?: "day" | "week" | "fortnight" | "month" }) {
   await requireMfaOk()
   return runRosterWrite(() => loadRosterData(q))
+}
+/** One page of a week's change history (a read, so "Load more" and a week switch never write anything). `cursor` is the one the previous page came with. */
+export async function historyPage(weekId: string, cursor: string | null, limit?: number) {
+  await requireMfaOk()
+  return runRosterWrite(() => loadWeekHistory(weekId, cursor ?? undefined, limit))
 }
 export async function createWeek(body: PostBody<"/v1/roster/weeks">) {
   return write(async (api) => toWeek(await api.post("/v1/roster/weeks", { body })))

@@ -136,6 +136,10 @@
 .ros-scard .ros-time{font-size:12.5px;line-height:18px}
 .ros-scard .ros-role{font-size:12px;line-height:17px}
 .ros-scard .ros-req-btn{margin-top:4px}
+.ros-acts{display:flex;flex-wrap:wrap;gap:4px 12px}
+.ros-cut{display:flex;align-items:center;gap:6px;margin:0;font-size:13px;line-height:20px;color:var(--ink-3)}
+.ros-cut svg{flex:none;width:16px;height:16px}
+.ros-rp-check{display:block}
 /* Day column = kanban column: while a card is held every valid day is tinted, the hovered one lights up like a hovered .rec-col. */
 .ros-day{transition:background var(--dur-fast) var(--ease)}
 .ros-day[data-target]{background:color-mix(in srgb,var(--brand-soft) 40%,var(--mute-bg))}
@@ -222,7 +226,8 @@
 /* Open shifts and swaps (Task 10, FR-RS-38/42/43) */
 .ros-os{display:flex;flex-direction:column;gap:8px;padding:12px 14px;border-radius:var(--r-lg);background:var(--mute-bg)}
 .ros-os-claim{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
-.ros-os-i{width:14px;height:14px;margin-right:6px;vertical-align:-2px;color:var(--ink-3)}
+.ros-os-i{display:inline-block;width:14px;height:14px;margin-right:6px;vertical-align:-2px;color:var(--ink-3)}
+.ros-os-top{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
 .ros-os-gap{margin-left:auto;text-decoration:none}
 .ros-os-gap:hover{color:var(--brand-deep)}
 .mr-note{font-size:12px;line-height:16px;color:var(--ink-3)}

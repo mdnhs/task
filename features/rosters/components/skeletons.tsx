@@ -1,6 +1,6 @@
 import { SkMask } from "@/components/sk"
 import type { LeaveQueue, LocationAdminData, MyExchange, MyRosterData } from "../types"
-import { SKELETON_TODAY, skeletonPayload, skeletonTemplates } from "../skeleton-data"
+import { SKELETON_TODAY, skeletonPanels, skeletonPayload, skeletonTemplates } from "../skeleton-data"
 import { LocationFormPage } from "./location-form"
 import { MyRosterView } from "./my-roster"
 import { LocationsView } from "./locations-view"
@@ -10,7 +10,7 @@ import { RostersView } from "./rosters-view"
 export function RostersSkeleton() {
   return (
     <SkMask label="Loading rosters">
-      <RostersView payload={skeletonPayload()} query={{}} today={SKELETON_TODAY} templates={skeletonTemplates()} />
+      <RostersView payload={skeletonPayload()} query={{}} today={SKELETON_TODAY} templates={skeletonTemplates()} panels={skeletonPanels()} />
     </SkMask>
   )
 }

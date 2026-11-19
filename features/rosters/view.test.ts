@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { LID, LID2, PERSON, SHIFTS, lockedAccess, openAccess, payloadFixture } from "./fixtures"
-import { violationLines, weekViewData } from "./view"
+import { historyWeekOf, violationLines, weekViewData } from "./view"
 import type { RosterViewData } from "./view"
 
 const TODAY = "2026-11-04T09:00:00"
@@ -105,5 +105,15 @@ describe("violationLines: the API's violations with the person and the shifts na
     expect(lines[1]).toMatchObject({ severity: "warn", person: "Cara Doyle" })
     expect(lines[1]!.shifts.map((s) => s.label)).toEqual(["Tue 3 Nov 22:00–06:00"])
     expect(lines.map((l) => l.severity)).toEqual(["block", "warn"]) // blocks first
+  })
+})
+
+describe("historyWeekOf: the week the history panel opens with", () => {
+  it("is the shown location's week of the range (the view's own default when none is chosen), not another site's", () => {
+    const p = payloadFixture({ locations: [LID, LID2] })
+    expect(historyWeekOf(p)?.locationId).toBe(LID) // the first location is what the view shows by default
+    expect(historyWeekOf(p, LID2)?.locationId).toBe(LID2)
+    expect(historyWeekOf(p, "all")).toBeDefined()
+    expect(historyWeekOf({ ...p, weeks: [] }, LID)).toBeUndefined()
   })
 })

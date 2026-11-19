@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "motion/react"
 
 import { Icon } from "@/components/icon"
 import { listItem } from "@/lib/motion"
+import { NamedLine } from "./named-line"
 import type { ViolationLine } from "../view"
 
 // What the API said about the shifts (the warnings that came back with an edit, a refused edit, or a "Check rules"): each line names the person and the shifts (AC-RS-04 front).
@@ -33,7 +34,7 @@ export function ViolationsPanel({ lines, needsOffice, onOpen, onOverride, onDism
               {l.severity === "block" ? <Icon name="ban" size={24} /> : <Icon name="warning" size={24} />}
               <span>
                 {/* The API's sentence usually starts with the person's name: bold it once instead of writing the name twice. */}
-                {l.message.startsWith(l.person) ? <><b>{l.person}</b>{l.message.slice(l.person.length)}</> : <><b>{l.person}</b> {l.message}</>}
+                <NamedLine person={l.person} message={l.message} />
                 {l.shifts.map((s) => (
                   <span key={s.id}>
                     {" · "}

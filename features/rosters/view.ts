@@ -15,6 +15,8 @@ export type RosterGroup = (typeof ROSTER_GROUPS)[number]
 export type ViewShift = {
   id: string; weekId: string; personId: string | null; person: string; open: boolean; role: string; location: string; date: string; start: string; end: string; endsNextDay: boolean
   version: number; templateId: string; unpaidBreakMin: number
+  /** Added on screen and not answered by the API yet (a temporary id): it is shown, but cannot be dragged or opened until the API has the real shift. */
+  pending: boolean
 }
 export type ViewDay = {
   date: string; weekId: string | null; hasRoster: boolean; count: number; target: number; short: number; over: number; shifts: ViewShift[]
@@ -24,9 +26,13 @@ export type ViewDay = {
   locked: boolean
   /** Office on a published week: an edit asks for a reason first. */
   reasonRequired: boolean
+  /** The week's status (null: no roster this day). */
+  weekStatus: "draft" | "published" | null
 }
+/** A week of the shown range, for the buttons of its location block (publish, repeat, check). */
+export type ViewWeek = { id: string; weekStart: string; status: "draft" | "published"; version: number; canEdit: boolean; locked: boolean; autoRepeatDays: number | null }
 export type ViewBlock = {
-  locationId: string; name: string; status: "draft" | "published" | "none"; days: ViewDay[]; count: number; target: number
+  locationId: string; name: string; status: "draft" | "published" | "none"; days: ViewDay[]; weeks: ViewWeek[]; count: number; target: number
   /** Sum of the days' shortfalls: an over-staffed day never cancels a short one. */
   short: number
   /** The shown range has a published week that this caller may not edit. */
@@ -81,7 +87,7 @@ export function weekViewData(payload: RosterPayload, q: RosterQuery, today: stri
   const people = new Map(payload.members.map((m) => [m.id, m.name]))
   const toView = (s: WeekShift): ViewShift => ({
     id: s.id, weekId: s.weekId, personId: s.personId, person: s.personId ? (people.get(s.personId) ?? "Member") : "Open shift", open: s.personId === null, role: s.role,
-    location: nameOf.get(s.locationId) ?? "", date: s.date, start: s.start, end: s.end, endsNextDay: crossesMidnight(s), version: s.version, templateId: s.templateId, unpaidBreakMin: s.unpaidBreakMin,
+    location: nameOf.get(s.locationId) ?? "", date: s.date, start: s.start, end: s.end, endsNextDay: crossesMidnight(s), version: s.version, templateId: s.templateId, unpaidBreakMin: s.unpaidBreakMin, pending: s.id.startsWith("local-"),
   })
   const byTime = (a: WeekShift, b: WeekShift) => a.start.localeCompare(b.start) || (people.get(a.personId ?? "") ?? "~").localeCompare(people.get(b.personId ?? "") ?? "~")
   const inRange = payload.shifts.filter((s) => shownIds.has(s.locationId) && s.date >= from && s.date <= to).sort(byTime)
@@ -96,19 +102,20 @@ export function weekViewData(payload: RosterPayload, q: RosterQuery, today: stri
     const days: ViewDay[] = dates.map((date) => {
       const week: WeekRoster | undefined = weeks.find((w) => w.weekStart === weekStart(date))
       const col = week?.days.find((d) => d.date === date)
-      if (!week || !col) return { date, weekId: null, hasRoster: false, count: 0, target: 0, short: 0, over: 0, shifts: [], canEdit: false, locked: false, reasonRequired: false }
+      if (!week || !col) return { date, weekId: null, hasRoster: false, count: 0, target: 0, short: 0, over: 0, shifts: [], canEdit: false, locked: false, reasonRequired: false, weekStatus: null }
       const { canEdit, locked, lockReason } = week.access
       return {
-        date, weekId: week.id, hasRoster: true, count: col.count, target: col.target, short: col.short, over: col.over, canEdit, locked, reasonRequired: lockReason === "reason_required",
+        date, weekId: week.id, hasRoster: true, count: col.count, target: col.target, short: col.short, over: col.over, canEdit, locked, reasonRequired: lockReason === "reason_required", weekStatus: week.status,
         shifts: inRange.filter((s) => s.locationId === l.id && s.date === date).map(toView),
       }
     })
     const inView = weeks.filter((w) => dates.some((d) => weekStart(d) === w.weekStart))
     const status = inView.length === 0 ? "none" : inView.every((w) => w.status === "published") ? "published" : "draft"
+    const viewWeeks: ViewWeek[] = [...inView].sort((a, b) => a.weekStart.localeCompare(b.weekStart)).map((w) => ({ id: w.id, weekStart: w.weekStart, status: w.status, version: w.version, canEdit: w.access.canEdit, locked: w.access.locked, autoRepeatDays: w.autoRepeatDays }))
     const sum = (f: (d: ViewDay) => number) => days.reduce((n, d) => n + f(d), 0)
     count += sum((d) => d.count); target += sum((d) => d.target); short += sum((d) => d.short); over += sum((d) => d.over)
     blocks.push({
-      locationId: l.id, name: l.name, status, days, count: sum((d) => d.count), target: sum((d) => d.target), short: sum((d) => d.short),
+      locationId: l.id, name: l.name, status, days, weeks: viewWeeks, count: sum((d) => d.count), target: sum((d) => d.target), short: sum((d) => d.short),
       locked: inView.some((w) => w.access.locked), canCreate: inView.length === 0 && payload.access.canEdit, createWeekStart: weekStart(from),
     })
   }
@@ -152,4 +159,12 @@ export function violationLines(violations: RuleViolation[], payload: RosterPaylo
     shifts: [v.shiftId, ...v.otherShiftIds].flatMap((id) => { const s = byId.get(id); return s ? [{ id, label: label(s) }] : [] }),
   }))
   return [...lines.filter((l) => l.severity === "block"), ...lines.filter((l) => l.severity === "warn")]
+}
+
+/** The week whose history the panel opens with: the week of the range's first day at the shown location (or the first location), else the first week there is. */
+export function historyWeekOf(payload: RosterPayload, locationId?: string): WeekRoster | undefined {
+  const loc = locationId ?? payload.locations[0]?.id // the view's own default: the first location
+  const here = payload.weeks.filter((w) => !loc || loc === "all" || w.locationId === loc)
+  const first = weekStart(payload.range.from)
+  return here.find((w) => w.weekStart === first) ?? [...here].sort((a, b) => a.weekStart.localeCompare(b.weekStart))[0]
 }

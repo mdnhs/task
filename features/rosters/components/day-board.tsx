@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useRef, useState } from "react"
 import { DndContext, rectIntersection, useDraggable, useDroppable } from "@dnd-kit/core"
 import type { Announcements, DragEndEvent, DragStartEvent } from "@dnd-kit/core"
 import { useReducedMotion } from "motion/react"
@@ -9,6 +9,7 @@ import { RollNumber } from "@/components/roll-number"
 import { formatDate } from "@/lib/dates"
 import { numDir } from "@/lib/motion"
 import { DragLayer, moveBetweenTargets, originOf, useDragSensors } from "@/lib/drag-card"
+import { useKeepFocus } from "../use-keep-focus"
 import type { RosterViewKind, ViewBlock, ViewDay, ViewShift } from "../view"
 import { Icon } from "@/components/icon"
 
@@ -19,9 +20,12 @@ export type DayEditor = {
   onAdd(day: ViewDay): void
   onEdit(id: string): void
   onMove(id: string, date: string): void
-  /** Published week the role can't edit but may ask to change (FR-RS-36); arrives with the request panels (Task 21). */
+  /** Published week the role can't edit but may ask to change (FR-RS-36): the card offers "Request change". */
   canRequest?(day: ViewDay): boolean
   onRequest?(id: string): void
+  /** The signed-in person's own shift on a published week still to come: the card offers "Swap" (FR-RS-42). */
+  canSwap?(s: ViewShift, day: ViewDay): boolean
+  onSwap?(id: string): void
 }
 
 function Lines({ s, place }: { s: ViewShift; place?: boolean }) {
@@ -50,23 +54,29 @@ function RollCount({ value }: { value: number }) {
   return <RollNumber value={String(value)} dir={seen.dir} />
 }
 
-type LineProps = { s: ViewShift; place?: boolean; fresh?: boolean; card?: boolean; onEdit?(): void; onRequest?(): void }
+type LineProps = { s: ViewShift; place?: boolean; fresh?: boolean; card?: boolean; onEdit?(): void; onRequest?(): void; onSwap?(): void }
 
 /** One shift. `card` = a card on a day column (the same card as the recruitment kanban: lib/drag-card.tsx + drag.css); the person grid uses plain lines. */
-export function ShiftLine({ s, place, fresh, card, onEdit, onRequest }: LineProps) {
+export function ShiftLine({ s, place, fresh, card, onEdit, onRequest, onSwap }: LineProps) {
   const cls = card ? "ros-shift ros-scard" : "ros-shift"
-  if (!onEdit && onRequest) {
+  // A card the API has not answered for yet (temporary id): shown, but not a button and not draggable until the real shift arrives (it would move or open a shift that does not exist).
+  if (s.pending) {
     return (
-      <li className={cls} data-open={s.open || undefined} data-new={fresh || undefined}>
+      <li className={cls} data-open={s.open || undefined} data-new={fresh || undefined} data-pending="" aria-busy="true">
         <Lines s={s} place={place} />
-        <button type="button" className="ros-req-btn" onClick={onRequest} aria-label={`Request change, ${s.person}, ${s.start} to ${s.end}`}>Request change</button>
       </li>
     )
   }
   if (!onEdit) {
     return (
-      <li className={cls} data-open={s.open || undefined} data-new={fresh || undefined}>
+      <li className={cls} data-shift-id={s.id} data-open={s.open || undefined} data-new={fresh || undefined}>
         <Lines s={s} place={place} />
+        {(onRequest || onSwap) && (
+          <span className="ros-acts">
+            {onRequest && <button type="button" className="ros-req-btn" onClick={onRequest} aria-label={`Request change, ${s.person}, ${s.start} to ${s.end}`}>Request change</button>}
+            {onSwap && <button type="button" className="ros-req-btn" onClick={onSwap} aria-label={`Swap, ${s.start} to ${s.end}`}>Swap</button>}
+          </span>
+        )}
       </li>
     )
   }
@@ -82,6 +92,7 @@ function DragShift({ s, place, fresh, card, onEdit }: { s: ViewShift; place?: bo
       ref={setNodeRef}
       className={`${card ? "ros-shift ros-scard" : "ros-shift"} dnd-card`}
       data-edit=""
+      data-shift-id={s.id}
       data-dragging={isDragging ? "" : undefined}
       data-open={s.open || undefined} data-new={fresh || undefined}
     >
@@ -140,7 +151,12 @@ function Day({ day, today, held, editor }: { day: ViewDay; today: string; held?:
       {day.shifts.length > 0 ? (
         <ul className="ros-shifts">
           {day.shifts.map((s) => (
-            <ShiftLine key={s.id} s={s} card fresh={fresh.has(s.id)} onEdit={canEdit ? () => editor?.onEdit(s.id) : undefined} onRequest={canAsk ? () => editor?.onRequest?.(s.id) : undefined} />
+            <ShiftLine
+              key={s.id} s={s} card fresh={fresh.has(s.id)}
+              onEdit={canEdit ? () => editor?.onEdit(s.id) : undefined}
+              onRequest={canAsk ? () => editor?.onRequest?.(s.id) : undefined}
+              onSwap={!canEdit && !!editor?.canSwap?.(s, day) ? () => editor?.onSwap?.(s.id) : undefined}
+            />
           ))}
         </ul>
       ) : (
@@ -164,8 +180,10 @@ export function DayBoard({ block, today, view, firstWeekday, editor }: { block: 
     onDragEnd: ({ active, over }) => (over ? `${who(active.id)} moved to ${dayName(over.id)}.` : `${who(active.id)} dropped, not moved.`),
     onDragCancel: ({ active }) => `Move cancelled. ${who(active.id)} stays on the same day.`,
   }
+  const boardRef = useRef<HTMLDivElement>(null)
+  const keepFocus = useKeepFocus(boardRef)
   const board = (
-    <div className="ros-board" data-view={view}>
+    <div ref={boardRef} className="ros-board" data-view={view}>
       {block.days.map((d, i) => (
         <div key={d.date} className="ros-cell" style={i === 0 && view === "month" ? { gridColumnStart: firstWeekday + 1 } : undefined}>
           <Day day={d} today={today} held={held} editor={editor} />
@@ -174,9 +192,11 @@ export function DayBoard({ block, today, view, firstWeekday, editor }: { block: 
     </div>
   )
   if (!editor) return board
-  const end = ({ active, over }: DragEndEvent) => {
+  const end = ({ active, over, activatorEvent }: DragEndEvent) => {
     setDragId(null)
-    if (over) editor.onMove(String(active.id), String(over.id))
+    if (!over) return
+    if ("key" in activatorEvent) keepFocus(String(active.id)) // a keyboard move: the card is a new element in its new column, focus follows it
+    editor.onMove(String(active.id), String(over.id))
   }
   return (
     <DndContext

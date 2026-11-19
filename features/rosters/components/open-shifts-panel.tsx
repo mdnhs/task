@@ -4,28 +4,47 @@ import { AnimatePresence, motion } from "motion/react"
 import { listItem } from "@/lib/motion"
 import Link from "next/link"
 
-import { formatDate } from "@/lib/dates"
-import type { Claim, RosterShift, SwapRequest } from "../types"
 import { Icon } from "@/components/icon"
+import { formatDate } from "@/lib/dates"
+import { canClaim, exchangeActions, openExchanges } from "../exchange"
+import type { ApiExchange, WeekAccess, WeekShift } from "../types"
 
-// Open shifts of the shown range with who offered to take them, and swap requests waiting (FR-RS-38/42/43, D6). `canDecide` is approverFor for the
-// shift's week and location, so a supervisor sees the buttons only where they may decide. Each open shift is also a derived gap in Staff & Rosters
-// (D12): a plain link, the features never import each other.
-export function OpenShiftsPanel({ gapsLink, open, claims, swaps, shiftOf, nameOf, placeOf, canDecide, onClaim, onSwap }: {
+/** One open shift of a published week in view, with the place and what it needs to know about its week for the approver matrix. */
+export type OpenRow = { shift: WeekShift; place: string; weekStatus: "draft" | "published"; delegated: boolean }
+export type SwapRow = { exchange: ApiExchange; place: string; weekStatus: "draft" | "published"; delegated: boolean }
+
+// Open shifts of the shown range with who offered to take them, and swap requests waiting (FR-RS-38/42/43, D6, R8-11). Which buttons show is `exchangeActions` (the matrix); the API decides every one
+// again. Each open shift is also a derived gap in Staff & Rosters (D12): a plain link, features never import each other.
+export function OpenShiftsPanel({ gapsLink, level, today, open, swaps, exchanges, nameOf, busy, onClaim, onRecommend, onDecide }: {
   gapsLink: boolean
-  open: RosterShift[]
-  claims: Claim[]
-  swaps: SwapRequest[]
-  shiftOf(id: string): RosterShift | undefined
+  level: WeekAccess["level"]
+  today: string
+  open: OpenRow[]
+  swaps: SwapRow[]
+  /** Every exchange the API listed for the shown shifts. */
+  exchanges: ApiExchange[]
   nameOf(id: string | null): string
-  placeOf(locationId: string): string
-  canDecide(shiftId: string): boolean
-  onClaim(c: Claim, approve: boolean): void
-  onSwap(r: SwapRequest, approve: boolean): void
+  /** Keys (shift or exchange ids) with a request on its way: their buttons are off. */
+  busy: ReadonlySet<string>
+  onClaim(shiftId: string): void
+  onRecommend(x: ApiExchange): void
+  onDecide(x: ApiExchange, decision: "approve" | "reject"): void
 }) {
-  const waiting = swaps.filter((r) => r.status === "open" && shiftOf(r.shiftId))
+  const waiting = swaps.filter((r) => r.exchange.status === "requested" || r.exchange.status === "recommended")
   if (!open.length && !waiting.length) return null
-  const when = (s: RosterShift) => `${formatDate(s.date)} ${s.start}–${s.end}`
+  const when = (date: string, start: string, end: string) => `${formatDate(date)} ${start}–${end}`
+  const buttons = (x: ApiExchange, row: { weekStatus: "draft" | "published"; delegated: boolean }, label: string) => {
+    const a = exchangeActions({ level, weekStatus: row.weekStatus, delegated: row.delegated, status: x.status, expired: x.expired })
+    const working = busy.has(x.id)
+    if (!a.approve && !a.reject && !a.recommend) return <span className="ros-role">{x.status === "recommended" ? "Recommended: the office approves" : "A higher-level user approves"}</span>
+    return (
+      <span className="ros-req-act">
+        {a.recommend && <button type="button" className="btn btn-outline" disabled={working} aria-label={`Recommend ${label}`} onClick={() => onRecommend(x)}><Icon name="send" size={24} />Recommend</button>}
+        {a.reject && <button type="button" className="btn btn-outline" disabled={working} aria-label={`Reject ${label}`} onClick={() => onDecide(x, "reject")}><Icon name="close" size={24} />Reject</button>}
+        {a.approve && <button type="button" className="btn btn-primary" disabled={working} aria-label={`Approve ${label}`} onClick={() => onDecide(x, "approve")}><Icon name="check" size={24} />Approve</button>}
+      </span>
+    )
+  }
   return (
     <section className="card ros-panel" aria-label="Open shifts and swaps">
       <div className="ros-panel-head">
@@ -35,51 +54,42 @@ export function OpenShiftsPanel({ gapsLink, open, claims, swaps, shiftOf, nameOf
       </div>
       <ul className="ros-req-list">
         <AnimatePresence initial={false}>
-        {open.map((s) => {
-          const mine = claims.filter((c) => c.shiftId === s.id && c.status === "open")
-          return (
-            <motion.li key={s.id} className="ros-os" data-id={s.id} {...listItem}>
-              <div className="ros-req-main">
-                <span className="ros-who"><Icon name="hand" className="ros-os-i" size={24} />{when(s)} · {s.role}</span>
-                <span className="ros-role">{placeOf(s.locationId)}{mine.length === 0 ? " · nobody has offered yet" : ""}</span>
-              </div>
-              {mine.map((c) => (
-                <div key={c.id} className="ros-os-claim">
-                  <span className="ros-who">{nameOf(c.personId)}</span>
-                  {canDecide(s.id) ? (
-                    <span className="ros-req-act">
-                      <button type="button" className="btn btn-outline" aria-label={`Reject ${nameOf(c.personId)}`} onClick={() => onClaim(c, false)}><Icon name="close" size={24} />Reject</button>
-                      <button type="button" className="btn btn-primary" aria-label={`Approve ${nameOf(c.personId)}`} onClick={() => onClaim(c, true)}><Icon name="check" size={24} />Approve</button>
-                    </span>
-                  ) : (
-                    <span className="ros-role">A higher-level user approves</span>
+          {open.map((row) => {
+            const s = row.shift
+            const claims = openExchanges(exchanges, s.id, "claim")
+            return (
+              <motion.li key={s.id} className="ros-os" data-id={s.id} {...listItem}>
+                <div className="ros-os-top">
+                  <div className="ros-req-main">
+                    <span className="ros-who"><Icon name="hand" className="ros-os-i" size={24} />{when(s.date, s.start, s.end)} · {s.role}</span>
+                    <span className="ros-role">{row.place}{claims.length === 0 ? " · nobody has offered yet" : ""}</span>
+                  </div>
+                  {canClaim(row.weekStatus, s.personId, s.date, today) && claims.length === 0 && (
+                    <button type="button" className="btn btn-outline" disabled={busy.has(s.id)} aria-label={`Claim ${when(s.date, s.start, s.end)}`} onClick={() => onClaim(s.id)}><Icon name="hand" size={24} />Claim</button>
                   )}
                 </div>
-              ))}
-            </motion.li>
-          )
-        })}
-        {waiting.map((r) => {
-          const s = shiftOf(r.shiftId)!
-          const t = r.toShiftId ? shiftOf(r.toShiftId) : undefined
-          return (
-            <motion.li key={r.id} className="ros-os" data-id={r.id} {...listItem}>
-              <div className="ros-req-main">
-                <span className="ros-who"><Icon name="swap" className="ros-os-i" size={24} />{nameOf(r.fromPersonId)} to {nameOf(r.toPersonId)}</span>
-                <span className="ros-time num">{when(s)}{t ? ` for ${when(t)}` : ""}</span>
-                <span className="ros-role">{placeOf(s.locationId)}</span>
-              </div>
-              {canDecide(s.id) ? (
-                <span className="ros-req-act">
-                  <button type="button" className="btn btn-outline" aria-label={`Reject swap, ${nameOf(r.fromPersonId)}`} onClick={() => onSwap(r, false)}><Icon name="close" size={24} />Reject</button>
-                  <button type="button" className="btn btn-primary" aria-label={`Approve swap, ${nameOf(r.fromPersonId)}`} onClick={() => onSwap(r, true)}><Icon name="check" size={24} />Approve</button>
-                </span>
-              ) : (
-                <span className="ros-role">A higher-level user approves</span>
-              )}
-            </motion.li>
-          )
-        })}
+                {claims.map((c) => (
+                  <div key={c.id} className="ros-os-claim">
+                    <span className="ros-who">{nameOf(c.fromUserId)}{c.status === "recommended" ? " · recommended" : ""}</span>
+                    {buttons(c, row, nameOf(c.fromUserId))}
+                  </div>
+                ))}
+              </motion.li>
+            )
+          })}
+          {waiting.map((r) => {
+            const x = r.exchange
+            return (
+              <motion.li key={x.id} className="ros-os" data-id={x.id} {...listItem}>
+                <div className="ros-req-main">
+                  <span className="ros-who"><Icon name="swap" className="ros-os-i" size={24} />{nameOf(x.fromUserId)} to {nameOf(x.toUserId)}{x.status === "recommended" ? " · recommended" : ""}</span>
+                  <span className="ros-time num">{when(x.date, x.start, x.end)}</span>
+                  <span className="ros-role">{r.place}</span>
+                </div>
+                {buttons(x, r, `swap, ${nameOf(x.fromUserId)}`)}
+              </motion.li>
+            )
+          })}
         </AnimatePresence>
       </ul>
     </section>

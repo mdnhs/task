@@ -97,6 +97,20 @@ describe("roster server actions", () => {
     expect(p.ok && p.value.week.status).toBe("published")
   })
 
+  test("historyPage reads one page with its cursor and size, after the MFA check; a failure is mapped, never thrown", async () => {
+    answer = () => json({ items: [{ id: SHIFT_ID, at: "2026-11-16T09:00:00.000Z", actorId: UID, action: "shift_moved", locationId: LID, weekId: WEEK_ID, shiftId: SHIFT_ID, reason: null, before: null, after: null }], nextCursor: "c2" })
+    const r = await actions.historyPage(WEEK_ID, "c1", 20)
+    expect(r.ok && r.value.nextCursor).toBe("c2")
+    expect(seen[0]).toMatchObject({ method: "GET", path: `/v1/roster/weeks/${WEEK_ID}/history`, query: "?cursor=c1&limit=20" })
+    await actions.historyPage(WEEK_ID, null)
+    expect(seen[1]!.query).toBe("")
+    answer = () => problem(404, "week_not_found")
+    const gone = await actions.historyPage(WEEK_ID, null)
+    expect(gone.ok === false && gone.error.state).toBe("not_found")
+    mfa.ok = false
+    await expect(actions.historyPage(WEEK_ID, null)).rejects.toThrow("NEXT_REDIRECT")
+  })
+
   test("add shifts and rules (If-Match) and leave go through the same mapping", async () => {
     answer = () => json({ shifts: [shiftDto], violations: [] }, 201)
     const a = await actions.addShifts(WEEK_ID, { shifts: [{ date: "2026-11-02", userIds: [UID, null], shiftTypeId: "t" }] })

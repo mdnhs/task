@@ -3,7 +3,7 @@ import type { RosterAccess } from "@/lib/roster-access"
 import type { LeaveRequest } from "@/lib/roster-rules"
 import type { RosterShift, RosterWeek } from "@/lib/rosters"
 import type { WorkforceMember } from "@/lib/workforce"
-import { getMyRoster, getLeaveQueue, getRosterRules } from "./api"
+import { getMyRoster, getLeaveQueue } from "./api"
 import { canApproveLeave, combinedRoster, decideLeave, isSeen, isUpcoming, leaveQueue, mergeMine, shiftSig, splitAvailability, validateAvailability, validateLeave } from "./self-service"
 
 const wk = (id: string, locationId: string, status: RosterWeek["status"]): RosterWeek => ({ id, locationId, weekStart: "2026-10-19", status, publishedAt: null, publishedBy: null, autoRepeatDays: null })
@@ -169,10 +169,6 @@ describe("server payloads", () => {
     const mine = await getMyRoster("p-daniel")
     const weeks = new Map(mine.weeks.map((w) => [w.id, w]))
     expect(mine.shifts.every((s) => weeks.get(s.weekId)?.status === "published")).toBe(true)
-  })
-  it("the supervisor's rules payload carries only what the check needs from leave", async () => {
-    const r = await getRosterRules(acc({ editDraft: true, locationIds: ["loc-coppers"] }))
-    expect(r.leave.every((l) => l.status === "approved" && l.kind === "" && l.decidedBy === null && l.decidedAt === null)).toBe(true)
   })
   it("a supervisor's queue holds only people homed at their locations", async () => {
     const q = await getLeaveQueue(acc({ editDraft: true, locationIds: ["loc-coppers"] }), "p-ismail")

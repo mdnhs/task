@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest"
-import { loadCoverage, loadExchange, loadLeaveQueue, loadLocationAdmin, loadMyRoster, loadRosterData, loadRules } from "./loaders"
+import { loadCoverage, loadExchange, loadExchanges, loadLeaveQueue, loadWeekHistory, loadLocationAdmin, loadMyRoster, loadRosterData, loadRules } from "./loaders"
 import { openAccess, exchangeDto, historyDto, leaveDto, locationDto, mineShiftDto, rulesDto, shiftDto, shiftTypeDto, weekDto, weeksDto, LID, UID } from "./fixtures"
 
 type Call = { path: string; o: { path?: Record<string, string>; query?: Record<string, string>; onResponse?: (r: Response) => void } | undefined }
@@ -82,5 +82,20 @@ describe("roster readers", () => {
     expect((await loadRules(api)).etag).toBe('"e1"')
     expect((await loadCoverage(api, {})).locations).toEqual([])
 
+  })
+})
+
+describe("roster panel readers (Task 21)", () => {
+  test("the history page asks for its cursor and its size; the exchange list is one page with no week lookup", async () => {
+    const { api, calls } = fake({ "/v1/roster/weeks/{id}/history": { items: [historyDto], nextCursor: "c2" }, "/v1/roster/exchanges": { items: [exchangeDto], nextCursor: null } })
+    const h = await loadWeekHistory(api, "w1", "c1", 20)
+    expect(calls[0]!.o).toMatchObject({ path: { id: "w1" }, query: { cursor: "c1", limit: "20" } })
+    expect(h.nextCursor).toBe("c2")
+    expect(h.items[0]!.reason).toBe("Cover")
+    await loadWeekHistory(api, "w1")
+    expect(calls[1]!.o!.query).toEqual({})
+    const x = await loadExchanges(api)
+    expect(x.items[0]!.kind).toBe("claim")
+    expect(calls.map((c) => c.path)).not.toContain("/v1/roster/weeks")
   })
 })

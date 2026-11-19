@@ -1,6 +1,7 @@
 import { dayColumns } from "@/lib/rosters"
 import { toWeeksPayload } from "./adapters"
-import type { RosterPayload, WeekTemplateSummary } from "./types"
+import type { HistoryEntry, RosterPayload, WeekTemplateSummary } from "./types"
+import type { RosterPanels } from "./components/rosters-view"
 
 // The TYPICAL week the loading skeleton draws (B6 ruling I9: a loading.tsx knows nothing from the API or the session). One location, a draft week the caller may edit, seven day columns with a full
 // day's cards. The real page then replaces it; a role with less access (no Manage locations link, no add buttons) or a different roster sees a small layout change, never a delay.
@@ -39,4 +40,10 @@ export const SKELETON_TODAY = "2026-11-02T09:00:00"
 /** Two saved templates, as the demo roster has: the panel under the week is part of the page's height. */
 export function skeletonTemplates(): WeekTemplateSummary[] {
   return [0, 1].map((i) => ({ id: `t${i}`, locationId: LOCATION, name: "Template name", shifts: 12, createdAt: "2026-11-01T00:00:00.000Z", createdBy: null }))
+}
+
+/** The panels of the typical page (the demo roster): a page of history (a week with change requests or open shifts adds its own panels: a known, recorded ceiling). Placeholder text only; the mask hides every glyph. */
+export function skeletonPanels(): RosterPanels {
+  const hist = (i: number): HistoryEntry => ({ id: `h${i}`, weekId: WEEK, locationId: LOCATION, shiftId: null, at: "2026-11-01T09:00:00.000Z", by: "u1", action: "shift_moved", before: null, after: null, reason: null })
+  return { requests: [], exchanges: [], history: { weekId: WEEK, page: { items: Array.from({ length: 18 }, (_, i) => hist(i)), nextCursor: null } }, gapsLink: false }
 }

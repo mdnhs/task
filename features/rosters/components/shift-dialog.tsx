@@ -13,12 +13,13 @@ import { validateShiftForm, type ShiftErrors } from "../editing"
 import type { RosterMember, ShiftType } from "../types"
 import type { ViewShift } from "../view"
 import { Icon } from "@/components/icon"
+import { CutHint } from "./cut-hint"
 
 export type ShiftSave = { date: string; templateId: string; role: string; start: string; end: string; unpaidBreakMin: number; people: string[] }
 
 // Add or edit shifts (FR-RS-20/22). Short enough for a dialog: shift, day and people on the left, times and break on the right.
 // Adding takes several people (one shift each, they can differ later); editing is one shift, so one person. Who can work which shift (licences) is the API's call: a refusal comes back as a toast (422 ineligible).
-export function ShiftDialog({ shift, date, types, members, dates, onSave, onRemove, onClose }: {
+export function ShiftDialog({ shift, date, types, members, membersTruncated = false, dates, onSave, onRemove, onClose }: {
   /** Set when editing. */
   shift?: ViewShift
   /** Day to add on. */
@@ -26,6 +27,8 @@ export function ShiftDialog({ shift, date, types, members, dates, onSave, onRemo
   /** The shift types of the location (the API's list; archived ones are not offered). */
   types: ShiftType[]
   members: RosterMember[]
+  /** The API cut the list at its cap: say so next to the picker. */
+  membersTruncated?: boolean
   /** The days of the shift's own week: a shift never moves to another week. */
   dates: { value: string; label: string }[]
   onSave(v: ShiftSave): void
@@ -103,6 +106,7 @@ export function ShiftDialog({ shift, date, types, members, dates, onSave, onRemo
                     <PeoplePicker label="People" people={editPeople} value={people} onChange={pickPeople} />
                   </Field>
                 )}
+                <CutHint cut={membersTruncated} />
               </FormSection>
             </div>
             <div className="od-form-col">

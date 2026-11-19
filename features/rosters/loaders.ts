@@ -6,7 +6,7 @@ import {
   toAvailability, toChangeRequest, toCoverage, toExchange, toHistory, toLeave, toLocation, toMine, toPage, toRules, toShift, toShiftType, toTemplate, toWeeksPayload,
 } from "./adapters"
 import type {
-  ApiChangeRequest, ApiLeave, Coverage, ExchangeBoard, ExchangeQuery, HistoryEntry, LeaveQueueData, LocationAdmin, MyRoster, Page, RosterLocation, RosterPayload, RulesView, WeekQuery, WeekTemplateSummary,
+  ApiChangeRequest, ApiExchange, ApiLeave, Coverage, ExchangeBoard, ExchangeQuery, ExchangeStatus, HistoryEntry, LeaveQueueData, LocationAdmin, MyRoster, Page, RosterLocation, RosterPayload, RulesView, WeekQuery, WeekTemplateSummary,
 } from "./types"
 
 type Getter = Pick<ApiClient, "get">
@@ -63,8 +63,13 @@ export async function loadChangeRequests(api: Getter, q: { status?: string; loca
   return toPage(await api.get("/v1/roster/change-requests", { query: defined(q) }), toChangeRequest)
 }
 
-export async function loadWeekHistory(api: Getter, weekId: string, cursor?: string): Promise<Page<HistoryEntry>> {
-  return toPage(await api.get("/v1/roster/weeks/{id}/history", { path: { id: weekId }, query: defined({ cursor }) }), toHistory)
+export async function loadWeekHistory(api: Getter, weekId: string, cursor?: string, limit?: number): Promise<Page<HistoryEntry>> {
+  return toPage(await api.get("/v1/roster/weeks/{id}/history", { path: { id: weekId }, query: defined({ cursor, limit: limit === undefined ? undefined : String(limit) }) }), toHistory)
+}
+
+/** Claims and swaps the caller is a party to or may decide (the API cuts it to their sites), newest first: one page, no open-shift lookup (the week payload already has the shifts). */
+export async function loadExchanges(api: Getter, q: { status?: ExchangeStatus; cursor?: string } = {}): Promise<Page<ApiExchange>> {
+  return toPage(await api.get("/v1/roster/exchanges", { query: defined({ status: q.status, cursor: q.cursor, limit: "100" }) }), toExchange)
 }
 
 export async function loadWeekTemplates(api: Getter, locationId?: string): Promise<WeekTemplateSummary[]> {

@@ -1,30 +1,39 @@
-import { canSeeLocation, type RosterAccess } from "@/lib/roster-access"
-import { blocking, checkShifts, type RuleContext, type RuleViolation } from "@/lib/roster-rules"
-import type { HistoryEntry, Location, RosterShift, RosterWeek, ShiftTemplate } from "@/lib/rosters"
+import type { RosterShift, RosterWeek, ShiftTemplate } from "@/lib/rosters"
 import type { WorkforceMember } from "@/lib/workforce"
 import { eligible } from "./editing"
 import { isUpcoming } from "./self-service"
-import type { Claim, SwapRequest } from "./types"
+import type { ApiExchange, Claim, ExchangeStatus, SwapRequest, WeekAccess } from "./types"
 
 export type { Claim, SwapRequest }
 
-// Open shifts and swaps (FR-RS-38, 42, 43, D6). Pure: who decides, who may claim, and the rule check before anything is assigned.
+// Open shifts and swaps. Two halves. (1) Task 21: what the roster page OFFERS on the API's exchanges (the approver matrix R8-11 below); the API decides every one of them again and answers
+// 403/404/409/422, so a button shown by mistake is a toast, never a change. (2) The mock claim and swap REQUEST rules My roster still runs on until Task 22 moves it to the API (FR-RS-38, 42, 43).
+
+/**
+ * R8-11 as buttons. Who DECIDES a claim or swap: an office role always; a supervisor on a draft week, and on a published week only when the location delegates swap approval; staff never.
+ * Who RECOMMENDS: a supervisor on a published week who cannot decide (office is asked; the exchange moves requested to recommended once). Who CLAIMS an open shift: anyone, on a published week,
+ * before it starts: the API checks that the person is located at the site and eligible. A decided or cancelled exchange offers nothing; an expired one (the shift has started) can still be rejected,
+ * not approved. Nobody approves their own: the API's 403 self_decision, not hidden here (the page does not know who is party to what).
+ */
+export function exchangeActions(p: { level: WeekAccess["level"]; weekStatus: "draft" | "published"; delegated: boolean; status: ExchangeStatus; expired: boolean }) {
+  const open = p.status === "requested" || p.status === "recommended"
+  const decide = open && (p.level === "office" || (p.level === "supervisor" && (p.weekStatus === "draft" || p.delegated)))
+  return {
+    approve: decide && !p.expired,
+    reject: decide,
+    recommend: open && p.status === "requested" && p.level === "supervisor" && p.weekStatus === "published" && !decide,
+  }
+}
+
+/** An open shift can be claimed: published week, still open, and not started (the shift's own wall time is compared by the API; this only hides what is certainly past, by date). */
+export const canClaim = (weekStatus: "draft" | "published", personId: string | null, date: string, today: string): boolean => weekStatus === "published" && personId === null && date >= today.slice(0, 10)
+
+/** Open exchanges of one shift, claims and swaps apart. */
+export const openExchanges = (list: ApiExchange[], shiftId: string, kind: ApiExchange["kind"]): ApiExchange[] => list.filter((x) => x.shiftId === shiftId && x.kind === kind && (x.status === "requested" || x.status === "recommended"))
 
 let seq = 0
 const uid = () => (++seq).toString(36)
-const clean = (s: string | null | undefined) => (s ?? "").trim()
 
-/**
- * D6: who decides a claim or swap. Office roles always (within their locations). A supervisor of the location decides on a draft week, and on a
- * published week only when the location delegates swap approval; otherwise a higher-level user does. Staff and read-only roles never.
- * A supervisor's access has `editDraft` (rosterAccess sets `approve` for office roles only), so either flag counts.
- */
-export function approverFor(week: RosterWeek, location: Location, a: RosterAccess): boolean {
-  if (week.locationId !== location.id || !canSeeLocation(a, location.id)) return false
-  if (a.editPublished) return true
-  if (!(a.approve || a.editDraft)) return false
-  return week.status === "draft" || location.swapApprovalDelegated
-}
 
 /** Why a person can't work this template on this date, or null when they can (left, or a required licence missing or expired). */
 export function ineligible(m: WorkforceMember, t: ShiftTemplate, date: string): string | null {
@@ -51,74 +60,9 @@ export function claimShift(s: RosterShift, m: WorkforceMember, t: ShiftTemplate,
   return { id: `cl-${s.id}-${m.id}-${uid()}`, shiftId: s.id, personId: m.id, at, status: "open", decidedBy: null, decidedAt: null }
 }
 
-/** A blocking rule stands in the way: an office role may approve anyway with a reason. */
-export class BlockedError extends Error {}
-
-const MSG = (v: RuleViolation[]) => [...new Set(v.map((x) => x.message))].join("; ")
-
-/** A rule check of the new assignments. Blocking violations refuse, unless the caller is office and gives a reason. Warnings come back. */
-function gate(found: RuleViolation[], a: RosterAccess, overrideReason: string | null | undefined): { violations: RuleViolation[]; reason: string | null } {
-  const stop = blocking(found)
-  const reason = clean(overrideReason)
-  if (stop.length === 0) return { violations: found, reason: null }
-  if (!a.editPublished) throw new BlockedError(`A blocking rule is broken: ${MSG(stop)}`)
-  if (!reason) throw new BlockedError(`A reason is needed to approve over a blocking rule: ${MSG(stop)}`)
-  return { violations: found, reason }
-}
-
-function guard(week: RosterWeek, location: Location, a: RosterAccess, s: RosterShift): void {
-  if (!approverFor(week, location, a)) throw new Error("This role cannot approve here")
-  if (s.weekId !== week.id || s.locationId !== location.id) throw new Error("Shift is not in this week")
-}
-
-/** The same finding from the browser's check and the server's counts once. */
-const merge = (local: RuleViolation[], remote: RuleViolation[]): RuleViolation[] => {
-  const seen = new Set(local.map((v) => `${v.rule}|${v.shiftId}|${v.message}`))
-  return [...local, ...remote.filter((v) => !seen.has(`${v.rule}|${v.shiftId}|${v.message}`))]
-}
-
-const withShifts = (ctx: RuleContext, changed: RosterShift[]): RuleContext => ({ ...ctx, shifts: [...ctx.shifts.filter((x) => !changed.some((c) => c.id === x.id)), ...changed] })
-const entryOf = (action: string, week: RosterWeek, s: RosterShift, by: string, at: string, before: unknown, after: unknown, reason: string | null): HistoryEntry =>
-  ({ id: `h-${at}-${s.id}-${action}-${uid()}`, weekId: week.id, locationId: s.locationId, shiftId: s.id, at, by, action, before, after, reason })
-
-/**
- * FR-RS-38: approve a claim. The claimant goes on the shift (confirmation cleared) after the rule check over the shift with them on it and
- * their other shifts. `found` carries violations from beyond this browser's shifts (a clash at a site the caller can't see).
- */
-export function approveClaim(
-  c: Claim, s: RosterShift, a: RosterAccess, week: RosterWeek, location: Location, ctx: RuleContext, by: string, at: string,
-  overrideReason?: string | null, found: RuleViolation[] = [],
-): { shift: RosterShift; claim: Claim; violations: RuleViolation[]; entry: HistoryEntry } {
-  guard(week, location, a, s)
-  if (c.status !== "open") throw new Error("Claim already decided")
-  if (c.shiftId !== s.id) throw new Error("Claim is for another shift")
-  if (s.personId !== null) throw new Error("This shift is no longer open")
-  const m = ctx.members.find((x) => x.id === c.personId)
-  const t = ctx.templates.find((x) => x.id === s.templateId)
-  if (!m || !t) throw new Error("Cannot verify this person for the shift")
-  const why = ineligible(m, t, s.date)
-  if (why) throw new Error(why)
-  const shift: RosterShift = { ...s, personId: c.personId, confirmedAt: null }
-  const violations = merge(checkShifts([shift], withShifts(ctx, [shift])), found.filter((v) => v.shiftId === s.id))
-  const { reason } = gate(violations, a, overrideReason)
-  return {
-    shift,
-    claim: { ...c, status: "approved", decidedBy: by, decidedAt: at },
-    violations,
-    entry: entryOf("claim.approved", week, s, by, at, { personId: null }, { personId: c.personId }, reason),
-  }
-}
-
-/** Reject a claim that is still waiting; the same people who may approve may reject. */
-export function rejectClaim(c: Claim, s: RosterShift, a: RosterAccess, week: RosterWeek, location: Location, by: string, at: string): Claim {
-  guard(week, location, a, s)
-  if (c.status !== "open") throw new Error("Claim already decided")
-  return { ...c, status: "rejected", decidedBy: by, decidedAt: at }
-}
-
 /**
  * FR-RS-42: ask to hand a shift to someone (`toShift` null) or trade it for theirs. Only the shift's holder asks, the target must be able to work
- * it. The trade's other side is checked at approval, where the full rules run.
+ * it.
  */
 export function requestSwap(s: RosterShift, requester: string, target: WorkforceMember, t: ShiftTemplate, toShift: RosterShift | null, at: string, id: string, opts?: Timing): SwapRequest {
   if (s.personId !== requester) throw new Error("You can only swap your own shift")
@@ -129,44 +73,4 @@ export function requestSwap(s: RosterShift, requester: string, target: Workforce
   if (why) throw new Error(why)
   if (toShift && toShift.personId !== target.id) throw new Error("That shift is not theirs")
   return { id, shiftId: s.id, toShiftId: toShift?.id ?? null, fromPersonId: requester, toPersonId: target.id, at, status: "open", decidedBy: null, decidedAt: null }
-}
-
-/** FR-RS-43: approve a swap. Both resulting assignments are checked; a blocking rule broken for either person refuses it (office can override with a reason). */
-export function approveSwap(
-  r: SwapRequest, s: RosterShift, toShift: RosterShift | null, a: RosterAccess, week: RosterWeek, location: Location, ctx: RuleContext, by: string, at: string,
-  overrideReason?: string | null, found: RuleViolation[] = [],
-): { shift: RosterShift; other: RosterShift | null; request: SwapRequest; violations: RuleViolation[]; entry: HistoryEntry } {
-  guard(week, location, a, s)
-  if (r.status !== "open") throw new Error("Swap already decided")
-  if (r.shiftId !== s.id || s.personId !== r.fromPersonId) throw new Error("The shift has changed since the request")
-  if ((r.toShiftId ?? null) !== (toShift?.id ?? null)) throw new Error("The other shift is missing")
-  if (toShift && (toShift.personId !== r.toPersonId || toShift.locationId !== s.locationId)) throw new Error("The other shift has changed since the request")
-  const templates = new Map(ctx.templates.map((x) => [x.id, x]))
-  const check = (m: WorkforceMember | undefined, x: RosterShift) => {
-    const t = templates.get(x.templateId)
-    if (!m || !t) throw new Error("Cannot verify this person for the shift")
-    const why = ineligible(m, t, x.date)
-    if (why) throw new Error(why)
-  }
-  check(ctx.members.find((x) => x.id === r.toPersonId), s)
-  if (toShift) check(ctx.members.find((x) => x.id === r.fromPersonId), toShift)
-  const shift: RosterShift = { ...s, personId: r.toPersonId, confirmedAt: null }
-  const other: RosterShift | null = toShift ? { ...toShift, personId: r.fromPersonId, confirmedAt: null } : null
-  const changed = other ? [shift, other] : [shift]
-  const ids = new Set(changed.map((x) => x.id))
-  const violations = merge(checkShifts(changed, withShifts(ctx, changed)), found.filter((v) => ids.has(v.shiftId)))
-  const { reason } = gate(violations, a, overrideReason)
-  return {
-    shift,
-    other,
-    request: { ...r, status: "approved", decidedBy: by, decidedAt: at },
-    violations,
-    entry: entryOf("swap.approved", week, s, by, at, { personId: r.fromPersonId, toShiftId: r.toShiftId }, { personId: r.toPersonId, toShiftPerson: other ? r.fromPersonId : null }, reason),
-  }
-}
-
-export function rejectSwap(r: SwapRequest, s: RosterShift, a: RosterAccess, week: RosterWeek, location: Location, by: string, at: string): SwapRequest {
-  guard(week, location, a, s)
-  if (r.status !== "open") throw new Error("Swap already decided")
-  return { ...r, status: "rejected", decidedBy: by, decidedAt: at }
 }
