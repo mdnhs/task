@@ -3,6 +3,7 @@ import { addDays, epochToWall } from "@opsdesk/domain/shifts"
 import { rosterAccess } from "@opsdesk/domain/roster-access"
 import type { ResolvedRole } from "../../core/context"
 import { registerJob } from "../../core/queue/queue"
+import { registerDsrHandler } from "../gdpr/registry"
 import { startSweep } from "../../core/observability/sweep"
 import { locations, memberQualifications, memberships, qualificationExpiryNotices, rosterAutoRepeatRuns, rosterWeeks, tenants } from "../../db/schema"
 import { withTenant, type TenantTx } from "../../db/tenant-tx"
@@ -10,6 +11,7 @@ import type { Deps } from "../../deps"
 import { errorInfo } from "../../core/safe-error"
 import { tenantEntitlements } from "../entitlements/service"
 import { notifyMany, SUBJECT_TOKEN, withTenantAfterCommit, type NotifyInput } from "../notifications"
+import { rostersDsrHandler } from "./dsr"
 import { approversOf, notifyActive } from "./events"
 import { copyWeek } from "./repeat"
 import { lockRoster, type RosterCtx } from "./scope"
@@ -269,6 +271,7 @@ export async function runQualificationExpiryJob(data: unknown, deps: Deps): Prom
 
 /** Registers the roster jobs (worker.ts, tests). Safe to call again. */
 export function registerRosters(): void {
+  registerDsrHandler("rosters", rostersDsrHandler) // data-subject export and erasure of the roster tables (dsr.ts)
   registerJob(AUTO_REPEAT_JOB, runAutoRepeatJob)
   registerJob(QUALIFICATION_EXPIRY_JOB, runQualificationExpiryJob)
 }

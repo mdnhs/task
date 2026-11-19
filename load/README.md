@@ -1,4 +1,4 @@
-# Load test (B7 Task 17)
+# Load test (B7 Task 17, roster scenario B8 Task 18)
 
 k6 scenarios for the 250-user target of NFR-08. **Localhost only**: the scripts refuse any `BASE_URL` that is not `localhost`, `127.0.0.1` or `[::1]`, and the seed refuses a database that is not local. Never point it at a client's deployment.
 
@@ -9,7 +9,8 @@ npm run e2e:stack                 # Postgres 55432, Redis 56379, MinIO 59000, Cl
 # one-time per database: roles + migrations (apiEnv in e2e/stack-env.ts has every variable; the API below needs them too)
 (cd api && npx tsx scripts/e2e-prepare.ts)
 
-# the load tenant: `loadtest`, 250 users (1 owner, 10 ops managers, 239 employees), 10 000 tasks, one daily shift everybody reports on
+# the load tenant: `loadtest`, 250 users (1 owner, 10 ops managers, 239 employees), 10 000 tasks, one daily shift everybody reports on,
+# and (B8 T18) 40 locations: every employee homed at one site with 4 shifts a week, this week and next published, one DRAFT week per site (--locations 0 = no rosters)
 ALLOW_DEMO_SEED=1 SEED_DEMO_PASSWORD=<12+ chars> npm run load:prepare -- [--users 250] [--tasks 10000]
 #   writes load/.users.json (session cookies of the throwaway users; gitignored, mode 0600, never printed)
 
@@ -41,6 +42,7 @@ BASE_URL=http://localhost:3101 TARGET=api METRICS_URL=http://127.0.0.1:9464/metr
 | 5 | report submit | open (an older, unused shift date), `PUT` draft, `POST /v1/shift-reports/{id}/submit` | write |
 | 5 | search | `GET /v1/search?q=...&limit=10` | read |
 | 5 | notifications | `GET /v1/notifications?limit=20` | read |
+| 10 | roster (B8 T18) | employee: `GET /v1/roster/mine` (`roster_mine`). Ops manager or owner (office level, every site): 70 % `GET /v1/roster/weeks?from=<monday>&view=week` (`roster_week`, all 40 sites at once: the heavy payload), 25 % `POST /v1/roster/weeks/{draft}/check` (`roster_check`), 5 % publish a draft week, once per draft (`GET` it, then `POST .../publish` with its version: `roster_publish`, 200 or 409) | read / write |
 
 Every request carries the tags `kind` (`read` or `write`) and `name` (the step).
 
@@ -53,6 +55,8 @@ Every request carries the tags `kind` (`read` or `write`) and `name` (the step).
 | `http_req_duration{name:report_submit}` p(95) < 2000 ms | report submit on the 4G budget, measured server side |
 | `http_req_failed` rate < 1 % | errors |
 | `checks` rate > 99 % | every step checks its status code |
+| `http_req_duration{name:roster_week}` p(95) < 400 ms | the week payload of every location at 250 users and 40 locations (B8 T18) |
+| `http_req_duration{name:roster_publish}` p(95) < 800 ms | publishing a draft week (its people are notified), 250 users and 40 locations (B8 T18) |
 | `rate_limited` count = 0 | no 429 in the steady state (the global limits must not bite 250 normal users) |
 | `db_pool_waiting` p(95) < 1 (so 0) | nobody waits for a Postgres connection; only with `METRICS_URL` (the series is scraped from the API's `/metrics`) |
 
@@ -98,3 +102,18 @@ The top three by cost:
 3. **report draft save**: `Nested Loop` from `task_assignees_user_idx` (42 rows) into `tasks_pkey`, 0.4 ms.
 
 **Decision: no change, no index migration.** The only sequential scans over 1 000 rows are whole-tenant aggregates where a scan is the cheapest plan (an index adds nothing and costs every write), and every endpoint answers in about 20 ms or less at this size, far inside the 500 ms read budget. Revisit when a tenant holds more than ~100 000 live tasks (the rewrite of the own-scope list above is the first candidate).
+
+## Roster scenario numbers (B8 Task 18, smoke profile only)
+
+Run on a laptop (macOS, k6 1.x) against the API port directly (`TARGET=api`), Postgres 16 and Redis in throwaway containers (own compose project, e2e ports 55432/56379/59000), the load tenant at its defaults (250 users, 10 000 tasks, 40 locations, 956 shifts a week), 5 VUs for 1 minute. **Not the 250-user profile**: only the smoke profile was run, so these numbers say the endpoints work and are fast when idle, not that the targets hold at 250 concurrent users.
+
+| Step | p(95) | Target |
+|---|---|---|
+| `roster_week` (all 40 sites, 525 KB) | 70.7 ms under the 5-VU mix; 18.7 ms alone (30 sequential requests) | < 400 ms |
+| `roster_publish` (one draft week) | 73 ms (a single publish in the run) | < 800 ms |
+| `roster_check` | inside `kind:write`, p(95) 55 ms | < 800 ms |
+| `roster_mine` (employee, 2.3 KB) | not in the run (the first 11 users are the owner and the ops managers, so 5 VUs never run an employee); 8.8 ms alone (30 sequential requests, one employee) | < 500 ms (`kind:read`) |
+
+A 1-minute 5-VU run holds only a handful of samples per roster step, so the p(95) values are indicative at best.
+
+Whole run: `http_req_failed` 0.00 %, `checks` 100 % (97), `rate_limited` 0, every threshold passed. The 250-user profile (`k6 run load/k6/scenarios.js`, 13 minutes) was **not** run: it needs the full e2e stack and a quiet machine; run it before relying on the roster targets.

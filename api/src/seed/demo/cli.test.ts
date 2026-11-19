@@ -64,7 +64,8 @@ describe("scripts/seed-demo.ts", () => {
     expect(first.code).toBe(0)
     expect(first.stdout).toContain("seeded northgate, harbourline, millbrook")
     expect(first.stdout).toContain("anchor 2026-12-01")
-    expect(first.stdout).toContain("not seeded: rosters/*: FE-only")
+    expect(first.stdout).toContain("not seeded: staff-rosters/{incidents,roster-gaps}.json: FE-only")
+    expect(first.stdout).not.toContain("not seeded: rosters/*")
     const before = (await ownerQuery("select id, slug from tenants order by slug")).map((r) => `${r.id}:${r.slug}`)
     const noOwner = await seed(OPT_IN)
     expect([noOwner.code, noOwner.stderr.trim()]).toEqual([1, "refused: owner_required"])
@@ -75,7 +76,7 @@ describe("scripts/seed-demo.ts", () => {
       expect(out.stdout + out.stderr).not.toContain(DEMO_PASSWORD)
       expect(out.stdout + out.stderr).not.toContain("JBSWY3DPEHPK3PXP")
     }
-    expect(await users()).toBe(21) // 20 people + the platform owner
+    expect(await users()).toBe(23) // 22 people (20 + the two roster people without an account) + the platform owner
   }, 300_000)
 
   test("--anchor latest-report is accepted; a held seed lock makes the script exit 1 with refused: lock_timeout within SEED_LOCK_TIMEOUT_MS", async () => {

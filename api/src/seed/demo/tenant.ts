@@ -21,6 +21,7 @@ import type { Anchor } from "./anchor"
 import { detId } from "./ids"
 import type { Person } from "./people"
 import { seedReports } from "./reports"
+import { rosterAnchor, seedRosters } from "./rosters"
 import type { MockSubscription, MockTenant, Source } from "./source"
 import { seedTasks } from "./tasks"
 import { wipeTenantData } from "./wipe"
@@ -219,6 +220,11 @@ async function seedDataset(tx: TenantTx, run: TenantRun, tenantId: string, actor
   counts.reports = src.reports.length
   if (seeded.evidenceFiles > 0) warnings.push(`${seeded.evidenceFiles} task evidence files are metadata only: the seed writes no objects to storage, so opening one fails`)
   if (rep.attachmentsSkipped > 0) warnings.push(`${rep.attachmentsSkipped} report attachments were skipped (files need object storage)`)
+
+  // ---- rosters (M1A): locations, shift types, weeks, shifts, history, requests, leave, availability, qualifications and the personas that can edit them ----
+  const roster = await seedRosters(tx, { tenantId, tz, now, anchor: rosterAnchor(src, weekAnchor, tz), actorId: ownerId, src, userOfMock })
+  Object.assign(counts, Object.fromEntries(Object.entries(roster.counts).map(([k, v]) => [`roster.${k}`, v])))
+  warnings.push(...roster.warnings)
 
   // ---- notifications of the demo's signed-in person (in-app only; no delivery rows, so nothing is ever sent) ----
   const me = byName.get(src.shellUser.name)

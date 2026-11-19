@@ -115,8 +115,8 @@ describe("error reporter", () => {
 describe("worker", () => {
   test("worker job failure logs name, jobId and requestId (when present), never the payload", () => {
     const { lines, logger } = cap()
-    logJobFailure(logger, { name: "notification.send", id: "job-42", data: { requestId: "0b9d6f3e-5c1a-4f6e-9a57-2f1d3c8e7a10", to: "leak@example.com", password: "PAYLOADSECRET", body: "x" } }, drizzleLike())
-    logJobFailure(logger, { name: "events.relay", id: "job-43", data: { requestId: "bad id with spaces" } }, new Error("x"))
+    logJobFailure(logger, { name: "notification.send", id: "job-42", opts: { requestId: "0b9d6f3e-5c1a-4f6e-9a57-2f1d3c8e7a10" }, data: { requestId: "payload-id-not-read", to: "leak@example.com", password: "PAYLOADSECRET", body: "x" } }, drizzleLike())
+    logJobFailure(logger, { name: "events.relay", id: "job-43", opts: { requestId: "bad id with spaces" }, data: {} }, new Error("x"))
     const [a, b] = lines.map((l) => JSON.parse(l))
     expect(a).toMatchObject({ job: "notification.send", jobId: "job-42", requestId: "0b9d6f3e-5c1a-4f6e-9a57-2f1d3c8e7a10", name: "Error", code: "23505" })
     expect(b.requestId).toBeUndefined() // a requestId that is not id-shaped is not logged
@@ -130,7 +130,7 @@ describe("worker", () => {
     const clock = { now: () => new Date(now) }
     const ok = await instrumentJob({ metrics, errorReporter: reporter, clock }, { name: "events.relay", id: "j1", data: {} }, async () => { now += 1500 })
     expect(ok).toBeUndefined()
-    await expect(instrumentJob({ metrics, errorReporter: reporter, clock }, { name: "tasks.recurrence", id: "j2", data: { requestId: "0b9d6f3e-5c1a-4f6e-9a57-2f1d3c8e7a10" } }, async () => { throw new Error("bad") })).rejects.toThrow("bad")
+    await expect(instrumentJob({ metrics, errorReporter: reporter, clock }, { name: "tasks.recurrence", id: "j2", opts: { requestId: "0b9d6f3e-5c1a-4f6e-9a57-2f1d3c8e7a10" }, data: {} }, async () => { throw new Error("bad") })).rejects.toThrow("bad")
     const out = metrics.render()
     expect(out).toContain('queue_jobs_total{name="events.relay",result="ok"} 1')
     expect(out).toContain('queue_jobs_total{name="tasks.recurrence",result="failed"} 1')

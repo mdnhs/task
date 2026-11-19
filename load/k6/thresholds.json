@@ -2,6 +2,8 @@
   "http_req_duration{kind:read}": ["p(95)<500"],
   "http_req_duration{kind:write}": ["p(95)<800"],
   "http_req_duration{name:report_submit}": ["p(95)<2000"],
+  "http_req_duration{name:roster_week}": ["p(95)<400"],
+  "http_req_duration{name:roster_publish}": ["p(95)<800"],
   "http_req_failed": ["rate<0.01"],
   "checks": ["rate>0.99"],
   "rate_limited": ["count==0"]

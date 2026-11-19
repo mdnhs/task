@@ -58,6 +58,34 @@ describe("load-prepare", () => {
     expect([200, 201], await open.clone().text()).toContain(open.status)
   })
 
+  test("B8 T18: the load tenant gets rosters: N locations, published weeks with 4 shifts per employee, one draft week per location to publish, the ops role may edit every site; the users file names the draft weeks; the roster endpoints answer 200 for the right roles", async () => {
+    const r = await prepareLoad(opts({ locations: 4 }))
+    const tid = String((await ownerQuery("select id from tenants where slug = $1", [LOAD_SLUG]))[0].id)
+    const n = async (sql: string) => Number((await ownerTenantQuery(tid, sql))[0].n)
+    expect(await n("select count(*)::int as n from locations")).toBe(4)
+    expect(await n("select count(*)::int as n from shift_types")).toBe(4)
+    expect(await n("select count(*)::int as n from roster_weeks where status = 'published'")).toBe(8) // this week and next, per location
+    expect(await n("select count(*)::int as n from roster_weeks where status = 'draft'")).toBe(4)
+    expect(await n("select count(*)::int as n from roster_shifts")).toBe(12) // one employee x 4 shifts x 3 weeks (the weeks of the employees' home sites; the other sites hold empty weeks)
+    expect(await n("select count(*)::int as n from roster_shifts where week_id in (select id from roster_weeks where status = 'draft')")).toBe(4)
+    expect(await n("select count(*)::int as n from memberships where home_location_id is not null")).toBe(1) // 12 users: one employee
+    expect(r.file.roster).toBeDefined()
+    expect(r.file.roster!.drafts).toHaveLength(4)
+    expect(r.file.roster!.locationIds).toHaveLength(4)
+    expect(r.file.roster!.weekStart).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+    const { app } = testApp()
+    const ops = r.file.users[1]
+    const week = await call(app, "GET", `/v1/roster/weeks?from=${r.file.roster!.weekStart}&view=week`, { cookie: ops.cookie, tenant: LOAD_SLUG })
+    expect(week.status, await week.clone().text()).toBe(200)
+    expect(((await week.json()) as { weeks: unknown[] }).weeks).toHaveLength(4)
+    const draft = r.file.roster!.drafts[0]
+    const check = await call(app, "POST", `/v1/roster/weeks/${draft.id}/check`, { cookie: ops.cookie, tenant: LOAD_SLUG, body: {} })
+    expect(check.status, await check.clone().text()).toBe(200)
+    const emp = r.file.users[11]
+    const mine = await call(app, "GET", "/v1/roster/mine", { cookie: emp.cookie, tenant: LOAD_SLUG })
+    expect(mine.status, await mine.clone().text()).toBe(200)
+  })
+
   test("buildUsersFile keeps only email, role and cookie per user", () => {
     const f = buildUsersFile({ tenant: "t", patternId: "p", today: "2026-12-01", users: [{ email: "a@demo.example", role: "ops", cookie: "c=1", ...({ password: "leak" } as object) } as never] })
     expect(f.users[0]).toEqual({ email: "a@demo.example", role: "ops", cookie: "c=1" })

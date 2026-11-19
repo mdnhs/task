@@ -28,6 +28,8 @@ export const TENANT = file.tenant
 export const PATTERN_ID = file.patternId
 export const TODAY = file.today
 export const USERS = file.users
+/** B8 T18: { weekStart, locationIds, drafts: [{ id, locationId }] } of the roster scenario; undefined when the users file was made without rosters. */
+export const ROSTER = file.roster
 
 export const rateLimited = new Counter("rate_limited")
 export const dbPoolWaiting = new Trend("db_pool_waiting")

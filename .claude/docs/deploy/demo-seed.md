@@ -55,7 +55,8 @@ Refusals print one safe code (`refused: <code>`) and write nothing. A failure pr
 
 - Three tenants (`shell/tenants.json` and `billing/subscription.json`): `northgate` (business, active, the full dataset), `harbourline` (starter, trialing),
   `millbrook` (business, past_due). The last two hold only their owner. Tenant name, brand colour, timezone, currency, locale and report deadline come from the mock; code knows none of them.
-- 20 users in `northgate`: the 14 of `settings/users.json` plus the 6 people only `tasks/people.json` knows (matched by name; the others get `<name-slug>@demo.example`).
+- 22 users in `northgate`: the 14 of `settings/users.json`, the 6 people only `tasks/people.json` knows (matched by name; the others get `<name-slug>@demo.example`) and the 2 people only the roster files name
+  (`s-bell` Marcus Bell, an employee; `s-grant` Oliver Grant, a deactivated membership: he left on 31 Oct). The other `s-` ids of the roster files are accounts under another key (M. Haddad, J. Silva, A. Kowalski, matched by name via `staff-rosters/staff.json`).
   All verified, no 2FA, role keys as in `shell/roles.json`. `amara.bello@demo.example` (owner) is also the owner of the other two tenants, so the tenant switcher has 3 entries.
   Two users (`chloe.barnes`, `marek.nowak`) are deactivated memberships, as in the mock.
 - Teams (Security, Cleaning, departments) with their members and the reporting lines verbatim from `shifts/members.json`; shift patterns, assignments and the reporting defaults;
@@ -67,6 +68,30 @@ Refusals print one safe code (`refused: <code>`) and write nothing. A failure pr
   Dates with no weekday meaning (tasks, subscription dates) move by the exact offset. **Weekday-bound dates (shift assignments and report shift dates) move by a whole number of weeks**: the
   largest multiple of 7 that keeps the latest report on or before the anchor day, so every report stays on a day its pattern runs and no submitted report is in the future. When that differs from the
   exact offset the run prints `warning: shift dates moved by N days (not M) to keep weekdays` (also `shiftOffsetDays` in the report).
+
+## Rosters (M1A, B8 Task 18) and the personas that can edit them
+
+`northgate` gets `public/data/rosters/*.json` as raw inserts with deterministic ids (`detId(tenant, "roster-<kind>", <mock id>)`, so a re-seed keeps every id): 3 locations (opening-hours lines like `Mon-Sat 08:00-22:00` become per-day keys), the
+supervisor grants of `access.json`, 7 shift types and their weekday targets, the rules the tenant chose (`roster.rules` setting), home sites and qualifications (one expires within a month of the anchor, one has no end date),
+4 weeks (3 published, 1 draft) with 51 shifts (6 open, some confirmed), history (the mock's lines in the service's action names plus a publish line for every published week), a change request, a claim, 4 leave requests (approved,
+requested, rejected), availability windows and 2 saved week layouts. The seeded data contains the rule breaks the engine must flag (a double booking at Coppers on the Friday, a 1-hour rest for J. Silva, approved leave and an unavailable window).
+Everything with a date moves by **whole weeks** (a Monday stays a Monday, also with `--anchor latest-report`, which moves other dates by days) and every wall time is kept: the instants are computed in the location's zone, so 18:00 is 18:00 on both
+sides of a clock change. Not seeded: the office-limits row of `access.json` for Priya Shah (she is HR, read-only: a limit means nothing without an office role), and `staff-rosters/{incidents,roster-gaps}.json` (FE-only incident and cover model).
+
+Who can edit rosters (the role templates in `public/data/shell/roles.json` are untouched; the demo tenant's own `ops` and `supervisor` roles were given a roster level, as a tenant owner could in the role editor):
+
+| Persona (password `SEED_DEMO_PASSWORD`) | Role | Roster level | Sites they see and edit |
+| --- | --- | --- | --- |
+| `amara.bello@demo.example` | owner | office (template) | all 3 (Coppers, Docklands Plaza, Liffey Retail Park); publishes, rules, grants |
+| `rhys.edwards@demo.example` | admin | office (template) | all 3 |
+| `lilianna.novak@demo.example` | ops, the all-scope manager | office (demo tenant role) | all 3, no limits |
+| `ismail.rahman@demo.example` | supervisor | supervisor (demo tenant role) | Coppers only (grant of `access.json`); drafts and publish-by-supervisor rules apply, another site is 404 |
+| `daniel.okafor@demo.example` | supervisor | supervisor (demo tenant role) | Docklands Plaza only |
+| `grace.mensah@demo.example` | supervisor | supervisor, no grant | none: the roster page shows no site (she is homed at Liffey as a member, which is not a grant) |
+| `priya.shah@demo.example`, `ibrahim.khan@demo.example` | hr, auditor | none | no roster access |
+| employees (`marcus.hill`, `leo.fernandez`, `m.haddad`, ...) | employee | staff | their own shifts, leave, availability, claims and swaps |
+
+The default `location-supervisor` role template keeps `attention: none`: its task attention items are tenant-wide (task scope `all`), not limited to the supervisor's sites (verified by a test in `rosters/attention.test.ts`).
 
 ## Idempotent and re-runnable
 
@@ -90,7 +115,7 @@ Both are listed in the run's `warning:` lines.
 
 ## What is not seeded (and why)
 
-Printed as `not seeded:` lines on every run. FE-only features with no backend module stay on the mock (rulings I16, J2): `rosters`, `staff-rosters`, `orders`, `recruitment`, `payroll`, `files`, `assistant`.
+Printed as `not seeded:` lines on every run. FE-only features with no backend module stay on the mock (rulings I16, J2): the FE-only incident and cover model of `staff-rosters`, `orders`, `recruitment`, `payroll`, `files`, `assistant` (`rosters/*` is seeded since B8 Task 18).
 Also not loaded: `platform/*` (platform plans, invoices and tenants are platform data), `billing/{invoices,usage,entitlements}.json` (the provider, the computation and the API's own data), the read models the API computes
 (`dashboard`, `attention`, `search`, `audit`) and display-only `settings/*` files.
 

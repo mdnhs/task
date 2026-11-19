@@ -14,10 +14,10 @@ export const PG_ADMIN = "postgres://postgres:postgres@localhost:55432/opsdesk_e2
 export const OWNER_URL = "postgres://app_owner:e2e_owner_pw@localhost:55432/opsdesk_e2e"
 export const USER_URL = "postgres://app_user:e2e_user_pw@localhost:55432/opsdesk_e2e"
 export const PERSONAS = {
-  owner: "amara.bello@demo.example", // all scope
+  owner: "amara.bello@demo.example", // all scope; roster level office: every site (docs/deploy/demo-seed.md, Rosters)
   platform: PLATFORM_EMAIL, // the console operator (2FA enrolled by the seed); signs in with a TOTP code
-  ops: "lilianna.novak@demo.example", // all-scope manager
-  supervisor: "daniel.okafor@demo.example", // Security team manager
+  ops: "lilianna.novak@demo.example", // all-scope manager; roster level office in the demo tenant: edits the roster of every site
+  supervisor: "daniel.okafor@demo.example", // Security team manager; roster supervisor of Docklands Plaza only
   supervisor2: "grace.mensah@demo.example", // Cleaning team manager
   auditor: "ibrahim.khan@demo.example", // read-only everywhere
   hr: "priya.shah@demo.example",
@@ -26,7 +26,7 @@ export const PERSONAS = {
   member2: "marcus.hill@demo.example", // Security, reports to Daniel
   kone: "amara.kone@demo.example", // Cleaning employee: the person CR-04 reassigns a task to
   leo: "leo.fernandez@demo.example", // CR-06: the member with the bound Android phone
-  ismail: "ismail.rahman@demo.example", // the fifth member of the all-day pattern: the one the conflict walk edits
+  ismail: "ismail.rahman@demo.example", // the fifth member of the all-day pattern: the one the conflict walk edits; roster supervisor of Coppers only (rosters walk)
   haddad: "m.haddad@demo.example", // unassigned Security employees: the people CR-01 and CR-03 give a shift to
   silva: "j.silva@demo.example",
   kowalski: "a.kowalski@demo.example",

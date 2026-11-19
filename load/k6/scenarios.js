@@ -1,8 +1,8 @@
 // The 250-user scenario (NFR-08): ramp 2 min, hold 10 min, ramp down 1 min. Each iteration picks ONE action by weight, then thinks 1 to 5 s.
-//   dashboard 20 | tasks list 25 | task detail 15 | Today 15 | shift report draft save 10 | report submit 5 | search 5 | notifications 5
+//   dashboard 20 | tasks list 25 | task detail 15 | Today 15 | shift report draft save 10 | report submit 5 | search 5 | notifications 5 | roster 10 (B8 T18: my roster for employees; week, check, publish for ops and the owner)
 // Thresholds: load/k6/thresholds.json (documented in load/README.md).
 import { sleep } from "k6"
-import { ok, json, req, userFor, USERS, thresholds, scrapePool, METRICS_URL, PATTERN_ID, daysBefore } from "./lib.js"
+import { ok, json, req, userFor, USERS, thresholds, scrapePool, METRICS_URL, PATTERN_ID, ROSTER, daysBefore } from "./lib.js"
 
 const MIX = [
   ["dashboard", 20],
@@ -13,6 +13,7 @@ const MIX = [
   ["report_submit", 5],
   ["search", 5],
   ["notifications", 5],
+  ["roster", 10],
 ]
 const TOTAL = MIX.reduce((n, [, w]) => n + w, 0)
 const pick = () => {
@@ -94,6 +95,34 @@ const ACTIONS = {
   notifications(user) {
     ok(req("GET", "/v1/notifications?limit=20", user, "read", "notifications"), "notifications")
   },
+  // B8 T18. An employee reads their own roster (`roster_mine`). An ops manager or the owner (office level: every site) loads the whole week of every site (`roster_week`: the heavy payload,
+  // 40 sites x ~25 shifts), runs a rule check on a draft (`roster_check`) or, once per draft week, publishes it (`roster_publish`: the draft's shifts become visible and its people are notified).
+  roster(user) {
+    if (!ROSTER) return ACTIONS.dashboard(user) // a users file made without rosters
+    if (user.role === "employee") return void ok(req("GET", "/v1/roster/mine", user, "read", "roster_mine"), "roster mine")
+    const r = Math.random()
+    if (r < 0.7) return void ok(req("GET", `/v1/roster/weeks?from=${ROSTER.weekStart}&view=week`, user, "read", "roster_week"), "roster week")
+    const draft = nextDraft()
+    if (!draft) return void ok(req("GET", `/v1/roster/weeks?from=${ROSTER.weekStart}&view=week`, user, "read", "roster_week"), "roster week")
+    if (r < 0.95) return void ok(req("POST", `/v1/roster/weeks/${draft.id}/check`, user, "write", "roster_check", {}), "roster check")
+    publish(user)
+  },
+}
+
+// One DRAFT week per site (users file): each publish takes the next unpublished one, so every VU publishes different weeks and a draft is published once. VUs are separate JS runtimes, so the
+// draft a VU takes is chosen by its VU number and a per-VU counter (stride = the number of VUs that can publish).
+let publishes = 0
+const nextDraft = () => (ROSTER.drafts.length ? ROSTER.drafts[(__VU - 1 + publishes * 11) % ROSTER.drafts.length] : null)
+const published = new Set()
+function publish(user) {
+  const draft = nextDraft()
+  publishes += 1
+  if (!draft || published.has(draft.id)) return
+  published.add(draft.id)
+  const week = req("GET", `/v1/roster/weeks/${draft.id}`, user, "read", "roster_week_one")
+  if (!ok(week, "roster week one")) return
+  const version = json(week).weeks[0].version
+  ok(req("POST", `/v1/roster/weeks/${draft.id}/publish`, user, "write", "roster_publish", { version }), "roster publish", [200, 409])
 }
 
 function uuid() {

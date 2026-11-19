@@ -36,6 +36,25 @@ export type MockReport = {
 export type MockTenant = { id: string; name: string; slug: string; brand: string; status: string; plan: string; trialEndsOn?: string; graceEndsOn?: string }
 export type MockDevice = { id: string; userId: string; type: "pc" | "android" | "browser"; owner: "company" | "personal"; label: string; trusted: boolean; lastSeen: string }
 export type MockNotification = { id: string; type: string; title: string; at: string; read: boolean; href: string }
+export type MockRosters = {
+  locations: { id: string; name: string; address: string; pin: { lat: number; lng: number }; zoneRadiusM: number; openingHours: string; contact: string; swapApprovalDelegated: boolean }[]
+  templates: { id: string; locationId: string; name: string; start: string; end: string; unpaidBreakMin: number; role: string; requires: string[] }[]
+  targets: { locationId: string; templateId: string; weekday: number; count: number }[]
+  weeks: { id: string; locationId: string; weekStart: string; status: "draft" | "published"; publishedAt: string | null; publishedBy: string | null; autoRepeatDays: number | null }[]
+  shifts: { id: string; weekId: string; locationId: string; date: string; personId: string | null; templateId: string; role: string; start: string; end: string; unpaidBreakMin: number; confirmedAt: string | null }[]
+  history: { id: string; weekId: string | null; locationId: string; shiftId: string | null; at: string; by: string; action: string; before: Record<string, unknown> | null; after: Record<string, unknown> | null; reason: string | null }[]
+  requests: { id: string; weekId: string; shiftId: string; by: string; at: string; patch: Record<string, unknown>; why: string; status: string; decidedBy: string | null; decidedAt: string | null; note: string | null }[]
+  claims: { id: string; shiftId: string; personId: string; at: string; status: string; decidedBy: string | null; decidedAt: string | null }[]
+  swaps: { id: string; shiftId: string; fromPersonId: string; toPersonId: string | null; at: string; status: string }[]
+  leave: { id: string; personId: string; from: string; to: string; kind: string; status: string; decidedBy: string | null; decidedAt: string | null }[]
+  availability: { personId: string; weekday: number; from: string; to: string }[]
+  workforce: { id: string; homeLocationId: string; qualifications: { type: string; expires: string | null }[]; leftOn?: string }[]
+  weekTemplates: { id: string; name: string; locationId: string; shifts: { day: number; personId: string | null; templateId: string; role: string; start: string; end: string; unpaidBreakMin: number }[] }[]
+  access: { grants: { locationId: string; personId: string }[]; limits: { personId: string; except: string[] }[] }
+  rules: { avgWeekReferenceWeeks: number; severity: Record<string, string> }
+  /** staff-rosters/staff.json: the names behind the `s-...` ids the roster files use (only the ids the roster data names are ever made people). */
+  staff: { id: string; name: string; role: string; dept: string; personId?: string }[]
+}
 export type MockSubscription = { planId: string; status: string; renewsOn: string; cardLast4: string | null }
 
 export type Source = {
@@ -59,8 +78,19 @@ export type Source = {
   tasks: MockTask[]
   reports: MockReport[]
   notifications: MockNotification[]
+  rosters: MockRosters
   plans: { id: string }[]
   loaded: string[]
+}
+
+function loadRosters(read: <T>(path: string) => T): MockRosters {
+  const f = <K extends string, T>(file: string, key: K): T => (read<Record<K, T>>(`rosters/${file}.json`))[key]
+  return {
+    locations: f("locations", "locations"), templates: f("templates", "templates"), targets: f("targets", "targets"), weeks: f("weeks", "weeks"), shifts: f("shifts", "shifts"),
+    history: f("history", "history"), requests: f("requests", "requests"), claims: f("claims", "claims"), swaps: f("swaps", "swaps"), leave: f("leave", "leave"),
+    availability: f("availability", "availability"), workforce: f("workforce", "extras"), weekTemplates: f("week-templates", "weekTemplates"), access: read<MockRosters["access"]>("rosters/access.json"),
+    rules: read<MockRosters["rules"]>("rosters/rules.json"), staff: read<{ staff: MockRosters["staff"] }>("staff-rosters/staff.json").staff,
+  }
 }
 
 /** Reads every mock file the seed uses (and says which). A missing or malformed file is a refusal, before anything is written. */
@@ -100,6 +130,7 @@ export function loadSource(dir: string): Source {
     tasks: read<{ tasks: MockTask[] }>("tasks/tasks.json").tasks,
     reports: read<{ reports: MockReport[] }>("reports/reports.json").reports,
     notifications: read<MockNotification[]>("shell/notifications.json"),
+    rosters: loadRosters(read),
     plans: read<{ id: string }[]>("billing/plans.json"),
     loaded,
   }
@@ -110,8 +141,7 @@ export function loadSource(dir: string): Source {
 
 /** Every public/data file the seed deliberately does NOT load: features that have no backend module yet (FE-only, ruling I16/J2), display data and platform data. */
 export const NOT_SEEDED: Record<string, string> = {
-  "rosters/*": "FE-only, no backend module yet; stays on the mock",
-  "staff-rosters/*": "FE-only incident and cover model; stays on the mock",
+  "staff-rosters/{incidents,roster-gaps}.json": "FE-only incident and cover model; stays on the mock (staff-rosters/staff.json is read only for the names behind the roster files' person ids)",
   "orders/*": "FE-only Orders & Stock; stays on the mock",
   "recruitment/*": "FE-only; stays on the mock",
   "payroll/*": "FE-only; stays on the mock",

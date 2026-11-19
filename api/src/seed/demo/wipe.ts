@@ -10,6 +10,9 @@ import { DEMO_SLUGS } from "./guards"
  * delete also names the tenant.
  */
 const TENANT_TABLES = [
+  // rosters: children before parents (the composite foreign keys are not cascades); memberships.home_location_id is cleared by its own ON DELETE SET NULL
+  "roster_exchanges", "roster_change_requests", "roster_history", "qualification_expiry_notices", "roster_auto_repeat_runs", "roster_shifts", "roster_weeks", "roster_week_templates",
+  "roster_availability", "leave_requests", "member_qualifications", "shift_type_targets", "shift_types", "roster_office_limits", "location_supervisors", "locations",
   "notification_deliveries", "notifications", "notification_preferences",
   "report_exports", "shift_report_alerts", "shift_reports", // items, versions, comments and files of a report go with it (cascade)
   "shift_assignments", "shift_reporting_people", "shift_reporting_teams", "shift_patterns",

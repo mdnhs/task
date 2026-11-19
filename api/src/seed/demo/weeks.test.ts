@@ -53,7 +53,7 @@ describe("weekday semantics survive any anchor (J6)", () => {
       all.push(`${anchor}:${shift}`)
     }
     expect(Number((await ownerQuery("select count(*)::int as n from tenants"))[0].n)).toBe(3)
-    expect(Number((await ownerQuery('select count(*)::int as n from "user"'))[0].n)).toBe(20)
+    expect(Number((await ownerQuery('select count(*)::int as n from "user"'))[0].n)).toBe(22)
     expect(new Set(all).size).toBeGreaterThan(1)
   }, 300_000)
 })

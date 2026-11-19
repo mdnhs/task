@@ -48,7 +48,8 @@ describe("demo seed (loaded once, anchored to 2026-12-01)", () => {
   afterAll(() => vi.restoreAllMocks())
 
   test("row counts equal the JSON: users, memberships, teams, patterns, assignments, tasks, reports, devices, projects, templates", async () => {
-    const people = new Set([...mockUsers.map((u) => u.name), ...mockPeople.map((p) => p.name)])
+    // + the two roster people with no account (s-bell, s-grant): the other `s-` ids of the roster files are accounts under another name key (M. Haddad, J. Silva, A. Kowalski)
+    const people = new Set([...mockUsers.map((u) => u.name), ...mockPeople.map((p) => p.name), "Marcus Bell", "Oliver Grant"])
     expect(report.tenants).toEqual(["northgate", "harbourline", "millbrook"])
     expect(await n('select count(*)::int as n from "user"')).toBe(people.size)
     expect(report.users).toBe(people.size)
