@@ -122,11 +122,13 @@ export type RosterLocation = {
 export type ShiftType = ShiftTemplate & { targets: { weekday: number; count: number }[]; archived: boolean; version: number }
 export type WeekShift = RosterShift & { version: number; startAt: string; endAt: string }
 export type WeekDay = { date: string; shiftIds: string[]; count: number; target: number; short: number; over: number }
-export type WeekRoster = RosterWeek & { version: number; days: WeekDay[] }
+/** What the API says the caller may do (derived from its write gate; the web never re-derives it): `locked` = published and this level may not edit it; `reason_required` = an office role editing a published week must give a reason. */
+export type WeekAccess = { level: "office" | "supervisor" | null; canEdit: boolean; locked: boolean; lockReason: "forbidden" | "roster_locked" | "reason_required" | null }
+export type WeekRoster = RosterWeek & { version: number; days: WeekDay[]; access: WeekAccess }
 export type RosterMember = { id: string; name: string; active: boolean; homeLocationId: string | null }
 export type ViewKind = "day" | "week" | "fortnight" | "month"
 export type RosterPayload = {
-  range: { from: string; to: string; view: ViewKind }; weeks: WeekRoster[]; shifts: WeekShift[]; shiftTypes: ShiftType[]; members: RosterMember[]; membersTruncated: boolean; locations: RosterLocation[]
+  range: { from: string; to: string; view: ViewKind }; weeks: WeekRoster[]; shifts: WeekShift[]; shiftTypes: ShiftType[]; members: RosterMember[]; membersTruncated: boolean; locations: RosterLocation[]; /** The caller's access to a DRAFT week (can they create and edit weeks at all). */ access: WeekAccess
 }
 export type WeekQuery = { locationId?: string; from?: string; to?: string; view?: ViewKind }
 
@@ -149,7 +151,7 @@ export type MineShift = {
   id: string; date: string; start: string; end: string; startAt: string; endAt: string; unpaidBreakMin: number; role: string; shiftType: string; confirmedAt: string | null
   version: number; locationId: string; locationName: string; locationAddress: string; timeZone: string
 }
-export type MyRoster = { from: string; to: string; shifts: MineShift[]; truncated: boolean; availability: Availability[]; leave: ApiLeave[] }
+export type MyRoster = { from: string; to: string; shifts: MineShift[]; truncated: boolean; availability: Availability[]; leave: ApiLeave[]; access: WeekAccess }
 export type LeaveQueueData = Page<ApiLeave>
 export type ExchangeQuery = { from?: string; to?: string; status?: ExchangeStatus; shiftId?: string; cursor?: string }
 export type ExchangeBoard = Page<ApiExchange> & { openShifts: WeekShift[] }

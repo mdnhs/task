@@ -1,94 +1,126 @@
-import { canSeeLocation, type RosterAccess } from "@/lib/roster-access"
-import type { HistoryEntry, RosterShift, RosterWeek, ShiftTemplate } from "@/lib/rosters"
-import { isHm, weekStart } from "@/lib/shifts"
+import { dayColumns, type StaffingTarget } from "@/lib/rosters"
+import type { RuleViolation } from "@/lib/roster-rules"
+import { isHm } from "@/lib/shifts"
 import type { WorkforceMember } from "@/lib/workforce"
+import type { RosterPayload, ShiftTemplate, ShiftType, WeekShift } from "./types"
 
-// Editing shifts (FR-RS-20/21/22/04). Pure: who may edit, one shift per person, moving a shift, who to suggest and the audit line.
+// Editing shifts on the API (FR-RS-20/21/22; B8 Task 20). Pure: the request bodies, the override pair, and the optimistic copies of the payload. Who may edit is the API's `access`, never worked out here.
 
-/** What the form fills in: the shift minus its id and person. */
-export type ShiftInput = Pick<RosterShift, "weekId" | "locationId" | "date" | "templateId" | "role" | "start" | "end" | "unpaidBreakMin">
-
-/** Supervisors edit drafts of the locations they manage; office roles edit drafts and published weeks (the reason prompt is Task 7). */
-export function canEditShift(a: RosterAccess, week: RosterWeek): boolean {
-  if (a.locationIds && !canSeeLocation(a, week.locationId)) return false
-  return week.status === "published" ? a.editPublished : a.editDraft
-}
-
-/** FR-RS-22: one shift per person, each with its own copy of the times so they can differ afterwards. No people makes one open shift. */
-export function addShifts(input: ShiftInput, people: string[], ids: string[]): RosterShift[] {
-  const who: (string | null)[] = people.length ? [...new Set(people)] : [null]
-  return who.map((personId, i) => ({ ...input, id: ids[i], personId, confirmedAt: null }))
-}
-
-/** `addShifts` behind the access guard: the role must be allowed to edit that week, the input must belong to it, and a published week (office only) needs a reason. */
-export function addShiftsChecked(a: RosterAccess, week: RosterWeek, input: ShiftInput, people: string[], ids: string[], reason: string | null): RosterShift[] {
-  if (!canEditShift(a, week)) throw new Error("This role cannot edit this roster")
-  if (input.weekId !== week.id || input.locationId !== week.locationId) throw new Error("Shift is not in this week")
-  if (week.status === "published" && !(reason ?? "").trim()) throw new Error("A reason is needed to edit a published roster")
-  return addShifts(input, people, ids)
-}
-
-/** A shift stays on the date it starts (FR-RS-21); moving it changes the date only. */
-export const moveShift = (s: RosterShift, date: string): RosterShift => ({ ...s, date })
-
-/**
- * `moveShift` behind the lock: the role must edit both the shift's week and the target week (a day in the same location), and both must still be
- * drafts. A published week changes only through `editPublished` (reason, history). Returns the shift on the target week.
- */
-export function moveShiftChecked(a: RosterAccess, s: RosterShift, from: RosterWeek, to: RosterWeek, date: string): RosterShift {
-  if (!canEditShift(a, from) || !canEditShift(a, to)) throw new Error("This role cannot edit this roster")
-  if (from.status === "published" || to.status === "published") throw new Error("A published roster changes through an edit with a reason")
-  if (s.weekId !== from.id || s.locationId !== from.locationId || to.locationId !== s.locationId) throw new Error("Shift is not in this week")
-  if (weekStart(date) !== to.weekStart) throw new Error("That day is not in the target week")
-  return { ...moveShift(s, date), weekId: to.id }
+// ----------------------------------------------------------------------------------------------------------------- override (AI2 #3)
+/** The blocking rules among violations, each once: what `overrideRuleIds` has to name. */
+export function blockingRules(violations: RuleViolation[]): string[] {
+  return [...new Set(violations.filter((x) => x.severity === "block").map((x) => x.rule))]
 }
 
 /**
- * FR-RS-35: remove a shift. A draft week: any role that may edit it. A published week: an office role, with a reason. The audit line keeps the
- * whole shift as `before`. Returns the shifts without it; nothing is mutated.
+ * The reason and `overrideRuleIds` of an edit, a publish or a decision, always set TOGETHER. A blank reason is no override (nothing). A reason with blocking violations names them; a reason
+ * with nothing blocking (an office edit of a published week) is the reason alone. The API refuses a reason that does not cover a block, and ids without a reason.
+ * The reason's key is `reason` on shift edits and publish, `overrideReason` on change-request and exchange decisions (pass it as `key`).
  */
-export function removeShift(a: RosterAccess, week: RosterWeek, shifts: RosterShift[], id: string, by: string, at: string, existing: HistoryEntry[], reason: string | null): { shifts: RosterShift[]; entry: HistoryEntry } {
-  const s = shifts.find((x) => x.id === id)
-  if (!s || s.weekId !== week.id || s.locationId !== week.locationId) throw new Error("Shift is not in this week")
-  if (!canEditShift(a, week)) throw new Error("This role cannot edit this roster")
-  const why = (reason ?? "").trim()
-  if (week.status === "published" && !why) throw new Error("A reason is needed to edit a published roster")
+export function overrideFields(reason: string, violations: RuleViolation[]): { reason?: string; overrideRuleIds?: string[] }
+export function overrideFields(reason: string, violations: RuleViolation[], key: "overrideReason"): { overrideReason?: string; overrideRuleIds?: string[] }
+export function overrideFields(reason: string, violations: RuleViolation[], key: "reason" | "overrideReason" = "reason"): Record<string, string | string[]> {
+  const why = reason.trim()
+  if (!why) return {}
+  const ids = blockingRules(violations)
+  return ids.length ? { [key]: why, overrideRuleIds: ids } : { [key]: why }
+}
+
+type Gate = { reason?: string; overrideRuleIds?: string[] }
+
+// ----------------------------------------------------------------------------------------------------------------- request bodies
+export type ShiftEdit = { date?: string; start?: string; end?: string; unpaidBreakMin?: number; personId?: string | null; templateId?: string; role?: string }
+
+/** PATCH /v1/roster/shifts/{id}: the shift's `version` and only the fields that changed. Null when nothing did (no request). */
+export function patchBody(shift: Pick<WeekShift, "version" | "date" | "start" | "end" | "unpaidBreakMin" | "personId" | "templateId" | "role">, edit: ShiftEdit, gate: Gate = {}) {
+  const patch: Record<string, string | number | null> = {}
+  if (edit.date !== undefined && edit.date !== shift.date) patch.date = edit.date
+  if (edit.start !== undefined && edit.start !== shift.start) patch.start = edit.start
+  if (edit.end !== undefined && edit.end !== shift.end) patch.end = edit.end
+  if (edit.unpaidBreakMin !== undefined && edit.unpaidBreakMin !== shift.unpaidBreakMin) patch.unpaidBreakMin = edit.unpaidBreakMin
+  if (edit.personId !== undefined && edit.personId !== shift.personId) patch.userId = edit.personId
+  if (edit.templateId !== undefined && edit.templateId !== shift.templateId) patch.shiftTypeId = edit.templateId
+  if (edit.role !== undefined && edit.role !== shift.role) patch.role = edit.role
+  return Object.keys(patch).length ? { version: shift.version, patch, ...gate } : null
+}
+
+export type AddForm = { date: string; people: (string | null)[]; start: string; end: string; unpaidBreakMin: number }
+/** POST /v1/roster/weeks/{id}/shifts: one entry, one shift per person (FR-RS-22), none = one open shift. Times go out only when they differ from the shift type's. */
+export function addBody(type: Pick<ShiftType, "id" | "start" | "end" | "unpaidBreakMin">, f: AddForm, gate: Gate = {}) {
+  const userIds = f.people.length ? [...new Set(f.people)] : [null]
   return {
-    shifts: shifts.filter((x) => x.id !== id),
-    entry: { ...shiftHistory("shift.removed", { weekId: week.id, locationId: week.locationId, shiftId: id }, s, null, by, at, existing), reason: why || null },
+    shifts: [{
+      date: f.date, userIds, shiftTypeId: type.id,
+      ...(f.start !== type.start ? { start: f.start } : {}), ...(f.end !== type.end ? { end: f.end } : {}), ...(f.unpaidBreakMin !== type.unpaidBreakMin ? { unpaidBreakMin: f.unpaidBreakMin } : {}),
+    }],
+    ...gate,
   }
 }
 
-/** FR-RS-04: who may be suggested for a template on `date`. Not someone who left on or before it, and everyone holds each `requires` licence still valid that day. */
+// ----------------------------------------------------------------------------------------------------------------- optimistic copies
+/** The day columns of the weeks given, counted again from the shifts (the same domain function the API uses). A copy: `p` is never changed. */
+function recount(p: RosterPayload, weekIds: Set<string>): RosterPayload {
+  const targets: StaffingTarget[] = p.shiftTypes.flatMap((t) => t.targets.map((x) => ({ locationId: t.locationId, templateId: t.id, weekday: x.weekday as StaffingTarget["weekday"], count: x.count })))
+  return {
+    ...p,
+    weeks: p.weeks.map((w) => {
+      if (!weekIds.has(w.id)) return w
+      const cols = dayColumns(w, p.shifts, targets, p.shiftTypes)
+      return { ...w, days: cols.map((c) => ({ date: c.date, shiftIds: c.shifts.map((s) => s.id), count: c.count, target: c.target, short: c.short, over: c.over })) }
+    }),
+  }
+}
+
+/** The shift with these fields changed (a move is `{ date }`); a shift not in the payload leaves it as it was. */
+export function setShiftLocal(p: RosterPayload, id: string, edit: ShiftEdit): RosterPayload {
+  const s = p.shifts.find((x) => x.id === id)
+  if (!s) return p
+  const next: WeekShift = {
+    ...s, ...(edit.date !== undefined ? { date: edit.date } : {}), ...(edit.start !== undefined ? { start: edit.start } : {}), ...(edit.end !== undefined ? { end: edit.end } : {}),
+    ...(edit.unpaidBreakMin !== undefined ? { unpaidBreakMin: edit.unpaidBreakMin } : {}), ...(edit.personId !== undefined ? { personId: edit.personId } : {}),
+    ...(edit.templateId !== undefined ? { templateId: edit.templateId } : {}), ...(edit.role !== undefined ? { role: edit.role } : {}),
+  }
+  return replaceShift(p, next)
+}
+
+/** Replace a shift with the API's copy (its new `version`), or add it; the day columns are counted again. */
+export function replaceShift(p: RosterPayload, next: WeekShift): RosterPayload {
+  const known = p.shifts.some((x) => x.id === next.id)
+  return recount({ ...p, shifts: known ? p.shifts.map((x) => (x.id === next.id ? next : x)) : [...p.shifts, next] }, new Set([next.weekId]))
+}
+
+export function removeShiftLocal(p: RosterPayload, id: string): RosterPayload {
+  const s = p.shifts.find((x) => x.id === id)
+  return s ? recount({ ...p, shifts: p.shifts.filter((x) => x.id !== id) }, new Set([s.weekId])) : p
+}
+
+let counter = 0
+/** A temporary id for a shift the API has not answered for yet (never sent anywhere). */
+export const newOpenId = (n: number): string => `local-${n}-${++counter}`
+
+/** The shifts of an add, at once, with temporary ids and version 0; the API's answer replaces them. */
+export function shiftsAddedLocal(p: RosterPayload, weekId: string, type: ShiftType, f: AddForm): RosterPayload {
+  const week = p.weeks.find((w) => w.id === weekId)
+  if (!week) return p
+  const who = f.people.length ? [...new Set(f.people)] : [null]
+  const made: WeekShift[] = who.map((personId, i) => ({
+    id: newOpenId(i), weekId, locationId: week.locationId, date: f.date, personId, templateId: type.id, role: type.role, start: f.start, end: f.end, unpaidBreakMin: f.unpaidBreakMin, confirmedAt: null,
+    version: 0, startAt: "", endAt: "",
+  }))
+  return recount({ ...p, shifts: [...p.shifts, ...made] }, new Set([weekId]))
+}
+
+/** Drop the temporary shifts of an add the API has answered (or refused). */
+export const withoutLocal = (p: RosterPayload): RosterPayload => recount({ ...p, shifts: p.shifts.filter((s) => !s.id.startsWith("local-")) }, new Set(p.weeks.map((w) => w.id)))
+
+// ----------------------------------------------------------------------------------------------------------------- the form
+/** FR-RS-04: who may be suggested for a template on `date`: not someone who left on or before it, and each `requires` licence still valid that day. (The roster API checks it again: 422 ineligible.) Kept for the mock-era panels until Task 21. */
 export function eligible(members: WorkforceMember[], t: ShiftTemplate, date: string): WorkforceMember[] {
   return members.filter(
     (m) =>
       (m.leftOn === null || date < m.leftOn) &&
       t.requires.every((r) => m.qualifications.some((q) => q.type === r && (q.expires === null || q.expires >= date))),
   )
-}
-
-/** After a template or day change: split the picks into those still eligible and those who no longer are. `keep` stays whatever the rules say (the person already on the edited shift while nothing changed). */
-export function prunePeople(people: string[], members: WorkforceMember[], t: ShiftTemplate, date: string, keep: string[] = []): { kept: string[]; dropped: string[] } {
-  const ok = new Set([...eligible(members, t, date).map((m) => m.id), ...keep])
-  return { kept: people.filter((id) => ok.has(id)), dropped: people.filter((id) => !ok.has(id)) }
-}
-
-/** Fresh ids for new shifts, unique against the ones in the store. */
-export function newShiftIds(count: number, taken: RosterShift[], stamp = Date.now().toString(36)): string[] {
-  const used = new Set(taken.map((s) => s.id))
-  return Array.from({ length: count }, (_, i) => {
-    let n = i
-    let id = `s-${stamp}-${n}`
-    while (used.has(id)) id = `s-${stamp}-${++n}`
-    used.add(id)
-    return id
-  })
-}
-
-/** The audit line for one shift change (week and shift level). */
-export function shiftHistory(action: string, where: { weekId: string; locationId: string; shiftId: string }, before: unknown, after: unknown, by: string, at: string, existing: HistoryEntry[]): HistoryEntry {
-  return { id: `h-${String(existing.length + 1).padStart(3, "0")}-${Date.now().toString(36)}-${where.shiftId}`, weekId: where.weekId, locationId: where.locationId, shiftId: where.shiftId, at, by, action, before, after, reason: null }
 }
 
 export type ShiftForm = { templateId: string; start: string; end: string; unpaidBreakMin: string }

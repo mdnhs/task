@@ -1,37 +1,33 @@
-import { checkAssignRules, checkWeekRules } from "./actions"
-import { RostersView, getRosterData, rosterScopeKey, getHolidayDates, getRosterExchange, getRosterHistory, getRosterRequests, getRosterRules, getWeekTemplates, rosterEdit, rosterViewData } from "@/features/rosters"
-import { AccessRestricted, getUser, mockGate } from "@/features/shell"
-import { getData } from "@/lib/data"
-import { getMockOrg } from "@/lib/org"
+import { RostersView, loadRosterData, loadWeekTemplates, type RosterQuery } from "@/features/rosters"
+import { AccessRestricted, apiFailureView, mockGate } from "@/features/shell"
+import { ApiError } from "@/lib/api/problem"
+import { getOrg } from "@/lib/org"
 import { can } from "@/lib/permissions"
-import { getMockPeople, todayUserId } from "@/lib/people"
-import { rosterAccess, type LocationGrant, type OfficeLimit } from "@/lib/roster-access"
-import { getSession } from "@/lib/session"
+import { requireMfaOk } from "@/lib/session"
 
-// Location Rosters (Module 1A, FR-RS-10/11/12/33). The role's location access cuts the payload on the server (D4); a location the
-// role may not open shows "no access" and none of its data is sent.
+const ISO = /^\d{4}-\d{2}-\d{2}$/
+const VIEWS = ["day", "week", "fortnight", "month"] as const
+
+// Location Rosters, week view (FR-RS-10/11/12, B8 Task 20). The API cuts the payload to the caller's locations and says what they may do (`access`): a location the caller may not open is a 404 there
+// ("no access" here) and none of its data arrives. The page re-reads the API on every navigation; edits go through the roster server actions.
 export default async function Page({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const off = mockGate("Location Rosters")
   if (off) return off
-  const [sp, session, org, user] = await Promise.all([searchParams, getSession(), getMockOrg(), getUser()])
+  const [sp, session, org] = await Promise.all([searchParams, requireMfaOk(), getOrg()])
   if (!can(session.role, "roster")) return <AccessRestricted moduleLabel="Location Rosters" />
-  const [{ locations }, { grants, limits }, people] = await Promise.all([
-    getData<{ locations: { id: string; name: string }[] }>("rosters/locations.json"),
-    getData<{ grants: LocationGrant[]; limits: OfficeLimit[] }>("rosters/access.json"),
-    getMockPeople(),
-  ])
-  const me = todayUserId(session, people, user.name)
-  const access = rosterAccess(session.role, me, grants, limits, locations.map((l) => l.id))
-  if (access.scope === "none") return <AccessRestricted moduleLabel="Location Rosters" />
   const one = (k: string) => (typeof sp[k] === "string" ? (sp[k] as string) : undefined)
-  const data = await getRosterData(access, me)
-  const query = { location: one("location"), week: one("week"), view: one("view"), group: one("group") }
-  const view = rosterViewData(data, access, query, org.today)
-  if ("denied" in view) return <AccessRestricted moduleLabel="Location Rosters" />
-  // Rule data, history and requests are only sent to roles that can edit, already cut to the caller's locations.
-  const editor = access.editDraft || access.editPublished
-  const extra = editor
-    ? { rules: await getRosterRules(access), tz: org.timezone, history: await getRosterHistory(access), requests: await getRosterRequests(access), weekTemplates: await getWeekTemplates(access), holidays: await getHolidayDates(), exchange: await getRosterExchange(access), gapsLink: can(session.role, "staff") }
-    : undefined
-  return <RostersView data={view} edit={extra && rosterEdit(data, access, query, rosterScopeKey(session.tenant.id, session.role.id), me, org.today, extra, checkWeekRules, checkAssignRules)} />
+  const query: RosterQuery = { location: one("location"), week: one("week"), view: one("view"), group: one("group") }
+  const view = VIEWS.find((v) => v === query.view)
+  const loaded = await loadRosterData({ locationId: query.location && query.location !== "all" ? query.location : undefined, from: query.week && ISO.test(query.week) ? query.week : undefined, view })
+    .then(async (payload) => ({ ok: true as const, payload, templates: payload.access.canEdit ? await loadWeekTemplates(query.location && query.location !== "all" ? query.location : undefined) : [] }))
+    .catch((e: unknown) => ({ ok: false as const, e }))
+  if (!loaded.ok) {
+    const v = apiFailureView(loaded.e, "Location Rosters")
+    if (v) return v
+    if (loaded.e instanceof ApiError && loaded.e.status === 404) return <AccessRestricted moduleLabel="Location Rosters" />
+    throw loaded.e
+  }
+  const { payload, templates } = loaded
+  if (payload.locations.length === 0) return <AccessRestricted moduleLabel="Location Rosters" />
+  return <RostersView payload={payload} query={query} today={org.today} templates={templates} />
 }

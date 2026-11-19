@@ -7,7 +7,7 @@ import type { Availability, RuleViolation, ViolationRule } from "@/lib/roster-ru
 import type { Weekday } from "@/lib/shifts"
 import type {
   ApiChangeRequest, ApiExchange, ApiLeave, Coverage, ExchangeStatus, HistoryEntry, MineShift, MyRoster, Page, RepeatConflict, RepeatCounts, RosterLocation, RosterMember, RosterPayload,
-  RulesView, ShiftType, ViewKind, WeekDay, WeekRoster, WeekShift, WeekTemplateSummary,
+  RulesView, ShiftType, ViewKind, WeekAccess, WeekDay, WeekRoster, WeekShift, WeekTemplateSummary,
 } from "./types"
 
 const r = reader("rosters")
@@ -58,11 +58,20 @@ function toDay(dto: unknown): WeekDay {
   return { date: r.str(o, "date"), shiftIds: list(o.shiftIds, (x) => r.str({ x } as Rec, "x")), count: r.int(o, "count"), target: r.int(o, "target"), short: r.int(o, "short"), over: r.int(o, "over") }
 }
 
+const LOCK_REASONS = ["forbidden", "roster_locked", "reason_required"] as const
+/** The API's own verdict of what the caller may do (api/.../scope.ts `accessInfo`). The web shows it and never works it out again. */
+export function toAccess(dto: unknown): WeekAccess {
+  const o = r.rec(dto, "access")
+  const level = o.level === null ? null : r.oneOf(o, "level", ["office", "supervisor"] as const)
+  const lockReason = o.lockReason === null ? null : r.oneOf(o, "lockReason", LOCK_REASONS)
+  return { level, canEdit: r.bool(o, "canEdit"), locked: r.bool(o, "locked"), lockReason }
+}
+
 export function toWeek(dto: unknown): WeekRoster {
   const o = r.rec(dto, "week")
   return {
     id: r.str(o, "id"), locationId: r.str(o, "locationId"), weekStart: r.str(o, "weekStart"), status: r.oneOf(o, "status", ["draft", "published"] as const), publishedAt: r.strOrNull(o, "publishedAt"),
-    publishedBy: r.strOrNull(o, "publishedBy"), autoRepeatDays: r.intOrNull(o, "autoRepeatDays"), version: r.int(o, "version"), days: list(o.days, toDay),
+    publishedBy: r.strOrNull(o, "publishedBy"), autoRepeatDays: r.intOrNull(o, "autoRepeatDays"), version: r.int(o, "version"), days: list(o.days, toDay), access: toAccess(o.access),
   }
 }
 
@@ -77,7 +86,7 @@ export function toWeeksPayload(dto: unknown, locations: unknown): RosterPayload 
   const range = r.rec(o.range, "range")
   return {
     range: { from: r.str(range, "from"), to: r.str(range, "to"), view: r.oneOf(range, "view", VIEWS) }, weeks: list(o.weeks, toWeek), shifts: list(o.shifts, toShift),
-    shiftTypes: list(o.shiftTypes, toShiftType), members: list(o.members, toMember), membersTruncated: r.bool(o, "membersTruncated"), locations: list(locations, toLocation),
+    shiftTypes: list(o.shiftTypes, toShiftType), members: list(o.members, toMember), membersTruncated: r.bool(o, "membersTruncated"), locations: list(locations, toLocation), access: toAccess(o.access),
   }
 }
 
@@ -153,7 +162,7 @@ function toMineShift(dto: unknown): MineShift {
 /** GET /v1/roster/mine; availability and leave are fetched separately and added by the loader. */
 export function toMine(dto: unknown, availability: Availability[] = [], leave: ApiLeave[] = []): MyRoster {
   const o = r.rec(dto, "mine")
-  return { from: r.str(o, "from"), to: r.str(o, "to"), shifts: list(o.items, toMineShift), truncated: r.bool(o, "truncated"), availability, leave }
+  return { from: r.str(o, "from"), to: r.str(o, "to"), shifts: list(o.items, toMineShift), truncated: r.bool(o, "truncated"), availability, leave, access: toAccess(o.access) }
 }
 
 export function toRules(dto: unknown, etag: string | null): RulesView {

@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs"
 import {
   toChangeRequest, toExchange, toHistory, toLeave, toLocation, toMine, toRepeat, toRules, toShift, toShiftType, toViolation, toWeek, toWeeksPayload,
 } from "./adapters"
-import { changeRequestDto, exchangeDto, historyDto, leaveDto, locationDto, mineShiftDto, rulesDto, shiftDto, shiftTypeDto, violationDto, weekDto, weeksDto, LID, SHIFT_ID, STID, UID, WEEK_ID } from "./fixtures"
+import { changeRequestDto, exchangeDto, historyDto, leaveDto, locationDto, mineShiftDto, rulesDto, shiftDto, shiftTypeDto, violationDto, weekDto, weeksDto, openAccess, LID, SHIFT_ID, STID, UID, WEEK_ID } from "./fixtures"
 
 describe("adapters: a week DTO becomes RosterWeek and RosterShift (R8-2)", () => {
   test("adapters map a week DTO to RosterWeek and RosterShift with wall strings and instants (R8-2) and never invent a location name", () => {
@@ -24,6 +24,18 @@ describe("adapters: a week DTO becomes RosterWeek and RosterShift (R8-2)", () =>
     expect(toLocation({ ...locationDto, lat: null, lng: null, timeZone: null })).toMatchObject({ lat: null, lng: null, timeZone: null })
   })
 
+  test("each week and the payload carry the API's access object (level, canEdit, locked, lockReason); the web never derives it", () => {
+    const p = toWeeksPayload(weeksDto, [locationDto])
+    expect(p.access).toEqual({ level: "supervisor", canEdit: true, locked: false, lockReason: null })
+    expect(p.weeks[0]!.access).toEqual({ level: "supervisor", canEdit: true, locked: false, lockReason: null })
+    const locked = toWeek({ ...weekDto, access: { level: "office", canEdit: true, locked: false, lockReason: "reason_required" } })
+    expect(locked.access).toEqual({ level: "office", canEdit: true, locked: false, lockReason: "reason_required" })
+    expect(toWeek({ ...weekDto, access: { level: null, canEdit: false, locked: false, lockReason: "forbidden" } }).access.level).toBeNull()
+    expect(() => toWeek({ ...weekDto, access: undefined })).toThrow(/access/)
+    expect(() => toWeek({ ...weekDto, access: { ...openAccess, lockReason: "nope" } })).toThrow(/lockReason/)
+    expect(toMine({ from: "a", to: "b", items: [], truncated: false, access: { level: null, canEdit: false, locked: false, lockReason: "forbidden" } }).access.lockReason).toBe("forbidden")
+  })
+
   test("a null user stays an open shift (personId null)", () => {
     expect(toShift({ ...shiftDto, userId: null }).personId).toBeNull()
   })
@@ -42,7 +54,7 @@ describe("adapters: a week DTO becomes RosterWeek and RosterShift (R8-2)", () =>
     expect(() => toShift({ ...shiftDto, startAt: undefined })).toThrow(/startAt/)
     expect(() => toShift({ ...shiftDto, version: "1" })).toThrow(/version/)
     expect(() => toLocation({ ...locationDto, name: 5 })).toThrow(/name/)
-    expect(() => toMine({ from: "a", to: "b", items: [{ ...mineShiftDto, locationName: undefined }], truncated: false })).toThrow(/locationName/)
+    expect(() => toMine({ from: "a", to: "b", items: [{ ...mineShiftDto, locationName: undefined }], truncated: false, access: openAccess })).toThrow(/locationName/)
     expect(() => toWeek({ ...weekDto, status: "archived" })).toThrow(/status/)
   })
 
@@ -54,7 +66,7 @@ describe("adapters: a week DTO becomes RosterWeek and RosterShift (R8-2)", () =>
     expect(toChangeRequest(changeRequestDto)).toMatchObject({ requestedBy: UID, shiftVersion: 2, patch: { start: "09:00", end: "17:00" } })
     expect(toHistory(historyDto)).toMatchObject({ by: UID, action: "shift_moved", shiftId: SHIFT_ID, before: { start: "08:00" } })
     expect(toRules(rulesDto, '"abc"')).toEqual({ severity: rulesDto.severity, avgWeekReferenceWeeks: 17, draftWarnDays: 3, etag: '"abc"' })
-    const m = toMine({ from: "2026-11-16", to: "2026-12-13", items: [mineShiftDto], truncated: false })
+    const m = toMine({ from: "2026-11-16", to: "2026-12-13", items: [mineShiftDto], truncated: false, access: openAccess })
     expect(m.shifts[0]).toMatchObject({ locationName: "Harbour Street", timeZone: "Europe/Dublin", startAt: "2026-11-16T08:00:00.000Z" })
     const r = toRepeat({ created: [weekDto], conflicts: [{ weekId: WEEK_ID, shiftId: SHIFT_ID, personId: UID, date: "2026-11-10", reason: "approved_leave", open: true, message: "m" }], counts: { copied: 1, kept: 0, warned: 0, opened: 1 } })
     expect(r.created[0]!.id).toBe(WEEK_ID)

@@ -6,6 +6,11 @@
 //   422 rule_blocked                -> rule_blocked    no toast: the conflicts panel, with the violations the API sent
 //   402                             -> billing         no toast: the billing banner speaks
 //   403 module_not_entitled         -> not_entitled    no toast: the "not in your plan" state
+//   403 rule_blocked_office_required-> rule_blocked    (needsOffice): a supervisor publishing over a blocked rule sees the same conflicts panel, with the office hint
+//   428 precondition_required       -> precondition_required  refetch, toast "Reload the page and try again."
+//   403 mfa_required / 401 mfa_challenge -> mfa        toast "Enter your verification code."
+//   429                             -> rate_limited    toast, nothing else
+//   network failure                 -> network         toast "No connection. Your change was not saved."
 //   anything else                   -> its generic kind (forbidden, not_found, session_expired, error) with the generic copy and "Ref <requestId>"
 import { ApiError, classifyApiError, userMessage } from "@/lib/api/problem"
 import type { RuleViolation } from "@/lib/roster-rules"
@@ -13,8 +18,8 @@ import { toViolation } from "./adapters"
 
 export type RosterToast = { text: string; ref: string | null }
 export type RosterError = { refetch: boolean; toast: RosterToast | null; code: string } & (
-  | { state: "conflict" | "locked" | "reason_required" | "billing" | "not_entitled" | "forbidden" | "not_found" | "session_expired" | "error" }
-  | { state: "rule_blocked"; violations: RuleViolation[] }
+  | { state: "conflict" | "locked" | "reason_required" | "billing" | "not_entitled" | "forbidden" | "not_found" | "session_expired" | "precondition_required" | "mfa" | "rate_limited" | "network" | "error" }
+  | { state: "rule_blocked"; violations: RuleViolation[]; /** The rule blocks and only an office role may go over it (403 rule_blocked_office_required). */ needsOffice: boolean }
 )
 export type RosterWriteResult<T> = { ok: true; value: T } | { ok: false; error: RosterError }
 
@@ -40,7 +45,12 @@ export function mapRosterError(e: unknown): RosterError {
   if (kind === "version_conflict") return { state: "conflict", refetch: true, toast: { ...toast, text: "Changed by someone else." }, code }
   if (api?.status === 403 && code === "roster_locked") return { state: "locked", refetch: true, toast: null, code }
   if (api?.status === 422 && code === "reason_required") return { state: "reason_required", refetch: false, toast: null, code }
-  if (api?.status === 422 && code === "rule_blocked") return { state: "rule_blocked", refetch: false, toast: null, code, violations: violationsOf(api) }
+  if (api?.status === 422 && code === "rule_blocked") return { state: "rule_blocked", refetch: false, toast: null, code, violations: violationsOf(api), needsOffice: false }
+  if (api?.status === 403 && code === "rule_blocked_office_required") return { state: "rule_blocked", refetch: false, toast: null, code, violations: violationsOf(api), needsOffice: true }
+  if (api?.status === 428) return { state: "precondition_required", refetch: true, toast: { ...toast, text: "Reload the page and try again." }, code }
+  if (kind === "mfa_challenge" || kind === "mfa_enrolment") return { state: "mfa", refetch: false, toast, code }
+  if (kind === "rate_limited") return { state: "rate_limited", refetch: false, toast: { ...toast, text: "Too many changes at once. Wait a moment, then try again." }, code }
+  if (kind === "network") return { state: "network", refetch: false, toast: { ...toast, text: "No connection. Your change was not saved." }, code }
   if (kind === "billing_required") return { state: "billing", refetch: false, toast: null, code }
   if (kind === "module_not_entitled") return { state: "not_entitled", refetch: false, toast: null, code }
   if (kind === "forbidden") return { state: "forbidden", refetch: false, toast, code }

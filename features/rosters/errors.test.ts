@@ -31,7 +31,23 @@ describe("roster write errors map to exactly one UI state", () => {
     expect(m.state === "rule_blocked" && m.violations).toEqual([violation])
     // a malformed list never reaches the panel
     expect(mapRosterError(e(422, "rule_blocked", { violations: "x" }))).toMatchObject({ state: "rule_blocked", violations: [] })
-    expect(mapRosterError(e(403, "rule_blocked_office_required", { violations: [violation] })).state).toBe("forbidden")
+  })
+
+  test("403 rule_blocked_office_required is the conflicts panel with the API's violations and a needsOffice flag (a supervisor publishing over a blocked rule)", () => {
+    const m = mapRosterError(e(403, "rule_blocked_office_required", { violations: [violation] }))
+    expect(m).toMatchObject({ state: "rule_blocked", needsOffice: true, refetch: false, toast: null, violations: [violation] })
+    expect(mapRosterError(e(422, "rule_blocked", { violations: [violation] }))).toMatchObject({ state: "rule_blocked", needsOffice: false })
+    expect(mapRosterError(e(403, "forbidden")).state).toBe("forbidden")
+  })
+
+  test("428, MFA, 429 and a network failure each have their own state and calm copy (never a generic error)", () => {
+    expect(mapRosterError(e(428, "precondition_required"))).toMatchObject({ state: "precondition_required", refetch: true, toast: { text: "Reload the page and try again.", ref: "req-1" } })
+    expect(mapRosterError(e(403, "mfa_required"))).toMatchObject({ state: "mfa", refetch: false, toast: { text: "Enter your verification code." } })
+    expect(mapRosterError(e(401, "mfa_challenge")).state).toBe("mfa")
+    expect(mapRosterError(e(429, "rate_limited"))).toMatchObject({ state: "rate_limited", toast: { text: "Too many changes at once. Wait a moment, then try again." } })
+    expect(mapRosterError(new TypeError("fetch failed"))).toMatchObject({ state: "network", toast: { text: "No connection. Your change was not saved." } })
+    const named = new Set(["precondition_required", "mfa", "rate_limited", "network"])
+    for (const err of [e(428, "x"), e(403, "mfa_required"), e(401, "mfa_challenge"), e(429, "x"), new TypeError("x")]) expect(named.has(mapRosterError(err).state)).toBe(true)
   })
 
   test("everything else falls back to the generic copy and keeps the request id", () => {
@@ -41,7 +57,6 @@ describe("roster write errors map to exactly one UI state", () => {
     expect(mapRosterError(e(404, "not_found")).state).toBe("not_found")
     expect(mapRosterError(e(401, "session_expired")).state).toBe("session_expired")
     expect(mapRosterError(e(500, "boom")).state).toBe("error")
-    expect(mapRosterError(new TypeError("fetch failed")).state).toBe("error")
   })
 
   test("runRosterWrite returns ok with the value, or the mapped error; a 409 retry is tried once more", async () => {

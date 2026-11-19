@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest"
 import { loadCoverage, loadExchange, loadLeaveQueue, loadLocationAdmin, loadMyRoster, loadRosterData, loadRules } from "./loaders"
-import { exchangeDto, historyDto, leaveDto, locationDto, mineShiftDto, rulesDto, shiftDto, shiftTypeDto, weekDto, weeksDto, LID, UID } from "./fixtures"
+import { openAccess, exchangeDto, historyDto, leaveDto, locationDto, mineShiftDto, rulesDto, shiftDto, shiftTypeDto, weekDto, weeksDto, LID, UID } from "./fixtures"
 
 type Call = { path: string; o: { path?: Record<string, string>; query?: Record<string, string>; onResponse?: (r: Response) => void } | undefined }
 function fake(answers: Record<string, unknown | ((o: Call["o"]) => unknown)>) {
@@ -43,7 +43,7 @@ describe("roster readers", () => {
 
   test("getMyRoster merges mine, availability and own leave", async () => {
     const { api, calls } = fake({
-      "/v1/roster/mine": { from: "2026-11-16", to: "2026-12-13", items: [mineShiftDto], truncated: false },
+      "/v1/roster/mine": { from: "2026-11-16", to: "2026-12-13", items: [mineShiftDto], truncated: false, access: openAccess },
       "/v1/roster/availability": { windows: [{ weekday: 1, from: "09:00", to: "12:00" }] },
       "/v1/leave": { items: [leaveDto], nextCursor: null },
     })

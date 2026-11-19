@@ -11,7 +11,7 @@ import type { Req } from "@/lib/api/client"
 import { apiServer } from "@/lib/api/server"
 import { requireMfaOk } from "@/lib/session"
 import {
-  runRosterWrite, toApplied, toChangeRequest, toExchange, toLeave, toLocation, toRepeat, toShift, toShiftType, toViolations, toWeek, type RosterWriteResult,
+  loadRosterData, runRosterWrite, toApplied, toChangeRequest, toExchange, toLeave, toLocation, toRepeat, toShift, toShiftType, toViolations, toWeek, type RosterWriteResult,
 } from "@/features/rosters"
 
 type Paths = keyof import("@/lib/api/schema").paths
@@ -62,6 +62,11 @@ export async function setHomeLocation(userId: string, locationId: string | null)
 }
 
 // ------------------------------------------------------------------ weeks and shifts
+/** The week view as the API has it now (after a write or a refused one): the page reads again, the API is the truth (I10). A read, so it never changes anything. */
+export async function reloadRoster(q: { locationId?: string; from?: string; to?: string; view?: "day" | "week" | "fortnight" | "month" }) {
+  await requireMfaOk()
+  return runRosterWrite(() => loadRosterData(q))
+}
 export async function createWeek(body: PostBody<"/v1/roster/weeks">) {
   return write(async (api) => toWeek(await api.post("/v1/roster/weeks", { body })))
 }

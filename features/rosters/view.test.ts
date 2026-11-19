@@ -1,74 +1,109 @@
 import { describe, expect, it } from "vitest"
-import type { RosterAccess } from "@/lib/roster-access"
-import { getRosterData } from "./api"
-import { rosterViewData } from "./view"
+import { LID, LID2, PERSON, SHIFTS, lockedAccess, openAccess, payloadFixture } from "./fixtures"
+import { violationLines, weekViewData } from "./view"
+import type { RosterViewData } from "./view"
 
-const acc = (scope: RosterAccess["scope"], locationIds: string[] | null): RosterAccess => ({ scope, locationIds, editDraft: false, editPublished: false, approve: false })
-const TODAY = "2026-10-21T09:00:00"
+const TODAY = "2026-11-04T09:00:00"
+const ok = (v: ReturnType<typeof weekViewData>): RosterViewData => {
+  if ("denied" in v) throw new Error("denied")
+  return v
+}
 
-describe("rosterViewData", () => {
-  it("a supervisor asking for an ungranted location is denied", async () => {
-    const a = acc("locations", ["loc-coppers"])
-    const data = await getRosterData(acc("all", ["loc-coppers", "loc-docklands", "loc-liffey"]), "x")
-    expect(rosterViewData(data, a, { location: "loc-docklands" }, TODAY)).toEqual({ denied: true })
-    expect(rosterViewData(data, a, { location: "all" }, TODAY)).toEqual({ denied: true })
+describe("weekViewData: the API payload as the week view", () => {
+  it("renders 7 day columns with each person's own start and end (AC-RS-01, AC-RS-02)", () => {
+    const v = ok(weekViewData(payloadFixture(), { week: "2026-11-02" }, TODAY))
+    const days = v.blocks[0]!.days
+    expect(days).toHaveLength(7)
+    expect(days.map((d) => d.date)).toEqual(["2026-11-02", "2026-11-03", "2026-11-04", "2026-11-05", "2026-11-06", "2026-11-07", "2026-11-08"])
+    // two people on the same day keep their OWN times
+    expect(days[0]!.shifts.map((s) => [s.person, s.start, s.end])).toEqual([["Ann Byrne", "08:00", "16:00"], ["Ben Walsh", "14:00", "22:00"]])
+    // a night shift ends the next day
+    expect(days[1]!.shifts[0]).toMatchObject({ person: "Cara Doyle", start: "22:00", end: "06:00", endsNextDay: true })
+    expect(days[2]!.shifts[0]).toMatchObject({ person: "Open shift", open: true })
+    expect(days[3]!.shifts).toEqual([])
   })
-  it("a supervisor's view data holds no other location's name, shift id or person", async () => {
-    const a = acc("locations", ["loc-coppers"])
-    const full = await getRosterData(acc("all", ["loc-coppers", "loc-docklands", "loc-liffey"]), "x") // uncut on purpose
-    const v = rosterViewData(full, a, { week: "2026-10-19" }, TODAY)
-    const json = JSON.stringify(v)
-    const others = full.shifts.filter((s) => s.locationId !== "loc-coppers")
-    expect(others.length).toBeGreaterThan(0)
-    for (const s of others) expect(json).not.toContain(s.id)
-    for (const l of full.locations.filter((l) => l.id !== "loc-coppers")) expect(json).not.toContain(l.name)
-    const names = new Set(full.shifts.filter((s) => s.locationId === "loc-coppers").map((s) => s.personId))
-    for (const s of others) if (s.personId && !names.has(s.personId)) expect(json).not.toContain(full.members.find((m) => m.id === s.personId)!.name)
+
+  it("short and over come from the payload's day columns, not from a client count (FR-RS-12)", () => {
+    const p = payloadFixture()
+    const v = ok(weekViewData(p, { week: "2026-11-02" }, TODAY))
+    expect(v.blocks[0]!.days[0]).toMatchObject({ count: 2, target: 4, short: 2, over: 0 })
+    expect(v.blocks[0]!.short).toBe(25) // 2 + 3 + 4 + 4 x 4: the sum of the days, as the API counted them
+    expect(v.totals).toEqual({ count: 3, target: 28, short: 25, over: 0 })
+    const both = ok(weekViewData(payloadFixture({ locations: [LID, LID2] }), { location: "all", week: "2026-11-02" }, TODAY))
+    expect(both.totals.short).toBe(25 + 28) // the second site is empty: its whole target is short
+    const wk = p.weeks[0]!
+    // the API says Monday is over staffed: that is what the view shows, whatever the shifts say
+    wk.days[0] = { ...wk.days[0]!, count: 5, target: 2, short: 0, over: 3 }
+    const over = ok(weekViewData(p, { week: "2026-11-02" }, TODAY))
+    expect(over.blocks[0]!.days[0]).toMatchObject({ short: 0, over: 3 })
+    expect(over.totals.over).toBe(3)
   })
-  it("defaults to the first permitted location and shows seven days with count and target", async () => {
-    const a = acc("locations", ["loc-coppers"])
-    const data = await getRosterData(a, "p-ismail")
-    const v = rosterViewData(data, a, { week: "2026-10-19" }, TODAY)
-    if ("denied" in v) throw new Error("denied")
-    expect(v.location).toBe("loc-coppers")
-    expect(v.blocks).toHaveLength(1)
-    expect(v.blocks[0].days).toHaveLength(7)
-    expect(v.blocks[0].status).toBe("published")
-    expect(v.totals.count).toBeGreaterThan(0)
+
+  it("controls follow the payload's access per week: editable, locked (read-only) and reason_required (office on a published week)", () => {
+    const edit = ok(weekViewData(payloadFixture(), { week: "2026-11-02" }, TODAY))
+    expect(edit.blocks[0]!.days.every((d) => d.canEdit && !d.locked)).toBe(true)
+    expect(edit.access).toEqual(openAccess)
+    const locked = ok(weekViewData(payloadFixture({ status: "published", access: lockedAccess }), { week: "2026-11-02" }, TODAY))
+    expect(locked.blocks[0]!.days.every((d) => !d.canEdit && d.locked)).toBe(true)
+    expect(locked.blocks[0]!.status).toBe("published")
+    const office = ok(weekViewData(payloadFixture({ status: "published", access: { level: "office", canEdit: true, locked: false, lockReason: "reason_required" } }), { week: "2026-11-02" }, TODAY))
+    expect(office.blocks[0]!.days.every((d) => d.canEdit && d.reasonRequired)).toBe(true)
+    const none = ok(weekViewData(payloadFixture({ access: { level: null, canEdit: false, locked: false, lockReason: "forbidden" } }), { week: "2026-11-02" }, TODAY))
+    expect(none.blocks[0]!.days.some((d) => d.canEdit)).toBe(false)
+    // a day with no week has no roster and nothing to edit; the block says whether the caller may create the week
+    const empty = ok(weekViewData(payloadFixture(), { week: "2026-11-09" }, TODAY))
+    expect(empty.blocks[0]!.days.every((d) => !d.hasRoster && !d.canEdit)).toBe(true)
+    expect(empty.blocks[0]!.canCreate).toBe(true)
   })
-  it("scope all may pick all locations; ranges and groupings follow the query", async () => {
-    const a = acc("all", ["loc-coppers", "loc-docklands", "loc-liffey"])
-    const data = await getRosterData(a, "x")
-    const v = rosterViewData(data, a, { location: "all", week: "2026-10-19", view: "fortnight", group: "role" }, TODAY)
-    if ("denied" in v) throw new Error("denied")
-    expect(v.dates).toHaveLength(14)
-    expect(v.locations[0].value).toBe("all")
-    expect(v.groups.length).toBeGreaterThan(0)
-    const m = rosterViewData(data, a, { location: "loc-coppers", week: "2026-10-21", view: "month" }, TODAY)
-    if ("denied" in m) throw new Error("denied")
-    expect(m.from).toBe("2026-10-01")
-    expect(m.dates).toHaveLength(31)
+
+  it("a supervisor with one location sees only that location, no other option and no 'All locations'", () => {
+    const v = ok(weekViewData(payloadFixture(), {}, TODAY))
+    expect(v.locations).toEqual([{ value: LID, label: "Coppers" }])
+    expect(v.location).toBe(LID)
+    expect(JSON.stringify(v)).not.toContain("Docklands")
+    const many = ok(weekViewData(payloadFixture({ locations: [LID, LID2] }), { location: "all", week: "2026-11-02" }, TODAY))
+    expect(many.locations.map((l) => l.value)).toEqual(["all", LID, LID2])
+    expect(many.blocks.map((b) => b.name)).toEqual(["Coppers", "Docklands"])
   })
-  it("no access scope is denied", async () => {
-    expect(rosterViewData({ locations: [], templates: [], targets: [], weeks: [], shifts: [], members: [] }, acc("none", []), {}, TODAY)).toEqual({ denied: true })
+
+  it("an unknown location or no location at all is denied (the API cut the list; nothing is made up)", () => {
+    expect(weekViewData(payloadFixture(), { location: LID2 }, TODAY)).toEqual({ denied: true })
+    expect(weekViewData({ ...payloadFixture(), locations: [] }, {}, TODAY)).toEqual({ denied: true })
+    expect(weekViewData(payloadFixture(), { location: "all" }, TODAY)).toEqual({ denied: true }) // one visible location: "all" is not an option
   })
-  it("a short day and an over day don't cancel out in the totals or the block", () => {
-    const loc = { id: "l1", name: "Site", address: "", pin: { lat: 0, lng: 0 }, zoneRadiusM: 1, openingHours: "", contact: "", swapApprovalDelegated: false }
-    const tpl = { id: "t1", locationId: "l1", name: "Day", start: "09:00", end: "17:00", unpaidBreakMin: 0, role: "Guard", requires: [] }
-    const shift = (id: string, date: string, personId: string) => ({ id, weekId: "w1", locationId: "l1", date, personId, templateId: "t1", role: "Guard", start: "09:00", end: "17:00", unpaidBreakMin: 0, confirmedAt: null })
-    const member = (id: string) => ({ id, name: id, role: "Guard", dept: "Security", homeLocationId: "l1", qualifications: [], leftOn: null })
-    const data = {
-      locations: [loc], templates: [tpl],
-      targets: [{ locationId: "l1", templateId: "t1", weekday: 1 as const, count: 2 }, { locationId: "l1", templateId: "t1", weekday: 2 as const, count: 1 }],
-      weeks: [{ id: "w1", locationId: "l1", weekStart: "2026-10-19", status: "draft" as const, publishedAt: null, publishedBy: null, autoRepeatDays: null }],
-      shifts: [shift("a", "2026-10-20", "p1"), shift("b", "2026-10-20", "p2"), shift("c", "2026-10-20", "p3")], // Mon: 0 of 2 (short 2), Tue: 3 of 1 (over 2)
-      members: ["p1", "p2", "p3"].map(member),
-    }
-    const v = rosterViewData(data, acc("all", ["l1"]), { location: "l1", week: "2026-10-19" }, TODAY)
-    if ("denied" in v) throw new Error("denied")
-    expect(v.blocks[0].days[0]).toMatchObject({ short: 2, over: 0 })
-    expect(v.blocks[0].days[1]).toMatchObject({ short: 0, over: 2 })
-    expect(v.blocks[0].short).toBe(2)
-    expect(v.totals).toMatchObject({ count: 3, target: 3, short: 2, over: 2 })
+
+  it("ranges and groupings follow the query; by person lists each person once, open shifts last", () => {
+    const v = ok(weekViewData(payloadFixture(), { week: "2026-11-02", group: "person" }, TODAY))
+    expect(v.groups[0]!.rows.map((r) => r.name)).toEqual(["Ann Byrne", "Ben Walsh", "Cara Doyle", "Open shifts"])
+    expect(v.groups[0]!.rows[0]!.cells[0]![0]).toMatchObject({ start: "08:00", end: "16:00" })
+    const day = ok(weekViewData(payloadFixture(), { week: "2026-11-02", view: "day" }, TODAY))
+    expect(day.dates).toEqual(["2026-11-02"])
+    expect(day.next).toBe("2026-11-03")
+    const role = ok(weekViewData(payloadFixture(), { week: "2026-11-02", group: "role" }, TODAY))
+    expect(role.groups.map((g) => g.label)).toEqual(["Security officer"])
+  })
+
+  it("a shift carries what an edit needs (week, version, shift type, break)", () => {
+    const s = ok(weekViewData(payloadFixture(), { week: "2026-11-02" }, TODAY)).blocks[0]!.days[0]!.shifts[0]!
+    expect(s).toMatchObject({ id: "sh-mon-ann", personId: PERSON.ann, version: 1, unpaidBreakMin: 30, date: "2026-11-02" })
+    expect(s.weekId).toBe(SHIFTS[0]!.weekId)
+  })
+})
+
+describe("violationLines: the API's violations with the person and the shifts named (AC-RS-04 front)", () => {
+  it("names the person and each shift (day and times); a shift the caller cannot see is left out, not invented", () => {
+    const p = payloadFixture()
+    const lines = violationLines(
+      [
+        { rule: "double_booking", shiftId: "sh-mon-ann", personId: PERSON.ann, severity: "block", message: "Ann Byrne is on two shifts", otherShiftIds: ["sh-mon-ben", "elsewhere-shift"] },
+        { rule: "daily_rest", shiftId: "sh-tue-cara", personId: PERSON.cara, severity: "warn", message: "Cara Doyle has 9h rest", otherShiftIds: [] },
+      ],
+      p,
+    )
+    expect(lines[0]).toMatchObject({ severity: "block", person: "Ann Byrne", message: "Ann Byrne is on two shifts" })
+    expect(lines[0]!.shifts.map((s) => s.label)).toEqual(["Mon 2 Nov 08:00–16:00", "Mon 2 Nov 14:00–22:00"])
+    expect(lines[1]).toMatchObject({ severity: "warn", person: "Cara Doyle" })
+    expect(lines[1]!.shifts.map((s) => s.label)).toEqual(["Tue 3 Nov 22:00–06:00"])
+    expect(lines.map((l) => l.severity)).toEqual(["block", "warn"]) // blocks first
   })
 })

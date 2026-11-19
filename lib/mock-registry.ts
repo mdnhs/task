@@ -32,11 +32,8 @@ export type ReaderKind =
 
 /** Every file that may import `@/lib/data` (the JSON reader) or call getData(. Adding one means adding a line here, with the reason. */
 export const MOCK_DATA_READERS: Readonly<Record<string, { kind: ReaderKind; why: string }>> = {
-  "app/(app)/rosters/actions.ts": { kind: "mock", why: "roster rule checks run on the roster seed (mockGate inside)" },
-  "app/(app)/rosters/loading.tsx": { kind: "mock", why: "sizes the roster skeleton from the seed; generic skeleton when the flag is off" },
   "app/(app)/rosters/locations/gate.ts": { kind: "mock", why: "location admin gate on the roster seed" },
   "app/(app)/rosters/mine/gate.ts": { kind: "mock", why: "my roster gate on the roster seed" },
-  "app/(app)/rosters/page.tsx": { kind: "mock", why: "Location Rosters" },
   "app/actions/onboarding.ts": { kind: "catalogue", why: "country defaults of the onboarding form" },
   "features/account/api.ts": { kind: "display", why: "profile form placeholders (the profile itself is the API's)" },
   "features/assistant/api.ts": { kind: "mock", why: "AI assistant prompts (no assistant backend yet)" },

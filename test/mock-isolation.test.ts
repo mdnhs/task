@@ -118,10 +118,6 @@ describe("4. mock routes exist only behind ENABLE_MOCK_MODULES=1", () => {
     expect(layout).toContain("hideMockNav(")
     expect(layout).toMatch(/!mockEnabled\(\) \|\| !hasProductModule/)
   })
-  test("the roster rule-check server actions refuse without the flag", () => {
-    const a = strip(read("app/(app)/rosters/actions.ts"))
-    expect(a.match(/!mockEnabled\(\)/g)?.length).toBe(2)
-  })
 })
 
 describe("5. the files I15 named are gone and nothing imports them", () => {

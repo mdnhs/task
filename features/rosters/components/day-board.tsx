@@ -14,24 +14,14 @@ import { Icon } from "@/components/icon"
 
 // By location (FR-RS-10): one card per day, laid out as the seven-day columns (a single column at 640px and under). A card shows the
 // day's count against its target (the shortfall is highlighted), then each person with their own times and role.
-/** What the board needs to edit (FR-RS-20/21): which days take edits, and the actions. Only passed when the role may edit. */
+/** What the board needs to edit (FR-RS-20/21): the actions. Which days take them is the API's `access`, carried on every day (`ViewDay.canEdit`); the board never works it out. */
 export type DayEditor = {
-  editable(locationId: string, date: string): boolean
-  /** A shift's own location and date, to check a drop. */
-  shiftInfo(id: string): { locationId: string; date: string } | undefined
-  onAdd(locationId: string, date: string): void
+  onAdd(day: ViewDay): void
   onEdit(id: string): void
   onMove(id: string, date: string): void
-  /** Published week the role can't edit but may ask to change (FR-RS-36). */
-  canRequest(locationId: string, date: string): boolean
-  onRequest(id: string): void
-  /** Draft week of the shown range that this role may publish (FR-RS-23). */
-  canPublish(locationId: string): boolean
-  onPublish(locationId: string): void
-  publishLabel(locationId: string): string
-  /** Repeat the shown week of this location into later draft weeks (FR-RS-26). */
-  canRepeat(locationId: string): boolean
-  onRepeat(locationId: string): void
+  /** Published week the role can't edit but may ask to change (FR-RS-36); arrives with the request panels (Task 21). */
+  canRequest?(day: ViewDay): boolean
+  onRequest?(id: string): void
 }
 
 function Lines({ s, place }: { s: ViewShift; place?: boolean }) {
@@ -103,10 +93,10 @@ function DragShift({ s, place, fresh, card, onEdit }: { s: ViewShift; place?: bo
   )
 }
 
-function Day({ day, today, locationId, editor, dragId }: { day: ViewDay; today: string; locationId: string; editor?: DayEditor; dragId: string | null }) {
+function Day({ day, today, held, editor }: { day: ViewDay; today: string; held?: ViewShift; editor?: DayEditor }) {
   const short = day.short > 0
-  const canEdit = !!editor && day.hasRoster && editor.editable(locationId, day.date)
-  const canAsk = !canEdit && !!editor && day.hasRoster && editor.canRequest(locationId, day.date)
+  const canEdit = !!editor && day.hasRoster && day.canEdit
+  const canAsk = !canEdit && !!editor && day.hasRoster && !!editor.canRequest?.(day)
   // Cards that arrive after the first paint (added, or moved here from another day) fade in once; the first paint is covered by the page enter.
   const key = day.shifts.map((x) => x.id).join("|")
   const [known, setKnown] = useState({ key, ids: new Set(day.shifts.map((x) => x.id)), fresh: new Set<string>() })
@@ -115,8 +105,8 @@ function Day({ day, today, locationId, editor, dragId }: { day: ViewDay; today: 
     setKnown({ key, ids, fresh: new Set([...ids].filter((id) => !known.ids.has(id))) })
   }
   const fresh = known.fresh
-  const dragged = dragId && editor ? editor.shiftInfo(dragId) : undefined
-  const droppable = canEdit && !!dragged && dragged.locationId === locationId && dragged.date !== day.date
+  // A shift moves to another day of its own week only (the API refuses another week: cannot_move_week).
+  const droppable = canEdit && !!held && held.weekId === day.weekId && held.date !== day.date
   // Same drop target as a kanban column: tinted while a card is held, the hovered one lit up (drag.css / rosters.css).
   const { setNodeRef, isOver } = useDroppable({ id: day.date, disabled: !droppable })
   return (
@@ -125,6 +115,8 @@ function Day({ day, today, locationId, editor, dragId }: { day: ViewDay; today: 
       className="ros-day"
       data-today={day.date === today || undefined}
       data-short={short || undefined}
+      data-surplus={day.over > 0 || undefined}
+      data-locked={day.locked || undefined}
       data-target={droppable || undefined}
       data-over={droppable && isOver ? "" : undefined}
       aria-label={formatDate(day.date)}
@@ -140,7 +132,7 @@ function Day({ day, today, locationId, editor, dragId }: { day: ViewDay; today: 
           </span>
         )}
         {canEdit && (
-          <button type="button" className="ros-add" aria-label={`Add shift on ${formatDate(day.date)}`} onClick={() => editor?.onAdd(locationId, day.date)}>
+          <button type="button" className="ros-add" aria-label={`Add shift on ${formatDate(day.date)}`} onClick={() => editor?.onAdd(day)}>
             <Icon name="plus" size={24} />
           </button>
         )}
@@ -148,7 +140,7 @@ function Day({ day, today, locationId, editor, dragId }: { day: ViewDay; today: 
       {day.shifts.length > 0 ? (
         <ul className="ros-shifts">
           {day.shifts.map((s) => (
-            <ShiftLine key={s.id} s={s} card fresh={fresh.has(s.id)} onEdit={canEdit ? () => editor?.onEdit(s.id) : undefined} onRequest={canAsk ? () => editor?.onRequest(s.id) : undefined} />
+            <ShiftLine key={s.id} s={s} card fresh={fresh.has(s.id)} onEdit={canEdit ? () => editor?.onEdit(s.id) : undefined} onRequest={canAsk ? () => editor?.onRequest?.(s.id) : undefined} />
           ))}
         </ul>
       ) : (
@@ -176,7 +168,7 @@ export function DayBoard({ block, today, view, firstWeekday, editor }: { block: 
     <div className="ros-board" data-view={view}>
       {block.days.map((d, i) => (
         <div key={d.date} className="ros-cell" style={i === 0 && view === "month" ? { gridColumnStart: firstWeekday + 1 } : undefined}>
-          <Day day={d} today={today} locationId={block.locationId} editor={editor} dragId={dragId} />
+          <Day day={d} today={today} held={held} editor={editor} />
         </div>
       ))}
     </div>

@@ -1,16 +1,16 @@
 import { SkMask } from "@/components/sk"
-import type { LeaveQueue, LocationAdminData, MyExchange, MyRosterData, RosterEdit } from "../types"
-import type { RosterViewData } from "../view"
+import type { LeaveQueue, LocationAdminData, MyExchange, MyRosterData } from "../types"
+import { SKELETON_TODAY, skeletonPayload } from "../skeleton-data"
 import { LocationFormPage } from "./location-form"
 import { MyRosterView } from "./my-roster"
 import { LocationsView } from "./locations-view"
 import { RostersView } from "./rosters-view"
 
-// The exact skeleton is the real view masked (SkMask): same filters, boards and grid, so layout and wrapping match by construction.
-export function RostersSkeleton({ data, edit }: { data: RosterViewData; edit?: RosterEdit }) {
+// The exact skeleton is the real view masked (SkMask): same filters, boards and grid, so layout and wrapping match by construction. It draws the typical week (skeleton-data.ts): no API, no session (K1).
+export function RostersSkeleton() {
   return (
     <SkMask label="Loading rosters">
-      <RostersView data={data} edit={edit} />
+      <RostersView payload={skeletonPayload()} query={{}} today={SKELETON_TODAY} />
     </SkMask>
   )
 }

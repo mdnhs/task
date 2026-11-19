@@ -19,6 +19,15 @@
 .ros-block-head{display:flex;align-items:center;flex-wrap:wrap;gap:8px 12px;margin-bottom:12px}
 .ros-block-head h2{margin:0;font-size:16px;line-height:24px}
 .ros-block-head .ros-sum{font-size:13px}
+/* Week view on the API (Task 20): a lock for a published week the caller may not edit, Check rules, Start week. Short is red, surplus is info; a locked day takes no drop. */
+.ros-lock{display:inline-grid;place-items:center;width:24px;height:24px;color:var(--ink-3)}
+.ros-lock svg{width:16px;height:16px}
+.ros-check{margin-left:auto}
+.ros-check + .ros-start{margin-left:0}
+.ros-start:only-of-type,.ros-block-head .ros-sum + .ros-start{margin-left:auto}
+.ros-day[data-surplus] .ros-count{color:var(--info)}
+.ros-day[data-short][data-surplus] .ros-count{color:var(--bad)}
+.ros-day[data-locked] .ros-shifts{cursor:default}
 
 /* Day board: seven columns, one card per day at 640px and under */
 .ros-board{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:10px}

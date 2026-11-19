@@ -8,7 +8,7 @@ import { FilterSelect } from "@/components/filter-bar"
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { formatDate } from "@/lib/dates"
-import type { WeekTemplate } from "@/lib/roster-repeat"
+import type { WeekTemplateSummary as WeekTemplate } from "../types"
 import { Icon } from "@/components/icon"
 
 const WEEKS_AHEAD = 8
@@ -46,7 +46,7 @@ export function TemplatesPanel({ templates, locationName, canSave, onSave, onApp
             <li key={t.id} className="ros-tpl-row">
               <div className="ros-req-main">
                 <span className="ros-who">{t.name}</span>
-                <span className="ros-time num">{locationName(t.locationId)} · {t.shifts.length} shifts</span>
+                <span className="ros-time num">{locationName(t.locationId)} · {t.shifts} shifts</span>
               </div>
               <button type="button" className="btn btn-outline" onClick={() => onApply(t)}>Apply</button>
             </li>
