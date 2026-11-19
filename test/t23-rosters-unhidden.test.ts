@@ -68,7 +68,8 @@ describe("B8 Task 23: Location Rosters without the mock flag", () => {
 
   test("staff-rosters, orders-stock, recruitment, files, payroll-issues, manager-attention stay hidden and their pages and data are untouched (git diff on public/data/staff-rosters is empty)", () => {
     const hidden = ["/staff-rosters", "/orders-stock", "/recruitment", "/files", "/payroll-issues", "/manager-attention"]
-    expect(MOCK_ROUTES.map((r) => r.prefix).sort()).toEqual([...hidden].sort())
+    // main's mock WhatsApp management page (/settings/integrations/whatsapp) is a mock route too; it is not one of the modules this task is about
+    expect(MOCK_ROUTES.map((r) => r.prefix).sort()).toEqual([...hidden, "/settings/integrations/whatsapp"].sort())
     for (const m of ["attention", "staff", "recruitment", "files", "payroll", "orders"]) expect(MOCK_MODULES).toContain(m)
     vi.stubEnv("ENABLE_MOCK_MODULES", "")
     for (const h of hidden) expect(shellNav(roleOf("owner"), "business"), h).not.toContain(h)
