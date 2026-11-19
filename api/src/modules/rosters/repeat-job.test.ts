@@ -289,6 +289,25 @@ describe("auto-repeat sweep (R8-12)", () => {
     expect((await failures(w, w.a)).n).toBe(0) // success resets the count
   })
 
+  test("R6: a lock timeout (55P03) is not a failure of the site: no back-off, the next run tries again at once (a real failure still counts: the test above)", async () => {
+    const w = await world()
+    await due(w)
+    await ownerQuery(`create function fail_next_week() returns trigger language plpgsql as $$ begin if new.week_start = '${NEXT}' then raise exception 'lock timeout' using errcode = '55P03'; end if; return new; end $$`)
+    await ownerQuery("create trigger fail_next_week before insert on roster_weeks for each row execute function fail_next_week()")
+    try {
+      await run(w)
+      expect(await drafts(w)).toHaveLength(0)
+      expect(await failures(w, w.a)).toMatchObject({ n: 0, auto_repeat_attempt_at: null }) // not counted, not backed off
+      setClock(w, "2026-12-10T09:15:00.000Z")
+      await run(w)
+      expect((await failures(w, w.a)).n).toBe(0) // still not (the site was tried again, not skipped)
+    } finally {
+      await healFor()
+    }
+    await run(w)
+    expect(await drafts(w)).toHaveLength(1)
+  })
+
   test("AG4: a week of a backed-off site made by hand (create, or a manual repeat) clears its failure count and back-off; another site's is untouched", async () => {
     const w = await world()
     await due(w)

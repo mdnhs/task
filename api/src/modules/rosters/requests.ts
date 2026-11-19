@@ -116,6 +116,7 @@ export async function decideChangeRequest(
   const approve = input.decision === "approve"
   let shift: ShiftDto | null = null
   let violations: RuleViolation[] = []
+  let shiftAudit: () => Promise<void> = async () => undefined
   let done: () => Promise<void> = async () => undefined
   if (approve) {
     if (cur.userId === ctx.me || patch.userId === ctx.me) throw Forbidden("self_decision") // nobody approves a change to their own shift
@@ -124,6 +125,7 @@ export async function decideChangeRequest(
     const out = await applyShiftPatch(tx, ctx, env, cur, loaded, patch, { reason: row.reason, gateReason: overrideReason ?? undefined, overrideRuleIds: overrideIds, extra: { changeRequestId: row.id, ...(overrideReason ? { overrideReason } : {}) } })
     shift = out.shift
     violations = out.violations
+    shiftAudit = out.audit
     done = out.done
   }
   const status = approve ? "approved" : "rejected"
@@ -134,6 +136,7 @@ export async function decideChangeRequest(
     .returning()
   await writeHistory(tx, ctx, { locationId: cur.locationId, weekId: cur.weekId, shiftId: cur.id, action: approve ? "change_approved" : "change_rejected", reason: note, before: { requestId: row.id, status: row.status }, after: { requestId: row.id, status } })
   await notifyActive(tx, ctx, env, [{ userId: row.requestedBy, title: approve ? "Change request approved" : "Change request rejected", body: `Your roster change request was ${status}.${note ? ` Note: ${note}` : ""}` }])
+  await shiftAudit() // the audit lines come last (the shift edit's, then the decision's)
   await auditRoster(tx, ctx, { action: "roster.change_decided", entity: "roster_change_request", entityId: row.id, before: { status: row.status }, after: { status, shiftId: cur.id, requestedBy: row.requestedBy, ...(note ? { note } : {}), ...(overrideReason && approve ? { overrideReason } : {}) } })
   await done()
   await publishRoster(tx, ctx, "roster.change_decided", { requestId: row.id, shiftId: cur.id, weekId: cur.weekId, locationId: cur.locationId, decision: input.decision, requestedBy: row.requestedBy })

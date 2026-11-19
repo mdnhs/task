@@ -104,12 +104,12 @@ const conflictDtos = (weekId: string, res: RepeatResult, opaque: Set<string>): R
   return res.conflicts.map((c) => generic(c, opaque)).map((c) => ({ weekId, shiftId: c.shiftId, personId: c.personId, date: date.get(c.shiftId)!, reason: c.reason, open: c.open, message: c.message }))
 }
 
-export type CopyResult = { weeks: WeekRow[]; conflicts: RepeatDto["conflicts"]; counts: Counts }
+export type CopyResult = { weeks: WeekRow[]; conflicts: RepeatDto["conflicts"]; counts: Counts; /** The audit lines of the copied weeks, in week order. The caller awaits it as its LAST write (audit last): the hash-chain lock is then held for the tail of the transaction only, never across the copy of every week. */ audit: () => Promise<void> }
 
 /**
  * The engine of a repeat, shared with the auto-repeat job: copies `source` into `targets` (Mondays, in order) as DRAFTS under the roster lock the caller holds. All or nothing (one
  * transaction; a failure anywhere rolls every week back). Each target week is its own copy of the source, checked against the whole roster including the copies already made in this call.
- * Target rows (the existing drafts to replace) are locked FOR UPDATE in id order first. History and audit per week; no notification, no event.
+ * Target rows (the existing drafts to replace) are locked FOR UPDATE in id order first. History per week; the audit lines come back as `audit()` for the caller to write last; no notification, no event.
  */
 export async function copyWeek(tx: TenantTx, ctx: RosterCtx, source: { week: WeekRow; zone: string }, targets: { weekStart: string; existing: WeekRow | null }[], reason: "repeat" | "auto_repeat"): Promise<CopyResult> {
   const srcShifts = await tx.select().from(rosterShifts).where(and(eq(rosterShifts.tenantId, ctx.tenantId), eq(rosterShifts.weekId, source.week.id))).orderBy(asc(rosterShifts.date), asc(rosterShifts.startTime), asc(rosterShifts.id))
@@ -127,6 +127,7 @@ export async function copyWeek(tx: TenantTx, ctx: RosterCtx, source: { week: Wee
   const weeks: WeekRow[] = []
   const conflicts: RepeatDto["conflicts"] = []
   let counts = ZERO
+  const audits: Parameters<typeof auditRoster>[2][] = []
   for (const t of targets) {
     const ids = [t.existing?.id ?? randomUUID(), ...srcShifts.map(() => randomUUID())]
     const res = domainRepeat(src, srcDomain, t.weekStart, t.existing ? domainWeek(t.existing) : null, true, { ...rc, shifts: known }, holidays, ids, eligible)
@@ -137,12 +138,12 @@ export async function copyWeek(tx: TenantTx, ctx: RosterCtx, source: { week: Wee
       locationId: week.locationId, weekId: week.id, action: reason === "repeat" ? "week_repeated" : "week_auto_repeated",
       after: { sourceWeekId: source.week.id, weekStart: week.weekStart, replaced: t.existing !== null, shifts: c.copied, kept: c.kept, warned: c.warned, opened: c.opened },
     })
-    await auditRoster(tx, ctx, { action: reason === "repeat" ? "roster.week_repeated" : "roster.week_auto_repeated", entity: "roster_week", entityId: week.id, before: null, after: { sourceWeekId: source.week.id, locationId: week.locationId, weekStart: week.weekStart, ...c } })
+    audits.push({ action: reason === "repeat" ? "roster.week_repeated" : "roster.week_auto_repeated", entity: "roster_week", entityId: week.id, before: null, after: { sourceWeekId: source.week.id, locationId: week.locationId, weekStart: week.weekStart, ...c } })
     weeks.push(week)
     conflicts.push(...conflictDtos(week.id, res, rc.opaque))
     counts = addCounts(counts, c)
   }
-  return { weeks, conflicts, counts }
+  return { weeks, conflicts, counts, audit: async () => { for (const a of audits) await auditRoster(tx, ctx, a) } }
 }
 
 /** The weeks at these Mondays of a location, locked FOR UPDATE in id order. */
@@ -175,8 +176,9 @@ export async function repeatWeek(tx: TenantTx, ctx: RosterCtx, weekId: string, i
     if (t && given[s] !== t.version) throw Conflict("version_conflict") // the target draft changed since the caller looked
     if (!t && given[s] !== undefined) throw Conflict("version_conflict") // the caller saw a draft that is not there any more
   }
+  await clearAutoRepeatBackoff(tx, ctx, week.locationId, starts) // a manual repeat makes the next weeks: the site's auto-repeat failures are history (before the copy: it reads only published weeks, which the copy never touches)
   const out = await copyWeek(tx, ctx, { week, zone: loaded.zone }, starts.map((s) => ({ weekStart: s, existing: found.get(s) ?? null })), "repeat")
-  await clearAutoRepeatBackoff(tx, ctx, week.locationId, starts) // a manual repeat made the next weeks: the site's auto-repeat failures are history
+  await out.audit() // the last write
   return { created: await weekDtos(tx, ctx, out.weeks), conflicts: out.conflicts, counts: out.counts }
 }
 

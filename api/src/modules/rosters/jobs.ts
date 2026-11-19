@@ -110,13 +110,14 @@ export async function repeatOne(deps: Deps, tenantId: string, tz: string, c: Can
     if (exists) return false // somebody made it by hand: nothing to copy over, nothing to tell
     const [row] = await tx.insert(rosterAutoRepeatRuns).values({ tenantId, sourceWeekId: src.id, targetWeekStart: target, createdAt: now }).onConflictDoNothing().returning({ w: rosterAutoRepeatRuns.sourceWeekId })
     if (!row) return false // another worker (or an earlier run) already did this one
-    await copyWeek(tx, ctx, { week: src as WeekRow, zone: c.zone }, [{ weekStart: target, existing: null }], "auto_repeat")
+    const copied = await copyWeek(tx, ctx, { week: src as WeekRow, zone: c.zone }, [{ weekStart: target, existing: null }], "auto_repeat")
     await tx.update(locations).set({ autoRepeatAttemptAt: now, autoRepeatFailures: 0 }).where(and(eq(locations.tenantId, tenantId), eq(locations.id, src.locationId)))
     const everyone = await approversOf(tx, tenantId, src.locationId, { supervisors: true, exclude: [] })
     const office = new Set(await approversOf(tx, tenantId, src.locationId, { supervisors: false, exclude: [] }))
     const supervisors = everyone.filter((u) => !office.has(u))
     const told = supervisors.length > 0 ? supervisors : [...office] // nobody supervises the site: the office roles that cover it hear instead
     await notifyActive(tx, ctx, env, told.map((userId) => ({ userId, title: DRAFT_READY.title, body: DRAFT_READY.body(target) })))
+    await copied.audit() // audit last
     return true
   })
 }
@@ -153,7 +154,8 @@ export async function runAutoRepeatJob(data: unknown, deps: Deps): Promise<void>
           } catch (err) {
             // a conflict, a lock timeout or a bad row wrote nothing (the ledger row rolled back with it): the next run tries again; ids and a safe code only
             deps.logger.error({ tenantId: t.id, errCode: safeCode(err) }, "roster auto-repeat failed for a week")
-            await recordFailure(deps, t.id, c.locationId, now) // outside the rolled-back copy: the back-off survives it
+            // a lock timeout (55P03: another roster writer held the tenant lock) says nothing about the site: no back-off, the next run (15 minutes) simply tries again; real failures count
+            if (errorInfo(err).code !== "55P03") await recordFailure(deps, t.id, c.locationId, now) // outside the rolled-back copy: the back-off survives it
           }
         }
         if (created > 0) await deps.readModelCache.bust(t.id) // the new drafts show in the attention feed within one read

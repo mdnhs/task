@@ -293,15 +293,15 @@ export async function resolvePatch(tx: TenantTx, ctx: RosterCtx, cur: ShiftRow, 
  * The one change of a shift every route that edits a published or draft shift goes through (an office edit and the approval of a change request): resolves and validates the patch, re-runs
  * eligibility and the rule gate INSIDE the roster write, updates the row (confirmation cleared, versions bumped), writes history and audit and tells the people. The caller has already
  * passed the edit gate and the version check. `gateReason` is what may override a block (an office reason; the override contract for a published week is `overrideRuleIds`); `reason` is what history keeps.
- * Returns what to show and `done`, which the caller awaits LAST (after its own history, notify and audit): the `roster.shift_changed` event of a published week.
+ * Returns what to show, `audit` (the audit line, which the caller awaits after ALL its own writes: audit last, so the hash-chain lock is held for the tail only) and `done`, which the caller awaits after that: the `roster.shift_changed` event of a published week.
  */
 export async function applyShiftPatch(
   tx: TenantTx, ctx: RosterCtx, env: RosterEnv, cur: ShiftRow, loaded: LoadedWeek, p: Patch,
   o: { reason: string | null; gateReason: string | undefined; overrideRuleIds: string[] | undefined; extra?: Record<string, unknown> },
-): Promise<{ shift: ShiftDto; violations: RuleViolation[]; changed: boolean; done: () => Promise<void> }> {
+): Promise<{ shift: ShiftDto; violations: RuleViolation[]; changed: boolean; audit: () => Promise<void>; done: () => Promise<void> }> {
   const week = loaded.week
   const { next, t, typeChanged, inst, same } = await resolvePatch(tx, ctx, cur, loaded, p)
-  if (same) return { shift: shiftDto(cur), violations: [], changed: false, done: async () => undefined } // nothing changes: no bump, no history, no audit
+  if (same) return { shift: shiftDto(cur), violations: [], changed: false, audit: async () => undefined, done: async () => undefined } // nothing changes: no bump, no history, no audit
   if (loaded.archived) throw Conflict("location_archived")
   const spec: Spec = { id: cur.id, date: next.date, userId: next.userId, type: t, role: next.role, start: next.start, end: next.end, unpaidBreakMin: next.unpaidBreakMin, startAt: inst.startAt, endAt: inst.endAt }
   if (next.userId !== null && (next.userId !== cur.userId || typeChanged || next.date !== cur.date)) await assertEligible(tx, ctx, [{ userId: next.userId, date: next.date, type: t }])
@@ -324,8 +324,8 @@ export async function applyShiftPatch(
   })
   const told = await tellPeople(tx, ctx, env, week, [cur.userId, row.userId])
   if (row.userId === null && cur.userId !== null) await postOpen(tx, ctx, env, week, [{ date: row.date, requires: t.requires }]) // the shift was taken off a person: it is open now
-  await auditRoster(tx, ctx, { action: "roster.shift_moved", entity: "roster_shift", entityId: cur.id, before: shiftSnap(cur), after: { ...shiftSnap(row), ...(o.extra ?? {}), ...reasonIf(week, o.reason) } })
-  return { shift: shiftDto(row), violations: gate.violations, changed: true, done: () => announce(tx, ctx, week, { action: "moved", shiftIds: [cur.id], userIds: told }) }
+  const audit = () => auditRoster(tx, ctx, { action: "roster.shift_moved", entity: "roster_shift", entityId: cur.id, before: shiftSnap(cur), after: { ...shiftSnap(row), ...(o.extra ?? {}), ...reasonIf(week, o.reason) } })
+  return { shift: shiftDto(row), violations: gate.violations, changed: true, audit, done: () => announce(tx, ctx, week, { action: "moved", shiftIds: [cur.id], userIds: told }) }
 }
 
 /**
@@ -340,6 +340,7 @@ export async function patchShift(tx: TenantTx, ctx: RosterCtx, env: RosterEnv, i
   const reason = cleanReason(input.reason)
   const p = parsePatch(input.patch)
   const out = await applyShiftPatch(tx, ctx, env, cur, loaded, p, { reason, gateReason: input.reason, overrideRuleIds: input.overrideRuleIds })
+  await out.audit()
   await out.done()
   return { shift: out.shift, violations: out.violations }
 }
