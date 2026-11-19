@@ -10,6 +10,7 @@ import { RollNumber } from "@/components/roll-number"
 import { Button } from "@/components/ui/button"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { useNotifications } from "@/hooks/use-notifications"
+import { usePlatformBell } from "@/hooks/use-platform-bell"
 import { formatDue } from "@/lib/dates"
 import { DUR, EASE, STAGGER, layoutTransition, listItem, numDir } from "@/lib/motion"
 import { cn } from "@/lib/utils"
@@ -54,8 +55,22 @@ const badge = (n: number) => (n > 9 ? "9+" : String(n))
 // The platform console's alerts are still mock (T6.8): static items with read state kept in a client store, like before. The company bell below is the API's.
 // Bell + panel. One Popover at every width: full-width under 640px via CSS (the existing useIsMobile hook breaks at 768).
 // Company bell: the list is the API's (hooks/use-notifications: 60 s poll while the tab is visible, mark one, mark all). Console bell: static alerts.
-export function NotificationsPanel({ items, today, tzLabel, scope, timezone }: { items: Notification[]; today: string; tzLabel: string; scope: string; /** The company's IANA zone: present = the API's bell, absent = the console's static alerts. */ timezone?: string }) {
+// Console bell (B8 Task 24): the API's derived feed (lib/platform-bell.ts), only for active platform staff; "Mark seen" stamps the server's clock. A non-staff user never gets one.
+export function NotificationsPanel({ items, today, tzLabel, scope, timezone, platform }: {
+  items: Notification[]; today: string; tzLabel: string; scope: string
+  /** The company's IANA zone: present = the API's bell, absent = the console's static alerts. */
+  timezone?: string
+  /** The console's API bell (active staff only). */
+  platform?: boolean
+}) {
+  if (platform) return <PlatformBell today={today} tzLabel={tzLabel} />
   return timezone ? <ApiBell today={today} tzLabel={tzLabel} timezone={timezone} /> : <StaticBell items={items} today={today} tzLabel={tzLabel} scope={scope} />
+}
+
+function PlatformBell({ today, tzLabel }: { today: string; tzLabel: string }) {
+  const b = usePlatformBell()
+  // No per-item read state on the API: opening an item only closes the panel; "Mark seen" clears the badge.
+  return <BellView list={b.items as Notification[]} loading={!b.loaded} onRead={() => undefined} onReadAll={b.seen} markLabel="Mark seen" today={today} tzLabel={tzLabel} />
 }
 
 function ApiBell({ today, tzLabel, timezone }: { today: string; tzLabel: string; timezone: string }) {
@@ -77,7 +92,7 @@ function StaticBell({ items, today, tzLabel, scope }: { items: Notification[]; t
   )
 }
 
-function BellView({ list: source, loading, onRead, onReadAll, today, tzLabel }: { list: Notification[]; loading: boolean; onRead: (id: string) => void; onReadAll: () => void; today: string; tzLabel: string }) {
+function BellView({ list: source, loading, onRead, onReadAll, markLabel = "Mark all read", today, tzLabel }: { list: Notification[]; loading: boolean; onRead: (id: string) => void; onReadAll: () => void; markLabel?: string; today: string; tzLabel: string }) {
   const [tab, setTab] = React.useState<Tab>("all")
   const [open, setOpen] = React.useState(false)
   // "Mark all read" clears the dots top to bottom in a short cascade: these ids keep showing as unread until their turn (the data is already read).
@@ -137,7 +152,7 @@ function BellView({ list: source, loading, onRead, onReadAll, today, tzLabel }: 
         <div className="od-notif-head">
           <span className="od-menu-name">Notifications</span>
           <button type="button" className="od-notif-mark" onClick={markAll} disabled={unread === 0}>
-            Mark all read
+            {markLabel}
           </button>
         </div>
         <div className="od-notif-tabs">

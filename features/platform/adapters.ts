@@ -24,12 +24,18 @@ export function tenantStatus(t: { status: string; subscriptionStatus: string | n
   return "active"
 }
 
-export type LiveTenantRow = { id: string; slug: string; name: string; status: TenantStatus; planId: string | null; plan: string; subscriptionStatus: string | null; seats: number | null; createdAt: string }
+/** B8 Task 24: `mrrCents` in minor units of `currency` (null without a subscription), the API's `health` band and `usage` counts (active members, active in 30 days, stored bytes). */
+export type LiveTenantRow = {
+  id: string; slug: string; name: string; status: TenantStatus; planId: string | null; plan: string; subscriptionStatus: string | null; seats: number | null; createdAt: string
+  mrrCents: number; currency: string | null; health: "green" | "amber" | "red"; usage: { seats: number; activeUsers30d: number; storageBytes: number }
+}
 export type LiveTenantList = { rows: LiveTenantRow[]; page: number; pageSize: number; total: number }
 
 export function toTenantList(dto: TenantsDto): LiveTenantList {
   return {
-    rows: dto.items.map((i) => ({ id: i.id, slug: i.slug, name: i.name, status: tenantStatus(i), planId: i.planId, plan: i.planId ? titleCase(i.planId) : "", subscriptionStatus: i.subscriptionStatus, seats: i.seats, createdAt: i.createdAt })),
+    rows: dto.items.map((i) => ({ id: i.id, slug: i.slug, name: i.name, status: tenantStatus(i), planId: i.planId, plan: i.planId ? titleCase(i.planId) : "", subscriptionStatus: i.subscriptionStatus, seats: i.seats, createdAt: i.createdAt,
+      mrrCents: i.mrrCents, currency: i.currency, health: i.health, usage: { seats: i.usage.seats, activeUsers30d: i.usage.activeUsers30d, storageBytes: i.usage.storageBytes },
+    })),
     page: dto.page, pageSize: dto.pageSize, total: dto.total,
   }
 }

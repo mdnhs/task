@@ -19,7 +19,8 @@ import { LiveTenants } from "./live-tenants"
 // 8 tenants, 5 audit lines); a smaller real page changes the height only below the last row.
 
 const at = "2026-01-01T00:00:00.000Z"
-const tenantRows = Array.from({ length: 8 }, (_, i) => ({ id: `s${i}`, slug: "company-name", name: "Company name", status: "active" as const, planId: "business", plan: "Business", subscriptionStatus: "active", seats: 25, createdAt: at }))
+const tenantRows = Array.from({ length: 8 }, (_, i) => ({ id: `s${i}`, slug: "company-name", name: "Company name", status: "active" as const, planId: "business", plan: "Business", subscriptionStatus: "active", seats: 25, createdAt: at,
+  mrrCents: 14900, currency: "EUR", health: "green" as const, usage: { seats: 12, activeUsers30d: 9, storageBytes: 48_211_234 } }))
 const TENANTS: LiveTenantList = { rows: tenantRows, page: 1, pageSize: 100, total: 8 }
 const METRICS: LiveMetrics = { mrr: [{ currency: "EUR", minor: 1000000 }], arr: [{ currency: "EUR", minor: 12000000 }], trials: 0, pastDue: 0, churn: 0 }
 const T360: Live360 = {
@@ -33,7 +34,7 @@ const STAFF: LiveStaff[] = Array.from({ length: 3 }, (_, i) => ({ id: `u${i}`, n
 // The owner's tabs: billing, usage and settings have no API yet and show only on a demo deployment (liveTabsFor).
 const ALL_TABS: TenantTab[] = ["overview", "billing", "usage", "modules", "support", "audit", "settings"]
 const LIVE_ONLY_TABS: TenantTab[] = ["overview", "modules", "support", "audit"]
-const ALL = { suspend: true, support: true }
+const ALL = { suspend: true, support: true, revenue: true } // the owner (typical); support has no MRR column (a CEILING by one column)
 
 export const LiveTenantsSkeleton = () => <SkMask label="Loading tenants"><LiveTenants data={TENANTS} view="all" q="" can={ALL} /></SkMask>
 // The sample sections of a demo deployment (ENABLE_MOCK_MODULES=1): the same grid as the loaded page, with the typical row counts (3 plans, 7 attention items, 8 activity lines).

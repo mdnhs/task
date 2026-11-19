@@ -15,7 +15,7 @@ import { StatusPill } from "@/components/status-pill"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { downloadCsv, toCsv } from "@/lib/csv"
 import type { LiveTenantList, LiveTenantRow } from "../adapters"
-import { dateUtc } from "../format"
+import { HEALTH_PILL, bytes, dateUtc, minorMoney } from "../format"
 import { DEFAULT_LIVE_SORT, LIVE_VIEWS, sortRows, viewCounts, viewRows, type LiveSort, type LiveSortKey, type LiveView } from "../live-views"
 import { tenantPath } from "../tenant-360"
 import { TENANT_STATUS } from "../types"
@@ -27,7 +27,11 @@ const SORTS: { value: string; label: string }[] = [
   { value: "seats:desc", label: "Most seats" }, { value: "plan:asc", label: "Plan" }, { value: "status:asc", label: "Status" },
 ]
 
-export type TenantsCan = { suspend: boolean; support: boolean }
+/** `revenue`: the operator may read billing figures (billing.read): the MRR column shows only then. */
+export type TenantsCan = { suspend: boolean; support: boolean; revenue?: boolean }
+
+/** Seat bar state: near the plan's limit from 90%, over it above 100%. */
+const seatState = (used: number, limit: number | null) => (limit === null || limit <= 0 ? undefined : used > limit ? "over" : used / limit >= 0.9 ? "near" : undefined)
 
 /**
  * The tenants list on the API (B6 T6.8). The server pages (`?page=`) and the API filters by name; the saved views that need a subscription status, and the sort, work on the loaded
@@ -57,8 +61,13 @@ export function LiveTenants({ data, view: initial, q, can }: { data: LiveTenantL
   }
 
   function exportCsv() {
-    const csv = toCsv(rows.map((t) => ({ id: t.id, name: t.name, slug: t.slug, plan: t.plan, status: TENANT_STATUS[t.status].label, seats: t.seats ?? "", created: t.createdAt.slice(0, 10) })), [
-      { key: "id", label: "ID" }, { key: "name", label: "Name" }, { key: "slug", label: "Slug" }, { key: "plan", label: "Plan" }, { key: "status", label: "Status" }, { key: "seats", label: "Seats" }, { key: "created", label: "Created" },
+    const csv = toCsv(rows.map((t) => ({
+      id: t.id, name: t.name, slug: t.slug, plan: t.plan, status: TENANT_STATUS[t.status].label, health: HEALTH_PILL[t.health].label, seats: t.seats ?? "", users: t.usage.seats, active30d: t.usage.activeUsers30d,
+      storageBytes: t.usage.storageBytes, ...(can.revenue ? { mrr: t.currency ? (t.mrrCents / 100).toFixed(2) : "", currency: t.currency ?? "" } : {}), created: t.createdAt.slice(0, 10),
+    })), [
+      { key: "id", label: "ID" }, { key: "name", label: "Name" }, { key: "slug", label: "Slug" }, { key: "plan", label: "Plan" }, { key: "status", label: "Status" }, { key: "health", label: "Health" },
+      { key: "seats", label: "Seats" }, { key: "users", label: "Users" }, { key: "active30d", label: "Active 30d" }, { key: "storageBytes", label: "Storage bytes" },
+      ...(can.revenue ? [{ key: "mrr" as const, label: "MRR" }, { key: "currency" as const, label: "Currency" }] : []), { key: "created", label: "Created" },
     ])
     downloadCsv(csv, `tenants-page-${data.page}.csv`)
     toast.success("CSV exported")
@@ -84,9 +93,12 @@ export function LiveTenants({ data, view: initial, q, can }: { data: LiveTenantL
         {rows.length > 0 ? (
           <>
             <div className="table-wrap">
-              <table className="rtable pf-table pf-tenants pf-no-mrr">
+              <table className={`rtable pf-table pf-tenants${can.revenue ? "" : " pf-no-mrr"}`}>
                 <thead>
-                  <tr><th>Tenant</th><th>Plan</th><th>Status</th><th>Seats</th><th>Created</th><th><span className="sr-only">Actions</span></th></tr>
+                  <tr>
+                    <th>Tenant</th><th>Plan</th><th>Status</th><th>Health</th><th>Users</th><th className="pf-r">Active 30d</th><th className="pf-r">Storage</th>
+                    {can.revenue && <th className="pf-r">MRR</th>}<th>Created</th><th><span className="sr-only">Actions</span></th>
+                  </tr>
                 </thead>
                 <tbody>
                   {rows.map((t) => (
@@ -99,7 +111,16 @@ export function LiveTenants({ data, view: initial, q, can }: { data: LiveTenantL
                       </td>
                       <td data-label="Plan">{t.plan || "—"}</td>
                       <td data-label="Status"><StatusPill status={TENANT_STATUS[t.status]} /></td>
-                      <td data-label="Seats" className="num">{t.seats ?? "—"}</td>
+                      <td data-label="Health"><StatusPill status={HEALTH_PILL[t.health]} /></td>
+                      <td data-label="Users" className="pf-users">
+                        <span className="num">{t.usage.seats}{t.seats !== null ? ` / ${t.seats}` : ""}</span>
+                        {t.seats !== null && t.seats > 0 && (
+                          <span className="pf-seat" data-state={seatState(t.usage.seats, t.seats)} aria-hidden="true"><i style={{ width: `${Math.min(100, Math.round((t.usage.seats / t.seats) * 100))}%` }} /></span>
+                        )}
+                      </td>
+                      <td data-label="Active 30d" className="num pf-r">{t.usage.activeUsers30d}</td>
+                      <td data-label="Storage" className="num pf-r">{bytes(t.usage.storageBytes)}</td>
+                      {can.revenue && <td data-label="MRR" className="num pf-r">{t.currency && t.mrrCents > 0 ? minorMoney(t.mrrCents, t.currency) : "—"}</td>}
                       <td data-label="Created" className="num"><time dateTime={t.createdAt}>{dateUtc(t.createdAt)}</time></td>
                       <td className="pf-menu-cell">
                         <DropdownMenu>

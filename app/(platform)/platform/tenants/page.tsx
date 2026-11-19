@@ -18,5 +18,5 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ v
   const page = Math.max(1, Math.floor(Number(one(sp.page))) || 1)
   const r = await settle(apiServer({ tenant: null }).then((api) => loadTenantList(api, { q: q || undefined, page, pageSize: TENANTS_PAGE })))
   if (!r.ok) return refused(r.e, "platform tenants")
-  return <LiveTenants data={r.v} view={isLiveView(view) ? view : "all"} q={q} can={{ suspend: requireStaff(g.op, "tenants.suspend"), support: requireStaff(g.op, "support.request") }} />
+  return <LiveTenants data={r.v} view={isLiveView(view) ? view : "all"} q={q} can={{ suspend: requireStaff(g.op, "tenants.suspend"), support: requireStaff(g.op, "support.request"), revenue: requireStaff(g.op, "billing.read") }} />
 }

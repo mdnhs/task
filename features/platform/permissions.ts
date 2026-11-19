@@ -6,18 +6,18 @@ export const STAFF_ROLES: StaffRole[] = ["owner", "support", "billing", "viewer"
 export const PLATFORM_ACTIONS: PlatformAction[] = [
   "tenants.read", "tenants.suspend", "tenants.lifecycle", "tenants.modules", "tenants.notes",
   "billing.read", "billing.write", "plans.write",
-  "support.request", "data.requests", "audit.read", "team.manage", "settings.read", "settings.write",
+  "support.request", "data.requests", "data.resolve", "audit.read", "team.manage", "settings.read", "settings.write",
 ]
 
 export const STAFF_ROLE_LABEL: Record<StaffRole, string> = { owner: "Owner", support: "Support", billing: "Billing", viewer: "Viewer" }
 
 // Mirrors the API's role matrix (api/src/modules/platform-*: requirePlatformStaff). The API is the authority; this only hides controls and pages it would refuse.
 //   tenants list/360: all roles · suspend, reactivate, extend trial, support grants: owner, support · modules, staff, settings: owner
-//   metrics: owner, billing, viewer · audit: owner, viewer · data requests: all roles (read only)
+//   metrics: owner, billing, viewer · audit: owner, viewer · data requests: all roles read, owner and support resolve (B8 T17)
 // `billing.write`, `plans.write`, `tenants.lifecycle` and `tenants.notes` have no API route yet (mock pages only, shown with ENABLE_MOCK_MODULES).
 const MAP: Record<StaffRole, ReadonlySet<PlatformAction>> = {
   owner: new Set(PLATFORM_ACTIONS),
-  support: new Set<PlatformAction>(["tenants.read", "tenants.suspend", "tenants.notes", "support.request", "data.requests"]),
+  support: new Set<PlatformAction>(["tenants.read", "tenants.suspend", "tenants.notes", "support.request", "data.requests", "data.resolve"]),
   billing: new Set<PlatformAction>(["tenants.read", "tenants.notes", "billing.read", "billing.write", "plans.write", "data.requests"]),
   viewer: new Set<PlatformAction>(["tenants.read", "billing.read", "audit.read", "data.requests"]),
 }

@@ -27,6 +27,8 @@ export default async function PlatformLayout({ children }: { children: React.Rea
       variant="platform"
       env={env ?? undefined}
       bellScope={`platform:${op?.id ?? "none"}`}
+      // B8 Task 24: the API's bell for active staff past their second factor; anyone else (the restricted page) gets no bell at all.
+      bell={op && mfaOk ? "platform" : "none"}
       navigation={nav}
       user={user}
       // The operator isn't inside a company, so no tenant banner.

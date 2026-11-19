@@ -39,6 +39,12 @@ export function makePlatformClient(api: ApiClient) {
       if (!whole(hours, 1, GRANT_HOURS_MAX)) throw new PlatformInputError("hours", `Hours must be a whole number from 1 to ${GRANT_HOURS_MAX}.`)
       return api.post("/v1/platform/tenants/{tenantId}/support-grants", { path: tid(tenantId), body: { reason: checkReason(reason), hours } })
     },
+    /** B8 T17: close a `running` or `failed` request by hand; the note (1..500) is shown to the tenant. */
+    resolveDataRequest(id: string, outcome: "completed" | "rejected", note: string) {
+      const n = note.trim()
+      if (n.length < 1 || n.length > REASON_MAX) throw new PlatformInputError("reason", `Add a note of 1 to ${REASON_MAX} characters.`)
+      return api.post("/v1/platform/data-requests/{id}/resolve", { path: { id }, body: { outcome, note: n } })
+    },
     revokeGrant: (id: string) => api.delete("/v1/platform/support-grants/{id}", { path: { id } }),
     async addStaff(email: string, role: "owner" | "support" | "billing" | "viewer") {
       const e = email.trim()

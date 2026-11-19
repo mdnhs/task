@@ -110,7 +110,7 @@ export type StaffMember = { id: string; name: string; email: string; role: Staff
 export type PlatformAction =
   | "tenants.read" | "tenants.suspend" | "tenants.lifecycle" | "tenants.modules" | "tenants.notes"
   | "billing.read" | "billing.write" | "plans.write"
-  | "support.request" | "data.requests" | "audit.read" | "team.manage" | "settings.read" | "settings.write"
+  | "support.request" | "data.requests" | "data.resolve" | "audit.read" | "team.manage" | "settings.read" | "settings.write"
 
 // D4: subscription events and invoices are the source of the metrics (metrics.ts); nothing aggregated is stored.
 export type SubEvent = { id: string; tenantId: string; at: string; kind: "start" | "upgrade" | "downgrade" | "cancel" | "reactivate"; plan: string; mrrDelta: number }

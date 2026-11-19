@@ -29,7 +29,8 @@ without the console's nav or search.
   Stripe publishable key prefix (`pk_test_` / `pk_live_`), owner only.
 - **Times** show in UTC (the console is not inside a company). Money is the API's integer minor units per currency.
 - **Skeletons**: every `loading.tsx` is static (K1): it renders the real view masked (`SkMask`) with typical sample rows, no data layer. Mock pages use `MockPageSkeleton`.
-- **Not carried over**: the platform bell (alerts) is empty, the old health score, MRR per tenant and plan-mix columns need data the API does not have, support requests and data-request resolving have no routes.
+- **Not carried over**: the old health SCORE (the API gives a band), plan-mix columns and support requests have no API.
+- **Wired in B8 Task 24**: the bell is the API's derived feed for active staff past their second factor (`lib/platform-bell.ts`, `hooks/use-platform-bell.ts`, `NotificationsPanel platform`): badge = the API's `unread` (the newest `unread` items show unread; there is no per-item read state), 60 s poll while visible, **Mark seen** = `POST .../seen` (optimistic, a refusal puts the badge back with the app's copy); anyone else on the console (the restricted page) gets no bell (`AppShell bell="none"`). The tenants table shows **Health** (green Healthy / amber Watch / red At risk, the API's band), **Users** (active members / plan seats with the seat bar), **Active 30d**, **Storage** and, with `billing.read` only, **MRR** (`mrrCents` in the plan's own currency, "—" for 0); the CSV carries the same columns. **Data requests**: owner and support (`data.resolve`) get **Resolve** on `running` and `failed` rows (a `pending` one is the job's): outcome (Completed/Rejected) and a note (1..500, shown to the tenant) are both required; the row shows the API's answer at once.
 
 ## API coverage (B6 T6.8)
 

@@ -127,6 +127,7 @@ export function AppShell({
   variant = "app",
   env,
   bellScope,
+  bell = "auto",
   children,
 }: {
   navigation: NavigationData
@@ -152,6 +153,8 @@ export function AppShell({
   env?: { label: string; live: boolean }
   /** Read-state key for the bell. Defaults to tenant + role; the console passes its own (platform alerts never share tenant state). */
   bellScope?: string
+  /** Which bell: "auto" = the company's (bellTimezone) or the static alerts; "platform" = the console's API bell (active staff); "none" = no bell at all (a non-staff user on the console). */
+  bell?: "auto" | "platform" | "none"
   children: React.ReactNode
 }) {
   const platform = variant === "platform"
@@ -229,7 +232,7 @@ export function AppShell({
             {platform && <PlatformContext env={env} />}
             <div className="top-actions">
               {assistant}
-              <NotificationsPanel items={notifications} today={today} tzLabel={tzLabel} scope={bellScope ?? `${session.tenant.id}:${session.role.id}`} timezone={bellTimezone} />
+              {bell !== "none" && <NotificationsPanel items={notifications} today={today} tzLabel={tzLabel} scope={bellScope ?? `${session.tenant.id}:${session.role.id}`} timezone={bellTimezone} platform={bell === "platform"} />}
               <NavUser user={user} session={session} variant={variant} />
             </div>
             {showDepts && <DeptRow items={navigation.departments} dep={dep} onChange={setDep} />}
