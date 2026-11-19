@@ -10402,9 +10402,9 @@ export interface paths {
         post?: never;
         delete: {
             parameters: {
-                query?: {
-                    /** @description The shift version the editor saw; a stale one is 409 version_conflict */
-                    version?: string;
+                query: {
+                    /** @description Required: the shift version the editor saw; a missing one is 400, a stale one 409 version_conflict */
+                    version: string;
                     /** @description Why (required from an office role on a published week) */
                     reason?: string;
                 };

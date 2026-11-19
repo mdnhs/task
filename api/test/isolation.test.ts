@@ -50,7 +50,7 @@ const NOT_APPLICABLE: Record<string, string> = {
  *  - "owner": owner of A.  - "dual": a member of BOTH A and B, the allocated user of a device in A and one in B.
  * `body(w)` gets the world whose ids are in the path (so bind can use a code issued for that very device).
  */
-type Spec = { actor: "owner" | "dual"; expect: string; body?: (w: World) => Promise<unknown> | unknown; prepare?: (w: World) => Promise<void> }
+type Spec = { actor: "owner" | "dual"; expect: string; /** appended to the URL (a required query parameter, e.g. DELETE shift ?version=) */ query?: string; body?: (w: World) => Promise<unknown> | unknown; prepare?: (w: World) => Promise<void> }
 const issueCode = async (w: World) => {
   const r = await call(t.app, "POST", `/v1/devices/${w.resources.device}/enrolment-code`, { cookie: w.owner.cookie, tenant: w.tenant.slug })
   if (r.status !== 201) throw new Error(`enrolment code failed: ${r.status}`)
@@ -184,7 +184,7 @@ const SPECS: Record<string, Spec> = {
   "GET /v1/roster/weeks/{id}": { actor: "owner", expect: "not_found" },
   "POST /v1/roster/weeks/{id}/shifts": { actor: "owner", expect: "not_found" },
   "PATCH /v1/roster/shifts/{id}": { actor: "owner", expect: "not_found" },
-  "DELETE /v1/roster/shifts/{id}": { actor: "owner", expect: "not_found" },
+  "DELETE /v1/roster/shifts/{id}": { actor: "owner", expect: "not_found", query: "?version=1" }, // version is a required query parameter (R3)
   // B8 T10: publish (control: 200), history of a week and of a site (control: 200), confirm (control: 403 forbidden, the owner is not the assigned person). One plain 404 for anything hidden, missing, another tenant's or not a uuid.
   "POST /v1/roster/weeks/{id}/publish": { actor: "owner", expect: "not_found" },
   "GET /v1/roster/weeks/{id}/history": { actor: "owner", expect: "not_found" },
@@ -358,7 +358,7 @@ describe("AC-M0-01 cross-tenant isolation walker", () => {
     for (const { o, spec, body, params, ghost } of plan) {
       const cookie = spec.actor === "dual" ? dual.cookie : ownerA.cookie
       const send = (url: string) => call(t.app, o.method, url, { cookie, tenant: a.tenant.slug, body })
-      const r = await send(substitute(o.path, params))
+      const r = await send(substitute(o.path, params) + (spec.query ?? ""))
       walked.push(o.key)
       const text = await r.text()
       const code = (JSON.parse(text) as Json).code
@@ -367,7 +367,7 @@ describe("AC-M0-01 cross-tenant isolation walker", () => {
       if (!(r.headers.get("content-type") ?? "").startsWith("application/problem+json")) failures.push(`${o.key}: content-type ${r.headers.get("content-type")}`)
       for (const m of b.marks) if (text.includes(m)) failures.push(`${o.key}: 404 body leaks tenant-B value ${m}`)
       // B's id must look exactly like an id that never existed.
-      const g = await send(substitute(o.path, ghost))
+      const g = await send(substitute(o.path, ghost) + (spec.query ?? ""))
       if (g.status !== 404 || ((await g.json()) as Json).code !== spec.expect) failures.push(`${o.key}: never-existing id did not give 404 ${spec.expect}`)
     }
     expect(failures).toEqual([])
@@ -394,7 +394,7 @@ describe("AC-M0-01 cross-tenant isolation walker", () => {
       await spec.prepare?.(w)
       const ex = bodyExample(o.op)
       const body = ex.present ? await (spec.body ? spec.body(w) : ex.example) : undefined
-      const r = await call(t.app, o.method, substitute(o.path, params), { cookie: spec.actor === "dual" ? dual.cookie : ownerA.cookie, tenant: a.tenant.slug, body })
+      const r = await call(t.app, o.method, substitute(o.path, params) + (spec.query ?? ""), { cookie: spec.actor === "dual" ? dual.cookie : ownerA.cookie, tenant: a.tenant.slug, body })
       if (r.status === 404 || r.status >= 500) failures.push(`${o.key} -> ${r.status} with A's own ids: ${(await r.text()).slice(0, 120)}`)
     }
     expect(failures).toEqual([])

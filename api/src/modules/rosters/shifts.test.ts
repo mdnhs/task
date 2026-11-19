@@ -287,6 +287,13 @@ describe("change a shift (FR-RS-10)", () => {
     expect(warn.violations.map((v: Json) => [v.rule, v.severity])).toContainEqual(["daily_rest", "warn"])
   })
 
+  test("R3: DELETE without ?version is 400 (required, like PATCH) and removes nothing", async () => {
+    const w = await sites()
+    const s = await one(w, w.p["location-supervisor"])
+    for (const q of ["", "?reason=gone", "?version="]) expect((await w.fail("DELETE", `/v1/roster/shifts/${s.id}${q}`, w.p.owner, undefined, 400)).code, q).toBe("validation_failed")
+    expect(await w.rows("select 1 from roster_shifts where id = $1", [s.id])).toHaveLength(1)
+  })
+
   test("DELETE of a shift in a draft writes history with the whole shift as before and removes the row", async () => {
     const w = await sites()
     const s = await one(w, w.p["location-supervisor"])
@@ -298,7 +305,7 @@ describe("change a shift (FR-RS-10)", () => {
     expect(h.after).toBeNull()
     expect(h.actor_id).toBe(w.p["location-supervisor"].userId)
     expect(await w.rows("select 1 from audit_events where action = 'roster.shift_removed'")).toHaveLength(1)
-    expect((await w.req("DELETE", `/v1/roster/shifts/${s.id}`, w.p.owner)).status).toBe(404) // gone
+    expect((await w.req("DELETE", `/v1/roster/shifts/${s.id}?version=1`, w.p.owner)).status).toBe(404) // gone
   })
 
   test("a hidden shift, a missing one and a non-uuid id answer one identical 404 on PATCH and DELETE; the hidden shift is untouched", async () => {
@@ -306,10 +313,10 @@ describe("change a shift (FR-RS-10)", () => {
     const hiddenShift = (await w.addOk(w.p.owner, w.wb, [{ date: MON, userIds: [w.staff2.userId], shiftTypeId: w.tb }])).shifts[0]
     const sup = w.p["location-supervisor"]
     const ids = [hiddenShift.id, "00000000-0000-4000-8000-000000000000", "nope", "x' or '1'='1"]
-    for (const [method, body] of [["PATCH", { version: 1, patch: { start: "09:00" } }], ["DELETE", undefined]] as const) {
+    for (const [method, body, q] of [["PATCH", { version: 1, patch: { start: "09:00" } }, ""], ["DELETE", undefined, "?version=1"]] as const) {
       const seen: ReturnType<typeof strip>[] = []
       for (const id of ids) {
-        const r = await w.req(method, `/v1/roster/shifts/${encodeURIComponent(id)}`, sup, body)
+        const r = await w.req(method, `/v1/roster/shifts/${encodeURIComponent(id)}${q}`, sup, body)
         seen.push(strip(r, await r.text()))
       }
       expect(seen[0], method).toMatchObject({ status: 404, code: "not_found" })

@@ -306,11 +306,12 @@ describe("AH1 erase takes the roster lock (lock order = deactivation)", () => {
     await w.addOk(w.p.owner, draft, [{ date: "2026-12-08", userIds: [me.userId, them.userId], shiftTypeId: w.ta }])
     const v = Number((await w.rows("select version from roster_weeks where id = $1", [draft]))[0].version)
     const sv = Number((await w.rows("select version from roster_shifts where id = $1", [theirs[0]]))[0].version)
+    const mineV = Number((await w.rows("select version from roster_shifts where id = $1", [mine[1]]))[0].version)
     const results = await Promise.all([
       runJob("dsr.erase", { dsrId: id, tenantId: w.tenant.id }, w.deps).then(() => "erase"),
       w.req("POST", `/v1/roster/weeks/${draft}/publish`, w.p.owner, { version: v }),
       w.req("PATCH", `/v1/roster/shifts/${theirs[0]}`, w.p.owner, { version: sv, patch: { start: "10:00", end: "18:00" }, reason: "Busy day" }),
-      w.req("DELETE", `/v1/roster/shifts/${mine[1]}?reason=${encodeURIComponent("Cover")}`, w.p.owner),
+      w.req("DELETE", `/v1/roster/shifts/${mine[1]}?version=${mineV}&reason=${encodeURIComponent("Cover")}`, w.p.owner),
     ])
     for (const r of results) if (r instanceof Response) expect([200, 204, 404, 409, 422], `${r.status} ${await r.clone().text()}`).toContain(r.status) // a 409 is the documented retry answer, never a 500
     expect((await w.ok("GET", `/v1/data-requests/${id}`, w.p.owner)).status).toBe("completed")

@@ -14,7 +14,7 @@ type Action = "add" | "move" | "remove" | "publish" | "confirm" | "check" | "cha
 const RUN: Record<Action, (w: W, who: Who, c: Cell, reason?: string) => Promise<Response>> = {
   add: (w, who, c, reason) => w.add(who, c.weekId, [{ date: c.start, userIds: [null], shiftTypeId: w.ta }], reason ? { reason } : {}),
   move: (w, who, c, reason) => w.req("PATCH", `/v1/roster/shifts/${c.shiftId}`, who, { version: c.shiftVersion, patch: { start: "09:00", end: "17:00" }, ...(reason ? { reason } : {}) }),
-  remove: (w, who, c, reason) => w.req("DELETE", `/v1/roster/shifts/${c.shiftId}${reason ? `?reason=${encodeURIComponent(reason)}` : ""}`, who),
+  remove: (w, who, c, reason) => w.req("DELETE", `/v1/roster/shifts/${c.shiftId}?version=${c.shiftVersion}${reason ? `&reason=${encodeURIComponent(reason)}` : ""}`, who),
   publish: async (w, who, c) => w.req("POST", `/v1/roster/weeks/${c.weekId}/publish`, who, { version: Number((await w.rows("select version from roster_weeks where id = $1", [c.weekId]))[0].version) }),
   confirm: (w, who, c) => w.req("POST", `/v1/roster/shifts/${c.shiftId}/confirm`, who),
   check: (w, who, c) => w.req("POST", `/v1/roster/weeks/${c.weekId}/check`, who),

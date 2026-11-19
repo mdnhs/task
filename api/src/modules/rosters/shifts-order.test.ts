@@ -51,7 +51,7 @@ describe("lock order of the week and shift writes", () => {
     expect(calls.slice(0, 2)).toEqual(["lockRoster", "lockActor"])
     expect(calls.filter((c) => c === "checkWeek").length).toBe(2)
     calls.length = 0
-    expect((await w.req("DELETE", `/v1/roster/shifts/${added.shifts[0].id}`, w.p.owner)).status).toBe(204)
+    expect((await w.req("DELETE", `/v1/roster/shifts/${added.shifts[0].id}?version=2`, w.p.owner)).status).toBe(204)
     expect(calls).toEqual(["lockRoster", "lockActor"])
     expect(checkLocks.length).toBe(4)
     expect(checkLocks.every(Boolean)).toBe(true)

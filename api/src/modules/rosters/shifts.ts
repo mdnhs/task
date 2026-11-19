@@ -346,11 +346,11 @@ export async function patchShift(tx: TenantTx, ctx: RosterCtx, env: RosterEnv, i
 
 // ------------------------------------------------------------------ remove
 
-/** DELETE /v1/roster/shifts/{id}[?version=&reason=]: removes the shift; history keeps the whole shift as `before`. An archived site's shifts may still be removed. */
-export async function deleteShift(tx: TenantTx, ctx: RosterCtx, env: RosterEnv, id: string, o: { version?: string; reason?: string }): Promise<void> {
+/** DELETE /v1/roster/shifts/{id}?version=[&reason=] (version is required, like PATCH): removes the shift; history keeps the whole shift as `before`. An archived site's shifts may still be removed. */
+export async function deleteShift(tx: TenantTx, ctx: RosterCtx, env: RosterEnv, id: string, o: { version: string; reason?: string }): Promise<void> {
   const { shift: cur, loaded } = await loadShift(tx, ctx, id)
   editableWeek(ctx, loaded, o.reason, { allowArchived: true })
-  if (o.version !== undefined && (!/^\d{1,9}$/.test(o.version) || Number(o.version) !== cur.version)) throw Conflict("version_conflict")
+  if (!/^\d{1,9}$/.test(o.version) || Number(o.version) !== cur.version) throw Conflict("version_conflict")
   const reason = cleanReason(o.reason)
   await tx.delete(rosterShifts).where(and(eq(rosterShifts.tenantId, ctx.tenantId), eq(rosterShifts.id, cur.id)))
   await bumpWeek(tx, ctx, loaded.week)

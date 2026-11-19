@@ -226,7 +226,7 @@ export const PatchShiftBody = z
   .openapi({ example: { version: 1, patch: { start: "09:00", end: "17:00" } } })
 export const PatchShiftOut = z.object({ shift: ShiftOut, violations: z.array(ViolationOut) }).openapi({ example: { shift: shiftEx, violations: [] } })
 export const DeleteShiftQuery = z.object({
-  version: z.string().max(9).optional().openapi({ description: "The shift version the editor saw; a stale one is 409 version_conflict", example: "1" }),
+  version: z.string().min(1).max(9).openapi({ description: "Required: the shift version the editor saw; a missing one is 400, a stale one 409 version_conflict", example: "1" }),
   reason: z.string().max(2000).optional().openapi({ description: "Why (required from an office role on a published week)", example: "Cover found" }),
 })
 

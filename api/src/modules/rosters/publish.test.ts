@@ -189,15 +189,15 @@ describe("office edit of a published week (R8-8, R8-17, FR-RS-37)", () => {
     const before = await w.rows("select id, version, start_time from roster_shifts order by id")
     const add = await w.add(sup, w.wa, [{ date: MON, userIds: [null], shiftTypeId: w.ta }])
     const move = await w.req("PATCH", `/v1/roster/shifts/${s.id}`, sup, { version: s.version, patch: { start: "09:00" }, reason: "please" })
-    const del = await w.req("DELETE", `/v1/roster/shifts/${s.id}?reason=please`, sup)
+    const del = await w.req("DELETE", `/v1/roster/shifts/${s.id}?version=${s.version}&reason=please`, sup)
     for (const r of [add, move, del]) {
       expect(r.status).toBe(403)
       expect(((await r.json()) as Json).code).toBe("roster_locked")
     }
     const o1 = await w.add(w.p.owner, w.wa, [{ date: MON, userIds: [null], shiftTypeId: w.ta }])
     const o2 = await w.req("PATCH", `/v1/roster/shifts/${s.id}`, w.p.owner, { version: s.version, patch: { start: "09:00" } })
-    const o3 = await w.req("DELETE", `/v1/roster/shifts/${s.id}`, w.p.owner)
-    const o4 = await w.req("DELETE", `/v1/roster/shifts/${s.id}?reason=%20%20`, w.p.owner)
+    const o3 = await w.req("DELETE", `/v1/roster/shifts/${s.id}?version=${s.version}`, w.p.owner)
+    const o4 = await w.req("DELETE", `/v1/roster/shifts/${s.id}?version=${s.version}&reason=%20%20`, w.p.owner)
     for (const r of [o1, o2, o3, o4]) {
       expect(r.status).toBe(422)
       expect(((await r.json()) as Json).code).toBe("reason_required")
@@ -248,7 +248,8 @@ describe("office edit of a published week (R8-8, R8-17, FR-RS-37)", () => {
     await w.ok("PATCH", `/v1/roster/shifts/${open.id}`, w.p.owner, { version: open.version, patch: { start: "07:00" }, reason: "Earlier start" })
     expect(await notices(w)).toHaveLength(0)
     // remove: the person hears
-    expect((await w.req("DELETE", `/v1/roster/shifts/${mine.id}?reason=Cancelled`, w.p.owner)).status).toBe(204)
+    const mineV = (await w.rows("select version from roster_shifts where id = $1", [mine.id]))[0].version
+    expect((await w.req("DELETE", `/v1/roster/shifts/${mine.id}?version=${mineV}&reason=Cancelled`, w.p.owner)).status).toBe(204)
     expect((await notices(w)).map((x) => x.user_id)).toEqual([w.staff3.userId])
     const [h] = await w.rows("select reason, before, after from roster_history where shift_id = $1 and action = 'shift_removed'", [mine.id])
     expect(h).toMatchObject({ reason: "Cancelled", after: null })
