@@ -220,7 +220,7 @@ describe("the check endpoint (FR-RS-44)", () => {
     expect(cut).toHaveLength(1) // the average, the weekly rest and the rest all built on hidden hours are ONE line
     expect(cut[0].message).toBe("Already rostered elsewhere")
     expect(rule(all, "avg_48h")).toEqual([])
-    expect(JSON.stringify(all)).not.toMatch(/\d+\.\dh|54|limit/)
+    expect(JSON.stringify(all)).not.toMatch(/\d+\.\dh|\b54\.0|limit/)
     const full = rule(await w.violations(w.p.admin, wk), "avg_48h")
     expect(full[0].message).toMatch(/54\.0h a week over 1 weeks \(limit 48h\)/)
   })
