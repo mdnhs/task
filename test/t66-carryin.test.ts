@@ -1,7 +1,5 @@
 import { readFileSync } from "node:fs"
 import path from "node:path"
-import { createElement } from "react"
-import { renderToStaticMarkup } from "react-dom/server"
 import { describe, expect, test, vi } from "vitest"
 import { fakeApi, problem } from "@/test/support/fake-api"
 import { userMessage, ApiError } from "@/lib/api/problem"
