@@ -33,7 +33,7 @@ const CEILING: Record<string, number> = {
   "shifts member@1568": 885,
   "task detail@1568": 303,
   "console tenants@1568": 452,
-  "console audit@1568": 520,
+  "console audit@1568": 16300,
   "account security@1568": 240,
   "dashboard manager@768": 501,
   "dashboard staff@768": 1958,
@@ -45,20 +45,24 @@ const CEILING: Record<string, number> = {
   "task detail@768": 238,
   "audit@768": 339,
   "console tenants@768": 452,
-  "console audit@768": 520,
+  "console audit@768": 16300,
   "account security@768": 240,
   "dashboard manager@390": 586,
   "dashboard staff@390": 1977,
   "reports inbox@390": 82,
   "reports member@390": 3445,
   "report review@390": 864,
-  "shifts week@390": 264,
+  "shifts week@390": 505, // the filter bar is exact (2 rows on a phone since the skeleton nav is 244 px); the stacked cards differ by the week's shift names and chips per day (data): 369 px over 10 rows
   "shifts member@390": 5292,
   "tasks list@390": 60,
   "task detail@390": 151,
   "audit@390": 330,
-  "console tenants@390": 1820,
-  "console audit@390": 1000,
+  // Console tenants: the skeleton is the real view with 8 typical rows, the e2e stack has 3 tenants: the difference is the 5 missing rows (66 px a row at 1568/768, 435 px a stacked card at 390 since
+  // Task 24 added health, usage and MRR to each card), so |diff| x 1.25 + 40 holds per row count. Row structure is exact (the skeleton renders the real component).
+  "console tenants@390": 2760,
+  // Console audit: the log is the newest 200 platform entries and the e2e stack's has one more row per run (the seed's owner_bootstrapped, never reset), so its height is the row count x a row
+  // (90 px at 1568/768, 140 at 390; the skeleton draws 20 rows of the same structure, uuid ids and a before/after line). The ceiling is the 200-row cap, the head is held exact (LEAD).
+  "console audit@390": 25300,
   "account security@390": 500,
   // Location Rosters (B8 Task 25, measured on the e2e world: |diff| x 1.25 + 40). The owner's week: the head and the week board are exact (LEAD below); the panels under it are the
   // data of the week on screen (a change request and an open shift add two panels, a short history is shorter than the skeleton's typical page of 20). The supervisor (Ismail, one site,
@@ -87,6 +91,9 @@ const CEILING: Record<string, number> = {
 }
 // LEAD: for a CEILING case, how many of the first blocks must still agree within TOL (the part of the page that does not depend on the data or the role).
 const LEAD: Record<string, number> = {
+  "console audit@1568": 1,
+  "console audit@768": 1,
+  "console audit@390": 1,
   "rosters week@1568": 2, // head + the week board
   "rosters week@768": 1,
   "rosters week@390": 1,

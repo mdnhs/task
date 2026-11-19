@@ -16,7 +16,7 @@ import { LiveTenants } from "./live-tenants"
 
 // Exact-by-construction loading states (B6 T6.8, K1): each one renders the REAL view, masked (SkMask: text transparent, blocks tinted, inert), with typical static sample rows, so the
 // layout, wraps and card structure are the loaded page's. No data layer is imported: a loading.tsx never asks the API anything. The row counts are the typical case (a page of
-// 8 tenants, 5 audit lines); a smaller real page changes the height only below the last row.
+// 8 tenants, 20 audit lines with uuid record ids: the log is the newest 200 entries); a smaller real page changes the height only below the last row.
 
 const at = "2026-01-01T00:00:00.000Z"
 const tenantRows = Array.from({ length: 8 }, (_, i) => ({ id: `s${i}`, slug: "company-name", name: "Company name", status: "active" as const, planId: "business", plan: "Business", subscriptionStatus: "active", seats: 25, createdAt: at,
@@ -28,7 +28,7 @@ const T360: Live360 = {
   planId: "business", plan: "Business", subscriptionStatus: "active", seats: 25, seatsUsed: 12, memberCount: 14, trialEndsAt: null, currentPeriodEnd: at, cancelAtPeriodEnd: false, hasProviderSubscription: true,
   overrides: [], lastActivityDate: "2026-01-01", openDataRequests: 0,
 }
-const AUDIT: LiveAuditLine[] = Array.from({ length: 5 }, (_, i) => ({ seq: i, at, actor: "usr_000000", action: "tenant.suspended", entity: "tenant", entityId: "00000000", tenantId: null, before: null, after: null }))
+const AUDIT: LiveAuditLine[] = Array.from({ length: 20 }, (_, i) => ({ seq: i, at, actor: "usr_000000", action: "tenant.suspended", entity: "tenant", entityId: "00000000-0000-0000-0000-000000000000", tenantId: null, before: null, after: { status: "suspended" } }))
 const REQUESTS: LiveDataRequests = { rows: Array.from({ length: 6 }, (_, i) => ({ id: `d${i}`, tenantId: "t", tenant: "Company name", kind: "export", kindLabel: "Export", status: "pending", createdAt: at, dueAt: at, overdue: false })), page: 1, pageSize: 100, total: 6 }
 const STAFF: LiveStaff[] = Array.from({ length: 3 }, (_, i) => ({ id: `u${i}`, name: "Staff member", email: "staff@company.example", role: "support", mfa: true, lastSignInAt: null, status: "active", addedAt: at }))
 // The owner's tabs: billing, usage and settings have no API yet and show only on a demo deployment (liveTabsFor).

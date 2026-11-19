@@ -90,7 +90,7 @@ td.sh-act{text-align:right;white-space:nowrap}
 /* Skeleton: ghost chips keep the chip box but hide every text colour */
 .sh-chip.sk-ghost{background:color-mix(in srgb,var(--ink) 8%,transparent)}
 .sh-chip.sk-ghost *{color:transparent !important}
-@media (max-width:720px){.sk-sh-nav{flex:1 1 auto;width:auto !important}}
+@media (max-width:720px){.sk-sh-nav{flex:1 1 auto;width:auto !important;min-width:244px}} /* the real nav is 244px wide on phones (its content), so it wraps to a second row beside the search like the real bar */
 /* Pattern dialog: the time zone fold toggle sits left, its text in line with the field labels */
 .sh-zone{display:flex;margin-top:-6px}
 .sh-zone .fs-act{margin-left:-10px;max-width:calc(100% + 10px)}
