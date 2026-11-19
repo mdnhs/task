@@ -94,7 +94,8 @@ export async function assertEligible(tx: TenantTx, ctx: RosterCtx, people: { use
   }
 }
 
-const violationKey = (v: RuleViolation): string => `${v.rule}|${v.shiftId}|${v.personId}|${[...v.otherShiftIds].sort().join(",")}|${v.message}`
+/** Severity is part of the identity: a generic hidden-site line (one per shift and person) stays the same line while it turns from a warning into a block, and that is a NEW block. */
+const violationKey = (v: RuleViolation): string => `${v.rule}|${v.severity}|${v.shiftId}|${v.personId}|${[...v.otherShiftIds].sort().join(",")}|${v.message}`
 
 /**
  * The rule gate of a change, run INSIDE the roster write (the lock is held, so the other shifts it reads cannot move under it): the week is checked before and after the

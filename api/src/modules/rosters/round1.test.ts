@@ -121,6 +121,24 @@ describe("AE2: a cross-site loan is opaque to a supervisor who cannot see the pe
   })
 })
 
+describe("R1 (final review): a move that turns an existing generic hidden warning into a block is a NEW violation", () => {
+  test("a supervisor's move of a loaned person's shift onto an approved leave day is 422 rule_blocked although a generic warning was already on the shift", async () => {
+    const w = await sites()
+    await w.ok("PUT", `/v1/members/${w.p.employee.userId}/home-location`, w.p.owner, { locationId: w.b }) // hidden to the Alpha supervisor: every private rule reads "Already rostered elsewhere"
+    const sup = w.p["location-supervisor"]
+    const l = await w.ok("POST", "/v1/leave", w.p.employee, { from: "2026-11-03", to: "2026-11-03", kind: "annual" }, 201)
+    await w.ok("POST", `/v1/leave/${l.id}/decide`, w.p.owner, { decision: "approve" })
+    await w.ok("PUT", "/v1/roster/availability", w.p.employee, { windows: [{ weekday: 1, from: "08:00", to: "12:00" }] }) // Monday: an unavailable window over the 08:00-16:00 shift, a warning
+    const added = await w.addOk(sup, w.wa, [{ date: MON, userIds: [w.p.employee.userId], shiftTypeId: w.ta }])
+    expect(added.violations.map((v: Json) => [v.rule, v.severity, v.message])).toEqual([["elsewhere", "warn", "Already rostered elsewhere"]]) // the existing generic warning
+    const s = added.shifts[0]
+    const blocked = await w.fail("PATCH", `/v1/roster/shifts/${s.id}`, sup, { version: 1, patch: { date: "2026-11-03" } }, 422)
+    expect(blocked.code).toBe("rule_blocked")
+    expect(blocked.violations.map((v: Json) => [v.rule, v.severity])).toContainEqual(["elsewhere", "block"])
+    expect((await w.rows("select date::text as date from roster_shifts where id = $1", [s.id]))[0].date).toBe(MON) // nothing moved
+  })
+})
+
 describe("AE3: an office edit of a published week needs explicit overrideRuleIds for a new block", () => {
   const published = async () => {
     const w = await sites()
