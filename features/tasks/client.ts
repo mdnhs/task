@@ -4,6 +4,7 @@
 //  - the id in every path is the uuid (the `ref` is only for display, I11); nothing here makes up an id;
 //  - an upload is intent -> direct PUT of the bytes -> complete -> wait until the malware scan says clean (D10); an infected file is refused, never attached;
 //  - a voice note is never read through a URL kept by the client: playUrl() is a path on OUR origin that the API answers with a 60 s redirect, one logged play per call (D21).
+import { voicePlayPath } from "@/lib/task-voice"
 import type { ApiClient } from "@/lib/api/client"
 import { ApiError, classifyApiError } from "@/lib/api/problem"
 import type { EvidenceRule, RepeatRule, Task } from "./types"
@@ -201,7 +202,7 @@ export class VoiceTooLong extends Error {
  * The path a player loads for ONE play: our own origin, a fresh `play` value every call so the browser never reuses a cached answer, and no credential in it. The API
  * answers with a 60 s presigned redirect (no-store) and logs the play. Nothing here is ever stored, and no signed URL ever reaches this code.
  */
-export const playUrl = (taskId: string, nonce: string): string => `/v1/tasks/${encodeURIComponent(taskId)}/voice-note?play=${encodeURIComponent(nonce)}`
+export const playUrl = voicePlayPath
 
 export type TasksClient = ReturnType<typeof makeTasksClient>
 

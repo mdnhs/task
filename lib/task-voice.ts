@@ -34,6 +34,12 @@ export function pickVoiceMime(canRecord: (mime: string) => boolean): string {
 /** Total length to show: the media's own duration when the browser knows it (recorded webm often reports Infinity), else the recorded length. */
 export const voiceTotal = (mediaDuration: number, recorded: number) => (Number.isFinite(mediaDuration) && mediaDuration > 0 ? mediaDuration : recorded)
 
+/**
+ * Where a task's voice note is played (D21): a path on OUR origin that the API answers with a short-lived redirect and logs as one play. A fresh `nonce` per play, so no URL is ever
+ * kept or reused. Shared by the task page and "Play my day" (B8 Task 24: the Today card plays it only when the API's `hasVoice` is true).
+ */
+export const voicePlayPath = (taskId: string, nonce: string): string => `/v1/tasks/${encodeURIComponent(taskId)}/voice-note?play=${encodeURIComponent(nonce)}`
+
 // ---------- hand-off to the Today card ----------
 
 /**

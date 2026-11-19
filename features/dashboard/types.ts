@@ -113,7 +113,8 @@ export type ReportDeadlineCardData = ReportDeadline & {
 import type { DayGroup, DaySummary, TodayCounts, TodayMode, TodayTask, WorkingDay } from "@/lib/today"
 
 /** A task of the day's order; `id` (the uuid) is what "Mark done" sends. */
-export type TodayItemTask = TodayTask & { id: string }
+/** `hasVoice`: the task has voice instructions this caller may play (the API decides; a flag only, never a file id). */
+export type TodayItemTask = TodayTask & { id: string; hasVoice: boolean }
 export type TodayItem = { task: TodayItemTask; group: DayGroup; reason: string }
 /** The Today card as the UI holds it: the numbers, the order and the written summary are the SERVER's (cached 30 s per user; the card refreshes after its own writes). */
 export type TodayData = {

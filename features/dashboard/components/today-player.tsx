@@ -3,18 +3,22 @@
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react"
 
 import { Switch } from "@/components/ui/switch"
-import { VOICE_LEAD, type VoiceNote } from "@/lib/task-voice"
+import { VOICE_LEAD } from "@/lib/task-voice"
 import { taskSpeech } from "@/lib/today"
 import type { DayItem, DayMode, DaySummary } from "@/lib/today"
 
 // "Play my day" (FR-M1-73..75, FR-M1-77): the browser speech engine reads the summary, then each task. Compact bar; the
-// motion is only colour/opacity transitions, which the global reduced-motion rule switches off. A task with voice instructions
-// (lib/task-voice.ts) is read, then "Voice instructions:" and the recording plays at the player's speed; pause, next, previous,
-// repeat, a speed change and closing all stop it (the effect cleanup).
+// motion is only colour/opacity transitions, which the global reduced-motion rule switches off. A task with voice instructions the
+// caller may play (the API's `hasVoice`, B8 Task 24) is read, then "Voice instructions:" and the recording plays at the player's speed
+// through a fresh play path each time (lib/task-voice.ts voicePlayPath, D21); pause, next, previous, repeat, a speed change and closing
+// all stop it (the effect cleanup). A task without (or with a voice out of the caller's reach) never gets the lead or a recording.
+
+/** Which items have a recording the caller may play, and a fresh play path for one (one per play: never a kept URL). */
+export type TodayVoice = { has(item: DayItem): boolean; path(item: DayItem): string }
 
 export const SPEEDS = [0.75, 1, 1.25, 1.5] as const
 
-const NO_VOICE: Record<string, VoiceNote> = {}
+const NO_VOICE: TodayVoice = { has: () => false, path: () => "" }
 const speechSupported = () => typeof window !== "undefined" && "speechSynthesis" in window && typeof SpeechSynthesisUtterance !== "undefined"
 const noop = () => () => {}
 
@@ -45,8 +49,8 @@ export function TodayPlayer({
   onClose,
 }: {
   items: DayItem[]
-  /** Voice instructions by task ref (this session's recordings). */
-  voice?: Record<string, VoiceNote>
+  /** Voice instructions the API says this caller may play (`hasVoice`). */
+  voice?: TodayVoice
   summary: DaySummary
   now: string
   mode: DayMode
@@ -65,12 +69,12 @@ export function TodayPlayer({
   const [nonce, setNonce] = useState(0) // bumped by "repeat" to restart the same segment
 
   const segments = useMemo(
-    () => [summary.spoken, ...items.map((it, i) => taskSpeech(it, i + 1, items.length, now) + (voice[it.task.ref] ? ` ${VOICE_LEAD}` : ""))],
+    () => [summary.spoken, ...items.map((it, i) => taskSpeech(it, i + 1, items.length, now) + (voice.has(it) ? ` ${VOICE_LEAD}` : ""))],
     [summary, items, now, voice],
   )
   const at = Math.min(pos, segments.length - 1)
   const current = at > 0 ? items[at - 1] : undefined
-  const note = current ? voice[current.task.ref] : undefined
+  const note = current !== undefined && voice.has(current)
   // Which run of the effect is playing the recording now (so the label clears on its own when the segment changes).
   const run = `${at}|${nonce}|${rate}|${playing}`
   const [voiceRun, setVoiceRun] = useState<string | null>(null)
@@ -96,7 +100,7 @@ export function TodayPlayer({
     u.onend = () => {
       if (!live) return
       if (!note) return next()
-      audio = new Audio(note.url)
+      audio = new Audio(voice.path(current!))
       audio.playbackRate = rate
       audio.onended = next
       audio.onerror = next
@@ -117,7 +121,7 @@ export function TodayPlayer({
         audio = null
       }
     }
-  }, [supported, playing, at, rate, segments, nonce, note, run])
+  }, [supported, playing, at, rate, segments, nonce, note, run, voice, current])
 
   // Leaving the page or closing the bar stops the voice (the effect cleanup above cancels; this covers the unmount order).
   useEffect(() => () => void (speechSupported() && window.speechSynthesis.cancel()), [])

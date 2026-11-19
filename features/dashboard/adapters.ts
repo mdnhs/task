@@ -331,12 +331,12 @@ export function toToday(dto: unknown, ctx: { meId: string; subject?: string; tz:
     order: R.arr(r, "order").map((v): TodayItem => {
       const x = R.rec(v, "today item")
       R.exact(x, ["taskId", "ref", "title", "priority", "status", "dueAt", "due", "evidenceRequired", "project", "hasVoice", "group", "reason"])
-      R.bool(x, "hasVoice") // B8 T15: a note the caller can play; the player is wired by the web task that restores it (Task 24)
       const priority = R.int(x, "priority")
       return {
         task: {
           id: R.str(x, "taskId"), ref: R.str(x, "ref"), title: R.str(x, "title"), priority: (priority >= 1 && priority <= 3 ? priority : 2) as 1 | 2 | 3, status: R.str(x, "status"),
           due: wall(R.str(x, "dueAt"), ctx.tz), evidenceRequired: R.bool(x, "evidenceRequired"), project: R.str(x, "project"),
+          hasVoice: R.bool(x, "hasVoice"), // B8 T15/T24: a note the caller can play (false for a voice out of their reach)
         },
         group: R.oneOf(x, "group", ["overdue", "high-today", "today"] as readonly DayGroup[]),
         reason: R.str(x, "reason"),

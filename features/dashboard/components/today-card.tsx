@@ -13,7 +13,8 @@ import { readAuto, readDismissed, readSnoozed, writeDismissed, writeSnoozed } fr
 import { toToday } from "../adapters"
 import { makeTodayClient } from "../client"
 import type { TodayData } from "../types"
-import { TodayPlayer } from "./today-player"
+import { voicePlayPath } from "@/lib/task-voice"
+import { TodayPlayer, type TodayVoice } from "./today-player"
 import { TodayChipCounts, teamLines, todayNews, todaySub } from "./today-copy"
 
 // The Today card (FR-M1-70..79, AC-M1-09/10), on GET /v1/today (B6 T6.7). The numbers, the order and the written summary are the SERVER's (cached 30 s per user, busted by this tenant's writes):
@@ -93,6 +94,15 @@ export function TodayCard({ data: initial }: { data: TodayData }) {
   }
 
   const itemOf = (i: DayItem) => data.order.find((x) => x.task.ref === i.task.ref)
+  // Voice instructions only where the API says this caller may play them (hasVoice); every play asks the API afresh (D21).
+  const plays = useRef(0)
+  const voice = useMemo<TodayVoice>(
+    () => ({
+      has: (i) => data.order.some((x) => x.task.ref === i.task.ref && x.task.hasVoice),
+      path: (i) => voicePlayPath(data.order.find((x) => x.task.ref === i.task.ref)?.task.id ?? "", `${++plays.current}-${Math.random().toString(36).slice(2)}`),
+    }),
+    [data.order],
+  )
   const evidencePrompt = (ref: string) => {
     // AC-M1-10: evidence-required tasks are never closed from the player; the task page has the upload step.
     toast("Evidence is needed first", { description: `Opening ${ref} so you can add it.` })
@@ -219,6 +229,7 @@ export function TodayCard({ data: initial }: { data: TodayData }) {
           {player && (
             <TodayPlayer
               items={queue}
+              voice={voice}
               summary={data.summary}
               now={data.now}
               mode={mode}
