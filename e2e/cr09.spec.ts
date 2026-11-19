@@ -26,7 +26,7 @@ test("CR-09 (AC-RS-03): the supervisor sees and edits only their location; anoth
   await visit("/rosters")
   await expect(page.getByRole("heading", { name: ROSTER.quayside })).toBeVisible()
   await expect(page.getByRole("combobox", { name: "Location" })).toHaveCount(0)
-  await visit(`/rosters?location=${quayside}&week=${W.rest}`)
+  await visit(`/rosters?location=${quayside}&week=${W.history}`) // a draft no spec publishes
   const block = page.getByRole("region", { name: ROSTER.quayside })
   await expect(block.getByText("Draft", { exact: true })).toBeVisible()
   await expect(block.getByRole("button", { name: /^Add shift on / })).toHaveCount(7)

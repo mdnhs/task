@@ -169,8 +169,9 @@ test("Today voice: a task whose voice note is scanned clean (ClamAV) gets the vo
     Object.defineProperty(window, "speechSynthesis", { configurable: true, get: () => fake })
   })
   await page.goto("/")
-  const open = page.getByRole("button", { name: /^Open your day/ })
-  if (await open.isVisible()) await open.click()
+  const bar = page.getByRole("button", { name: /^(Open|Close) your day/ })
+  await expect(bar).toBeVisible()
+  if ((await bar.getAttribute("aria-label"))?.startsWith("Open")) await bar.click()
   const played = page.waitForRequest((r) => new RegExp(`/v1/tasks/${task.id}/voice-note\\?play=`).test(r.url()))
   await page.getByRole("button", { name: "Play my day" }).click()
   const req = await played
@@ -183,7 +184,8 @@ test("Today voice: a task whose voice note is scanned clean (ClamAV) gets the vo
   expect(lines.every((t) => t.includes("E2E voice briefing"))).toBe(true)
   // A second play asks again with a NEW play path (never a kept URL).
   const again = page.waitForRequest((r) => new RegExp(`/v1/tasks/${task.id}/voice-note\\?play=`).test(r.url()) && r.url() !== req.url())
-  await page.getByRole("group", { name: "Play my day" }).getByRole("button", { name: /^(Play|Pause)$/ }).click()
-  if (await page.getByRole("group", { name: "Play my day" }).getByRole("button", { name: "Play" }).isVisible()) await page.getByRole("group", { name: "Play my day" }).getByRole("button", { name: "Play" }).click()
+  const play = page.getByRole("group", { name: "Play my day" }).getByRole("button", { name: "Play", exact: true })
+  await expect(play).toBeVisible() // the run reached the end (each line ends at once, the recording does not decode): Play starts it again from the top
+  await play.click()
   expect((await again).url()).not.toBe(req.url())
 })
