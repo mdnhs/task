@@ -88,6 +88,30 @@ describe("B8 Task 24: dashboard department filter", () => {
     expect(tableRefs()).toHaveLength(4)
   })
 
+  test("a failed team call never shows the whole scope's figures under the picked department: an error state with Try again", async () => {
+    let fail = true
+    m.get.mockImplementation(async (p: string) => {
+      if (fail) throw new Error("network")
+      return p === "/v1/dashboard" ? secDash : secTeam
+    })
+    m.toast.error.mockClear()
+    await mount("Security")
+    expect(m.toast.error).toHaveBeenCalled()
+    // no figure, chart or table row of the whole scope (42 open, 4 rows) is left on screen under "Security"
+    expect(document.querySelectorAll(".stat")).toHaveLength(0)
+    expect(tableRefs()).toHaveLength(0)
+    const alert = document.querySelector('[role="alert"]')
+    expect(alert?.textContent).toContain("Security")
+    // Try again asks once more and shows the team's answer
+    fail = false
+    const retry = [...document.querySelectorAll("button")].find((b) => b.textContent === "Try again")!
+    await act(async () => retry.click())
+    await flush()
+    expect(document.querySelector('[role="alert"]')).toBeNull()
+    expect(String(stat("Open Tasks"))).toContain("3")
+    expect(tableRefs()).toHaveLength(3)
+  })
+
   test("the table's next page keeps the teamId; the client-side department cuts are deleted", async () => {
     const src = (f: string) => readFileSync(path.resolve(__dirname, "components", f), "utf8")
     expect(src("team-tasks-table.tsx")).not.toMatch(/t\.dept === dep/)

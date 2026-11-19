@@ -44,6 +44,9 @@ export function DashboardBody({ data, teamTasks, deadline, departments, clock, c
   const dept = useDept()
   const { teamId, unknown } = deptTeam(dept, departments)
   const [scoped, setScoped] = useState<Scoped | null>(null)
+  // The team whose call failed: its figures are NOT the server's first (whole-scope) answer, so an error state with Try again stands in for them (never the wrong numbers under a department).
+  const [failed, setFailed] = useState<{ teamId: string; attempt: number } | null>(null)
+  const [attempt, setAttempt] = useState(0)
   const withTable = teamTasks !== null
   useEffect(() => {
     if (!teamId) return
@@ -57,17 +60,31 @@ export function DashboardBody({ data, teamTasks, deadline, departments, clock, c
         const ctx = { tz: clock.tz, ...(clock.nowAt ? { nowAt: clock.nowAt } : {}), ...(clock.tzLabel ? { tzLabel: clock.tzLabel } : {}), ...(clock.dueAfterMinutes === undefined ? {} : { dueAfterMinutes: clock.dueAfterMinutes }) }
         setScoped({ teamId, home: toDashboard(dto, ctx), teamTasks: team ? toTeamTasks(team, { people: [], tz: clock.tz, today: clock.today }) : null })
       })
-      .catch((e: unknown) => live && toast.error(userMessage(e).text))
+      .catch((e: unknown) => {
+        if (!live) return
+        setFailed({ teamId, attempt })
+        toast.error(userMessage(e).text)
+      })
     return () => {
       live = false
     }
-  }, [teamId, withTable, clock.tz, clock.today, clock.nowAt, clock.tzLabel, clock.dueAfterMinutes])
+  }, [teamId, attempt, withTable, clock.tz, clock.today, clock.nowAt, clock.tzLabel, clock.dueAfterMinutes])
 
   // The team's answer once it is here; until then (and for "all") the server's first answer, marked busy while a team is being asked for.
   const now = teamId && scoped?.teamId === teamId ? scoped : null
   const home = now ? now.home : data
   const table = now ? now.teamTasks : teamTasks
   const card = now ? now.home.deadline : deadline
+  if (teamId && !now && failed?.teamId === teamId && failed.attempt === attempt)
+    return (
+      <>
+        <section className="card dash-fail flex flex-wrap items-center justify-between gap-4" role="alert">
+          <p>{dept} figures could not be loaded.</p>
+          <button type="button" className="btn btn-primary" onClick={() => setAttempt((n) => n + 1)}>Try again</button>
+        </section>
+        {middle}
+      </>
+    )
   return (
     <>
       <DeptNote unknown={unknown} />
