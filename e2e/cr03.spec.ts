@@ -49,7 +49,7 @@ test("CR-03 a submitted report is in the manager's inbox within a minute and is 
 
   // A seeded past-deadline member is flagged Missing in the inbox (yesterday's shifts of the demo tenant ended with no report).
   await ops.goto("/daily-reports")
-  await ops.getByRole("group").getByRole("button", { name: "Missing", exact: true }).click()
+  await ops.getByRole("group").getByRole("button", { name: /^Missing( \d+)?$/ }).click() // the chip carries the API's count since B8 Task 24
   const missing = ops.getByRole("row").filter({ hasText: "Missing" })
   await expect(missing.first()).toBeVisible()
   await expect(missing.filter({ hasText: "Daniel Okafor" }).first()).toBeVisible()

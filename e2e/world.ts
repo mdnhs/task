@@ -40,6 +40,20 @@ export async function buildWorld(): Promise<void> {
   await task(TASKS.haddad, "M. Haddad", `${today}T08:00:00`, `${today}T11:00:00`)
   await ops.ctx.dispose()
   await buildRosterWorld()
+  await buildOwnersWorld()
+}
+
+/** A second active owner (Nadia Rahman, otherwise unused by the specs), so the last-owner refusal can be reached from a page that still shows two owners (e2e/b8-flows.spec.ts). */
+export const SECOND_OWNER = "Nadia Rahman"
+async function buildOwnersWorld(): Promise<void> {
+  const owner = await apiAs("owner")
+  try {
+    const roles: { id: string; key: string }[] = await owner.get("/v1/roles")
+    const people: { userId: string; name: string }[] = await owner.get("/v1/people?limit=100")
+    await owner.send("PATCH", `/v1/members/${people.find((p) => p.name === SECOND_OWNER)!.userId}`, { roleId: roles.find((r) => r.key === "owner")!.id })
+  } finally {
+    await owner.ctx.dispose()
+  }
 }
 
 // ------------------------------------------------------------------ rosters (B8 Task 25: CR-07..09, AC-RS-04..06 and the flows the demo seed cannot show)

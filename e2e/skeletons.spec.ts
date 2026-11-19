@@ -15,9 +15,12 @@ const EXACT: Record<string, number[]> = {
   "shifts week": [1568, 768],
   "tasks list": [1568],
   "billing": [1568, 768, 390],
-  "audit": [1568],
+  // "audit" was exact at 1568 on the plain seed; since B8 Task 25 the e2e world's roster writes are the newest audit rows (uuid record ids on two lines): CEILING below.
   "reports inbox": [1568],
-  "console overview": [1568, 768, 390]
+  "console overview": [1568, 768, 390],
+  // Location Rosters (B8 Task 25): the office's My roster and a location with the typical two shift types.
+  "my roster office": [1568, 768, 390],
+  "location form liffey": [1568]
 }
 // CEILING: what is left cannot be exact because the real page depends on data (a task row with an evidence tag, a wrapped id, the number of sessions or people, a report's rows),
 // on the role (K4: loading.tsx is static and draws the typical OWNER view, so staff pages are shorter) or on tables turning into stacked cards below 768px. The number is the
@@ -31,6 +34,7 @@ const CEILING: Record<string, number> = {
   "console tenants@1568": 452,
   "console audit@1568": 520,
   "account security@1568": 240,
+  "audit@1568": 145, // B8 Task 25: -83 px, the world's roster audit rows (see EXACT)
   "dashboard manager@768": 501,
   "dashboard staff@768": 1958,
   "reports inbox@768": 760,
@@ -55,7 +59,60 @@ const CEILING: Record<string, number> = {
   "audit@390": 330,
   "console tenants@390": 1820,
   "console audit@390": 1000,
-  "account security@390": 500
+  "account security@390": 500,
+  // Location Rosters (B8 Task 25, measured on the e2e world: |diff| x 1.25 + 40). The owner's week: the head and the week board are exact (LEAD below); the panels under it are the
+  // data of the week on screen (a change request and an open shift add two panels, a short history is shorter than the skeleton's typical page of 20). The supervisor (Ismail, one site,
+  // no templates panel on a published week) and the staff "Access restricted" page differ by the role (K4: loading.tsx draws the typical office view). The locations list has the
+  // world's two extra sites (the skeleton draws the seed's three: +68 px a row), the Coppers form has more shift types than the typical two, a staff My roster has fewer sections.
+  "rosters week@1568": 561,
+  "rosters week@768": 526,
+  "rosters week@390": 419,
+  "rosters supervisor@1568": 832,
+  "rosters supervisor@768": 838,
+  "rosters supervisor@390": 633,
+  "rosters staff@1568": 2182,
+  "rosters staff@768": 2495,
+  "rosters staff@390": 4405,
+  "roster locations@1568": 210,
+  "roster locations@768": 210,
+  "roster locations@390": 385,
+  "location form coppers@1568": 598,
+  "location form coppers@768": 598,
+  "location form coppers@390": 991,
+  "location form liffey@768": 83,
+  "location form liffey@390": 223,
+  "my roster staff@1568": 85,
+  "my roster staff@768": 85,
+  "my roster staff@390": 151
+}
+// LEAD: for a CEILING case, how many of the first blocks must still agree within TOL (the part of the page that does not depend on the data or the role).
+const LEAD: Record<string, number> = {
+  "rosters week@1568": 2, // head + the week board
+  "rosters week@768": 1,
+  "rosters week@390": 1,
+  "rosters supervisor@1568": 1,
+  "rosters supervisor@768": 1,
+  "rosters staff@1568": 1,
+  "rosters staff@768": 1,
+  "roster locations@1568": 1,
+  "roster locations@768": 1,
+  "roster locations@390": 1,
+  "location form coppers@1568": 2,
+  "location form coppers@768": 2,
+  "location form coppers@390": 2,
+  "location form liffey@768": 1,
+  "location form liffey@390": 1,
+  "my roster staff@1568": 2,
+  "my roster staff@768": 2,
+  "my roster staff@390": 2
+}
+
+const ROSTER_RX = "^/v1/(roster|locations|leave|shift-types|members/[^/]+/qualifications)"
+const locationPath = async (name: string) => {
+  const a = await apiAs("owner")
+  const { items }: { items: { id: string; name: string }[] } = await a.get("/v1/locations")
+  await a.ctx.dispose()
+  return `/rosters/locations/${items.find((l) => l.name === name)!.id}`
 }
 
 type Case = { name: string; as: Persona; path: string | (() => Promise<string>); rx: string; tol?: number }
@@ -76,6 +133,15 @@ const CASES: Case[] = [
   { name: "console tenants", as: "platform", path: "/platform/tenants", rx: "^/v1/platform/tenants(?!\\?pageSize=1$)" },
   { name: "console audit", as: "platform", path: "/platform/audit", rx: "^/v1/platform/audit" },
   { name: "account security", as: "member", path: "/account/security", rx: "^/v1/me/sessions" },
+  // Location Rosters (B8 Task 25): only the roster reads are held back (the shell's own reads answer at once).
+  { name: "rosters week", as: "owner", path: "/rosters", rx: ROSTER_RX },
+  { name: "rosters supervisor", as: "ismail", path: "/rosters", rx: ROSTER_RX },
+  { name: "rosters staff", as: "member", path: "/rosters", rx: ROSTER_RX },
+  { name: "roster locations", as: "owner", path: "/rosters/locations", rx: ROSTER_RX },
+  { name: "location form coppers", as: "owner", path: () => locationPath("Coppers"), rx: ROSTER_RX },
+  { name: "location form liffey", as: "owner", path: () => locationPath("Liffey Retail Park"), rx: ROSTER_RX },
+  { name: "my roster office", as: "owner", path: "/rosters/mine", rx: ROSTER_RX },
+  { name: "my roster staff", as: "member", path: "/rosters/mine", rx: ROSTER_RX },
 ]
 
 const sig = (page: import("@playwright/test").Page) =>
@@ -125,6 +191,7 @@ for (const width of [1568, 768, 390]) {
             const ceiling = CEILING[key]
             expect(ceiling, `${key}: no measured ceiling: add it (or make it exact)`).toBeDefined()
             expect(Math.abs(sk.main - real.main), `${key}: total ${sk.main} vs ${real.main}`).toBeLessThanOrEqual(ceiling)
+            for (let i = 0; i < (LEAD[key] ?? 0); i++) expect(Math.abs(sk.blocks[i].h - real.blocks[i].h), `${key}: lead block ${i} ${sk.blocks[i].c} ${sk.blocks[i].h} vs ${real.blocks[i]?.h}`).toBeLessThanOrEqual(TOL)
           }
         } finally {
           await fetch(`${SLOW}/__delay/0`)
