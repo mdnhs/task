@@ -107,6 +107,21 @@ See `.claude/docs/deploy/migrations.md`. 16 new tenant tables, all FORCE RLS, al
 - `api/test/roster-cross-role.test.ts` (new): 6 callers (supervisor, cut office manager, staff, platform staff without a grant; the supervisor and staff of the other site as the mirror) x every GET route in the OpenAPI document with the other site's ids and filters: no other-site string in any body or header; mutation-checked by removing the scope cut of the week list (the matrix fails by name). A migrations-derived test requires every table created by 0043 to 0049 in `HASHED_TABLES`, every B8 route classified, and an example on every B8 request body.
 - A dropped tenant filter alone does not leak (RLS is the second wall); the walk's own mutation check therefore uses the scope cut.
 
-## 9. Gate evidence
+## 9. Gate evidence (settled tree, 20 Nov 2026)
 
-Recorded in `.superpowers/sdd/2026-11-18-backend-b8-rostering/task-26-report.md` and the last section of `load/README.md` (k6 smoke with the roster scenario).
+| Gate | Result |
+|---|---|
+| `npm -w api test` | 123 files, 1809 passed |
+| `npm -w api run typecheck`, `npx tsc --noEmit` | clean |
+| root `npx vitest run` | 174 files, 1876 passed |
+| `npm run test:contract` | 8 files, 41 passed |
+| `npx eslint .` | 0 errors, 27 warnings (baseline) |
+| `npm run api:types:check` | current |
+| `npm run build`, `npm run check:bundle` | ok, clean (5 patterns) |
+| `npm run check:audit` | pass (note: the picomatch allowlist entry GHSA-fc5q-39xc-vjpf matches nothing now; remove it or keep it until its 2026-12-18 expiry) |
+| Playwright desktop + android | 27 passed |
+| Playwright skeletons | 69 passed |
+| `npm run smoke` (fresh demo seed, flag off) | 75/75. On a database that already holds the Playwright roster world it is 70 to 73 of 75 (the shifts "19 people" text and Grace's "Access restricted" assume the plain seed; a platform TOTP code cannot be reused inside its 30 s window) |
+| k6 smoke with the roster scenario | `roster_week` p95 79.0 ms (target 400), read 99.2 ms, write 43.9 ms, report submit 30.1 ms; no `roster_publish` or `roster_mine` samples; all thresholds passed on a fresh database (details in `load/README.md`) |
+
+Isolation: see section 8. The stack ran under its own compose project and ports (web 3470, API 3471, proxy 3472, PG 55472, Redis 56472, MinIO 59072, ClamAV 53372) and was removed afterwards.
