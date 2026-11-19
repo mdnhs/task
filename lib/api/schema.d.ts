@@ -9925,7 +9925,7 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description The weeks of the range with their 7 day columns (count against target, short and over), shifts with each person's own start and end, the shift types with targets of their locations, and the members the caller may pick from (a supervisor gets no home location). Only locations the caller sees; staff get an empty cut. 404 not_found for a location the caller may not see; 422 invalid_view | invalid_range */
+                /** @description The weeks of the range with their 7 day columns (count against target, short and over), shifts with each person's own start and end, the shift types with targets of their locations, and the members the caller may pick from (a supervisor gets no home location). Only locations the caller sees; staff get an empty cut. Each week and the payload carry `access` (level, canEdit, locked, lockReason: forbidden | roster_locked | reason_required), derived from the write gate. 404 not_found for a location the caller may not see; 422 invalid_view | invalid_range */
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -9958,6 +9958,30 @@ export interface paths {
                                     short: number;
                                     over: number;
                                 }[];
+                                /**
+                                 * @example {
+                                 *       "level": "supervisor",
+                                 *       "canEdit": true,
+                                 *       "locked": false,
+                                 *       "lockReason": null
+                                 *     }
+                                 */
+                                access: {
+                                    /**
+                                     * @description The caller's roster level: office (edits drafts and, with a reason, published weeks), supervisor (drafts of granted sites only), null (read-only or staff)
+                                     * @enum {string|null}
+                                     */
+                                    level: "office" | "supervisor" | null;
+                                    /** @description The caller may write to this week (an office role on a published week still needs a reason) */
+                                    canEdit: boolean;
+                                    /** @description true when the week is published and the caller's level may not edit published weeks */
+                                    locked: boolean;
+                                    /**
+                                     * @description The write gate's own code: forbidden (this role never edits), roster_locked (published, supervisor), reason_required (published, office: edits need a reason); null when open
+                                     * @enum {string|null}
+                                     */
+                                    lockReason: "forbidden" | "roster_locked" | "reason_required" | null;
+                                };
                             }[];
                             shifts: {
                                 /** Format: uuid */
@@ -10005,6 +10029,31 @@ export interface paths {
                                 homeLocationId: string | null;
                             }[];
                             membersTruncated: boolean;
+                            /**
+                             * @description The caller's access to a DRAFT week (can they create and edit weeks at all); each week carries its own `access`, which also knows the publish lock
+                             * @example {
+                             *       "level": "supervisor",
+                             *       "canEdit": true,
+                             *       "locked": false,
+                             *       "lockReason": null
+                             *     }
+                             */
+                            access: {
+                                /**
+                                 * @description The caller's roster level: office (edits drafts and, with a reason, published weeks), supervisor (drafts of granted sites only), null (read-only or staff)
+                                 * @enum {string|null}
+                                 */
+                                level: "office" | "supervisor" | null;
+                                /** @description The caller may write to this week (an office role on a published week still needs a reason) */
+                                canEdit: boolean;
+                                /** @description true when the week is published and the caller's level may not edit published weeks */
+                                locked: boolean;
+                                /**
+                                 * @description The write gate's own code: forbidden (this role never edits), roster_locked (published, supervisor), reason_required (published, office: edits need a reason); null when open
+                                 * @enum {string|null}
+                                 */
+                                lockReason: "forbidden" | "roster_locked" | "reason_required" | null;
+                            };
                         };
                     };
                 };
@@ -10053,6 +10102,30 @@ export interface paths {
                                 short: number;
                                 over: number;
                             }[];
+                            /**
+                             * @example {
+                             *       "level": "supervisor",
+                             *       "canEdit": true,
+                             *       "locked": false,
+                             *       "lockReason": null
+                             *     }
+                             */
+                            access: {
+                                /**
+                                 * @description The caller's roster level: office (edits drafts and, with a reason, published weeks), supervisor (drafts of granted sites only), null (read-only or staff)
+                                 * @enum {string|null}
+                                 */
+                                level: "office" | "supervisor" | null;
+                                /** @description The caller may write to this week (an office role on a published week still needs a reason) */
+                                canEdit: boolean;
+                                /** @description true when the week is published and the caller's level may not edit published weeks */
+                                locked: boolean;
+                                /**
+                                 * @description The write gate's own code: forbidden (this role never edits), roster_locked (published, supervisor), reason_required (published, office: edits need a reason); null when open
+                                 * @enum {string|null}
+                                 */
+                                lockReason: "forbidden" | "roster_locked" | "reason_required" | null;
+                            };
                         };
                     };
                 };
@@ -10115,6 +10188,30 @@ export interface paths {
                                     short: number;
                                     over: number;
                                 }[];
+                                /**
+                                 * @example {
+                                 *       "level": "supervisor",
+                                 *       "canEdit": true,
+                                 *       "locked": false,
+                                 *       "lockReason": null
+                                 *     }
+                                 */
+                                access: {
+                                    /**
+                                     * @description The caller's roster level: office (edits drafts and, with a reason, published weeks), supervisor (drafts of granted sites only), null (read-only or staff)
+                                     * @enum {string|null}
+                                     */
+                                    level: "office" | "supervisor" | null;
+                                    /** @description The caller may write to this week (an office role on a published week still needs a reason) */
+                                    canEdit: boolean;
+                                    /** @description true when the week is published and the caller's level may not edit published weeks */
+                                    locked: boolean;
+                                    /**
+                                     * @description The write gate's own code: forbidden (this role never edits), roster_locked (published, supervisor), reason_required (published, office: edits need a reason); null when open
+                                     * @enum {string|null}
+                                     */
+                                    lockReason: "forbidden" | "roster_locked" | "reason_required" | null;
+                                };
                             }[];
                             shifts: {
                                 /** Format: uuid */
@@ -10162,6 +10259,31 @@ export interface paths {
                                 homeLocationId: string | null;
                             }[];
                             membersTruncated: boolean;
+                            /**
+                             * @description The caller's access to a DRAFT week (can they create and edit weeks at all); each week carries its own `access`, which also knows the publish lock
+                             * @example {
+                             *       "level": "supervisor",
+                             *       "canEdit": true,
+                             *       "locked": false,
+                             *       "lockReason": null
+                             *     }
+                             */
+                            access: {
+                                /**
+                                 * @description The caller's roster level: office (edits drafts and, with a reason, published weeks), supervisor (drafts of granted sites only), null (read-only or staff)
+                                 * @enum {string|null}
+                                 */
+                                level: "office" | "supervisor" | null;
+                                /** @description The caller may write to this week (an office role on a published week still needs a reason) */
+                                canEdit: boolean;
+                                /** @description true when the week is published and the caller's level may not edit published weeks */
+                                locked: boolean;
+                                /**
+                                 * @description The write gate's own code: forbidden (this role never edits), roster_locked (published, supervisor), reason_required (published, office: edits need a reason); null when open
+                                 * @enum {string|null}
+                                 */
+                                lockReason: "forbidden" | "roster_locked" | "reason_required" | null;
+                            };
                         };
                     };
                 };
@@ -10417,6 +10539,30 @@ export interface paths {
                                     short: number;
                                     over: number;
                                 }[];
+                                /**
+                                 * @example {
+                                 *       "level": "supervisor",
+                                 *       "canEdit": true,
+                                 *       "locked": false,
+                                 *       "lockReason": null
+                                 *     }
+                                 */
+                                access: {
+                                    /**
+                                     * @description The caller's roster level: office (edits drafts and, with a reason, published weeks), supervisor (drafts of granted sites only), null (read-only or staff)
+                                     * @enum {string|null}
+                                     */
+                                    level: "office" | "supervisor" | null;
+                                    /** @description The caller may write to this week (an office role on a published week still needs a reason) */
+                                    canEdit: boolean;
+                                    /** @description true when the week is published and the caller's level may not edit published weeks */
+                                    locked: boolean;
+                                    /**
+                                     * @description The write gate's own code: forbidden (this role never edits), roster_locked (published, supervisor), reason_required (published, office: edits need a reason); null when open
+                                     * @enum {string|null}
+                                     */
+                                    lockReason: "forbidden" | "roster_locked" | "reason_required" | null;
+                                };
                             };
                             violations: {
                                 /** @enum {string} */
@@ -11480,6 +11626,30 @@ export interface paths {
                                     short: number;
                                     over: number;
                                 }[];
+                                /**
+                                 * @example {
+                                 *       "level": "supervisor",
+                                 *       "canEdit": true,
+                                 *       "locked": false,
+                                 *       "lockReason": null
+                                 *     }
+                                 */
+                                access: {
+                                    /**
+                                     * @description The caller's roster level: office (edits drafts and, with a reason, published weeks), supervisor (drafts of granted sites only), null (read-only or staff)
+                                     * @enum {string|null}
+                                     */
+                                    level: "office" | "supervisor" | null;
+                                    /** @description The caller may write to this week (an office role on a published week still needs a reason) */
+                                    canEdit: boolean;
+                                    /** @description true when the week is published and the caller's level may not edit published weeks */
+                                    locked: boolean;
+                                    /**
+                                     * @description The write gate's own code: forbidden (this role never edits), roster_locked (published, supervisor), reason_required (published, office: edits need a reason); null when open
+                                     * @enum {string|null}
+                                     */
+                                    lockReason: "forbidden" | "roster_locked" | "reason_required" | null;
+                                };
                             }[];
                             conflicts: {
                                 /** Format: uuid */
@@ -11564,6 +11734,30 @@ export interface paths {
                                 short: number;
                                 over: number;
                             }[];
+                            /**
+                             * @example {
+                             *       "level": "supervisor",
+                             *       "canEdit": true,
+                             *       "locked": false,
+                             *       "lockReason": null
+                             *     }
+                             */
+                            access: {
+                                /**
+                                 * @description The caller's roster level: office (edits drafts and, with a reason, published weeks), supervisor (drafts of granted sites only), null (read-only or staff)
+                                 * @enum {string|null}
+                                 */
+                                level: "office" | "supervisor" | null;
+                                /** @description The caller may write to this week (an office role on a published week still needs a reason) */
+                                canEdit: boolean;
+                                /** @description true when the week is published and the caller's level may not edit published weeks */
+                                locked: boolean;
+                                /**
+                                 * @description The write gate's own code: forbidden (this role never edits), roster_locked (published, supervisor), reason_required (published, office: edits need a reason); null when open
+                                 * @enum {string|null}
+                                 */
+                                lockReason: "forbidden" | "roster_locked" | "reason_required" | null;
+                            };
                         };
                     };
                 };
@@ -11732,6 +11926,30 @@ export interface paths {
                                     short: number;
                                     over: number;
                                 }[];
+                                /**
+                                 * @example {
+                                 *       "level": "supervisor",
+                                 *       "canEdit": true,
+                                 *       "locked": false,
+                                 *       "lockReason": null
+                                 *     }
+                                 */
+                                access: {
+                                    /**
+                                     * @description The caller's roster level: office (edits drafts and, with a reason, published weeks), supervisor (drafts of granted sites only), null (read-only or staff)
+                                     * @enum {string|null}
+                                     */
+                                    level: "office" | "supervisor" | null;
+                                    /** @description The caller may write to this week (an office role on a published week still needs a reason) */
+                                    canEdit: boolean;
+                                    /** @description true when the week is published and the caller's level may not edit published weeks */
+                                    locked: boolean;
+                                    /**
+                                     * @description The write gate's own code: forbidden (this role never edits), roster_locked (published, supervisor), reason_required (published, office: edits need a reason); null when open
+                                     * @enum {string|null}
+                                     */
+                                    lockReason: "forbidden" | "roster_locked" | "reason_required" | null;
+                                };
                             };
                             conflicts: {
                                 /** Format: uuid */
@@ -11850,6 +12068,31 @@ export interface paths {
                             }[];
                             /** @description true when the range holds more than the 2000 shifts returned (narrow `from` / `to`) */
                             truncated: boolean;
+                            /**
+                             * @description The caller's roster access as for a PUBLISHED week (my roster only shows published weeks): level null and canEdit false for plain staff
+                             * @example {
+                             *       "level": "supervisor",
+                             *       "canEdit": true,
+                             *       "locked": false,
+                             *       "lockReason": null
+                             *     }
+                             */
+                            access: {
+                                /**
+                                 * @description The caller's roster level: office (edits drafts and, with a reason, published weeks), supervisor (drafts of granted sites only), null (read-only or staff)
+                                 * @enum {string|null}
+                                 */
+                                level: "office" | "supervisor" | null;
+                                /** @description The caller may write to this week (an office role on a published week still needs a reason) */
+                                canEdit: boolean;
+                                /** @description true when the week is published and the caller's level may not edit published weeks */
+                                locked: boolean;
+                                /**
+                                 * @description The write gate's own code: forbidden (this role never edits), roster_locked (published, supervisor), reason_required (published, office: edits need a reason); null when open
+                                 * @enum {string|null}
+                                 */
+                                lockReason: "forbidden" | "roster_locked" | "reason_required" | null;
+                            };
                         };
                     };
                 };

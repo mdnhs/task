@@ -105,5 +105,27 @@ export function weekEditGate(ctx: RosterCtx, week: { status: "draft" | "publishe
   if (!reason || reason.trim() === "") throw new AppError(422, "reason_required", "Unprocessable Entity")
 }
 
+/** What the web may show for a caller (and, for a week, for that week): derived ONLY from `weekEditGate` and the role's roster access, never a second rule. The API stays the write authority. */
+export type AccessInfo = { level: "office" | "supervisor" | null; canEdit: boolean; locked: boolean; lockReason: "forbidden" | "roster_locked" | "reason_required" | null }
+
+/**
+ * The caller's access to a week of `status` (a draft when no week is given), by running the gate itself with no reason: no throw = open (canEdit, not locked, no reason);
+ * 422 reason_required = an office role may edit but must name a reason (canEdit, not locked, lockReason "reason_required"); 403 roster_locked = a supervisor on a published week
+ * (locked, not editable); 403 forbidden = a role that may not edit at all (not locked: lockReason "forbidden"). `level` is the role's roster level as `rosterAccess` resolved it
+ * (office edits published weeks, supervisor only drafts, anyone else null). The gate has no past-week rule, so none is reported.
+ */
+export function accessInfo(ctx: RosterCtx, status: "draft" | "published" = "draft"): AccessInfo {
+  const level = ctx.access.editPublished ? "office" : ctx.access.editDraft ? "supervisor" : null
+  try {
+    weekEditGate(ctx, { status })
+    return { level, canEdit: true, locked: false, lockReason: null }
+  } catch (e) {
+    if (!(e instanceof AppError)) throw e
+    if (e.code === "reason_required") return { level, canEdit: true, locked: false, lockReason: "reason_required" }
+    if (e.code === "roster_locked") return { level, canEdit: false, locked: true, lockReason: "roster_locked" }
+    return { level, canEdit: false, locked: false, lockReason: "forbidden" }
+  }
+}
+
 /** Route guard of every roster route: tenant, the M1A product module (402/403 rules), the `roster` permission. */
 export const rosterGuard = (need: "read" | "write"): MiddlewareHandler<AppEnv>[] => [requireTenant, requireModule("M1A"), requirePermission("roster", need)]

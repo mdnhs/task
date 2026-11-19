@@ -168,4 +168,17 @@ Not built: FR-RS-13 (PDF/Excel export), FR-RS-14 (labour cost), FR-RS-22 rotatin
 
 Foundation for the API-backed screens (Task 20+); no UI yet. Pure mappers `features/rosters/adapters.ts` (DTO to the domain shapes: `userId` becomes `personId`, `shiftTypeId` becomes `templateId`; unknown fields dropped, missing required fields throw, no name or place invented), readers `loaders.ts` (take any `get` client) and `readers.ts` (`read*`, bound to `apiServer()`; the index exports them as `load*` until Task 20 retires the mock readers), errors `errors.ts`, server actions `app/actions/rosters.ts`.
 Write answers map to ONE state: 409 `version_conflict` (and 412) to `conflict` (refetch, toast "Changed by someone else."), 403 `roster_locked` to `locked` (read-only, no toast), 422 `reason_required` to `reason_required` (reason dialog), 422 `rule_blocked` to `rule_blocked` (conflicts panel with the API's violations), 402 to `billing`, 403 `module_not_entitled` to `not_entitled`.
-Rules for callers: `deleteShift` always sends `version`; `repeatWeek` with `replace` always sends `targetVersions`; decide and publish send `overrideReason` with `overrideRuleIds`; `setRules` sends the ETag it read. The API payload has no `access` object: Task 20 derives display affordances from the role's roster level and the week status, and the API stays the authority. The web never runs the rule engine.
+Rules for callers: `deleteShift` always sends `version`; `repeatWeek` with `replace` always sends `targetVersions`; decide and publish send `overrideReason` with `overrideRuleIds`; `setRules` sends the ETag it read. (Superseded by Task 19b below: the payload now carries `access`.) Task 20 derives display affordances from the role's roster level and the week status, and the API stays the authority. The web never runs the rule engine.
+
+## Access object (B8 Task 19b, ruling AI1)
+
+Every week (`GET /v1/roster/weeks`, `GET /v1/roster/weeks/{id}`, and the week in create, publish, repeat, template apply and auto-repeat answers) carries `access: { level, canEdit, locked, lockReason }`; the list payload and `GET /v1/roster/mine` carry one at the top level. It is computed by `accessInfo` (`api/src/modules/rosters/scope.ts`) by running `weekEditGate` itself with no reason and the role's `rosterAccess`: no new rule, no query per row. The API stays the write authority; the web only derives display affordances from it.
+
+| caller | draft week | published week |
+|---|---|---|
+| office (owner, roster manager) | `office`, canEdit, open | canEdit, not locked, `lockReason: "reason_required"` (an edit needs a reason) |
+| supervisor of the site | `supervisor`, canEdit, open | not canEdit, `locked: true`, `lockReason: "roster_locked"` |
+| supervisor of another site | the week is a 404 (no payload) | 404 |
+| read-only manager, staff | `level: null`, not canEdit, `lockReason: "forbidden"` | same |
+
+`lockReason` reuses the gate's own codes (`forbidden`, `roster_locked`, `reason_required`); `locked` is true only for `roster_locked`. The gate has no past-week rule, so none is reported. Top-level `access` of the list is the DRAFT-week view (can the caller create and edit weeks at all, also for an empty range); on `/mine` it is the published-week view, because my roster only shows published weeks.

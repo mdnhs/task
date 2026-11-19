@@ -6,7 +6,7 @@ import { locations, memberships, rosterShifts, rosterWeeks, shiftTypes, shiftTyp
 import type { TenantTx } from "../../db/tenant-tx"
 import type { ShiftDto, ShiftTypeDto, WeekDto, WeeksDto } from "./dto"
 import { realDate, todayOf } from "./qualifications"
-import { assertLocation, canSeePerson, inScopeSql, type RosterCtx } from "./scope"
+import { accessInfo, assertLocation, canSeePerson, inScopeSql, type RosterCtx } from "./scope"
 import { auditRoster, isUuid, writeHistory } from "./write"
 
 const unprocessable = (code: string) => new AppError(422, code, "Unprocessable Entity")
@@ -85,7 +85,7 @@ export async function createWeek(tx: TenantTx, ctx: RosterCtx, input: { location
   await clearAutoRepeatBackoff(tx, ctx, input.locationId, [input.weekStart])
   await writeHistory(tx, ctx, { locationId: row.locationId, weekId: row.id, action: "week_created", after: { weekId: row.id, weekStart: row.weekStart } })
   await auditRoster(tx, ctx, { action: "roster.week_created", entity: "roster_week", entityId: row.id, before: null, after: { locationId: row.locationId, weekStart: row.weekStart } })
-  return weekDto(row, [], [], [])
+  return weekDto(ctx, row, [], [], [])
 }
 
 const VIEWS = ["day", "week", "fortnight", "month"] as const
@@ -97,12 +97,12 @@ const targetsOf = (rows: { shiftTypeId: string; weekday: number; count: number }
   return rows.map((r) => ({ locationId: loc.get(r.shiftTypeId)!, templateId: r.shiftTypeId, weekday: r.weekday as Weekday, count: r.count }))
 }
 
-function weekDto(w: WeekRow, shifts: ShiftRow[], types: { id: string; locationId: string; name: string; start: string; end: string; unpaidBreakMin: number; role: string; requires: string[] }[], targets: StaffingTarget[]): WeekDto {
+function weekDto(ctx: RosterCtx, w: WeekRow, shifts: ShiftRow[], types: { id: string; locationId: string; name: string; start: string; end: string; unpaidBreakMin: number; role: string; requires: string[] }[], targets: StaffingTarget[]): WeekDto {
   const domainWeek: RosterWeek = { id: w.id, locationId: w.locationId, weekStart: w.weekStart, status: w.status as "draft" | "published", publishedAt: null, publishedBy: null, autoRepeatDays: w.autoRepeatDays }
   const domainShifts: RosterShift[] = shifts.map((s) => ({ id: s.id, weekId: s.weekId, locationId: s.locationId, date: s.date, personId: s.userId, templateId: s.shiftTypeId, role: s.role, start: s.startTime, end: s.endTime, unpaidBreakMin: s.unpaidBreakMin, confirmedAt: null }))
   const templates: ShiftTemplate[] = types.map((t) => ({ id: t.id, locationId: t.locationId, name: t.name, start: t.start, end: t.end, unpaidBreakMin: t.unpaidBreakMin, role: t.role, requires: t.requires }))
   const days = dayColumns(domainWeek, domainShifts, targets, templates).map((d) => ({ date: d.date, shiftIds: d.shifts.map((s) => s.id), count: d.count, target: d.target, short: d.short, over: d.over }))
-  return { id: w.id, locationId: w.locationId, weekStart: w.weekStart, status: domainWeek.status, publishedAt: w.publishedAt?.toISOString() ?? null, publishedBy: w.publishedBy, autoRepeatDays: w.autoRepeatDays, version: w.version, days }
+  return { id: w.id, locationId: w.locationId, weekStart: w.weekStart, status: domainWeek.status, publishedAt: w.publishedAt?.toISOString() ?? null, publishedBy: w.publishedBy, autoRepeatDays: w.autoRepeatDays, version: w.version, days, access: accessInfo(ctx, domainWeek.status) }
 }
 
 /**
@@ -129,7 +129,7 @@ async function loadWeekData(tx: TenantTx, ctx: RosterCtx, weeks: WeekRow[]) {
 /** The weeks as the API shows them (7 day columns each), for a caller that does not need the members or shift types (repeat, template apply). */
 export async function weekDtos(tx: TenantTx, ctx: RosterCtx, weeks: WeekRow[]): Promise<WeekDto[]> {
   const d = await loadWeekData(tx, ctx, weeks)
-  return weeks.map((w) => weekDto(w, d.shifts.filter((s) => s.weekId === w.id), d.flat.filter((t) => t.locationId === w.locationId), d.targets.filter((t) => t.locationId === w.locationId)))
+  return weeks.map((w) => weekDto(ctx, w, d.shifts.filter((s) => s.weekId === w.id), d.flat.filter((t) => t.locationId === w.locationId), d.targets.filter((t) => t.locationId === w.locationId)))
 }
 
 /** The member list of a read is bounded (the picker pages later): everyone on a shown shift, then at most this many other people. `membersTruncated` says more exist. */
@@ -164,11 +164,12 @@ async function payload(tx: TenantTx, ctx: RosterCtx, weeks: WeekRow[], range: We
   }))
   return {
     range,
-    weeks: weeks.map((w) => weekDto(w, shifts.filter((s) => s.weekId === w.id), flat.filter((t) => t.locationId === w.locationId), targets.filter((t) => t.locationId === w.locationId))),
+    weeks: weeks.map((w) => weekDto(ctx, w, shifts.filter((s) => s.weekId === w.id), flat.filter((t) => t.locationId === w.locationId), targets.filter((t) => t.locationId === w.locationId))),
     shifts: shifts.map(shiftDto),
     shiftTypes: typeDtos,
     members: members.map((m) => ({ userId: m.userId, name: !canSeePerson(ctx, m.userId, m.home) ? "Member" : m.erased ? "Erased user" : m.name, active: !canSeePerson(ctx, m.userId, m.home) || m.status === "active", homeLocationId: seesHome && m.home && ctx.access.locationIds?.includes(m.home) ? m.home : null })),
     membersTruncated,
+    access: accessInfo(ctx),
   }
 }
 

@@ -6,7 +6,7 @@ import { locations, rosterShifts, rosterWeeks, shiftTypes } from "../../db/schem
 import type { TenantTx } from "../../db/tenant-tx"
 import type { MineDto } from "./dto-reads"
 import { realDate, todayOf } from "./qualifications"
-import type { RosterCtx } from "./scope"
+import { accessInfo, type RosterCtx } from "./scope"
 
 // My roster (B8 Task 14; FR-RS-33, 40): the caller's OWN shifts across every location as one list, and the same list as an iCalendar file. A person sees only what is theirs and only what is PUBLISHED
 // (a draft week does not exist for staff, AF1), with the place they work at (name and address: they are told where to go) and nothing about anybody else: no co-worker, no other shift of the
@@ -43,7 +43,7 @@ export async function myRoster(tx: TenantTx, ctx: RosterCtx, q: { from?: string;
     .orderBy(asc(rosterShifts.date), asc(rosterShifts.startAt), asc(rosterShifts.id))
     .limit(MINE_LIMIT + 1)
   return {
-    from, to, truncated: rows.length > MINE_LIMIT,
+    from, to, truncated: rows.length > MINE_LIMIT, access: accessInfo(ctx, "published"),
     items: rows.slice(0, MINE_LIMIT).map(({ s, locName, locAddress, zone, typeName }) => ({
       id: s.id, date: s.date, start: s.startTime, end: s.endTime, startAt: s.startAt.toISOString(), endAt: s.endAt.toISOString(), unpaidBreakMin: s.unpaidBreakMin, role: s.role, shiftType: typeName,
       confirmedAt: s.confirmedAt?.toISOString() ?? null, version: s.version, locationId: s.locationId, locationName: locName, locationAddress: locAddress, timeZone: zone ?? ctx.tz,

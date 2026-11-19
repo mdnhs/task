@@ -1,4 +1,5 @@
 import { z } from "@hono/zod-openapi"
+import { AccessOut } from "./dto"
 
 // DTOs of the roster read models (B8 Task 14): my roster, the `.ics` feed's query, coverage, and the roster attention items.
 
@@ -21,8 +22,8 @@ const mineEx = {
   confirmedAt: null, version: 2, locationId: LID, locationName: "Harbour Street", locationAddress: "1 Harbour Street, Dublin", timeZone: "Europe/Dublin",
 }
 export const MineOut = z
-  .object({ from: z.string(), to: z.string(), items: z.array(MineShift), truncated: z.boolean().openapi({ description: "true when the range holds more than the 2000 shifts returned (narrow `from` / `to`)" }) })
-  .openapi({ example: { from: "2026-11-16", to: "2026-12-13", items: [mineEx], truncated: false } })
+  .object({ from: z.string(), to: z.string(), items: z.array(MineShift), truncated: z.boolean().openapi({ description: "true when the range holds more than the 2000 shifts returned (narrow `from` / `to`)" }), access: AccessOut.openapi({ description: "The caller's roster access as for a PUBLISHED week (my roster only shows published weeks): level null and canEdit false for plain staff" }) })
+  .openapi({ example: { from: "2026-11-16", to: "2026-12-13", items: [mineEx], truncated: false, access: { level: null, canEdit: false, locked: false, lockReason: "forbidden" } } })
 export type MineDto = z.infer<typeof MineOut>
 
 // ------------------------------------------------------------------ coverage (FR-RS-12)

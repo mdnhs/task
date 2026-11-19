@@ -148,7 +148,7 @@ const checkR = createRoute({
 const WEEK_HIDDEN = "404 not_found for a week or shift of a site the caller may not see, a missing or another tenant's one and an id that is not a uuid (all the same answer)"
 const weeksR = createRoute({
   method: "get", path: "/v1/roster/weeks", middleware: guard("read"), request: { query: WeeksQuery },
-  responses: { 200: json(WeeksOut, "The weeks of the range with their 7 day columns (count against target, short and over), shifts with each person's own start and end, the shift types with targets of their locations, and the members the caller may pick from (a supervisor gets no home location). Only locations the caller sees; staff get an empty cut. 404 not_found for a location the caller may not see; 422 invalid_view | invalid_range") },
+  responses: { 200: json(WeeksOut, "The weeks of the range with their 7 day columns (count against target, short and over), shifts with each person's own start and end, the shift types with targets of their locations, and the members the caller may pick from (a supervisor gets no home location). Only locations the caller sees; staff get an empty cut. Each week and the payload carry `access` (level, canEdit, locked, lockReason: forbidden | roster_locked | reason_required), derived from the write gate. 404 not_found for a location the caller may not see; 422 invalid_view | invalid_range") },
 })
 const weekCreateR = createRoute({
   method: "post", path: "/v1/roster/weeks", middleware: guard("write"), request: { body: body(CreateWeekBody) },

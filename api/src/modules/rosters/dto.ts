@@ -177,20 +177,29 @@ const shiftEx = { id: SHIFT_ID, weekId: WEEK_ID, locationId: LID, date: "2026-11
 export const ShiftSchema = ShiftOut.openapi({ example: shiftEx })
 
 const DayOut = z.object({ date: z.string(), shiftIds: z.array(z.uuid()), count: z.number().int(), target: z.number().int(), short: z.number().int(), over: z.number().int() })
+export const AccessOut = z
+  .object({
+    level: z.enum(["office", "supervisor"]).nullable().openapi({ description: "The caller's roster level: office (edits drafts and, with a reason, published weeks), supervisor (drafts of granted sites only), null (read-only or staff)" }),
+    canEdit: z.boolean().openapi({ description: "The caller may write to this week (an office role on a published week still needs a reason)" }),
+    locked: z.boolean().openapi({ description: "true when the week is published and the caller's level may not edit published weeks" }),
+    lockReason: z.enum(["forbidden", "roster_locked", "reason_required"]).nullable().openapi({ description: "The write gate's own code: forbidden (this role never edits), roster_locked (published, supervisor), reason_required (published, office: edits need a reason); null when open" }),
+  })
+  .openapi({ example: { level: "supervisor", canEdit: true, locked: false, lockReason: null } })
+export type AccessDto = z.infer<typeof AccessOut>
 export const WeekOut = z.object({
   id: z.uuid(), locationId: z.uuid(), weekStart: z.string(), status: z.enum(["draft", "published"]), publishedAt: z.string().nullable(), publishedBy: z.string().nullable(), autoRepeatDays: z.number().int().nullable(),
-  version: z.number().int(), days: z.array(DayOut),
+  version: z.number().int(), days: z.array(DayOut), access: AccessOut,
 })
 export type WeekDto = z.infer<typeof WeekOut>
 const weekEx = {
   id: WEEK_ID, locationId: LID, weekStart: "2026-11-02", status: "draft", publishedAt: null, publishedBy: null, autoRepeatDays: null, version: 1,
-  days: [{ date: "2026-11-02", shiftIds: [SHIFT_ID], count: 1, target: 2, short: 1, over: 0 }],
+  days: [{ date: "2026-11-02", shiftIds: [SHIFT_ID], count: 1, target: 2, short: 1, over: 0 }], access: { level: "supervisor", canEdit: true, locked: false, lockReason: null },
 }
 export const WeekSchema = WeekOut.openapi({ example: weekEx })
 const MemberOut = z.object({ userId: z.string(), name: z.string(), active: z.boolean(), homeLocationId: z.uuid().nullable() })
 export const WeeksOut = z
-  .object({ range: z.object({ from: z.string(), to: z.string(), view: z.enum(["day", "week", "fortnight", "month"]) }), weeks: z.array(WeekOut), shifts: z.array(ShiftOut), shiftTypes: z.array(ShiftTypeOut), members: z.array(MemberOut), membersTruncated: z.boolean() })
-  .openapi({ example: { range: { from: "2026-11-02", to: "2026-11-08", view: "week" }, weeks: [weekEx], shifts: [shiftEx], shiftTypes: [shiftTypeEx], members: [{ userId: UID, name: "Aoife Byrne", active: true, homeLocationId: LID }], membersTruncated: false } })
+  .object({ range: z.object({ from: z.string(), to: z.string(), view: z.enum(["day", "week", "fortnight", "month"]) }), weeks: z.array(WeekOut), shifts: z.array(ShiftOut), shiftTypes: z.array(ShiftTypeOut), members: z.array(MemberOut), membersTruncated: z.boolean(), access: AccessOut.openapi({ description: "The caller's access to a DRAFT week (can they create and edit weeks at all); each week carries its own `access`, which also knows the publish lock" }) })
+  .openapi({ example: { range: { from: "2026-11-02", to: "2026-11-08", view: "week" }, weeks: [weekEx], shifts: [shiftEx], shiftTypes: [shiftTypeEx], members: [{ userId: UID, name: "Aoife Byrne", active: true, homeLocationId: LID }], membersTruncated: false, access: { level: "supervisor", canEdit: true, locked: false, lockReason: null } } })
 export type WeeksDto = z.infer<typeof WeeksOut>
 export const WeeksQuery = z.object({
   locationId: z.string().max(64).optional().openapi({ description: "One location (404 when the caller may not see it); omitted: every location the caller sees", example: LID }),
