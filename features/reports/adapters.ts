@@ -5,7 +5,7 @@ import { ApiError } from "@/lib/api/problem"
 import { reader, type Rec } from "@/lib/api/read"
 import { wallInTz } from "@/lib/tz"
 import { ITEM_STATUS_ORDER, REPORT_STATE_ORDER, type ItemStatus, type ReportState, type StoredStatus } from "@opsdesk/domain/shift-report"
-import type { InboxRow, ReportAttachment, ReportItem, ReportVersionRow, ShiftReport } from "./types"
+import type { InboxRow, ReportAttachment, ReportItem, ReportVersionRow, ShiftReport, InboxCounts } from "./types"
 
 const R = reader("report")
 const STORED: readonly StoredStatus[] = ["draft", "submitted", "accepted", "returned"]
@@ -110,6 +110,15 @@ const INBOX_KEYS = [
   "id", "key", "userId", "person", "patternId", "teamId", "shiftName", "team", "date", "start", "end", "due", "startAt", "endAt", "dueAt", "status", "state", "version", "submissions", "itemCount",
   "doneCount", "submittedAt", "reviewedAt", "reviewedBy", "minutesLate", "minutesOpen",
 ] as const
+
+const COUNT_KEYS = ["all", "open", "missing", "late", "returned", "accepted"] as const
+/** The `counts` of `GET /v1/shift-reports` (first page only; null after a cursor). */
+export function toInboxCounts(dto: unknown): InboxCounts | null {
+  if (dto === null || dto === undefined) return null
+  const c = R.rec(dto, "inbox counts")
+  R.exact(c, COUNT_KEYS)
+  return { all: R.int(c, "all"), open: R.int(c, "open"), missing: R.int(c, "missing"), late: R.int(c, "late"), returned: R.int(c, "returned"), accepted: R.int(c, "accepted") }
+}
 
 /** One row of `GET /v1/shift-reports`. A virtual row has `id: null` and a `key` (open it with POST /v1/shift-reports/open before reading or writing). */
 export function toInboxRow(dto: unknown, tz: string): InboxRow {

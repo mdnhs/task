@@ -105,8 +105,13 @@ export type InboxRow = {
 }
 
 /** What /daily-reports loads for the caller: the API's first page for the URL filters (scope is the API's, nothing is widened here) and what the screen needs around it. */
+/** `counts` of GET /v1/shift-reports (B8 T15): items per state in the window under the scope, team and person filters but NOT the status filter; the parts add up to `all`. `open` = a draft
+ * not yet due + a report submitted on time and not reviewed. First page only (AG2). */
+export type InboxCounts = { all: number; open: number; missing: number; late: number; returned: number; accepted: number }
 export type ReportsData = {
   rows: InboxRow[]
+  /** The API's counts of the first page (null when the API sent none). */
+  counts: InboxCounts | null
   /** A member's own unfiltered window (for the prompts and "My shift report"); absent for managers. */
   mine?: InboxRow[]
   nextCursor: string | null

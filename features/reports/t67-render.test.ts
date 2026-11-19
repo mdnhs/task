@@ -67,7 +67,7 @@ describe("the inbox", () => {
     toInboxRow(inboxDto({ id: null, userId: "usr_other", key: `usr_other:${PID}:2026-10-23`, person: "Bob Lee", status: "draft", state: "missing", version: 0, submissions: 0, itemCount: 0, doneCount: 0, submittedAt: null, date: "2026-10-23" }), TZ),
   ]
   const data = (over: Partial<ReportsData> = {}): ReportsData => ({
-    rows, nextCursor: null, scope: "all", meId: ME, people: [], teams: [{ id: "t1", name: "Security" }], range: { from: "2026-10-19", to: "2026-10-25" }, dueAfterMinutes: 60, ...over,
+    rows, nextCursor: null, counts: null, scope: "all", meId: ME, people: [], teams: [{ id: "t1", name: "Security" }], range: { from: "2026-10-19", to: "2026-10-25" }, dueAfterMinutes: 60, ...over,
   })
   const render = (d: ReportsData, dept = "all") => renderToStaticMarkup(createElement(DeptContext.Provider, { value: dept }, createElement(ReportInbox, { data: d, nowAt: NOW_AT, today: "2026-10-25T08:00:00", tz: TZ, tzLabel: "Irish time" })))
   test("a stored row links to its uuid, my own virtual row to its key, and somebody else's virtual row to nothing", () => {

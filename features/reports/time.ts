@@ -21,6 +21,17 @@ export function reportStateAt(r: Timed, nowAt: string): ReportState {
 /** First submission came after the due instant. */
 export const isLateAt = (r: Pick<ShiftReport | InboxRow, "dueAt" | "submittedAtIso">): boolean => !!r.submittedAtIso && ms(r.submittedAtIso) > ms(r.dueAt)
 
+/** The API's real minutes late (`minutesLate`, from instants) in a few characters: "35 min late", "1 h 35 min late", "2 d 3 h late"; 0 (on time, or not due yet) is "". */
+export function lateText(minutes: number): string {
+  if (!(minutes > 0)) return ""
+  const m = Math.round(minutes)
+  const d = Math.floor(m / 1440)
+  const h = Math.floor((m % 1440) / 60)
+  const min = m % 60
+  const parts = d > 0 ? [`${d} d`, ...(h ? [`${h} h`] : [])] : h > 0 ? [`${h} h`, ...(min ? [`${min} min`] : [])] : [`${min} min`]
+  return `${parts.join(" ")} late`
+}
+
 /** "in_shift" until the shift's end instant, "open" after it. */
 export const draftPhaseAt = (r: Pick<ShiftReport | InboxRow, "endAt">, nowAt: string): "in_shift" | "open" => (ms(nowAt) < ms(r.endAt) ? "in_shift" : "open")
 

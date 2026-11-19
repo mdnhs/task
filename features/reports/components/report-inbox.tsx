@@ -16,7 +16,7 @@ import { formatDate } from "@/lib/dates"
 import { EMPTY_REPORT_FILTERS, windowLabel } from "@/lib/shift-report"
 import { toInboxRow } from "../adapters"
 import { inboxQuery } from "../query"
-import { reportStateAt, isLateAt } from "../time"
+import { lateText, reportStateAt } from "../time"
 import { useUrlFilters } from "@/hooks/use-url-filters"
 import { REPORT_PAGE_SIZE, REPORT_STATE, REPORT_STATE_ORDER } from "../types"
 import type { InboxRow, ReportFilters, ReportsData } from "../types"
@@ -64,6 +64,11 @@ export function ReportInbox({
   const rows = dept === "all" ? loaded : loaded.filter((r) => r.team === dept)
   const states = useMemo(() => new Map(loaded.map((r) => [r.id, reportStateAt(r, nowAt)])), [loaded, nowAt])
   const filtered = dept !== "all" || Object.entries(filters).some(([k, v]) => v !== EMPTY_REPORT_FILTERS[k as keyof ReportFilters])
+  // The API's counts (first page, B8 T15/T24): per state under the same scope, team and person filters as the list, not the status filter, so a chip's number is the list it opens. The topbar
+  // department narrows only the loaded rows (the API's counts are not cut by it), so no numbers then. "Submitted" has no number of its own: the API's `open` also holds drafts not yet due.
+  const counts = dept === "all" ? data.counts : null
+  const total = counts ? (filters.status === "all" ? counts.all : filters.status in counts ? counts[filters.status as Exclude<keyof typeof counts, "open">] : null) : null
+  const chip = (label: string, n: number | undefined) => (n === undefined ? label : <>{label} <span className="num">{n}</span></>)
 
   async function loadMore() {
     if (!cursor || loading) return
@@ -93,14 +98,14 @@ export function ReportInbox({
         <div>
           <h2 id="sr-inbox-h">{own ? "My reports" : "Report inbox"}</h2>
           <div className="sub">
-            {rows.length}{cursor ? "+" : ""} {rows.length === 1 ? "report" : "reports"} · {formatDate(filters.from || data.range.from)} to {formatDate(filters.to || data.range.to)}
+            {total ?? rows.length}{total === null && cursor ? "+" : ""} {(total ?? rows.length) === 1 ? "report" : "reports"}{counts && !own ? ` · ${counts.open} open` : ""} · {formatDate(filters.from || data.range.from)} to {formatDate(filters.to || data.range.to)}
           </div>
         </div>
         <ExportMenu label="Date range" request={exportReq} />
       </div>
       {!own && (
         <div className="sr-counts">
-          <FilterSeg label="Reports by status" value={filters.status} options={[{ value: "all", label: "All" }, ...REPORT_STATE_ORDER.filter((s) => s !== "draft").map((s) => ({ value: s, label: REPORT_STATE[s].label }))]} onChange={(v) => set("status", v)} />
+          <FilterSeg label="Reports by status" value={filters.status} options={[{ value: "all", label: chip("All", counts?.all) }, ...REPORT_STATE_ORDER.filter((s) => s !== "draft").map((s) => ({ value: s, label: chip(REPORT_STATE[s].label, counts && s !== "submitted" ? counts[s as "late" | "missing" | "accepted" | "returned"] : undefined) }))]} onChange={(v) => set("status", v)} />
         </div>
       )}
       <FilterBar>
@@ -134,7 +139,7 @@ export function ReportInbox({
                 {rows.map((r) => {
                   const p = people.get(r.userId)
                   const s = states.get(r.id) ?? reportStateAt(r, nowAt)
-                  const late = isLateAt(r)
+                  const late = lateText(r.minutesLate) // the API's real minutes (submitted late, or still missing up to now)
                   const href = rowHref(r, data.meId)
                   const title = `${formatDate(r.date)} · ${r.shiftName}`
                   return (
@@ -159,7 +164,7 @@ export function ReportInbox({
                       <td data-label="Status"><StatusPill status={REPORT_STATE[s]} /></td>
                       <td data-label="Submitted" className={`num due ${late ? "due-late" : ""}`}>
                         {r.submittedAt ? <When iso={r.submittedAt} today={today} tzLabel={tzLabel} /> : "Not submitted"}
-                        {late && s !== "late" ? " · late" : ""}
+                        {late && ` · ${late}`}
                       </td>
                       <td data-label="Tasks" className="num">
                         {r.itemCount === 0 && !r.reportId ? "—" : `${r.doneCount}/${r.itemCount} done`}

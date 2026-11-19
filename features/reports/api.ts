@@ -10,9 +10,9 @@ import type { Session } from "@/lib/session"
 import type { Person } from "@/lib/types"
 import type { TemplateData } from "@opsdesk/domain/shift-report"
 import { parseReportFilters } from "@/lib/shift-report"
-import { toInboxRow, toReport, toTemplateData } from "./adapters"
+import { toInboxCounts, toInboxRow, toReport, toTemplateData } from "./adapters"
 import { inboxQuery } from "./query"
-import type { InboxRow, ReportFilters, ReportsData, ShiftReport } from "./types"
+import type { InboxCounts, InboxRow, ReportFilters, ReportsData, ShiftReport } from "./types"
 
 export { inboxQuery }
 
@@ -20,9 +20,9 @@ type Reader = Pick<ApiClient, "get">
 type Team = { id: string; name: string }
 
 /** One page of the inbox (stored reports and virtual rows) for the filters. `nextCursor` is the API's. */
-export async function loadInbox(api: Reader, tz: string, f: Partial<ReportFilters>, teams: Team[], o: { cursor?: string; limit?: number } = {}): Promise<{ rows: InboxRow[]; nextCursor: string | null }> {
+export async function loadInbox(api: Reader, tz: string, f: Partial<ReportFilters>, teams: Team[], o: { cursor?: string; limit?: number } = {}): Promise<{ rows: InboxRow[]; nextCursor: string | null; counts: InboxCounts | null }> {
   const page = await api.get("/v1/shift-reports", { query: inboxQuery(f, teams, o) })
-  return { rows: page.items.map((d) => toInboxRow(d, tz)), nextCursor: page.nextCursor }
+  return { rows: page.items.map((d) => toInboxRow(d, tz)), nextCursor: page.nextCursor, counts: toInboxCounts(page.counts) }
 }
 
 /** The report for an id (its uuid). Null when the caller has no such report (404: unknown and out of scope look the same). */
@@ -67,6 +67,7 @@ export async function loadReportsData(
     rows: page.rows,
     ...(mine ? { mine } : {}),
     nextCursor: page.nextCursor,
+    counts: page.counts,
     scope: own ? "own" : o.session.role.reportScope === "team" ? "team" : "all",
     meId: o.session.user.id,
     people: o.people,
