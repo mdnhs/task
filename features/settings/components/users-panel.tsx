@@ -148,7 +148,7 @@ export function UsersPanel({ users, invites, roles, today, tzLabel, seatLimit, s
         </FilterBar>
         {paged.rows.length > 0 ? (
           <div className="table-wrap">
-            <table className="rtable set-table">
+            <table className="rtable set-table set-users">
               <thead>
                 <tr><th>User</th><th>Role</th><th>Department</th>{whatsapp && <th>WhatsApp <span className="tm">Demo</span></th>}<th>Status</th><th>Last active</th>{canWrite && <th><span className="sr-only">Actions</span></th>}</tr>
               </thead>
@@ -172,7 +172,7 @@ export function UsersPanel({ users, invites, roles, today, tzLabel, seatLimit, s
                     {whatsapp && (
                       <td data-label="WhatsApp">
                         <span className="wa-user-cell">
-                          <StatusPill status={WA_PERSON_STATUS[waStatus(u)]} tick={false} />
+                          <StatusPill status={waStatus(u) === "pending" ? { ...WA_PERSON_STATUS.pending, label: "Pending" } : WA_PERSON_STATUS[waStatus(u)]} tick={false} />
                           {canWrite && <button type="button" className="btn btn-outline set-sm" onClick={() => setWaEdit(u)} aria-label={`Edit WhatsApp number of ${u.name}`}>Edit</button>}
                         </span>
                       </td>
@@ -183,7 +183,7 @@ export function UsersPanel({ users, invites, roles, today, tzLabel, seatLimit, s
                       return (
                         <>
                           <td data-label="Status"><StatusPill status={on ? { tone: "ok", label: "Active" } : { tone: "mute", label: "Deactivated" }} /></td>
-                          <td data-label="Last active" className="num">{u.lastActiveAt ? <When iso={u.lastActiveAt} today={today} tzLabel={tzLabel} /> : <span className="tm">Never</span>}</td>
+                          <td data-label="Last active" className="num">{u.lastActiveAt ? <When iso={u.lastActiveAt} today={today} tzLabel={tzLabel} mode="date" /> : <span className="tm">Never</span>}</td>
                           {canWrite && (
                             <td data-label="Actions">
                               {on ? (

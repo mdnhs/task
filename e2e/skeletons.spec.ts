@@ -27,6 +27,11 @@ const EXACT: Record<string, number[]> = {
 // on the role (K4: loading.tsx is static and draws the typical OWNER view, so staff pages are shorter) or on tables turning into stacked cards below 768px. The number is the
 // measured |total difference| x 1.25 + 40 (the data moves a little between runs); a page that drifts further fails. Listed under "Remaining work" in architecture.md.
 const CEILING: Record<string, number> = {
+  // Settings Users (merged WhatsApp UI + B8 Task 24): the skeleton draws 3 typical people and 1 invite, the e2e tenant has 22 people (10 rows + the pager) and no invites. Every row is exact (71 px at 1568/768: 7 more rows x 71 + the 64 px pager = the 561 px of the
+  // users card; 390 stacked rows move with the data), the head is exact (LEAD); the invites card is the empty state (134 px).
+  "settings users@1568": 910,
+  "settings users@768": 910,
+  "settings users@390": 3140,
   "dashboard staff@1568": 1082,
   "reports member@1568": 516,
   "report review@1568": 240,
@@ -91,6 +96,9 @@ const CEILING: Record<string, number> = {
 }
 // LEAD: for a CEILING case, how many of the first blocks must still agree within TOL (the part of the page that does not depend on the data or the role).
 const LEAD: Record<string, number> = {
+  "settings users@1568": 1,
+  "settings users@768": 1,
+  "settings users@390": 1,
   "console audit@1568": 1,
   "console audit@768": 1,
   "console audit@390": 1,
@@ -134,6 +142,7 @@ const CASES: Case[] = [
   { name: "tasks list", as: "owner", path: "/tasks", rx: "^/v1/tasks" },
   { name: "task detail", as: "owner", path: "/tasks/TSK-1001", rx: "^/v1/tasks" },
   { name: "billing", as: "owner", path: "/settings/billing", rx: "^/v1/billing/invoices" },
+  { name: "settings users", as: "owner", path: "/settings/users", rx: "^/v1/(people|invites)" },
   { name: "audit", as: "owner", path: "/audit-log", rx: "^/v1/audit" },
   // The console: only the page's own reads are held back (the layout's probe is /v1/platform/tenants?pageSize=1, which must answer for the real shell to appear).
   { name: "console overview", as: "platform", path: "/platform", rx: "^/v1/platform/(metrics|audit|data-requests)" },

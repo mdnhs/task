@@ -125,6 +125,6 @@
 .wa-via .od-filters [data-slot="select-trigger"].od-filter-select{min-width:230px}
 .wa-via .set-req{margin-left:0}
 .wa-edit-hint{margin-top:-6px}
-.wa-user-cell{display:inline-flex;align-items:center;gap:10px;flex-wrap:wrap}
+.wa-user-cell{display:inline-flex;align-items:center;gap:6px;flex-wrap:nowrap;white-space:nowrap}
 .wa-user-cell .btn{cursor:pointer}
 @media (max-width:640px){.wa-via,.wa-via .od-filters,.wa-via .od-filters [data-slot="select-trigger"].od-filter-select{width:100%}}
