@@ -242,7 +242,7 @@ export async function rejectRequest(deps: Deps, tenantId: string, actor: Actor, 
 /**
  * Platform staff close a request that a worker is processing (status `running`) or that is stuck (`failed`; B8 Task 17, AH2). A `pending` request is picked up by the job itself, so it is not resolvable: the tenant side goes through THIS service (the tenant's own RLS context, never a bypass), so
  * the tenant sees the same status, note and notification as for its own decision. `outcome` is `completed` (it was dealt with outside the job) or `rejected`. Any other status (pending, completed, rejected) is 409
- * `request_not_processing`, so a second call changes nothing; a job still running sees a finished request and stops (every job step re-checks `running`). Order: DSR lock, row FOR UPDATE,
+ * `request_not_processing`, so a second call changes nothing; a job still running sees a finished request and stops: erase step 1 re-reads the request under its locks and returns without erasing anything unless it is still `running`, step 3 re-checks `running` before it completes (the export job checks at its write). Order: DSR lock, row FOR UPDATE,
  * the change, the tenant audit row (actor `platform:<staffId>`), the notification and event, and the PLATFORM audit row last (its lock is taken last). The note is stored on the request only.
  */
 export async function resolveByPlatform(deps: Deps, tenantId: string, staff: Actor, id: string, outcome: "completed" | "rejected", note: string): Promise<DataRequestDto> {
@@ -454,7 +454,7 @@ export async function expireExport(data: unknown, deps: Deps): Promise<void> {
 
 /**
  * Job `dsr.erase` { dsrId, tenantId }. Three steps, each safe to repeat, so a crash in between just resumes:
- *  1. tenant tx: rbac, shifts, roster, then dsr lock (the deactivation order); last active owner -> 409 last_owner (request fails with that code); every
+ *  1. tenant tx: rbac, shifts, roster, then dsr lock (the deactivation order); the request is re-read and must still be `running` (else the job ends, nothing erased); last active owner -> 409 last_owner (request fails with that code); every
  *     registered handler's erase; requests about the subject get reason/notes scrubbed to "[erased]" and their generated
  *     export files deleted; the membership is removed (audit `member.removed`, event `member.removed`);
  *  2. user tx: only when the person has NO membership left in any tenant, the global identity is anonymised
@@ -471,6 +471,7 @@ export async function runErase(data: unknown, deps: Deps): Promise<void> {
   const subject = req.subjectUserId
   try {
     const modules: string[] = []
+    let stopped = false
     await withTenantAfterCommit(deps, job.tenantId, async (tx, enqueue) => {
       // lock order = member deactivation (members/service.ts): RBAC, shifts, roster, then the DSR lock and the subject's membership row. A roster writer holds the roster lock, then its rows, and
       // may notify the subject (KEY SHARE on the membership row): taking that row first would deadlock with it (40P01), so every advisory lock comes BEFORE the row.
@@ -479,6 +480,11 @@ export async function runErase(data: unknown, deps: Deps): Promise<void> {
       await lockShifts(tx, job.tenantId)
       await lockRoster(tx, job.tenantId)
       await lockDsr(tx, job.tenantId)
+      // the claim was a while ago (this tx may have waited for the locks above): platform staff may have resolved the request meanwhile. Erasure is irreversible, so it only runs for a request that is STILL running.
+      if ((await requestIn(tx, job.tenantId, job.dsrId, true)).status !== "running") {
+        stopped = true
+        return
+      }
       const [m] = await tx
         .select({ roleKey: roles.key, status: memberships.status })
         .from(memberships)
@@ -505,6 +511,7 @@ export async function runErase(data: unknown, deps: Deps): Promise<void> {
         await publish(tx, { tenantId: job.tenantId, type: "member.removed", payload: { userId: subject }, actorId: req.requestedBy }, now)
       }
     })
+    if (stopped) return // resolved by platform staff while the job waited: nothing erased, the request stays as they closed it
     const globalErased = await eraseGlobalIdentity(deps, subject)
     await withTenantAfterCommit(deps, job.tenantId, async (tx, enqueue) => {
       const cur = await requestIn(tx, job.tenantId, job.dsrId, true)

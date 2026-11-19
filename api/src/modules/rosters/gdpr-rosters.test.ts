@@ -5,7 +5,7 @@ import { resetDb } from "../../../test/harness"
 import { resetSubscribers } from "../../core/events"
 import { runJob } from "../../core/queue/queue"
 import { registerFiles } from "../files"
-import { registerGdpr } from "../gdpr"
+import { registerGdpr, resolveByPlatform } from "../gdpr"
 import { resetDsrHandlers } from "../gdpr/registry"
 import { registerNotifications } from "../notifications"
 import { registerSearchIndexers } from "../search"
@@ -268,6 +268,35 @@ describe("AH1 erase takes the roster lock (lock order = deactivation)", () => {
     }
     throw new Error("the erase never waited on a lock")
   }
+
+  test("G1: a request that platform staff resolve while the erase waits for its locks is NOT erased: nothing is deleted, the identity stays, the request stays as resolved", async () => {
+    const { w, me, mine, theirs } = await scene()
+    const id = await eraseRequest(w, me)
+    const c = await owner.connect()
+    try {
+      await c.query("begin")
+      await c.query("select set_config('app.tenant_id', $1, true)", [w.tenant.id])
+      const pid = (await c.query("select pg_backend_pid() as pid")).rows[0].pid as number
+      await c.query("select pg_advisory_xact_lock($1::int, hashtext($2::text))", [ROSTER_LOCK_NS, w.tenant.id]) // a roster writer holds the roster lock
+      const job = runJob("dsr.erase", { dsrId: id, tenantId: w.tenant.id }, w.deps) // the erase claims the request (running) and waits for that lock
+      await waitBlocked(pid)
+      const resolved = await resolveByPlatform(w.deps, w.tenant.id, { userId: "staff-1" }, id, "rejected", "Handled outside the job") // platform staff close it meanwhile
+      expect(resolved.status).toBe("rejected")
+      await c.query("commit")
+      await job
+    } catch (e) {
+      await c.query("rollback").catch(() => undefined)
+      throw e
+    } finally {
+      c.release()
+    }
+    expect((await w.ok("GET", `/v1/data-requests/${id}`, w.p.owner)).status).toBe("rejected") // still resolved, not completed, not failed
+    expect((await w.rows("select 1 from memberships where user_id = $1", [me.userId])).length).toBe(1)
+    expect((await w.rows("select 1 from roster_shifts where user_id = $1", [me.userId])).length).toBe(mine.length) // the roster handler did not run: the shifts are still theirs
+    expect((await w.rows("select 1 from roster_shifts where user_id = $1", [w.staff2.userId])).length).toBe(theirs.length)
+    expect((await w.rows("select 1 from audit_events where action in ('member.removed', 'dsr.erasure_completed')")).length).toBe(0)
+    expect((await ownerQuery(`select erased_at from "user" where id = $1`, [me.userId]))[0].erased_at).toBeNull() // the global identity was not anonymised
+  }, 20_000)
 
   test("a roster writer that owns the subject's shift row and then notifies the subject (KEY SHARE on the membership row) does not deadlock with the erase: the erase waits for the roster lock, the writer commits, the erase completes (no 40P01, no failed request)", async () => {
     const { w, me, mine, wa } = await scene()
