@@ -252,6 +252,9 @@ describe("supervisor grants (FR-RS-03, FR-RS-34)", () => {
     // an existing grant of a person who is deactivated later stays in the table but is not listed as a supervisor
     await w.rows("update memberships set status = 'deactivated' where user_id = $1", [base[0]])
     expect((await w.ok("GET", `/v1/locations/${loc.id}`, w.p.owner)).supervisorIds).toEqual([])
+    // R4 (ruling AE): taking the grant of a deactivated member away tells them nothing (a removed ACTIVE supervisor is still told: see the test above)
+    await w.ok("PUT", `/v1/locations/${loc.id}/supervisors`, w.p.owner, { userIds: [] })
+    expect(await w.rows("select 1 from notifications where user_id = $1 and title = 'Location supervision ended'", [base[0]])).toHaveLength(0)
     expect((await w.req("PUT", `/v1/locations/${loc.id}/supervisors`, w.p.employee, { userIds: [] })).status).toBe(403)
   })
 })

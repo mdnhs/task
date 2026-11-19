@@ -4,6 +4,7 @@ import { AppError, Conflict, NotFound } from "../../core/errors"
 import { locations, locationSupervisors, memberships, rosterOfficeLimits, rosterShifts, rosterWeeks, roles, shiftTypes, shiftTypeTargets } from "../../db/schema"
 import type { TenantTx } from "../../db/tenant-tx"
 import { notify } from "../notifications"
+import { notifyActive } from "./events"
 import { canonicalTimezone } from "../settings"
 import type { LocationDto, ShiftTypeDto } from "./dto"
 import { assertLocation, inScopeSql, type RosterCtx } from "./scope"
@@ -234,8 +235,11 @@ export async function setSupervisors(tx: TenantTx, ctx: RosterCtx, env: RosterEn
   if (removed.length) await tx.delete(locationSupervisors).where(and(eq(locationSupervisors.tenantId, ctx.tenantId), eq(locationSupervisors.locationId, loc.id), inArray(locationSupervisors.userId, removed)))
   if (added.length) await tx.insert(locationSupervisors).values(added.map((userId) => ({ tenantId: ctx.tenantId, locationId: loc.id, userId, createdBy: ctx.actorId, createdAt: ctx.now })))
   await writeHistory(tx, ctx, { locationId: loc.id, action: "supervisors_changed", before: { userIds: old }, after: { userIds: next } })
-  for (const userId of added) await notify(tx, ctx.tenantId, { userId, kind: "member", title: "You now supervise a location", body: `You are a supervisor of ${loc.name}.`, link: "/rosters" }, env.deps, env.enqueue)
-  for (const userId of removed) await notify(tx, ctx.tenantId, { userId, kind: "member", title: "Location supervision ended", body: `You no longer supervise ${loc.name}.`, link: "/rosters" }, env.deps, env.enqueue)
+  // ACTIVE members only (ruling AE): the grant of a member who was deactivated meanwhile is taken away silently
+  await notifyActive(tx, ctx, env, [
+    ...added.map((userId) => ({ userId, title: "You now supervise a location", body: `You are a supervisor of ${loc.name}.` })),
+    ...removed.map((userId) => ({ userId, title: "Location supervision ended", body: `You no longer supervise ${loc.name}.` })),
+  ])
   await auditRoster(tx, ctx, { action: "roster.supervisors_changed", entity: "location", entityId: loc.id, before: { userIds: old }, after: { userIds: next } })
   await publishRoster(tx, ctx, "location.supervisors_changed", { locationId: loc.id, added, removed })
   return { locationId: loc.id, userIds: next }
