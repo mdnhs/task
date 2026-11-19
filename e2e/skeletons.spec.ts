@@ -1,11 +1,11 @@
 import { appendFileSync } from "node:fs"
 import { apiAs, expect, test } from "./fixtures"
-import type { Persona } from "./stack-env"
+import { PROXY_ORIGIN, type Persona } from "./stack-env"
 
 // Skeleton parity (architecture.md -> Skeletons, B6 T6.9): for each page the route's loading.tsx is held on screen (the API answers are delayed by e2e/slow-api.mjs, only the paths the
 // page itself reads), measured, then the real page arrives and is measured again. The blocks of the page (children of <main>, one level down) must agree within TOL px at 1568, 768
 // and 390 wide, and so must the total height. Results are appended to test-results/skeleton-measurements.jsonl (recorded in .claude/docs/architecture.md).
-const SLOW = "http://localhost:3102"
+const SLOW = PROXY_ORIGIN
 const TOL = 3
 // EXACT: the page and its skeleton agree within TOL px in total and in EVERY block (head, filters, cards, table, pager), at the widths listed. This is the project rule (exact skeletons);
 // a regression here fails. The constant, non-data-dependent differences found in T6.9 (the seats field, the invoice empty state, stat note line, team row lines, the shifts week

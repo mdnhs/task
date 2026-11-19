@@ -1,5 +1,7 @@
 # Throwaway backing services for the Playwright e2e and the real-login smoke (T6.9). Separate project name and ports, so it never
 # touches the dev stack. Local only: demo data, fake credentials, no live provider. Start: npm run e2e:stack
+# A second stack beside it: `docker compose -p <name> -f docker-compose.e2e.yml up -d --wait` with E2E_PG_PORT, E2E_REDIS_PORT, E2E_MINIO_PORT, E2E_CLAMD_PORT, E2E_WEB_PORT set
+# (e2e/stack-env.ts and playwright.config.ts read the same names, plus E2E_API_PORT and E2E_PROXY_PORT).
 name: opsdesk-e2e
 services:
   postgres:
@@ -8,7 +10,7 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: opsdesk_e2e
-    ports: ["55432:5432"]
+    ports: ["${E2E_PG_PORT:-55432}:5432"]
     tmpfs: ["/var/lib/postgresql/data"]
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d opsdesk_e2e"]
@@ -17,7 +19,7 @@ services:
       retries: 20
   redis:
     image: redis:7
-    ports: ["56379:6379"]
+    ports: ["${E2E_REDIS_PORT:-56379}:6379"]
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 3s
@@ -29,8 +31,8 @@ services:
     environment:
       MINIO_ROOT_USER: e2eminio
       MINIO_ROOT_PASSWORD: e2eminio-secret
-      MINIO_API_CORS_ALLOW_ORIGIN: "http://localhost:3100"
-    ports: ["59000:9000"]
+      MINIO_API_CORS_ALLOW_ORIGIN: "http://localhost:${E2E_WEB_PORT:-3100}"
+    ports: ["${E2E_MINIO_PORT:-59000}:9000"]
     tmpfs: ["/data"]
     healthcheck:
       test: ["CMD", "/usr/bin/mc", "ready", "local"]
@@ -40,7 +42,7 @@ services:
   clamav:
     image: clamav/clamav
     platform: linux/amd64
-    ports: ["53310:3310"]
+    ports: ["${E2E_CLAMD_PORT:-53310}:3310"]
     healthcheck:
       test: ["CMD", "clamdcheck.sh"]
       interval: 15s

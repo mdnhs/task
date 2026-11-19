@@ -69,3 +69,12 @@ export async function pickDate(page: Page, buttonSelector: string, iso: string, 
   await scope.locator(buttonSelector).first().click()
   await page.getByRole("button", { name: new RegExp(text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")) }).click()
 }
+
+/** The text a screen reader gets from an element: aria-hidden parts (the rolling digits of a count) left out, white space collapsed. */
+export async function spokenText(el: ReturnType<Page["locator"]>): Promise<string> {
+  return el.evaluate((n) => {
+    const c = n.cloneNode(true) as HTMLElement
+    c.querySelectorAll('[aria-hidden="true"]').forEach((x) => x.remove())
+    return (c.textContent ?? "").replace(/\s+/g, " ").trim()
+  })
+}
