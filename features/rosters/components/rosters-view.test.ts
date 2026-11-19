@@ -6,7 +6,7 @@ vi.mock("@/app/actions/rosters", () => ({ applyWeekTemplate: vi.fn(), checkWeek:
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: () => {}, refresh: () => {} }) }))
 
 import { LID2, lockedAccess, payloadFixture } from "../fixtures"
-import { skeletonPayload, SKELETON_TODAY } from "../skeleton-data"
+import { skeletonPayload, skeletonTemplates, SKELETON_TODAY } from "../skeleton-data"
 import { RostersSkeleton } from "./skeletons"
 import { RostersView } from "./rosters-view"
 import type { RosterPayload, WeekAccess } from "../types"
@@ -88,11 +88,11 @@ describe("skeleton: the loading view is the same view, masked, over the typical 
   // The pixel measurement (3 px at 1568 and 390 for owner, supervisor and staff-home shells) is recorded in the commit message and the report; jsdom has no layout.
   const shape = (s: string) => s.replace(/>[^<]*</g, "><").replace(/ (aria-[a-z]+|id|for|href|title|style|data-[a-z-]+)="[^"]*"/g, "").replace(/<(\/?)(span|div) class="(sk-mask|sr-only)[^"]*"[^>]*>/g, "")
   it("has the same blocks, columns and cards as the loaded view of the same payload", () => {
-    const live = renderToStaticMarkup(createElement(RostersView, { payload: skeletonPayload(), query: {}, today: SKELETON_TODAY }))
+    const live = renderToStaticMarkup(createElement(RostersView, { payload: skeletonPayload(), query: {}, today: SKELETON_TODAY, templates: skeletonTemplates() }))
     const sk = renderToStaticMarkup(createElement(RostersSkeleton))
     expect(count(sk, 'class="ros-day"')).toBe(7)
     expect(count(sk, "ros-scard")).toBe(count(live, "ros-scard"))
-    expect(count(sk, "ros-scard")).toBe(21)
+    expect(count(sk, "ros-scard")).toBe(17)
     for (const cls of ["ros-nav", "ros-block-head", "ros-board", "ros-card", "ros-add"]) expect(count(sk, cls), cls).toBe(count(live, cls))
     expect(shape(sk)).toContain(shape(live).slice(0, 400))
     expect(sk).toContain("Loading rosters")

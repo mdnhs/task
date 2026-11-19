@@ -47,6 +47,25 @@ describe("roster server actions", () => {
     expect(src).not.toMatch(/x-tenant|TENANT_HEADER|apiServer\(\s*\{/i)
   })
 
+  test("patchShift sends the version it was given and returns the API's shift with its NEW version and the violations (AI2 #4)", async () => {
+    answer = () => json({ shift: { ...shiftDto, start: "09:00", version: 5 }, violations: [violationDto] })
+    const r = await actions.patchShift(SHIFT_ID, { version: 4, patch: { start: "09:00" } })
+    expect(seen[0]!.body).toEqual({ version: 4, patch: { start: "09:00" } })
+    expect(r.ok && r.value.shift.version).toBe(5) // the answer's version, never the one sent plus one
+    expect(r.ok && r.value.shift.start).toBe("09:00")
+    expect(r.ok && r.value.violations.map((v) => v.rule)).toEqual(["daily_rest"])
+    answer = () => problem(409, "version_conflict")
+    expect(await actions.patchShift(SHIFT_ID, { version: 4, patch: { start: "10:00" } })).toMatchObject({ ok: false, error: { state: "conflict" } })
+  })
+
+  test("reloadRoster reads the week again for the range on screen (a read, after the MFA check)", async () => {
+    answer = (path) => (path === "/v1/locations" ? json({ items: [locationDto] }) : json({ range: { from: "2026-11-02", to: "2026-11-08", view: "week" }, weeks: [weekDto], shifts: [shiftDto], shiftTypes: [], members: [], membersTruncated: false, access: { level: "supervisor", canEdit: true, locked: false, lockReason: null } }))
+    const r = await actions.reloadRoster({ locationId: LID, from: "2026-11-02", view: "week" })
+    expect(r.ok && r.value.weeks[0]!.access.canEdit).toBe(true)
+    expect(seen.find((c) => c.path === "/v1/roster/weeks")!.query).toContain(`locationId=${LID}`)
+    expect(seen.every((c) => c.method === "GET")).toBe(true)
+  })
+
   test("deleteShift always sends the version (and the reason)", async () => {
     answer = () => new Response(null, { status: 204 })
     const r = await actions.deleteShift(SHIFT_ID, { version: 4, reason: "Cover found" })

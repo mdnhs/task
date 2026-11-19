@@ -32,7 +32,8 @@ export function ViolationsPanel({ lines, needsOffice, onOpen, onOverride, onDism
             <motion.li key={l.key} className="ros-viol-row" data-kind={l.severity} {...listItem}>
               {l.severity === "block" ? <Icon name="ban" size={24} /> : <Icon name="warning" size={24} />}
               <span>
-                <b>{l.person}</b> {l.message}
+                {/* The API's sentence usually starts with the person's name: bold it once instead of writing the name twice. */}
+                {l.message.startsWith(l.person) ? <><b>{l.person}</b>{l.message.slice(l.person.length)}</> : <><b>{l.person}</b> {l.message}</>}
                 {l.shifts.map((s) => (
                   <span key={s.id}>
                     {" · "}
