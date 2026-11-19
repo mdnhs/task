@@ -12,3 +12,9 @@ describe("dayBoundsInTz: a tenant calendar day as UTC instants", () => {
     expect(() => dayBoundsInTz("2026-11-18", "Not/AZone")).toThrow()
   })
 })
+
+describe("dayBoundsInTz in zones whose midnight does not exist (the domain's wallToEpoch rule, R8-1)", () => {
+  test("Havana, 8 Mar 2026: midnight is skipped, the day starts at the transition", () => expect(dayBoundsInTz("2026-03-08", "America/Havana")).toEqual({ from: "2026-03-08T05:00:00.000Z", to: "2026-03-09T03:59:59.999Z" }))
+  test("Santiago, 6 Sep 2026: midnight is skipped, the day starts at the transition", () => expect(dayBoundsInTz("2026-09-06", "America/Santiago")).toEqual({ from: "2026-09-06T04:00:00.000Z", to: "2026-09-07T02:59:59.999Z" }))
+  test("Cairo, 25 Oct 2026: the day is 25 hours", () => expect(dayBoundsInTz("2026-10-25", "Africa/Cairo")).toEqual({ from: "2026-10-24T21:00:00.000Z", to: "2026-10-25T20:59:59.999Z" }))
+})
