@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, type ReactNode } from "react"
+import { Fragment, useEffect, useState, type ReactNode } from "react"
 import { toast } from "sonner"
 
 import { useDept } from "@/hooks/use-dept"
@@ -82,7 +82,7 @@ export function DashboardBody({ data, teamTasks, deadline, departments, clock, c
           <p>{dept} figures could not be loaded.</p>
           <button type="button" className="btn btn-primary" onClick={() => setAttempt((n) => n + 1)}>Try again</button>
         </section>
-        {middle}
+        <Fragment key="middle">{middle}</Fragment>
       </>
     )
   return (
@@ -94,7 +94,8 @@ export function DashboardBody({ data, teamTasks, deadline, departments, clock, c
         <TaskProgress data={home.progress} />
         {card && <ReportDeadlineCard data={card} canRemind={canRemind} />}
       </section>
-      {middle}
+      {/* `middle` is a server element: while its chunk is still streaming it is a lazy node, not yet an element React could mark as a keyed static child, so the key is stated here */}
+      <Fragment key="middle">{middle}</Fragment>
       {table && <TeamTasksTable data={table} assignTask={assignTask} ctx={clock} teamId={now?.teamId} teamName={now ? dept : undefined} />}
     </>
   )
