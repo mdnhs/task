@@ -4,6 +4,8 @@ import { Sk, SkGroup } from "@/components/sk"
 import { AUDIT_PAGE_SIZE } from "../filters"
 
 // Mirrors AuditView: PageHead (Export CSV), .au-card with the note, the filter bar and the .rtable rows (same classes, same counts).
+// The typical log is a mature one: more than the API's first page of 100, so the note carries its "Showing the latest 100: load older entries..." sentence (2 lines at >=1241 and at <=900, 5 on
+// phones) and the page ends with the Load older button (B8 Task 25's e2e world is past 100 events and showed it). A log still under a page is shorter by that button and sentence.
 export function AuditSkeleton({ rows = 60 }: { rows?: number }) {
   return (
     <SkGroup label="Loading audit log" className="sk-page">
@@ -11,10 +13,13 @@ export function AuditSkeleton({ rows = 60 }: { rows?: number }) {
       <div className="card au-card">
         <p className="au-note">
           <Sk w={16} h={16} r={4} style={{ marginTop: 2 }} />
-          {/* the note wraps to 2 lines at ≤900 and 3 on phones */}
+          {/* the note (with the Showing the latest sentence) is 2 lines at >=1241 and at <=900 and 5 on phones; between, the measured wrap is not asserted */}
           <span>
             <Sk w={420} h={12} lh={19} />
+            <Sk w={300} h={12} lh={19} className="sk-wrap-xl" />
             <Sk w={300} h={12} lh={19} className="sk-wrap-md" />
+            <Sk w={300} h={12} lh={19} className="sk-wrap" />
+            <Sk w={300} h={12} lh={19} className="sk-wrap" />
             <Sk w={200} h={12} lh={19} className="sk-wrap" />
           </span>
         </p>
@@ -61,6 +66,7 @@ export function AuditSkeleton({ rows = 60 }: { rows?: number }) {
           </table>
         </div>
         {needsPager(rows, AUDIT_PAGE_SIZE) && <PagerSkeleton rows={rows} size={AUDIT_PAGE_SIZE} />}
+        <div className="au-more"><Sk w={118} h={48} r="pill" /></div>
       </div>
     </SkGroup>
   )

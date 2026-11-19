@@ -15,7 +15,8 @@ const EXACT: Record<string, number[]> = {
   "shifts week": [1568, 768],
   "tasks list": [1568],
   "billing": [1568, 768, 390],
-  // "audit" was exact at 1568 on the plain seed; since B8 Task 25 the e2e world's roster writes are the newest audit rows (uuid record ids on two lines): CEILING below.
+  // The audit log skeleton draws the typical mature log (more than the API's first page of 100: the "Showing the latest" sentence and Load older), as the e2e world's is (B8 Task 25 took it past 100).
+  "audit": [1568],
   "reports inbox": [1568],
   "console overview": [1568, 768, 390],
   // Location Rosters (B8 Task 25): the office's My roster and a location with the typical two shift types.
@@ -34,7 +35,6 @@ const CEILING: Record<string, number> = {
   "console tenants@1568": 452,
   "console audit@1568": 520,
   "account security@1568": 240,
-  "audit@1568": 145, // B8 Task 25: -83 px, the world's roster audit rows (see EXACT)
   "dashboard manager@768": 501,
   "dashboard staff@768": 1958,
   "reports inbox@768": 760,
