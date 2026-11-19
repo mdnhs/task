@@ -117,3 +117,20 @@ Run on a laptop (macOS, k6 1.x) against the API port directly (`TARGET=api`), Po
 A 1-minute 5-VU run holds only a handful of samples per roster step, so the p(95) values are indicative at best.
 
 Whole run: `http_req_failed` 0.00 %, `checks` 100 % (97), `rate_limited` 0, every threshold passed. The 250-user profile (`k6 run load/k6/scenarios.js`, 13 minutes) was **not** run: it needs the full e2e stack and a quiet machine; run it before relying on the roster targets.
+
+## B8 gate run (Task 26, 20 Nov 2026, smoke profile)
+
+Same method as above: laptop (macOS, k6 1.x), API process (`tsx src/server.ts`) and worker straight at the API (`TARGET=api`, `BASE_URL=http://localhost:3471`, `ORIGIN` = the API's `APP_URL`), Postgres 16, Redis 7, MinIO and ClamAV in throwaway containers (own compose project and ports), a freshly reset demo database plus the `loadtest` tenant (250 users, 10 000 tasks, 40 locations), 5 VUs for 1 minute. Still **not** the 250-user profile.
+
+| Metric | p(95) | Target |
+|---|---|---|
+| `roster_week` (all 40 sites) | **79.0 ms** (avg 65 ms, max 80 ms) | < 400 ms |
+| `kind:read` | 99.2 ms | < 500 ms |
+| `kind:write` (includes `roster_check`) | 43.9 ms | < 800 ms |
+| `report_submit` | 30.1 ms | < 2000 ms |
+| `roster_publish` | **no samples** (5 % of the ops-manager picks; 5 VUs did not draw it, so its threshold passed on an empty series) | < 800 ms |
+| `roster_mine` | no samples (the first 11 users are the owner and ops managers, so 5 VUs never run an employee) | < 500 ms (`kind:read`) |
+
+Whole run on the fresh database: 106 requests, `http_req_failed` 0.00 %, `checks` 100 % (106), `rate_limited` 0, every threshold passed.
+
+A **second** run against the same database (no reset) failed `checks` (97.80 %) and `http_req_failed` (2.19 %): the report-submit steps answered 422 because the reports of those users were already submitted by the first run. This is the documented behaviour of the script ("use a fresh database per run"), not an API regression; its latencies were the same (`roster_week` p(95) 69.9 ms, read 106 ms, write 42.5 ms). The `roster_publish` and `roster_mine` targets and the 250-user profile are still unproven here: run them on staging (go-live runbook, section B).
