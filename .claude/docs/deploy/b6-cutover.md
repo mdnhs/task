@@ -69,6 +69,7 @@ Separate environment, separate database from the first client's.
 - `npx vitest run`, `npm run test:contract`, `npm -w api test`, `npx tsc --noEmit`, `npx eslint .`, `npm run api:types:check`, `npm run build`, `npm run check:bundle`.
 - CI: `contract` (web clients against the real API) and `e2e` (Playwright, CR-01 to CR-06 on the real stack) jobs in `.github/workflows/ci.yml`.
 - Locally: `npm run e2e:stack` (Postgres, Redis, MinIO, ClamAV on ports 55432, 56379, 59000, 53310; demo data and fake credentials only), `npm run test:e2e`, and `SMOKE_PASSWORD=... npm run smoke` against a web on a demo database (`SMOKE_MOCK=1` when it runs with `ENABLE_MOCK_MODULES=1`).
+  A second stack beside it (B8 Task 25): set `E2E_WEB_PORT`, `E2E_API_PORT`, `E2E_PROXY_PORT`, `E2E_PG_PORT`, `E2E_REDIS_PORT`, `E2E_MINIO_PORT`, `E2E_CLAMD_PORT` and start it with `docker compose -p <name> -f docker-compose.e2e.yml up -d --wait`; `e2e/stack-env.ts`, `playwright.config.ts` and the compose file read the same names (defaults unchanged). The smoke signs the console operator in when `SMOKE_PLATFORM_TOTP` holds the seed's raw TOTP key (else those cases are skipped).
 - After go-live: sign in as each role once; Settings → Devices shows the registered PCs; a test report submits and reaches the inbox; a proof-required task refuses Complete without evidence.
 
 ## Download hardening (B7 Task 4)
