@@ -1,5 +1,5 @@
 import { MyRosterView, loadExchanges, loadLeaveQueue, loadMyRoster, loadRosterPeople, orEmpty } from "@/features/rosters"
-import { AccessRestricted, apiFailureView, mockGate } from "@/features/shell"
+import { AccessRestricted, apiFailureView } from "@/features/shell"
 import { ApiError } from "@/lib/api/problem"
 import { getOrg } from "@/lib/org"
 import { can } from "@/lib/permissions"
@@ -13,8 +13,6 @@ const AHEAD = 90
 // My roster on the API (Module 1A, FR-RS-23/33/40/41; B8 Task 22): the signed-in person's own published shifts (GET /v1/roster/mine: the person is the session, never a query), availability,
 // leave and their own claims and swaps. A caller with a site view also gets the people list (names in the leave queue, colleagues for a swap): the API cut both to their sites.
 export default async function Page() {
-  const off = mockGate("My roster")
-  if (off) return off
   const [session, org] = await Promise.all([requireMfaOk(), getOrg()])
   if (!can(session.role, "roster")) return <AccessRestricted moduleLabel="My roster" />
   const me = session.user.id

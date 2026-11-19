@@ -1,9 +1,4 @@
 import { getData } from "@/lib/data"
-import { hasProductModule } from "@/lib/entitlements"
-import { getMockPeople, todayUserId } from "@/lib/people"
-import { can } from "@/lib/permissions"
-import { rosterAccess, type LocationGrant, type OfficeLimit } from "@/lib/roster-access"
-import type { Location, RosterShift, RosterWeek, ShiftTemplate } from "@/lib/rosters"
 import type { Session } from "@/lib/session"
 import { gapsFromOpenShifts } from "./logic"
 import type { Incident, RosterGap, StaffMember } from "./types"
@@ -30,24 +25,10 @@ export async function getRosters(sensitive: boolean, derived: RosterGap[] = []) 
 }
 
 /**
- * Open shifts of published roster weeks as roster gaps (D12), when the tenant has Location Rosters (M1A) and the role has the Roster module.
- * Cut to the locations the role may open (D4), so a supervisor never sees another location's open shifts. Pass the result to getRosters().
+ * The "From roster" gaps (D12) of this mock page. Location Rosters is the API's now (B8), and this FE-only incident and cover model stays on its own seed until B11 (R8-15): it no longer
+ * reads the roster seed (public/data/rosters is read only by the API's demo seed script), so the derivation is fed an empty list and gives no gaps. The B11 cover API brings them back from the
+ * API's open shifts. Signature kept so the hidden pages are untouched.
  */
 export async function getDerivedGaps(session: Session, userName: string, today: string): Promise<RosterGap[]> {
-  if (!hasProductModule(session.entitlements, "M1A") || !can(session.role, "roster")) return []
-  const [locs, { grants, limits }, people] = await Promise.all([
-    getData<{ locations: Location[] }>("rosters/locations.json"),
-    getData<{ grants: LocationGrant[]; limits: OfficeLimit[] }>("rosters/access.json"),
-    getMockPeople(),
-  ])
-  const access = rosterAccess(session.role, todayUserId(session, people, userName), grants, limits, locs.locations.map((l) => l.id))
-  if (access.scope === "none" || access.scope === "own") return []
-  const ids = new Set(access.locationIds ?? [])
-  const [{ weeks }, { shifts }, { templates }] = await Promise.all([
-    getData<{ weeks: RosterWeek[] }>("rosters/weeks.json"),
-    getData<{ shifts: RosterShift[] }>("rosters/shifts.json"),
-    getData<{ templates: ShiftTemplate[] }>("rosters/templates.json"),
-  ])
-  const locations = locs.locations.filter((l) => ids.has(l.id))
-  return gapsFromOpenShifts(shifts.filter((s) => ids.has(s.locationId)), weeks.filter((w) => ids.has(w.locationId)), templates.filter((t) => ids.has(t.locationId)), locations, today)
+  return gapsFromOpenShifts([], [], [], [], today)
 }

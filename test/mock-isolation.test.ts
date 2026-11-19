@@ -83,7 +83,7 @@ describe("4. mock routes exist only behind ENABLE_MOCK_MODULES=1", () => {
     expect(readers).toEqual(["lib/mock-registry.ts"])
   })
   test("every page under a mock route starts with the gate, before any data call", () => {
-    expect(mockPages.length).toBeGreaterThanOrEqual(11)
+    expect(mockPages.length).toBeGreaterThanOrEqual(8) // B8 Task 23: the four Location Rosters pages left the list (the API backs them)
     for (const f of mockPages) {
       const src = strip(read(f))
       const body = src.slice(src.indexOf("export default"))
@@ -107,7 +107,7 @@ describe("4. mock routes exist only behind ENABLE_MOCK_MODULES=1", () => {
     const mockHrefs = all.filter((n) => isMockRoute(n.href)).map((n) => n.href)
     expect(mockHrefs.length).toBeGreaterThanOrEqual(MOCK_ROUTES.length) // every mock route has a nav entry
     vi.stubEnv("ENABLE_MOCK_MODULES", "")
-    expect(hideMockNav(all).map((n) => n.href)).toEqual(["/", "/tasks", "/daily-reports", "/shifts", "/settings", "/audit-log"])
+    expect(hideMockNav(all).map((n) => n.href)).toEqual(["/", "/tasks", "/daily-reports", "/rosters", "/rosters/mine", "/shifts", "/settings", "/audit-log"]) // Location Rosters is the API's (B8 Task 23)
     expect(hideMockNav(all).some((n) => "badge" in n)).toBe(false) // the seed's badge counts are mock numbers
     vi.stubEnv("ENABLE_MOCK_MODULES", "1")
     expect(hideMockNav(all).map((n) => n.href)).toEqual(all.map((n) => n.href))

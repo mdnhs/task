@@ -5,7 +5,6 @@ export const mockEnabled = (): boolean => process.env.ENABLE_MOCK_MODULES === "1
 /** The mock-only routes: unavailable (page) and hidden (nav, search) unless the flag is on. Every page under a prefix starts with `mockGate(...)`. */
 export const MOCK_ROUTES = [
   { prefix: "/manager-attention", label: "Manager Attention" },
-  { prefix: "/rosters", label: "Location Rosters" },
   { prefix: "/staff-rosters", label: "Staff & Rosters" },
   { prefix: "/orders-stock", label: "Orders & Stock" },
   { prefix: "/recruitment", label: "Recruitment" },
@@ -14,7 +13,7 @@ export const MOCK_ROUTES = [
 ] as const
 
 /** The permission modules whose screens are mock-only (popular search terms of these are hidden without the flag). */
-export const MOCK_MODULES: readonly string[] = ["attention", "roster", "staff", "recruitment", "files", "payroll", "orders"]
+export const MOCK_MODULES: readonly string[] = ["attention", "staff", "recruitment", "files", "payroll", "orders"]
 
 export const isMockRoute = (href: string): boolean => MOCK_ROUTES.some((r) => href === r.prefix || href.startsWith(`${r.prefix}/`) || href.startsWith(`${r.prefix}?`))
 
@@ -56,7 +55,6 @@ export const MOCK_DATA_READERS: Readonly<Record<string, { kind: ReaderKind; why:
   "lib/session-route.ts": { kind: "catalogue", why: "role templates and entitlement catalogue joined to the API's membership" },
   "lib/session.ts": { kind: "catalogue", why: "role templates and entitlement catalogue joined to the API's membership" },
   "lib/skeleton-session.ts": { kind: "catalogue", why: "the typical-case session a loading skeleton renders (no network in a loading file)" },
-  "lib/workforce.ts": { kind: "mock", why: "staff and roster workforce seed" },
 }
 
 /** The loading.tsx files allowed to read the static seed (they belong to mock pages and fall back to a generic skeleton when the flag is off). */
@@ -66,7 +64,6 @@ export const MOCK_LOADING_FILES: readonly string[] = [
   "app/(app)/orders-stock/loading.tsx",
   "app/(app)/payroll-issues/loading.tsx",
   "app/(app)/recruitment/loading.tsx",
-  "app/(app)/rosters/loading.tsx",
   "app/(app)/staff-rosters/loading.tsx",
   "app/(app)/staff-rosters/gaps/[id]/loading.tsx",
   "app/(app)/staff-rosters/incidents/new/loading.tsx",

@@ -1,5 +1,5 @@
 import { LocationFormPage, loadLocationAdminData, loadRosterPeople } from "@/features/rosters"
-import { AccessRestricted, apiFailureView, mockGate } from "@/features/shell"
+import { AccessRestricted, apiFailureView } from "@/features/shell"
 import { ApiError } from "@/lib/api/problem"
 import { can } from "@/lib/permissions"
 import { requireMfaOk } from "@/lib/session"
@@ -7,8 +7,6 @@ import { requireMfaOk } from "@/lib/session"
 // Add ("new") or edit one location on the API (FR-RS-01..04, 30, 34; B8 Task 22). Office roles only (the API's `access.level`); a location the caller may not see is the API's 404, the same
 // "no access" as a missing one, and none of its data arrives.
 export default async function Page({ params }: { params: Promise<{ id: string }> }) {
-  const off = mockGate("Location Rosters")
-  if (off) return off
   const [{ id }, session] = await Promise.all([params, requireMfaOk()])
   if (!can(session.role, "roster")) return <AccessRestricted moduleLabel="Locations" />
   const loaded = await Promise.all([id === "new" ? Promise.resolve(null) : loadLocationAdminData(id), loadRosterPeople()])

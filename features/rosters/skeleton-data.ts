@@ -45,7 +45,7 @@ export function skeletonTemplates(): WeekTemplateSummary[] {
 /** The panels of the typical page (the demo roster): a page of history (a week with change requests or open shifts adds its own panels: a known, recorded ceiling). Placeholder text only; the mask hides every glyph. */
 export function skeletonPanels(): RosterPanels {
   const hist = (i: number): HistoryEntry => ({ id: `h${i}`, weekId: WEEK, locationId: LOCATION, shiftId: null, at: "2026-11-01T09:00:00.000Z", by: "u1", action: "shift_moved", before: null, after: null, reason: null })
-  return { requests: [], exchanges: [], history: { weekId: WEEK, page: { items: Array.from({ length: 18 }, (_, i) => hist(i)), nextCursor: null } }, gapsLink: false }
+  return { requests: [], exchanges: [], history: { weekId: WEEK, page: { items: Array.from({ length: 18 }, (_, i) => hist(i)), nextCursor: null } } }
 }
 
 // ---- Locations admin and My roster (B8 Task 22). Static and synthetic like the week above: no API, no session, no first-location data (a loading.tsx gets no params, K1).

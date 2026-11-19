@@ -63,7 +63,7 @@ const deferred = <T,>() => { let resolve!: (v: T) => void; const promise = new P
 const TODAY = "2026-11-04T09:00:00"
 const office: WeekAccess = { level: "office", canEdit: true, locked: false, lockReason: null }
 const officeReason: WeekAccess = { level: "office", canEdit: true, locked: false, lockReason: "reason_required" }
-const none: RosterPanels = { requests: [], exchanges: [], history: null, gapsLink: false }
+const none: RosterPanels = { requests: [], exchanges: [], history: null }
 const view = (payload: RosterPayload, panels: RosterPanels = none, me = "", today = TODAY) => createElement(RostersView, { payload, query: { week: "2026-11-02" }, today, panels, me })
 const BEFORE = "2026-11-01T09:00:00" // before the shifts of the week: a swap is only offered on a shift still to come
 const ok = <T,>(value: T) => ({ ok: true as const, value })

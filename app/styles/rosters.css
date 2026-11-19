@@ -264,8 +264,6 @@ fieldset.rl-tpl:disabled{opacity:.7}
 .ros-os-claim{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
 .ros-os-i{display:inline-block;width:14px;height:14px;margin-right:6px;vertical-align:-2px;color:var(--ink-3)}
 .ros-os-top{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
-.ros-os-gap{margin-left:auto;text-decoration:none}
-.ros-os-gap:hover{color:var(--brand-deep)}
 .mr-note{font-size:12px;line-height:16px;color:var(--ink-3)}
 
 /* My calendar (FR-RS-40): month grid of the person's shifts and leave */

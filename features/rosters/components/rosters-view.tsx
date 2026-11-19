@@ -62,10 +62,8 @@ export type RosterPanels = {
   exchanges: ApiExchange[]
   /** The first page of the history of `weekId`; null when the caller has no week to show. */
   history: { weekId: string; page: Page<HistoryEntry> } | null
-  /** The role can open Staff & Rosters, so the open-shifts panel links to the derived gaps. */
-  gapsLink: boolean
 }
-const noPanels: RosterPanels = { requests: [], exchanges: [], history: null, gapsLink: false }
+const noPanels: RosterPanels = { requests: [], exchanges: [], history: null }
 
 // Location Rosters, week view and editing on the API (FR-RS-10/11/12/20..24/26/36/37/38/42/43; B8 Tasks 20 and 21). Filters live in the URL (?location=&week=&view=&group=) and the server reads the API again on every change.
 // The payload is the API's: what shows, what is highlighted (short, over) and which controls are on (`access`) all come from it; nothing is re-scoped or re-derived here. An edit shows at once and the API
@@ -542,7 +540,7 @@ export function RostersView({ payload, query, today, templates = [], panels = no
       {repeated && <ConflictsPanel conflicts={repeated.conflicts} counts={repeated.counts} shiftOf={shiftOf} nameOf={nameOf} onOpen={(id) => setDialog({ kind: "edit", id, n: (dialog?.n ?? 0) + 1 })} onDismiss={() => setRepeated(null)} />}
       <RequestsPanel requests={panels.requests.filter((r) => weekById(r.weekId))} shiftOf={shiftOf} nameOf={nameOf} canDecide={level === "office"} busy={working} onDecide={(r, d, note) => decide(r, d, note)} />
       <OpenShiftsPanel
-        gapsLink={panels.gapsLink} level={level} me={me} today={today} open={openRows} swaps={swapRows} exchanges={panels.exchanges} nameOf={nameOf} busy={working}
+        level={level} me={me} today={today} open={openRows} swaps={swapRows} exchanges={panels.exchanges} nameOf={nameOf} busy={working}
         onClaim={claim} onRecommend={recommend} onDecide={(x, d) => exchangeDecide(x, d)}
       />
       {anyEditable && (
