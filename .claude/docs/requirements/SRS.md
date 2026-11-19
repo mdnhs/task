@@ -894,26 +894,26 @@ Product owner decision (28 Oct 2026): WhatsApp, Orders & Stock, client files and
 
 ### A.6 SRS v1.3: Phase 1B status (9 Nov 2026)
 
-Module 1A is built as a front-end mock (status in A.7). Modules 1B and 1C are not built, apart from the small overlaps listed in [`srs-diff-2026-11-09.md`](srs-diff-2026-11-09.md). `billing/entitlements.json` now has `M1A` (rostering, in Business and Enterprise) and maps `payroll` to `M1C` (renamed from `M8`); it still needs an entitlement for M1B when that module is built. Ismail and Coppers are examples in the BA's text: seed data only, never code.
+Module 1A is backed by the API since B8 (status in A.7). Modules 1B and 1C are not built, apart from the small overlaps listed in [`srs-diff-2026-11-09.md`](srs-diff-2026-11-09.md). `billing/entitlements.json` now has `M1A` (rostering, in Business and Enterprise) and maps `payroll` to `M1C` (renamed from `M8`); it still needs an entitlement for M1B when that module is built. Ismail and Coppers are examples in the BA's text: seed data only, never code.
 
 To raise with the BA (from the v1.3 comparison): §2.4 and Q11 still describe the old Module 8; FR-M8-06 (reconcile sent and returned payroll) has no FR-PY equivalent although the Phase 1B gate needs a reconciled pay run; leave sits in both FR-RS-41 and FR-M4-05.
 
-### A.7 Module 1A Rostering: build status (10 Nov 2026)
+### A.7 Module 1A Rostering: build status (19 Nov 2026)
 
-Built as a front-end mock (details: [`../features/rosters.md`](../features/rosters.md)). Decisions D1..D13 are in `../superpowers/specs/2026-11-09-module-1a-rostering-design.md`; the owner asked for a plan without questions, so they are open to the BA.
+Module 1A is **backed by the API** (B8, 19 Nov 2026) and shown without `ENABLE_MOCK_MODULES`, except the deferred list below. Contract: [`../features/rosters.md`](../features/rosters.md); build rulings, deferred items and open follow-ups: [`../superpowers/plans/2026-11-18-backend-b8-followups.md`](../superpowers/plans/2026-11-18-backend-b8-followups.md). Decisions D1..D13 are in `../superpowers/specs/2026-11-09-module-1a-rostering-design.md`; the owner asked for a plan without questions, so they are open to the BA.
 
 | FR-RS group | Status |
 | --- | --- |
-| Locations and access (FR-RS-01..04, 30..32, 34) | Built: `/rosters/locations`, supervisor grants, Roster Manager `except` limits, location-scoped payloads |
-| Weekly view and staffing (FR-RS-10..12, 33; CR-07, 08) | Built: day board, person grid, count against target |
-| Rules (FR-RS-20..21, 44) | Built: eight configurable rules, 17-week 48h reference, override with reason |
-| Repeat and templates (FR-RS-22, 26..29) | Built, except the rotating pattern |
-| Publish, lock, change requests, history (FR-RS-23, 24, 35..37) | Built |
-| Open shifts and swaps (FR-RS-38, 42, 43) | Built |
-| Staff self-service (FR-RS-40, 41), `.ics` | Built |
-| Shift reports and cover (FR-RS-25) | Built: published roster shifts overlay the shift state; open shifts show as derived gaps |
+| Locations and access (FR-RS-01..04, 30..32, 34) | Built on the API: locations, supervisor grants, Roster Manager `except` limits, scope cut in SQL, hidden = same 404 |
+| Weekly view and staffing (FR-RS-10..12, 33; CR-07, 08) | Built on the API: day board, person grid, count against target (server `dayColumns`), coverage read model, My roster |
+| Rules (FR-RS-20..21, 44) | Built on the API: eight configurable rules over every site (masked for callers who cannot see a site), 17-week 48 h reference, override with reason and rule ids |
+| Repeat and templates (FR-RS-26..29) | Built on the API (manual repeat, templates, auto-repeat worker job); FR-RS-22 rotating pattern deferred |
+| Publish, lock, change requests, history (FR-RS-23, 24, 35..37) | Built on the API |
+| Open shifts and swaps (FR-RS-38, 42, 43) | Built on the API (claims, swaps, delegated approval) |
+| Staff self-service (FR-RS-40, 41), `.ics` | Built on the API (confirm, availability, leave, authenticated `.ics` download) |
+| Shift reports and cover (FR-RS-25) | **Deferred** (R8-14): published roster shifts do not feed shift reports or the Staff & Rosters cover model; the `roster.week_published` event is emitted for B9 and B11 |
 | Lock does not block daily attendance work (FR-RS-39) | Nothing in Module 1A blocks it; the work itself (no-shows, lateness, clock corrections) belongs to Module 1B, not built (see A.8, decision 4) |
-| FR-RS-13 (PDF/Excel), FR-RS-14 (labour cost), FR-RS-22 rotating pattern, FR-RS-45 | Deferred |
+| FR-RS-13 (PDF/Excel), FR-RS-14 (labour cost), FR-RS-22 rotating pattern, FR-RS-45, a calendar subscription URL | Deferred |
 
 Entitlements: `M1A` in Business and Enterprise; `M8` renamed `M1C`. Modules 1B and 1C are still not built.
 

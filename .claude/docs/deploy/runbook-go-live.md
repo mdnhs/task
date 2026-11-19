@@ -20,7 +20,7 @@ Staging is the same compose file with a **separate database, Redis and bucket**,
 - [ ] `migrate` run with the release image as `app_owner`; last line `migrate: ok`.
 - [ ] The deploy gate (container health is only `/healthz`): api `/readyz` ok; `readyz/details` (internal) shows migrations applied equal to expected; worker heartbeat healthy; web `/sign-in` ok.
 - [ ] First platform operator created (`npm -w api run platform:owner`) and 2FA enrolled.
-- [ ] Console: mail (Resend), storage (R2) and billing (Stripe) settings entered by the platform admin, each with its **test** button. Stripe webhook endpoint added at Stripe pointing at `https://<web-host>/webhooks/billing/stripe`; the signing secret entered in the console.
+- [ ] Console: mail (Resend), storage (R2) and billing (Stripe) settings entered by the platform admin, each with its **test** button. Resend's sending domain is verified by the owner by hand in the Resend dashboard (there is no in-app domain feature; a staging test email must arrive before go-live). Stripe webhook endpoint added at Stripe pointing at `https://<web-host>/webhooks/billing/stripe`; the signing secret entered in the console.
 
 ## B. Staging gate
 
@@ -30,6 +30,7 @@ Staging is the same compose file with a **separate database, Redis and bucket**,
 - [ ] [security-review.md](security-review.md) ticked, open items with owners; the external penetration test (NFR-13) done on the staging environment with the scope pack in section 10 of that page, findings fixed or accepted in writing.
 - [ ] **Restore drill done once, time recorded** (`deploy/scripts/restore-drill.sh`, [backup-restore.md](backup-restore.md)): under 4 h, counts and every audit chain pass, one R2 object restored from a version, one stored secret decrypted with the backed-up key.
 - [ ] **Rollback rehearsed** on staging: deploy a previous tag, confirm readiness, deploy forward again ([rollback.md](rollback.md)).
+- [ ] **Roster checks (B8, Module 1A), on staging with the demo seed:** (1) sign in as the owner, open Location Rosters, publish a draft week (the rostered person gets one notice); (2) as a location supervisor, the week of another site is "Access restricted" and the supervisor's published week shows only Request change; (3) My roster as a member: confirm a shift, download the `.ics` and open it in a real calendar (a clock-change night shows its real length); (4) the worker is running: the `roster.auto-repeat` and `roster.qualification-expiry` jobs show a heartbeat in the worker log within 15 min and 1 h (the cron cadence and a real Redis cache stamp are NOT proven by the automated tests); (5) `select count(*) from roster_auto_repeat_runs` stays flat on a second run (exactly-once); (6) k6 roster scenario smoke (`load/README.md`, `roster_week` p95 under 400 ms) and, if the client's size is near 250 users and 40 sites, the 250-user profile; (7) **restore drill includes the roster tables** (a roster week, its history and one exchange read back after the restore; the audit chain verifies); (8) the platform bell shows the pending data request and Mark seen works.
 - [ ] Browser walks that no automated test covers, on staging: audio player, drag reorder, a DST day, Safari and Firefox evidence, a real phone camera upload.
 
 ## C. Before live Stripe keys
