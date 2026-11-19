@@ -125,6 +125,25 @@ describe("roster server actions", () => {
     expect((await actions.archiveLocation(LID)).ok).toBe(true)
   })
 
+  test("B8 Task 22: archiving a shift type is the API's 204 (DELETE never deletes): ok with nothing to map", async () => {
+    answer = () => new Response(null, { status: 204 })
+    expect(await actions.archiveShiftType(SHIFT_ID)).toEqual({ ok: true, value: null })
+    expect(seen.at(-1)).toMatchObject({ method: "DELETE", path: `/v1/shift-types/${SHIFT_ID}` })
+  })
+
+  test("B8 Task 22: readQualifications and readLocation are reads after the MFA check; the expiry state is the API's, a refusal is mapped", async () => {
+    answer = () => json({ userId: UID, items: [{ type: "sia licence", expiresOn: "2026-11-20", expired: false, dueSoon: true }, { type: "first aid", expiresOn: "2026-01-01", expired: true, dueSoon: false }] })
+    expect(await actions.readQualifications(UID)).toEqual({ ok: true, value: [{ type: "sia licence", expiresOn: "2026-11-20", expired: false, dueSoon: true }, { type: "first aid", expiresOn: "2026-01-01", expired: true, dueSoon: false }] })
+    expect(seen.at(-1)).toMatchObject({ method: "GET", path: `/v1/members/${UID}/qualifications` })
+    answer = () => json(locationDto)
+    const l = await actions.readLocation(LID)
+    expect(l.ok && l.value.version).toBe(1)
+    answer = () => problem(404, "member_not_found")
+    expect(await actions.readQualifications(UID)).toMatchObject({ ok: false, error: { state: "not_found" } })
+    mfa.ok = false
+    await expect(actions.readQualifications(UID)).rejects.toThrow("NEXT_REDIRECT")
+  })
+
   test("every write checks the second factor first: a redirect is thrown, not mapped, and nothing reaches the API", async () => {
     mfa.ok = false
     await expect(actions.confirmShift(SHIFT_ID)).rejects.toThrow("NEXT_REDIRECT")

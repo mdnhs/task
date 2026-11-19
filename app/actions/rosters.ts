@@ -11,7 +11,7 @@ import type { Req } from "@/lib/api/client"
 import { apiServer } from "@/lib/api/server"
 import { requireMfaOk } from "@/lib/session"
 import {
-  loadRosterData, loadWeekHistory, runRosterWrite, toApplied, toChangeRequest, toExchange, toLeave, toLocation, toRepeat, toShift, toShiftType, toViolations, toWeek, type RosterWriteResult,
+  loadQualifications, loadRosterData, loadWeekHistory, runRosterWrite, toQualifications, toApplied, toChangeRequest, toExchange, toLeave, toLocation, toRepeat, toShift, toShiftType, toViolations, toWeek, type RosterWriteResult,
 } from "@/features/rosters"
 
 type Paths = keyof import("@/lib/api/schema").paths
@@ -45,8 +45,12 @@ export async function createShiftType(locationId: string, body: PostBody<"/v1/lo
 export async function updateShiftType(id: string, body: PatchBody<"/v1/shift-types/{id}">) {
   return write(async (api) => toShiftType(await api.patch("/v1/shift-types/{id}", { path: { id }, body })))
 }
+/** DELETE archives (never deletes) and answers 204: rostered shifts keep reading the type. */
 export async function archiveShiftType(id: string) {
-  return write(async (api) => toShiftType(await api.delete("/v1/shift-types/{id}", { path: { id } })))
+  return write(async (api) => {
+    await api.delete("/v1/shift-types/{id}", { path: { id } })
+    return null
+  })
 }
 export async function setShiftTypeTargets(id: string, targets: { weekday: number; count: number }[]) {
   return write(async (api) => toShiftType(await api.put("/v1/shift-types/{id}/targets", { path: { id }, body: { targets } })))
@@ -55,7 +59,17 @@ export async function setOfficeLimit(userId: string, except: string[]) {
   return write(async (api) => (await api.put("/v1/roster/office-limits/{userId}", { path: { userId }, body: { except } })).except)
 }
 export async function setQualifications(userId: string, qualifications: { type: string; expiresOn?: string | null }[]) {
-  return write(async (api) => (await api.put("/v1/members/{userId}/qualifications", { path: { userId }, body: { qualifications } })).items)
+  return write(async (api) => toQualifications(await api.put("/v1/members/{userId}/qualifications", { path: { userId }, body: { qualifications } })))
+}
+/** One person's licences with the API's expiry state (a read after the MFA check, for the licence editor's person switch). */
+export async function readQualifications(userId: string) {
+  await requireMfaOk()
+  return runRosterWrite(async () => loadQualifications(await apiServer(), userId))
+}
+/** The location as the API has it now: the "Changed by someone else" banner offers Keep mine (continue on this version) or Reload theirs. A read. */
+export async function readLocation(id: string) {
+  await requireMfaOk()
+  return runRosterWrite(async () => toLocation(await (await apiServer()).get("/v1/locations/{id}", { path: { id } })))
 }
 export async function setHomeLocation(userId: string, locationId: string | null) {
   return write(async (api) => (await api.put("/v1/members/{userId}/home-location", { path: { userId }, body: { locationId } })).homeLocationId)

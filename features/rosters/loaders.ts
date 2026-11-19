@@ -3,10 +3,11 @@
 // lives on the API; the web only shows the `violations` it sends back).
 import type { ApiClient } from "@/lib/api/client"
 import {
-  toAvailability, toChangeRequest, toCoverage, toExchange, toHistory, toLeave, toLocation, toMine, toPage, toRules, toShift, toShiftType, toTemplate, toWeeksPayload,
+  toAvailability, toChangeRequest, toCoverage, toExchange, toHistory, toLeave, toLocation, toMine, toPage, toPeople, toQualifications, toRules, toShift, toShiftType, toTemplate, toWeeksPayload,
 } from "./adapters"
 import type {
-  ApiChangeRequest, ApiExchange, ApiLeave, Coverage, ExchangeBoard, ExchangeQuery, ExchangeStatus, HistoryEntry, LeaveQueueData, LocationAdmin, MyRoster, Page, RosterLocation, RosterPayload, RulesView, WeekQuery, WeekTemplateSummary,
+  ApiChangeRequest, ApiExchange, ApiLeave, Coverage, ExchangeBoard, ExchangeQuery, ExchangeStatus, HistoryEntry, LeaveQueueData, LocationAdmin, MyRoster, Page, Qualification, RosterLocation, RosterPayload, RosterPeople, RulesView, WeekQuery,
+  WeekTemplateSummary,
 } from "./types"
 
 type Getter = Pick<ApiClient, "get">
@@ -31,6 +32,19 @@ export async function loadLocationAdmin(api: Getter, id: string): Promise<Locati
     api.get("/v1/locations/{id}/history", { path }),
   ])
   return { location: toLocation(location), shiftTypes: types.items.map(toShiftType), history: toPage<HistoryEntry>(history, toHistory) }
+}
+
+/**
+ * The people the caller may pick (supervisor grants, licences, names in the leave queue) and the caller's draft-week access (`level` "office" = may manage locations). One small read: the
+ * day view of the week payload, whose `members` the API already cut to the caller's sites (anyone homed elsewhere is not there; a person on a shown shift outside the caller's reach is "Member").
+ */
+export async function loadRosterPeople(api: Getter): Promise<RosterPeople> {
+  return toPeople(await api.get("/v1/roster/weeks", { query: { view: "day" } }))
+}
+
+/** One person's licences and skills, each with `expired` / `dueSoon` from the API's clock. 404 for a person out of the caller's reach. */
+export async function loadQualifications(api: Getter, userId: string): Promise<Qualification[]> {
+  return toQualifications(await api.get("/v1/members/{userId}/qualifications", { path: { userId } }))
 }
 
 /** The signed-in person's own roster: published shifts in the range, weekly not-available windows and own leave. `me` is the person's user id (for the leave filter and the availability rows). */

@@ -32,8 +32,6 @@ export type ReaderKind =
 
 /** Every file that may import `@/lib/data` (the JSON reader) or call getData(. Adding one means adding a line here, with the reason. */
 export const MOCK_DATA_READERS: Readonly<Record<string, { kind: ReaderKind; why: string }>> = {
-  "app/(app)/rosters/locations/gate.ts": { kind: "mock", why: "location admin gate on the roster seed" },
-  "app/(app)/rosters/mine/gate.ts": { kind: "mock", why: "my roster gate on the roster seed" },
   "app/actions/onboarding.ts": { kind: "catalogue", why: "country defaults of the onboarding form" },
   "features/account/api.ts": { kind: "display", why: "profile form placeholders (the profile itself is the API's)" },
   "features/assistant/api.ts": { kind: "mock", why: "AI assistant prompts (no assistant backend yet)" },
@@ -46,7 +44,6 @@ export const MOCK_DATA_READERS: Readonly<Record<string, { kind: ReaderKind; why:
   "features/payroll/api.ts": { kind: "mock", why: "Payroll Issues" },
   "features/platform/mock.ts": { kind: "mock", why: "console pages with no API route (plans, invoices, usage, notes)" },
   "features/recruitment/api.ts": { kind: "mock", why: "Recruitment" },
-  "features/rosters/api.ts": { kind: "mock", why: "Location Rosters and My roster" },
   "features/search/api.ts": { kind: "mock", why: "search index of the mock modules (empty unless the flag is on); popular terms and quick actions" },
   "features/settings/api.ts": { kind: "catalogue", why: "time zone, colour preset and notification option lists; delivery log seed (no API)" },
   "features/shell/api.ts": { kind: "catalogue", why: "navigation tree" },

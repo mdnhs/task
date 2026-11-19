@@ -255,6 +255,18 @@ const CODE_COPY: Record<string, string> = {
   exchange_open: "A request for this shift is already open.",
   invalid_swap: "Pick someone else to swap with.",
   member_not_found: "That person isn't available here.",
+  // Locations admin, licences, leave and availability (B8 Task 22).
+  leave_overlap: "You already have leave on those days.",
+  invalid_leave: "Check the dates and type of that leave.",
+  leave_not_open: "That leave can't be changed now.",
+  invalid_availability: "Check the times of that window.",
+  invalid_coordinates: "Add both coordinates, or neither.",
+  invalid_zone_radius: "The zone is 0 to 5000 m.",
+  invalid_time_zone: "That time zone isn't known. Try Europe/Dublin.",
+  invalid_location: "Check the location's details.",
+  invalid_supervisor: "Only active people can supervise.",
+  invalid_qualification: "Each licence once, with a real date.",
+  invalid_targets: "Staff per day is 0 to 99.",
   // The platform console (B6 T6.8).
   already_suspended: "This tenant is already suspended.",
   not_suspended: "This tenant is not suspended.",

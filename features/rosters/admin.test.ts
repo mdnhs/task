@@ -1,66 +1,75 @@
 import { describe, expect, it } from "vitest"
-import type { LocationGrant } from "@/lib/roster-access"
-import type { HistoryEntry, RosterShift } from "@/lib/rosters"
-import type { WorkforceMember } from "@/lib/workforce"
-import { assignableMembers, canDeleteTemplate, resolveMember, setSupervisors, supervisorHistory, validateLocation, type LocationForm } from "./admin"
+import { toLocation, toShiftType } from "./adapters"
+import { locationDto, shiftTypeDto } from "./fixtures"
+import {
+  createBody, draftOf, formOf, patchBody, qualBody, qualState, saveIds, supervisorChoice, targetsBody, typeAction, typePatchBody, validateLocation, validateQuals, validateType,
+} from "./admin"
 
-const shift = (id: string, templateId: string): RosterShift => ({ id, weekId: "w", locationId: "L", date: "2026-10-20", personId: null, templateId, role: "r", start: "09:00", end: "17:00", unpaidBreakMin: 0, confirmedAt: null })
-const member = (id: string, leftOn: string | null = null): WorkforceMember => ({ id, name: id, role: "r", dept: "d", homeLocationId: null, qualifications: [], leftOn })
-const form = (patch: Partial<LocationForm> = {}): LocationForm => ({ name: "Site", address: "1 Road", lat: "53.3", lng: "-6.2", radius: "150", openingHours: "Mon-Sun", contact: "01", ...patch })
+// B8 Task 22: the locations admin helpers on the API's shapes.
+const loc = toLocation(locationDto)
+const type = toShiftType(shiftTypeDto)
 
-describe("canDeleteTemplate", () => {
-  it("refuses a template any shift uses, allows an unused one", () => {
-    const shifts = [shift("a", "t1"), shift("b", "t2")]
-    expect(canDeleteTemplate("t1", shifts)).toBe(false)
-    expect(canDeleteTemplate("t3", shifts)).toBe(true)
+describe("location form", () => {
+  it("opens on the API's values and sends only what changed, with the version it was opened on", () => {
+    const f = formOf(loc)
+    expect(f).toMatchObject({ name: "Harbour Street", lat: "53.3498", radius: "150", timeZone: "", delegated: false })
+    expect(f.hours.mon).toBe("08:00-22:00")
+    expect(patchBody(f, loc, loc.version)).toBeNull() // nothing changed: no PATCH at all
+    expect(patchBody({ ...f, contact: "01 222", delegated: true }, loc, 4)).toEqual({ version: 4, contact: "01 222", swapApprovalDelegated: true })
+    expect(patchBody({ ...f, hours: { ...f.hours, tue: "09:00-17:00" } }, loc, 1)).toEqual({ version: 1, openingHours: { mon: "08:00-22:00", tue: "09:00-17:00" } })
+  })
+  it("keeps opening-hour keys the form does not show, and sends null for a cleared point or zone", () => {
+    const odd = { ...loc, openingHours: { all: "Mon-Sun 24h" } }
+    expect(patchBody({ ...formOf(odd), lat: "", lng: "", timeZone: "" }, odd, 1)).toEqual({ version: 1, lat: null, lng: null })
+    expect(createBody({ ...formOf(), name: " New ", timeZone: "Europe/Dublin" })).toMatchObject({ name: "New", timeZone: "Europe/Dublin", zoneRadiusM: 150, lat: null })
+  })
+  it("checks what the API would refuse: a name, both coordinates or neither, a radius of 0..5000, a zone name", () => {
+    const f = formOf()
+    expect(validateLocation(f)).toEqual({ name: "Enter a name" })
+    expect(validateLocation({ ...f, name: "A", lat: "53" })).toEqual({ lng: "Add both or neither" })
+    expect(validateLocation({ ...f, name: "A", lat: "91", lng: "0", radius: "6000", timeZone: "dublin" })).toEqual({ lat: "-90 to 90", radius: "0 to 5000 m", timeZone: "e.g. Europe/Dublin" })
   })
 })
 
-describe("setSupervisors", () => {
-  const grants: LocationGrant[] = [{ locationId: "L", personId: "a" }, { locationId: "L", personId: "b" }, { locationId: "M", personId: "a" }]
-  it("reports who was added and removed and leaves other locations alone", () => {
-    const r = setSupervisors(grants, "L", ["b", "c"])
-    expect(r.added).toEqual(["c"])
-    expect(r.removed).toEqual(["a"])
-    expect(r.grants.filter((g) => g.locationId === "L").map((g) => g.personId).sort()).toEqual(["b", "c"])
-    expect(r.grants).toContainEqual({ locationId: "M", personId: "a" })
-  })
-  it("reports nothing for an unchanged list", () => {
-    const r = setSupervisors(grants, "L", ["b", "a"])
-    expect(r.added).toEqual([])
-    expect(r.removed).toEqual([])
-    expect(r.grants).toHaveLength(3)
+describe("supervisor grants", () => {
+  it("lists only the people the API gave this caller; a supervisor out of reach is counted, never named, and kept on save", () => {
+    const members = [{ id: "u1", name: "Ann", active: true, homeLocationId: null }, { id: "u2", name: "Ben", active: false, homeLocationId: null }]
+    const c = supervisorChoice(members, ["u1", "hidden-1"])
+    expect(c.people).toEqual([{ id: "u1", name: "Ann" }]) // an inactive person is not offered
+    expect(c.hidden).toEqual(["hidden-1"])
+    expect(JSON.stringify(c.people)).not.toContain("hidden-1")
+    expect(saveIds(["u1"], c.hidden)).toEqual(["u1", "hidden-1"])
   })
 })
 
-describe("supervisorHistory (FR-RS-34)", () => {
-  it("is a location-level entry with the before and after lists, or null when nothing changed", () => {
-    const e = supervisorHistory("L", ["a"], ["a", "b"], "p-x", "2026-10-21T09:00:00", [] as HistoryEntry[])
-    expect(e).toMatchObject({ weekId: null, shiftId: null, locationId: "L", by: "p-x", action: "supervisors.changed", before: { supervisors: ["a"] }, after: { supervisors: ["a", "b"] } })
-    expect(supervisorHistory("L", ["a", "b"], ["b", "a"], "p-x", "t", [])).toBeNull()
+describe("shift types", () => {
+  it("a saved type shows Archive, never Delete (the API archives); an archived one offers nothing; only an unsaved card can be removed", () => {
+    expect(typeAction(type)).toBe("archive")
+    expect(typeAction({ ...type, archived: true })).toBe("none")
+    expect(typeAction(undefined)).toBe("remove")
+  })
+  it("patches with the type's version and only the changed fields; targets are a separate whole set", () => {
+    const d = draftOf(type)
+    expect(d.targets[1]).toBe("2")
+    expect(typePatchBody(d, type)).toBeNull()
+    expect(targetsBody(d, type)).toBeNull()
+    expect(typePatchBody({ ...d, end: "07:00" }, type)).toEqual({ version: 1, end: "07:00" })
+    expect(targetsBody({ ...d, targets: { ...d.targets, 1: "", 5: "3" } }, type)).toEqual([{ weekday: 5, count: 3 }])
+    expect(validateType({ ...d, name: "" })).toBe("Name and role")
+    expect(validateType({ ...d, start: "08:00", end: "08:00" })).toBe("Start and end differ")
   })
 })
 
-describe("validateLocation", () => {
-  it("accepts a valid form", () => expect(validateLocation(form())).toEqual({}))
-  it("radius must be above 0", () => {
-    expect(validateLocation(form({ radius: "0" })).radius).toBeTruthy()
-    expect(validateLocation(form({ radius: "-5" })).radius).toBeTruthy()
-    expect(validateLocation(form({ radius: "abc" })).radius).toBeTruthy()
-    expect(validateLocation(form({ radius: "1" })).radius).toBeUndefined()
+describe("licences", () => {
+  it("the expiry state is the API's flags only: a past date the API calls valid stays valid", () => {
+    expect(qualState({ type: "a", expiresOn: "2020-01-01", expired: false, dueSoon: false })).toBe("valid")
+    expect(qualState({ type: "a", expiresOn: "2099-01-01", expired: true, dueSoon: false })).toBe("expired")
+    expect(qualState({ type: "a", expiresOn: "2099-01-01", expired: false, dueSoon: true })).toBe("due")
+    expect(qualState({ type: "a", expiresOn: null, expired: false, dueSoon: false })).toBe("open")
   })
-  it("needs a name and a valid pin", () => {
-    expect(validateLocation(form({ name: " " })).name).toBeTruthy()
-    expect(validateLocation(form({ lat: "91" })).lat).toBeTruthy()
-    expect(validateLocation(form({ lng: "181" })).lng).toBeTruthy()
-  })
-})
-
-describe("members who have left", () => {
-  const members = [member("a"), member("gone", "2026-10-31")]
-  it("still resolve by id so past shifts keep the name", () => expect(resolveMember(members, "gone")?.name).toBe("gone"))
-  it("are not offered for new shifts on or after the leaving date", () => {
-    expect(assignableMembers(members, "2026-11-02").map((m) => m.id)).toEqual(["a"])
-    expect(assignableMembers(members, "2026-10-20").map((m) => m.id)).toEqual(["a", "gone"])
+  it("rows are named, unique by key (case-insensitive) and sent with null for no expiry", () => {
+    expect(validateQuals([{ type: "SIA", expiresOn: "" }, { type: "sia", expiresOn: "" }])).toBe("Each licence once")
+    expect(validateQuals([{ type: " ", expiresOn: "" }])).toBe("Name every licence")
+    expect(qualBody([{ type: " First aid ", expiresOn: "" }])).toEqual([{ type: "First aid", expiresOn: null }])
   })
 })

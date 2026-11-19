@@ -1,10 +1,9 @@
 import { LocationsSkeleton } from "@/features/rosters"
 import { PageSkeleton } from "@/features/shell"
-import { locationAdminGate } from "./gate"
-import { getSkeletonSession, getSkeletonUser } from "@/lib/skeleton-session"
+import { mockEnabled } from "@/lib/mock-registry"
 
-export default async function Loading() {
-  const g = await locationAdminGate(await getSkeletonSession(), await getSkeletonUser())
-  if (!g) return <PageSkeleton />
-  return <LocationsSkeleton data={g.data} scopeKey={g.scopeKey} />
+// Static (K1, I9): the typical office list, no session and no API.
+export default function Loading() {
+  if (!mockEnabled()) return <PageSkeleton /> // the page is the unavailable state while the mock gate is closed (Task 23 opens it)
+  return <LocationsSkeleton />
 }

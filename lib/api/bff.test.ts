@@ -363,6 +363,22 @@ describe("redirects and cookies coming back", () => {
   })
 })
 
+describe("file downloads (B8 Task 22, R8-16)", () => {
+  test("GET /v1/roster/mine.ics reaches the browser as an attachment: text/calendar, Content-Disposition, nosniff and private no-store pass through with the bytes unchanged", async () => {
+    const ics = "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nEND:VCALENDAR\r\n"
+    fetchMock.mockResolvedValueOnce(new Response(ics, { status: 200, headers: { "content-type": "text/calendar; charset=utf-8", "content-disposition": 'attachment; filename="roster.ics"', "x-content-type-options": "nosniff", "cache-control": "private, no-store" } }))
+    const res = await forwardToApi(req("/v1/roster/mine.ics?from=2026-11-16&to=2026-12-13", { headers: { cookie: "better-auth.session_token=s1; od-tenant=northgate" } }), V1)
+    expect(lastCall().url).toBe(`${API}/v1/roster/mine.ics?from=2026-11-16&to=2026-12-13`)
+    expect(lastCall().headers.get("x-tenant")).toBe("northgate")
+    expect(res.status).toBe(200)
+    expect(res.headers.get("content-type")).toBe("text/calendar; charset=utf-8")
+    expect(res.headers.get("content-disposition")).toBe('attachment; filename="roster.ics"')
+    expect(res.headers.get("x-content-type-options")).toBe("nosniff")
+    expect(res.headers.get("cache-control")).toBe("private, no-store")
+    expect(await res.text()).toBe(ics)
+  })
+})
+
 describe("errors (no internals leak)", () => {
   const UP = "ECONNREFUSED 10.0.0.5:3001 pg password=hunter2"
 

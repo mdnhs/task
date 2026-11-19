@@ -6,7 +6,7 @@ import { reader, type Rec } from "@/lib/api/read"
 import type { Availability, RuleViolation, ViolationRule } from "@/lib/roster-rules"
 import type { Weekday } from "@/lib/shifts"
 import type {
-  ApiChangeRequest, ApiExchange, ApiLeave, Coverage, ExchangeStatus, HistoryEntry, MineShift, MyRoster, Page, RepeatConflict, RepeatCounts, RosterLocation, RosterMember, RosterPayload,
+  ApiChangeRequest, ApiExchange, ApiLeave, Coverage, ExchangeStatus, HistoryEntry, MineShift, MyRoster, Page, Qualification, RepeatConflict, RepeatCounts, RosterLocation, RosterMember, RosterPayload, RosterPeople,
   RulesView, ShiftType, ViewKind, WeekAccess, WeekDay, WeekRoster, WeekShift, WeekTemplateSummary,
 } from "./types"
 
@@ -88,6 +88,21 @@ export function toWeeksPayload(dto: unknown, locations: unknown): RosterPayload 
     range: { from: r.str(range, "from"), to: r.str(range, "to"), view: r.oneOf(range, "view", VIEWS) }, weeks: list(o.weeks, toWeek), shifts: list(o.shifts, toShift),
     shiftTypes: list(o.shiftTypes, toShiftType), members: list(o.members, toMember), membersTruncated: r.bool(o, "membersTruncated"), locations: list(locations, toLocation), access: toAccess(o.access),
   }
+}
+
+/** The pick list of GET /v1/roster/weeks (members, the cap flag and the draft-week access); the weeks and shifts of that read are not needed here. */
+export function toPeople(dto: unknown): RosterPeople {
+  const o = r.rec(dto, "weeks")
+  return { members: list(o.members, toMember), truncated: r.bool(o, "membersTruncated"), access: toAccess(o.access) }
+}
+
+/** GET|PUT /v1/members/{userId}/qualifications: expiry state as the API computed it (never re-judged here). */
+export function toQualifications(dto: unknown): Qualification[] {
+  const o = r.rec(dto, "qualifications")
+  return list(o.items, (q) => {
+    const x = r.rec(q, "qualification")
+    return { type: r.str(x, "type"), expiresOn: r.strOrNull(x, "expiresOn"), expired: r.bool(x, "expired"), dueSoon: r.bool(x, "dueSoon") }
+  })
 }
 
 export function toViolation(dto: unknown): RuleViolation {

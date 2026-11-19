@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest"
 import { rearmClientStoresOnce, registerClientStoreReset } from "@/lib/client-stores"
-import { apiBrowser, makeBrowserClient, setPageTenant } from "@/lib/api/browser"
+import { apiBrowser, browserGet, makeBrowserClient, setPageTenant } from "@/lib/api/browser"
 
 let fetchMock: ReturnType<typeof vi.fn>
 beforeEach(() => {
@@ -122,5 +122,19 @@ describe("B7 T12: a session killed on another device clears the stores of this o
       await c.get("/v1/a").catch(() => undefined)
     }
     expect(reset).not.toHaveBeenCalled()
+  })
+})
+
+describe("browserGet (a file through the BFF, B8 Task 22)", () => {
+  test("a relative /v1 GET with the page tenant, same-origin cookies and no-store; the raw Response comes back unread; anything but /v1 is refused before a request", async () => {
+    setPageTenant("acme")
+    fetchMock.mockResolvedValueOnce(new Response("BEGIN:VCALENDAR", { status: 200, headers: { "content-type": "text/calendar", "content-disposition": "attachment" } }))
+    const res = await browserGet("/v1/roster/mine.ics?from=2026-11-16")
+    expect(sent().url).toBe("/v1/roster/mine.ics?from=2026-11-16")
+    expect(sent().headers.get("x-od-tenant")).toBe("acme")
+    expect(sent().init).toMatchObject({ method: "GET", credentials: "same-origin", cache: "no-store" })
+    expect(res.headers.get("content-disposition")).toBe("attachment")
+    expect(() => browserGet("https://api.example.com/v1/roster/mine.ics")).toThrow()
+    expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 })

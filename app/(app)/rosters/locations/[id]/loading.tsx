@@ -1,11 +1,9 @@
 import { LocationFormSkeleton } from "@/features/rosters"
 import { PageSkeleton } from "@/features/shell"
-import { locationAdminGate } from "../gate"
-import { getSkeletonSession, getSkeletonUser } from "@/lib/skeleton-session"
+import { mockEnabled } from "@/lib/mock-registry"
 
-// loading.tsx gets no params, so the skeleton is the edit form of the first permitted location (the common case, like /rosters).
-export default async function Loading() {
-  const g = await locationAdminGate(await getSkeletonSession(), await getSkeletonUser())
-  if (!g) return <PageSkeleton />
-  return <LocationFormSkeleton data={g.data} id={g.data.locations[0]?.id ?? "new"} scopeKey={g.scopeKey} me={g.me} today={g.today} />
+// Static (K1, I9): loading.tsx gets no params, so it draws the TYPICAL location form (synthetic, two shift types), never the first location's data.
+export default function Loading() {
+  if (!mockEnabled()) return <PageSkeleton /> // the page is the unavailable state while the mock gate is closed (Task 23 opens it)
+  return <LocationFormSkeleton />
 }

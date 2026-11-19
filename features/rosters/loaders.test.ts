@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest"
-import { loadCoverage, loadExchange, loadExchanges, loadLeaveQueue, loadWeekHistory, loadLocationAdmin, loadMyRoster, loadRosterData, loadRules } from "./loaders"
+import { loadCoverage, loadExchange, loadExchanges, loadLeaveQueue, loadWeekHistory, loadLocationAdmin, loadMyRoster, loadQualifications, loadRosterData, loadRosterPeople, loadRules } from "./loaders"
 import { openAccess, exchangeDto, historyDto, leaveDto, locationDto, mineShiftDto, rulesDto, shiftDto, shiftTypeDto, weekDto, weeksDto, LID, UID } from "./fixtures"
 
 type Call = { path: string; o: { path?: Record<string, string>; query?: Record<string, string>; onResponse?: (r: Response) => void } | undefined }
@@ -19,6 +19,21 @@ function fake(answers: Record<string, unknown | ((o: Call["o"]) => unknown)>) {
 }
 
 describe("roster readers", () => {
+  test("B8 Task 22: the people list is the week payload's members as the API cut them (one day view), with the cap flag and the caller's level; licences keep the API's expiry state", async () => {
+    const { api, calls } = fake({
+      "/v1/roster/weeks": { ...weeksDto, membersTruncated: true, members: [{ userId: UID, name: "Member", active: true, homeLocationId: null }], access: { level: "office", canEdit: true, locked: false, lockReason: null } },
+      "/v1/members/{userId}/qualifications": { userId: UID, items: [{ type: "sia licence", expiresOn: "2026-11-30", expired: false, dueSoon: true, extra: 1 }] },
+    })
+    const p = await loadRosterPeople(api)
+    expect(calls[0]!.o!.query).toEqual({ view: "day" })
+    expect(p).toEqual({ members: [{ id: UID, name: "Member", active: true, homeLocationId: null }], truncated: true, access: { level: "office", canEdit: true, locked: false, lockReason: null } })
+    expect(await loadQualifications(api, UID)).toEqual([{ type: "sia licence", expiresOn: "2026-11-30", expired: false, dueSoon: true }]) // the stray field is dropped
+    expect(calls[1]!.o!.path).toEqual({ userId: UID })
+    const { api: bad } = fake({ "/v1/members/{userId}/qualifications": { userId: UID, items: [{ type: "x", expiresOn: null, expired: false }] } })
+    await expect(loadQualifications(bad, UID)).rejects.toThrow() // a missing dueSoon is never read as "not due"
+  })
+
+
   test("getRosterData sends only the query and maps the payload; the API's cut is never re-cut", async () => {
     const { api, calls } = fake({ "/v1/roster/weeks": weeksDto, "/v1/locations": { items: [locationDto] } })
     const d = await loadRosterData(api, { locationId: LID, from: "2026-11-02", view: "week" })

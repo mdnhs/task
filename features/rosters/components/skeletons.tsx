@@ -1,12 +1,12 @@
 import { SkMask } from "@/components/sk"
-import type { LeaveQueue, LocationAdminData, MyExchange, MyRosterData } from "../types"
-import { SKELETON_TODAY, skeletonPanels, skeletonPayload, skeletonTemplates } from "../skeleton-data"
+import { SKELETON_NOW, SKELETON_TODAY, skeletonLocationForm, skeletonLocations, skeletonMyRoster, skeletonPanels, skeletonPayload, skeletonTemplates } from "../skeleton-data"
 import { LocationFormPage } from "./location-form"
-import { MyRosterView } from "./my-roster"
 import { LocationsView } from "./locations-view"
+import { MyRosterView } from "./my-roster"
 import { RostersView } from "./rosters-view"
 
-// The exact skeleton is the real view masked (SkMask): same filters, boards and grid, so layout and wrapping match by construction. It draws the typical week (skeleton-data.ts): no API, no session (K1).
+// The exact skeleton is the real view masked (SkMask): same filters, boards, forms and grid, so layout and wrapping match by construction. Each draws a TYPICAL static case (skeleton-data.ts):
+// no API, no session and no route params (K1, I9), so a loading.tsx can render it before anything is known.
 export function RostersSkeleton() {
   return (
     <SkMask label="Loading rosters">
@@ -15,26 +15,28 @@ export function RostersSkeleton() {
   )
 }
 
-export function LocationsSkeleton({ data, scopeKey }: { data: LocationAdminData; scopeKey: string }) {
+export function LocationsSkeleton() {
+  const d = skeletonLocations()
   return (
     <SkMask label="Loading locations">
-      <LocationsView data={data} scopeKey={scopeKey} />
+      <LocationsView locations={d.locations} people={d.people} truncated={false} today={SKELETON_TODAY.slice(0, 10)} />
     </SkMask>
   )
 }
 
-export function LocationFormSkeleton({ data, id, scopeKey, me, today }: { data: LocationAdminData; id: string; scopeKey: string; me: string; today: string }) {
+export function LocationFormSkeleton() {
+  const d = skeletonLocationForm()
   return (
     <SkMask label="Loading location">
-      <LocationFormPage data={data} id={id} scopeKey={scopeKey} me={me} today={today} />
+      <LocationFormPage location={d.location} shiftTypes={d.shiftTypes} people={d.people} truncated={false} />
     </SkMask>
   )
 }
 
-export function MyRosterSkeleton({ data, queue, exchange, me, tz, today, scopeKey }: { data: MyRosterData; queue: LeaveQueue; exchange: MyExchange; me: string; tz: string; today: string; scopeKey: string }) {
+export function MyRosterSkeleton() {
   return (
     <SkMask label="Loading my roster">
-      <MyRosterView data={data} queue={queue} exchange={exchange} me={me} tz={tz} today={today} scopeKey={scopeKey} />
+      <MyRosterView mine={skeletonMyRoster()} queue={[]} names={{}} exchanges={[]} people={null} peopleTruncated={false} me="u0" today={SKELETON_TODAY} nowAt={SKELETON_NOW} />
     </SkMask>
   )
 }

@@ -1,8 +1,7 @@
 import { dayColumns, type StaffingTarget } from "@/lib/rosters"
 import type { RuleViolation } from "@/lib/roster-rules"
 import { isHm } from "@/lib/shifts"
-import type { WorkforceMember } from "@/lib/workforce"
-import type { RosterPayload, ShiftTemplate, ShiftType, WeekShift } from "./types"
+import type { RosterPayload, ShiftType, WeekShift } from "./types"
 
 // Editing shifts on the API (FR-RS-20/21/22; B8 Task 20). Pure: the request bodies, the override pair, and the optimistic copies of the payload. Who may edit is the API's `access`, never worked out here.
 
@@ -114,15 +113,6 @@ export function shiftsAddedLocal(p: RosterPayload, weekId: string, type: ShiftTy
 export const withoutLocal = (p: RosterPayload): RosterPayload => recount({ ...p, shifts: p.shifts.filter((s) => !s.id.startsWith("local-")) }, new Set(p.weeks.map((w) => w.id)))
 
 // ----------------------------------------------------------------------------------------------------------------- the form
-/** FR-RS-04: who may be suggested for a template on `date`: not someone who left on or before it, and each `requires` licence still valid that day. (The roster API checks it again: 422 ineligible.) Kept for the mock-era panels until Task 21. */
-export function eligible(members: WorkforceMember[], t: ShiftTemplate, date: string): WorkforceMember[] {
-  return members.filter(
-    (m) =>
-      (m.leftOn === null || date < m.leftOn) &&
-      t.requires.every((r) => m.qualifications.some((q) => q.type === r && (q.expires === null || q.expires >= date))),
-  )
-}
-
 export type ShiftForm = { templateId: string; start: string; end: string; unpaidBreakMin: string }
 export type ShiftErrors = Partial<Record<keyof ShiftForm, string>>
 

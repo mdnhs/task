@@ -5,33 +5,34 @@ import { useMemo, useState, type ReactNode } from "react"
 import { useSlideDir } from "@/components/data-pagination"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { formatDate, formatTime } from "@/lib/dates"
-import type { LeaveRequest } from "@/lib/roster-rules"
-import type { RosterShift } from "@/lib/rosters"
 import { leaveOn, monthGrid, monthLabel, shiftMonth, shiftsByDay } from "../calendar"
+import { leaveKindLabel } from "../self-service"
+import type { ApiLeave, MineShift } from "../types"
 import { Icon } from "@/components/icon"
 
 const DOW = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 /** Shift chips shown in a month cell before "+n more" (the day's full list is under the grid). */
 const CHIPS = 2
 
-const full = (s: RosterShift) => `${formatTime(`${s.date}T${s.start}`)}–${formatTime(`${s.date}T${s.end}`)}`
+/** A shift as the calendar needs it: wall times and the place's name, both the API's. */
+export type CalShift = Pick<MineShift, "id" | "date" | "start" | "end" | "locationName">
+
+const full = (s: CalShift) => `${formatTime(`${s.date}T${s.start}`)}–${formatTime(`${s.date}T${s.end}`)}`
 /** "10 PM–6 AM": the on-the-hour minutes are dropped so a chip fits a narrow cell. */
-const short = (s: RosterShift) => `${formatTime(`${s.date}T${s.start}`)}–${formatTime(`${s.date}T${s.end}`)}`.replaceAll(":00", "")
+const short = (s: CalShift) => `${formatTime(`${s.date}T${s.start}`)}–${formatTime(`${s.date}T${s.end}`)}`.replaceAll(":00", "")
 
 /** Month calendar of the signed-in person's published shifts and leave (FR-RS-40). Pick a day to see its shifts under the grid. */
 export function MyCalendar({
   shifts,
   leave,
   today,
-  places,
   renderShift,
 }: {
-  shifts: RosterShift[]
-  leave: LeaveRequest[]
+  shifts: CalShift[]
+  leave: ApiLeave[]
   today: string
-  places: Map<string, string>
-  /** The same shift row the Shifts tab uses (times, Seen, Swap, add to calendar). */
-  renderShift: (s: RosterShift, close: () => void) => ReactNode
+  /** The same shift row the Shifts tab uses (times, Confirm, Swap). */
+  renderShift: (id: string, close: () => void) => ReactNode
 }) {
   const day0 = today.slice(0, 10)
   const days = useMemo(() => shiftsByDay(shifts), [shifts])
@@ -92,9 +93,9 @@ export function MyCalendar({
                     {Number(d.slice(8, 10))}
                   </button>
                   {mine.slice(0, CHIPS).map((s) => (
-                    <button key={s.id} type="button" className="mc-chip" title={`${full(s)} · ${places.get(s.locationId) ?? ""}`}>
+                    <button key={s.id} type="button" className="mc-chip" title={`${full(s)} · ${s.locationName}`}>
                       <b className="num">{short(s)}{s.end <= s.start && <i> +1</i>}</b>
-                      <small>{places.get(s.locationId) ?? ""}</small>
+                      <small>{s.locationName}</small>
                     </button>
                   ))}
                   {mine.length > CHIPS && (
@@ -121,11 +122,11 @@ export function MyCalendar({
             <DialogTitle>{formatDate(picked)}</DialogTitle>
             <DialogDescription>
               {list.length === 0 ? "No shifts." : `${list.length} shift${list.length > 1 ? "s" : ""}.`}
-              {away ? ` ${away.kind}: ${away.status === "approved" ? "approved" : "waiting for a decision"}.` : ""}
+              {away ? ` ${leaveKindLabel(away.kind)} leave: ${away.status === "approved" ? "approved" : "waiting"}.` : ""}
             </DialogDescription>
           </DialogHeader>
-          {list.length > 0 && <ul className="mr-list">{list.map((s) => renderShift(s, () => setOpen(false)))}</ul>}
-          {away && <p className="mc-detail-leave">{away.kind} · {formatDate(away.from)} to {formatDate(away.to)}</p>}
+          {list.length > 0 && <ul className="mr-list">{list.map((s) => renderShift(s.id, () => setOpen(false)))}</ul>}
+          {away && <p className="mc-detail-leave">{leaveKindLabel(away.kind)} · {formatDate(away.from)} to {formatDate(away.to)}</p>}
         </DialogContent>
       </Dialog>
     </section>

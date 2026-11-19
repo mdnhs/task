@@ -75,3 +75,13 @@ export async function runRosterWrite<T>(request: () => Promise<T>): Promise<Rost
     return { ok: false, error: mapRosterError(e) }
   }
 }
+
+/** A side list (leave queue, exchanges, people) that the API refuses for this caller (403: a role without that view; 404: out of reach) is simply empty; any other failure is the page's error. */
+export async function orEmpty<T>(read: Promise<T>, empty: T): Promise<T> {
+  try {
+    return await read
+  } catch (e) {
+    if (e instanceof ApiError && (e.status === 403 || e.status === 404)) return empty
+    throw e
+  }
+}

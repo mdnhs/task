@@ -26,10 +26,17 @@ function defaultSessionExpired(): void {
 
 type Opts = { fetch?: typeof globalThis.fetch; onSessionExpired?: () => void }
 
-export function makeBrowserClient(o: Opts = {}): ApiClient {
+/** The page's tenant header (x-od-tenant), so the BFF can refuse a stale tab. */
+function pageHeaders(): Headers {
+  const h = new Headers()
+  if (pageTenant) h.set(PAGE_TENANT_HEADER, pageTenant)
+  return h
+}
+
+function guardedFetch(o: Opts): typeof globalThis.fetch {
   const handler = o.onSessionExpired ?? defaultSessionExpired
   let fired = false
-  const guarded: typeof globalThis.fetch = async (input, init) => {
+  return async (input, init) => {
     const res = await (o.fetch ?? globalThis.fetch)(input, init)
     // T6.4: a write refused with 402 billing_required lights the read-only banner (lib/api/blocked.ts); the caller still gets the ApiError and rolls back.
     if (res.status === 402) reportBillingBlocked()
@@ -51,17 +58,19 @@ export function makeBrowserClient(o: Opts = {}): ApiClient {
     }
     return res
   }
-  return makeApiClient({
-    baseUrl: "",
-    fetch: guarded,
-    cache: "no-store",
-    credentials: "same-origin",
-    headers: () => {
-      const h = new Headers()
-      if (pageTenant) h.set(PAGE_TENANT_HEADER, pageTenant)
-      return h
-    },
-  })
+}
+
+export function makeBrowserClient(o: Opts = {}): ApiClient {
+  return makeApiClient({ baseUrl: "", fetch: guardedFetch(o), cache: "no-store", credentials: "same-origin", headers: pageHeaders })
+}
+
+/**
+ * A same-origin GET through the BFF whose body is not JSON (a file download such as the roster's calendar): the same page-tenant header, cookies and dead-session handling as the JSON client.
+ * `path` must be a relative /v1 path. The caller reads the Response (and its Content-Disposition).
+ */
+export function browserGet(path: string, o: Opts = {}): Promise<Response> {
+  if (!path.startsWith("/v1/")) throw new Error("browserGet: a relative /v1 path only")
+  return guardedFetch(o)(path, { method: "GET", headers: pageHeaders(), cache: "no-store", credentials: "same-origin" })
 }
 
 export const apiBrowser: ApiClient = makeBrowserClient()

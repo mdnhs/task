@@ -1,150 +1,184 @@
 "use client"
 
-import { useEffect, useMemo, useState, useSyncExternalStore } from "react"
+import { useRef, useState } from "react"
+import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 
-import { FilterSeg } from "@/components/filter-bar"
+import { cancelExchange, confirmShift, declineExchange, proposeSwap } from "@/app/actions/rosters"
+import { ActionButton } from "@/components/action-button"
 import { CountUp } from "@/components/count-up"
-import { FadeSwap } from "@/components/fade-swap"
 import { useSlideDir } from "@/components/data-pagination"
+import { FadeSwap } from "@/components/fade-swap"
+import { FilterSeg } from "@/components/filter-bar"
+import { FormSection } from "@/components/form-section"
+import { Icon } from "@/components/icon"
 import { PageHead } from "@/components/page-head"
 import { StatusPill } from "@/components/status-pill"
 import { formatDate, formatTime } from "@/lib/dates"
-import { toIcs } from "@/lib/ics"
-import { shiftMinutes } from "@/lib/rosters"
 import { durationLabel } from "@/lib/shifts"
-import { FormSection } from "@/components/form-section"
-import { claimShift, requestSwap } from "../exchange"
-import { claimsStore, confirmStore, leaveStore, shiftsStore, swapsStore, weeksStore } from "../store"
-import { isSeen, isUpcoming, mergeMine, shiftSig } from "../self-service"
-import { exchangeScopeKey, mergeById } from "../scope"
-import type { LeaveQueue, MyExchange, MyRosterData, RosterShift } from "../types"
+import { downloadMyCalendar } from "../ics-download"
+import { endsAfter, myRequests, realMinutes } from "../self-service"
+import type { ApiExchange, ApiLeave, MineShift, MyRoster } from "../types"
 import { AvailabilityForm } from "./availability-form"
 import { LeaveForm } from "./leave-form"
 import { LeavePanel } from "./leave-panel"
 import { MyCalendar } from "./my-calendar"
 import { SwapDialog } from "./swap-dialog"
-import { Icon } from "@/components/icon"
 
-// My roster (FR-RS-23, 33, 40, 41): the signed-in person's published shifts across every location, a "Seen" confirm, an .ics export,
-// their not-available windows and leave requests. Leave decisions (D8) show only for roles that can decide. Edits live in stores until reload.
-export function MyRosterView({ data, queue, exchange, me, tz, today, scopeKey }: { data: MyRosterData; queue: LeaveQueue; exchange: MyExchange; me: string; tz: string; today: string; scopeKey: string }) {
-  const [confirmed, setConfirmed] = confirmStore.useStore({}, scopeKey)
-  // Claims and swaps are one list on this page and on Rosters (same key), so an approval there shows here. Whichever page seeded first, top up with ours.
-  const exchangeKey = exchangeScopeKey(scopeKey)
-  const [claims, setClaims] = claimsStore.useStore(exchange.claims, exchangeKey)
-  const [swaps, setSwaps] = swapsStore.useStore(exchange.swaps, exchangeKey)
-  useEffect(() => {
-    setClaims((p) => mergeById(p, exchange.claims))
-    setSwaps((p) => mergeById(p, exchange.swaps))
-  }, [exchange.claims, exchange.swaps, setClaims, setSwaps])
+export type MyRosterProps = {
+  /** GET /v1/roster/mine (published shifts across every site, own availability and leave, the caller's access). */
+  mine: MyRoster
+  /** Waiting leave the API lists for this caller (own requests and the people they may decide for). */
+  queue: ApiLeave[]
+  /** Names of the people the API lets this caller see; anyone else is "Member". */
+  names: Record<string, string>
+  /** Claims and swaps the caller is a party to (or may decide). */
+  exchanges: ApiExchange[]
+  /** Colleagues to offer a swap to: the API's people list for this caller, or null when the caller has none (staff without a site view). */
+  people: { id: string; name: string }[] | null
+  peopleTruncated: boolean
+  me: string
+  /** The organisation's wall clock (ISO, for the calendar and date pickers) and the same moment as an instant (for "still to come"). */
+  today: string
+  nowAt: string
+}
+
+type Tab = "calendar" | "shifts" | "off"
+const TABS: Tab[] = ["calendar", "shifts", "off"]
+const when = (x: Pick<MineShift, "date" | "start" | "end">) => `${formatTime(`${x.date}T${x.start}`)} to ${formatTime(`${x.date}T${x.end}`)}`
+
+// My roster on the API (B8 Task 22; FR-RS-23, 33, 40, 41): the signed-in person's PUBLISHED shifts across every location as one list (the API's /mine: nobody else, never a draft), each
+// confirmed through the API (the confirmation is the API's `confirmedAt`, so it survives a reload, and an office edit clears it: confirm again), the calendar file from the API's builder, own
+// claims and swaps (cancel, or decline a swap offered to you), availability and leave. Every refusal is the API's, shown short.
+export function MyRosterView({ mine, queue, names, exchanges, people, peopleTruncated, me, today, nowAt }: MyRosterProps) {
+  const router = useRouter()
+  const [confirmed, setConfirmed] = useState<Record<string, string>>({})
+  const [tab, setTab] = useState<Tab>("calendar")
+  const tabDir = useSlideDir(TABS.indexOf(tab))
   const [swapping, setSwapping] = useState<{ id: string; n: number } | null>(null)
-  const places = useMemo(() => new Map([...exchange.locations, ...data.locations].map((l) => [l.id, l.name])), [data.locations, exchange.locations])
-  // The Rosters page stores, once seeded in this session, carry office edits (moves, deletions, publish): merge them over the server list.
-  const liveShifts = useSyncExternalStore(shiftsStore.subscribe, shiftsStore.get, () => undefined)
-  const liveWeeks = useSyncExternalStore(weeksStore.subscribe, weeksStore.get, () => undefined)
-  const shifts = useMemo(
-    () => mergeMine(me, data.shifts, data.weeks, liveShifts && liveWeeks ? { shifts: liveShifts, weeks: liveWeeks } : undefined),
-    [me, data.shifts, data.weeks, liveShifts, liveWeeks],
-  )
-  const stamp = `${today.slice(0, 10)}T${today.slice(11, 16)}:00`
-  // Open shifts the server offered, minus any the Rosters page stores show as taken in this session.
-  const open = exchange.open.filter((s) => !liveShifts || (liveShifts.find((x) => x.id === s.id)?.personId ?? null) === null)
-  // The same list the leave panel and the leave form write to (same seed, same key), so a new request shows on the calendar at once.
-  const [allLeave] = leaveStore.useStore([...data.leave, ...queue.leave.filter((q) => !data.leave.some((l) => l.id === q.id))], scopeKey)
-  const myLeave = allLeave.filter((l) => l.personId === me)
-  const upcoming = shifts.filter((s) => isUpcoming(s, today, tz))
-  const earlier = shifts.filter((s) => !isUpcoming(s, today, tz))
-  const [tab, setTab] = useState<"calendar" | "shifts" | "off">("calendar")
-  const tabDir = useSlideDir(["calendar", "shifts", "off"].indexOf(tab))
+  const [busy, setBusy] = useState<string | null>(null)
+  const once = useRef(false)
+
+  const shifts = mine.shifts
+  const isConfirmed = (s: MineShift) => s.confirmedAt !== null || confirmed[s.id] !== undefined
+  const upcoming = shifts.filter((s) => endsAfter(s, nowAt))
+  const earlier = shifts.filter((s) => !endsAfter(s, nowAt))
   const next = upcoming[0]
-  const unseen = upcoming.filter((s) => !isSeen(s, confirmed))
-  function confirmAll() {
-    setConfirmed((p) => ({ ...p, ...Object.fromEntries(unseen.map((s) => [s.id, { at: today, sig: shiftSig(s) }])) }))
-    toast.success(`${unseen.length} shift${unseen.length > 1 ? "s" : ""} marked as seen`)
-  }
+  const toConfirm = upcoming.filter((s) => !isConfirmed(s))
+  const { mine: asked, offered } = myRequests(exchanges, me)
+  const swapOpen = (id: string) => asked.some((x) => x.kind === "swap" && x.shiftId === id)
+  const decide = queue.filter((l) => l.status === "requested" && l.personId !== me).length
 
-  function download(list: RosterShift[], name: string) {
-    const ics = toIcs(list.map((s) => ({ id: s.id, date: s.date, start: s.start, end: s.end, role: s.role, location: places.get(s.locationId) })), tz)
-    const url = URL.createObjectURL(new Blob([ics], { type: "text/calendar;charset=utf-8" }))
-    const a = document.createElement("a")
-    a.href = url
-    a.download = `${name}.ics`
-    a.rel = "noopener"
-    // The link has to be in the page for Firefox and Safari to follow it, and the URL must outlive the click or the download is cancelled.
-    document.body.appendChild(a)
-    a.click()
-    a.remove()
-    setTimeout(() => URL.revokeObjectURL(url), 10_000)
-    toast.success(list.length === 1 ? "Shift saved to your calendar file" : `${list.length} shifts saved to your calendar file`)
-  }
-
-  function claim(s: RosterShift) {
-    const t = exchange.templates.find((x) => x.id === s.templateId)
-    if (!exchange.member || !t) return
+  /** One request at a time (a double click sends one); false when refused. */
+  async function guarded<T>(key: string, call: () => Promise<{ ok: true; value: T } | { ok: false; error: { toast: { text: string } | null } }>): Promise<T | null> {
+    if (once.current) return null
+    once.current = true
+    setBusy(key)
     try {
-      const c = claimShift(s, exchange.member, t, stamp, { week: exchange.weeks.find((w) => w.id === s.weekId), tz })
-      setClaims((p) => [...p, c])
-      toast.success("Offer sent", { description: `${formatDate(s.date)} · ${s.start}–${s.end}` })
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Could not claim this shift")
+      const r = await call()
+      if (!r.ok) {
+        toast.error(r.error.toast?.text ?? "Not saved.")
+        return null
+      }
+      return r.value
+    } finally {
+      once.current = false
+      setBusy(null)
     }
   }
-
+  async function confirm(s: MineShift): Promise<boolean> {
+    const v = await guarded(s.id, () => confirmShift(s.id))
+    if (!v) return false
+    setConfirmed((c) => ({ ...c, [s.id]: v.confirmedAt ?? new Date(0).toISOString() }))
+    router.refresh()
+    return true
+  }
+  async function confirmAll(): Promise<boolean> {
+    let n = 0
+    for (const s of toConfirm) {
+      const v = await guarded(s.id, () => confirmShift(s.id))
+      if (!v) break
+      n++
+      setConfirmed((c) => ({ ...c, [s.id]: v.confirmedAt ?? new Date(0).toISOString() }))
+    }
+    if (n) toast.success(`${n} shift${n > 1 ? "s" : ""} confirmed`)
+    router.refresh()
+    return n > 0
+  }
+  async function download(): Promise<boolean> {
+    const r = await downloadMyCalendar({ from: today.slice(0, 10), to: mine.to })
+    if (!r.ok) toast.error(r.error.toast?.text ?? "Couldn't get the calendar file.")
+    return r.ok
+  }
+  async function cancel(x: ApiExchange, decline: boolean) {
+    const v = await guarded(x.id, () => (decline ? declineExchange(x.id) : cancelExchange(x.id)))
+    if (!v) return
+    toast.success(decline ? "Swap declined" : "Request cancelled")
+    router.refresh()
+  }
   const swapShift = swapping ? shifts.find((s) => s.id === swapping.id) : undefined
-  function sendSwap(personId: string) {
-    const t = swapShift && exchange.templates.find((x) => x.id === swapShift.templateId)
-    const target = ((swapShift && exchange.peers[swapShift.id]) || []).find((p) => p.id === personId)
-    if (!swapShift || !t || !target) return
-    try {
-      // Only id and name reach this browser, so the target's own licences are re-checked by whoever approves (the full rule check).
-      const stub = { id: target.id, name: target.name, role: "", dept: "", homeLocationId: null, qualifications: t.requires.map((r) => ({ type: r, expires: null })), leftOn: null }
-      setSwaps((p) => [...p, requestSwap(swapShift, me, stub, t, null, stamp, `sw-${Date.now().toString(36)}-${p.length + 1}`, { week: exchange.weeks.find((w) => w.id === swapShift.weekId), tz })])
-      toast.success("Swap requested", { description: `${target.name} · ${formatDate(swapShift.date)}` })
-      setSwapping(null)
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Could not request the swap")
-    }
+  async function sendSwap(personId: string) {
+    if (!swapShift) return
+    const v = await guarded(swapShift.id, () => proposeSwap(swapShift.id, { toUserId: personId }))
+    if (!v) return
+    toast.success("Swap asked")
+    setSwapping(null)
+    router.refresh()
   }
 
-  const row = (s: RosterShift, close?: () => void) => {
-    const when = isSeen(s, confirmed)
+  const row = (id: string, close?: () => void) => {
+    const s = shifts.find((x) => x.id === id)
+    if (!s) return null
+    const ahead = endsAfter(s, nowAt)
+    const done = isConfirmed(s)
     return (
       <li key={s.id} className="mr-shift">
         <div className="mr-when">
           <b>{formatDate(s.date)}</b>
-          <span className="num">{formatTime(`${s.date}T${s.start}`)} to {formatTime(`${s.date}T${s.end}`)}{s.end <= s.start && <b className="ros-next" title="Ends the next day"> +1</b>} · {durationLabel(shiftMinutes(s, tz))}</span>
+          <span className="num">{when(s)}{s.end <= s.start && <b className="ros-next" title="Ends the next day"> +1</b>} · {durationLabel(realMinutes(s))}</span>
         </div>
         <div className="mr-where">
           <span>{s.role}</span>
-          <span className="rl-note">{places.get(s.locationId) ?? ""}</span>
+          <span className="rl-note">{s.locationName}</span>
         </div>
         <div className="mr-act">
-          <FadeSwap id={when ? "seen" : "ask"}>
-            {when ? (
-              <StatusPill status={{ tone: "ok", label: "Confirmed" }} tick={false} />
-            ) : (
-              <button type="button" className="btn btn-outline mr-btn" onClick={() => setConfirmed((p) => ({ ...p, [s.id]: { at: today, sig: shiftSig(s) } }))}>
-                <Icon name="check" size={24} />
-                Seen
-              </button>
-            )}
-          </FadeSwap>
-          {exchange.peers[s.id] && (swaps.some((x) => x.shiftId === s.id && x.fromPersonId === me && x.status === "open") ? (
+          {ahead && (
+            <FadeSwap id={done ? "done" : "ask"}>
+              {done ? (
+                <StatusPill status={{ tone: "ok", label: "Confirmed" }} tick={false} />
+              ) : (
+                <button type="button" className="btn btn-outline mr-btn" aria-label={`Confirm ${formatDate(s.date)}`} disabled={busy !== null} onClick={() => void confirm(s)}>
+                  <Icon name="check" size={24} />
+                  Confirm
+                </button>
+              )}
+            </FadeSwap>
+          )}
+          {ahead && people && (swapOpen(s.id) ? (
             <StatusPill status={{ tone: "warn", label: "Swap asked" }} tick={false} />
           ) : (
-            <button type="button" className="btn btn-outline mr-btn" aria-label={`Swap ${formatDate(s.date)}`} onClick={() => { close?.(); setSwapping({ id: s.id, n: (swapping?.n ?? 0) + 1 }) }}>
+            <button type="button" className="btn btn-outline mr-btn" aria-label={`Swap ${formatDate(s.date)}`} disabled={busy !== null} onClick={() => { close?.(); setSwapping({ id: s.id, n: (swapping?.n ?? 0) + 1 }) }}>
               <Icon name="swap" size={24} />
               Swap
             </button>
           ))}
-          <button type="button" className="mr-ics" aria-label={`Add ${formatDate(s.date)} to calendar`} onClick={() => download([s], `shift-${s.date}`)}>
-            <Icon name="calendar-plus" size={24} />
-          </button>
         </div>
       </li>
     )
   }
+  const reqRow = (x: ApiExchange, incoming: boolean) => (
+    <li key={x.id} className="mr-chip">
+      <span>
+        <b>{incoming ? "Swap offered to you" : x.kind === "claim" ? "Claim" : "Swap"}</b> <span className="rl-note num">{formatDate(x.date)} · {when(x)}</span>
+      </span>
+      <span className="mr-decide">
+        <StatusPill status={{ tone: "warn", label: x.status === "recommended" ? "Recommended" : "Waiting" }} tick={false} />
+        <button type="button" className="fs-act bad" aria-label={`${incoming ? "Decline" : "Cancel"} ${formatDate(x.date)}`} disabled={busy !== null} onClick={() => void cancel(x, incoming)}>
+          <Icon name="close" size={24} />
+        </button>
+      </span>
+    </li>
+  )
 
   return (
     <>
@@ -152,16 +186,10 @@ export function MyRosterView({ data, queue, exchange, me, tz, today, scopeKey }:
         title="My roster"
         subtitle="Your published shifts across every location."
         actions={
-          <button
-            type="button"
-            className="btn btn-outline"
-            disabled={upcoming.length === 0}
-            title={upcoming.length === 0 ? "No upcoming shifts to add" : undefined}
-            onClick={() => download(upcoming, "my-roster")}
-          >
+          <ActionButton className="btn btn-outline mr-cal" disabled={upcoming.length === 0} title={upcoming.length === 0 ? "No upcoming shifts" : undefined} onAction={download}>
             <Icon name="calendar-plus" size={24} />
             Add to calendar
-          </button>
+          </ActionButton>
         }
       />
       <div className="mr-sum od-cascade">
@@ -170,8 +198,8 @@ export function MyRosterView({ data, queue, exchange, me, tz, today, scopeKey }:
           {next ? (
             <>
               <b>{formatDate(next.date)}</b>
-              <span className="num">{formatTime(`${next.date}T${next.start}`)} to {formatTime(`${next.date}T${next.end}`)}</span>
-              <span className="rl-note">{places.get(next.locationId) ?? ""}</span>
+              <span className="num">{when(next)}</span>
+              <span className="rl-note">{next.locationName}</span>
             </>
           ) : (
             <span className="rl-empty">Nothing coming up</span>
@@ -179,26 +207,26 @@ export function MyRosterView({ data, queue, exchange, me, tz, today, scopeKey }:
         </div>
         <div className="mr-tile">
           <span className="mr-tile-k">To confirm</span>
-          <b className="num"><CountUp value={String(unseen.length)} /></b>
-          {unseen.length > 0 ? (
-            <button type="button" className="btn btn-outline mr-btn" onClick={confirmAll}>
+          <b className="num"><CountUp value={String(toConfirm.length)} /></b>
+          {toConfirm.length > 0 ? (
+            <ActionButton className="btn btn-outline mr-btn" disabled={busy !== null} onAction={confirmAll}>
               <Icon name="check-all" size={24} />
-              Mark all as seen
-            </button>
+              Confirm all
+            </ActionButton>
           ) : (
-            <span className="rl-note">{upcoming.length ? "All seen" : "No shifts"}</span>
+            <span className="rl-note">{upcoming.length ? "All confirmed" : "No shifts"}</span>
           )}
         </div>
         <div className="mr-tile">
-          <span className="mr-tile-k">Open shifts you can take</span>
-          <b className="num"><CountUp value={String(open.length)} /></b>
-          {open.length > 0 ? (
+          <span className="mr-tile-k">My requests</span>
+          <b className="num"><CountUp value={String(asked.length + offered.length)} /></b>
+          {asked.length + offered.length > 0 ? (
             <button type="button" className="btn btn-outline mr-btn" onClick={() => setTab("shifts")}>
-              <Icon name="hand" size={24} />
+              <Icon name="swap" size={24} />
               See them
             </button>
           ) : (
-            <span className="rl-note">None right now</span>
+            <span className="rl-note">None open</span>
           )}
         </div>
       </div>
@@ -209,61 +237,36 @@ export function MyRosterView({ data, queue, exchange, me, tz, today, scopeKey }:
           options={[
             { value: "calendar" as const, label: "Calendar" },
             { value: "shifts" as const, label: `Shifts${upcoming.length ? ` · ${upcoming.length}` : ""}` },
-            { value: "off" as const, label: `Time off${queue.leave.length ? ` · ${queue.leave.length}` : ""}` },
+            { value: "off" as const, label: `Time off${decide ? ` · ${decide}` : ""}` },
           ]}
-          onChange={(v) => setTab(v as "calendar" | "shifts" | "off")}
+          onChange={(v) => setTab(v as Tab)}
         />
       </div>
       <div className="card nt-card">
         <div className="od-form nt-form od-slide" key={tab} data-slide={tabDir}>
           {tab === "calendar" && (
-            <FormSection icon="calendar" title="Calendar" note="Pick a day to see its shifts">
-              <MyCalendar shifts={shifts} leave={myLeave} today={today} places={places} renderShift={row} />
+            <FormSection icon="calendar" title="Calendar" note="Pick a day">
+              <MyCalendar shifts={shifts} leave={mine.leave} today={today} renderShift={row} />
             </FormSection>
           )}
           {tab === "shifts" && (
             <>
               <FormSection icon="list-checks" title="Upcoming shifts" note={upcoming.length ? `${upcoming.length}` : undefined}>
-                {upcoming.length === 0 ? <p className="rl-empty">No published shifts coming up.</p> : <ul className="mr-list">{upcoming.map((s) => row(s))}</ul>}
+                {upcoming.length === 0 ? <p className="rl-empty">No published shifts coming up.</p> : <ul className="mr-list">{upcoming.map((s) => row(s.id))}</ul>}
                 {earlier.length > 0 && (
                   <details className="ev-earlier">
                     <summary>Earlier shifts ({earlier.length})</summary>
-                    <ul className="mr-list">{[...earlier].reverse().map((s) => row(s))}</ul>
+                    <ul className="mr-list">{[...earlier].reverse().map((s) => row(s.id))}</ul>
                   </details>
                 )}
               </FormSection>
-              <FormSection icon="hand" title="Open shifts you can take" note={open.length ? `${open.length}` : undefined}>
-                {open.length === 0 ? (
-                  <p className="rl-empty">No open shifts right now.</p>
+              <FormSection icon="swap" title="My requests" note={asked.length + offered.length ? `${asked.length + offered.length}` : undefined}>
+                {asked.length + offered.length === 0 ? (
+                  <p className="rl-empty">No open claims or swaps.</p>
                 ) : (
-                  <ul className="mr-list">
-                    {open.map((s) => {
-                      const offered = claims.some((c) => c.shiftId === s.id && c.personId === me && c.status === "open")
-                      return (
-                        <li key={s.id} className="mr-shift">
-                          <div className="mr-when">
-                            <b>{formatDate(s.date)}</b>
-                            <span className="num">{formatTime(`${s.date}T${s.start}`)} to {formatTime(`${s.date}T${s.end}`)}{s.end <= s.start && <b className="ros-next" title="Ends the next day"> +1</b>} · {durationLabel(shiftMinutes(s, tz))}</span>
-                          </div>
-                          <div className="mr-where">
-                            <span>{s.role}</span>
-                            <span className="rl-note">{places.get(s.locationId) ?? ""}</span>
-                          </div>
-                          <div className="mr-act">
-                            <FadeSwap id={offered ? "offered" : "claim"}>
-                              {offered ? (
-                                <StatusPill status={{ tone: "warn", label: "Offered" }} tick={false} />
-                              ) : (
-                                <button type="button" className="btn btn-primary mr-btn" aria-label={`Claim ${formatDate(s.date)}`} onClick={() => claim(s)}>
-                                  <Icon name="hand" size={24} />
-                                  Claim
-                                </button>
-                              )}
-                            </FadeSwap>
-                          </div>
-                        </li>
-                      )
-                    })}
+                  <ul className="mr-chips">
+                    {offered.map((x) => reqRow(x, true))}
+                    {asked.map((x) => reqRow(x, false))}
                   </ul>
                 )}
               </FormSection>
@@ -272,18 +275,18 @@ export function MyRosterView({ data, queue, exchange, me, tz, today, scopeKey }:
           {tab === "off" && (
             <div className="od-form-cols">
               <div className="od-form-col">
-                <LeaveForm me={me} today={today} scopeKey={scopeKey} data={data} queue={queue} />
-                <LeavePanel me={me} today={today} scopeKey={scopeKey} data={data} queue={queue} />
+                <LeaveForm today={today.slice(0, 10)} />
+                <LeavePanel mine={mine.leave} queue={queue} names={names} me={me} today={today} />
               </div>
               <div className="od-form-col">
-                <AvailabilityForm me={me} scopeKey={scopeKey} data={data} />
+                <AvailabilityForm windows={mine.availability} />
               </div>
             </div>
           )}
         </div>
       </div>
-      {swapShift && swapping && (
-        <SwapDialog key={swapping.n} shift={swapShift} place={places.get(swapShift.locationId) ?? ""} people={exchange.peers[swapShift.id] ?? []} onSend={sendSwap} onClose={() => setSwapping(null)} />
+      {swapShift && swapping && people && (
+        <SwapDialog key={swapping.n} shift={swapShift} place={swapShift.locationName} people={people.filter((p) => p.id !== me)} truncated={peopleTruncated} onSend={sendSwap} onClose={() => setSwapping(null)} />
       )}
     </>
   )
