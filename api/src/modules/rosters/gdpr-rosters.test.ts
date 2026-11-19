@@ -270,7 +270,9 @@ describe("AH1 erase takes the roster lock (lock order = deactivation)", () => {
   }
 
   test("G1: a request that platform staff resolve while the erase waits for its locks is NOT erased: nothing is deleted, the identity stays, the request stays as resolved", async () => {
-    const { w, me, mine, theirs } = await scene()
+    const { w, me } = await scene()
+    const count = async (u: string) => (await w.rows("select 1 from roster_shifts where user_id = $1", [u])).length
+    const [subjectShifts, colleagueShifts] = [await count(me.userId), await count(w.staff2.userId)]
     const id = await eraseRequest(w, me)
     const c = await owner.connect()
     try {
@@ -292,8 +294,9 @@ describe("AH1 erase takes the roster lock (lock order = deactivation)", () => {
     }
     expect((await w.ok("GET", `/v1/data-requests/${id}`, w.p.owner)).status).toBe("rejected") // still resolved, not completed, not failed
     expect((await w.rows("select 1 from memberships where user_id = $1", [me.userId])).length).toBe(1)
-    expect((await w.rows("select 1 from roster_shifts where user_id = $1", [me.userId])).length).toBe(mine.length) // the roster handler did not run: the shifts are still theirs
-    expect((await w.rows("select 1 from roster_shifts where user_id = $1", [w.staff2.userId])).length).toBe(theirs.length)
+    expect(subjectShifts).toBeGreaterThan(0)
+    expect(await count(me.userId)).toBe(subjectShifts) // the roster handler did not run: the shifts are still theirs
+    expect(await count(w.staff2.userId)).toBe(colleagueShifts)
     expect((await w.rows("select 1 from audit_events where action in ('member.removed', 'dsr.erasure_completed')")).length).toBe(0)
     expect((await ownerQuery(`select erased_at from "user" where id = $1`, [me.userId]))[0].erased_at).toBeNull() // the global identity was not anonymised
   }, 20_000)
