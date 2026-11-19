@@ -63,6 +63,9 @@ test("CR-06 on a bound Android phone Drive is blocked and the rest works", async
   // The end-of-shift report is filled in and submitted from the phone.
   await page.goto("/daily-reports")
   await page.getByRole("link", { name: "Open my report" }).click()
+  // Leo is also on the seeded Evening patrol (15:00-23:00), so which of his two running shifts "Open my report" opens depends on the hour: the check below follows the report he opened, by its id in the URL.
+  await page.waitForURL(/\/daily-reports\/[^/]+/)
+  const opened = decodeURIComponent(new URL(page.url()).pathname.split("/").pop()!)
   await page.getByLabel(/^Summary/).fill("East gate walked.")
   await page.getByLabel(/^Notes for the next shift/).fill("Nothing.")
   const minutes = page.getByLabel(/^Time spent on /)
@@ -73,6 +76,6 @@ test("CR-06 on a bound Android phone Drive is blocked and the rest works", async
   await expect(page).toHaveURL(/\/daily-reports$/)
   // The manager has it (Leo reports to nobody: the all-scope manager sees every report).
   const mgr = await apiAs("ops")
-  const rows = (await mgr.get("/v1/shift-reports?limit=50")).items as { person: string; status: string; shiftName: string }[]
-  expect(rows.find((r) => r.person === "Leo Fernandez" && r.shiftName === "E2E all day")?.status).toBe("submitted")
+  const rows = (await mgr.get("/v1/shift-reports?limit=50")).items as { id: string | null; key: string; person: string; status: string }[]
+  expect(rows.find((r) => r.person === "Leo Fernandez" && (r.id === opened || r.key === opened))?.status).toBe("submitted")
 })
