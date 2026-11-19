@@ -43,3 +43,12 @@ export function weekLabel(date: string): string {
   const f = (d: string) => `${Number(d.slice(8, 10))} ${SHORT[Number(d.slice(5, 7)) - 1]}`
   return `${f(a)} – ${f(b)} ${b.slice(0, 4)}`
 }
+
+/**
+ * The 42 days a month view shows (six Monday-first weeks): the most the API's calendar answers in one call. Here, in the pure module, because the server page calls it too (a function
+ * exported from the "use client" calendar component cannot be called on the server: the page failed with "Attempted to call rangeOf() from the server", found in B8 Task 24).
+ */
+export const rangeOf = (anchor: string, mode: "month" | "week") => {
+  const days = mode === "month" ? monthGrid(anchor).flat() : weekOf(anchor)
+  return { from: days[0]!, to: days[days.length - 1]! }
+}

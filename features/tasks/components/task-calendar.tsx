@@ -12,7 +12,7 @@ import { userMessage } from "@/lib/api/problem"
 import { toCard } from "../adapters"
 import { departmentFilter } from "../filters"
 import { addDays } from "../recurrence"
-import { byDueDay, monthGrid, monthLabel, shiftMonth, weekLabel, weekOf } from "../calendar"
+import { byDueDay, monthGrid, monthLabel, rangeOf, shiftMonth, weekLabel, weekOf } from "../calendar"
 import { STATUS } from "../types"
 import type { Person, Project, Task } from "../types"
 import { BoardFilters, NO_BOARD_FILTERS, type BoardFilterValues } from "./task-board"
@@ -34,11 +34,6 @@ function Chip({ t }: { t: Task }) {
   )
 }
 
-/** The 42 days a month view shows (six Monday-first weeks): the most the API's calendar answers in one call. */
-export const rangeOf = (anchor: string, mode: "month" | "week") => {
-  const days = mode === "month" ? monthGrid(anchor).flat() : weekOf(anchor)
-  return { from: days[0]!, to: days[days.length - 1]! }
-}
 
 /**
  * Calendar view by due date (FR-M1-05): month or week, Monday first. The days are the TENANT's (the API cuts them in the tenant zone, DST days included); each window is one

@@ -92,8 +92,9 @@ export function ReportsSkeleton({ own = false, prompts = 0, mine = true, rows = 
       <section className="card sr-inbox">
         <CardHead title={own ? 100 : 120} sub={200} button />
         {!own && (
-          // status tab seg (All + five states, labels only: the API gives no per-state counts): about 450px, 42px buttons + 4px padding (T6.9: measure)
-          <div className="sr-counts"><Sk w={450} h={48} r="pill" style={{ maxWidth: "100%" }} /></div>
+          // status tab seg (All + five states; B8 Task 24: All, Late, Missing, Accepted, Returned carry the API's counts): measured 560 x 48 at 1568 with the demo's 1-2 digit counts
+          // (a 3-digit count widens it by a few px; it never wraps), the card's full width (302) at 390
+          <div className="sr-counts"><Sk w={560} h={48} r="pill" style={{ maxWidth: "100%" }} /></div>
         )}
         <div className="od-filters">
           <div className="rep-date"><Sk w="100%" h={48} r={14} /></div>

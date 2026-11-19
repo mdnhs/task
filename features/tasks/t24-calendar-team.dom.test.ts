@@ -17,7 +17,8 @@ vi.mock("@/lib/api/browser", () => ({ apiBrowser: { get: m.get } }))
 
 import { DeptContext } from "@/hooks/use-dept"
 import { toCard } from "./adapters"
-import { TaskCalendar, rangeOf } from "./components/task-calendar"
+import { rangeOf } from "./calendar"
+import { TaskCalendar } from "./components/task-calendar"
 
 beforeAll(() => {
   ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
@@ -81,5 +82,12 @@ describe("B8 Task 24: calendar team filter", () => {
     await set("Kitchen")
     expect(m.get).not.toHaveBeenCalled()
     expect(titles()).toEqual([])
+  })
+
+  test("the server page's rangeOf comes from a module the server can call (not the \"use client\" calendar component)", () => {
+    const index = readFileSync(path.resolve(__dirname, "index.ts"), "utf8")
+    expect(index).toMatch(/export \{ rangeOf \} from "\.\/calendar"/)
+    expect(readFileSync(path.resolve(__dirname, "calendar.ts"), "utf8")).not.toMatch(/^"use client"/)
+    expect(readFileSync(path.resolve(__dirname, "components/task-calendar.tsx"), "utf8")).not.toMatch(/export const rangeOf/)
   })
 })

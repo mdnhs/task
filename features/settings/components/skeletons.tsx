@@ -226,11 +226,12 @@ function Users({ users, invites, canWrite }: { users: number; invites: number; c
                 <tr key={i}>
                   <td data-label="User"><Sk w={120} h={13} lh={19} /><Sk w={160} h={10} lh={16} /></td>
                   <td data-label="Role">{canWrite ? <div className="od-filters set-access"><Sk w={140} h={48} r="pill" /></div> : <Sk w={90} h={13} lh={19} />}</td>
-                  <td data-label="Department"><Sk w={80} h={13} lh={19} /></td>
-                  {/* B8 Task 24: the API's status pill, last active and the Deactivate control */}
-                  <td data-label="Status"><Sk w={64} h={24} r="pill" /></td>
-                  <td data-label="Last active"><Sk w={90} h={13} lh={19} /></td>
-                  {canWrite && <td data-label="Actions"><Sk w={104} h={38} r={12} /></td>}
+                  {/* Browser-measured (B8 Task 24, admin on the demo tenant): rows 71 at 1568 (the role select sets it); stacked at 390 the cells are dep tag 37.9, status pill 45.4,
+                      "Never" 32.7 and the Deactivate button 64 high */}
+                  <td data-label="Department"><Sk w={80} h={13} lh={21.9} /></td>
+                  <td data-label="Status"><Sk w={64} h={24} lh={29.4} r="pill" /></td>
+                  <td data-label="Last active"><Sk w={60} h={11} lh={16.7} /></td>
+                  {canWrite && <td data-label="Actions"><Sk w={98} h={48} r={14} /></td>}
                 </tr>
               ))}
             </tbody>
