@@ -5,7 +5,7 @@ import { notFound } from "next/navigation"
 import { BillingView, getBilling, getEntitlements, getPlans, getSeatLimit, moduleRows, planCards } from "@/features/billing"
 import {
   BrandingPanel, DepartmentsPanel, DevicePolicyCard, DevicesPanel, IntegrationsPanel, MfaPolicyCard, NotificationsPanel, OrganisationForm, PrivacyPanel, RolesMatrix, SETTINGS_TABS,
-  SettingsLayout, TemplatePanel, UsersPanel, getBrandingPresets, getDeliveryLog, getNames, getNotificationSettings, getOrganisationOptions, getMockUserActivity, loadReportTemplate, isTab, loadBranding, loadSessionIdleHours,
+  SettingsLayout, TemplatePanel, UsersPanel, getBrandingPresets, getDeliveryLog, getNames, getNotificationSettings, getOrganisationOptions, loadReportTemplate, isTab, loadBranding, loadSessionIdleHours,
   loadDepartments, loadDevices, loadIntegrations, loadInvites, loadMatrix, loadMfaPolicy, loadMyExports, loadOrganisation, loadPolicies, loadRequests, loadUsers, nameOfFrom, readable, serverApi,
 } from "@/features/settings"
 import { LOGO_UPLOAD_ENABLED } from "@/features/settings/constants"
@@ -61,11 +61,10 @@ export default async function Page({ params, searchParams }: { params: Promise<{
       }
       case "users": {
         const [users, roles, invites, seats] = await Promise.all([
-          readable(() => loadUsers(api)), readable(() => loadMatrix(api)), readable(() => loadInvites(api, org.timezone)), getSeatLimit(),
+          readable(() => loadUsers(api, org.timezone)), readable(() => loadMatrix(api)), readable(() => loadInvites(api, org.timezone)), getSeatLimit(),
         ])
         if (!users || !roles) return null
-        const mockActivity = mockEnabled() ? await getMockUserActivity() : undefined // MOCK (J2): deactivate and last active, demo deployments only
-        return <UsersPanel meId={session.user.id} mockActivity={mockActivity} users={users} invites={invites ?? []} roles={roles.roles} today={org.today} tzLabel={org.tzLabel} seatLimit={seats.limit} seatsUsed={seats.used} planName={seats.planName} canWrite={write} />
+        return <UsersPanel meId={session.user.id} users={users} invites={invites ?? []} roles={roles.roles} today={org.today} tzLabel={org.tzLabel} seatLimit={seats.limit} seatsUsed={seats.used} planName={seats.planName} canWrite={write} />
       }
       case "roles": {
         const [matrix, policy] = await Promise.all([readable(() => loadMatrix(api)), readable(() => loadMfaPolicy(api))])

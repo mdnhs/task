@@ -2,7 +2,7 @@ import { existsSync, readFileSync, readdirSync, statSync } from "node:fs"
 import path from "node:path"
 import { afterEach, describe, expect, test, vi } from "vitest"
 import navigation from "@/public/data/shell/navigation.json"
-import { MOCK_DATA_READERS, MOCK_LOADING_FILES, MOCK_ROUTES, MOCK_SETTINGS_FILES, STATIC_LOADING_READERS, STATIC_SETTINGS_FILES, hideMockNav, isMockRoute, mockEnabled } from "@/lib/mock-registry"
+import { MOCK_DATA_READERS, MOCK_LOADING_FILES, MOCK_ROUTES, STATIC_LOADING_READERS, STATIC_SETTINGS_FILES, hideMockNav, isMockRoute, mockEnabled } from "@/lib/mock-registry"
 import { mockGate } from "@/features/shell/components/not-available"
 
 // B6 T6.9 mock isolation (Review Focus 5): a switched feature never depends on mock-only behaviour, and the mock-only features exist only behind ENABLE_MOCK_MODULES=1.
@@ -40,8 +40,8 @@ describe("1. the JSON reader is used only by the files the registry lists", () =
   })
   test("the static settings seeds are the files the registry names (T6.5 carry-in)", () => {
     const refs = [...strip(read("features/settings/api.ts")).matchAll(/getData\b[\s\S]*?\("(settings\/[^"]+)"\)/g)].map((m) => m[1]).sort()
-    expect(refs).toEqual([...STATIC_SETTINGS_FILES, ...MOCK_SETTINGS_FILES].sort())
-    for (const f of [...STATIC_SETTINGS_FILES, ...MOCK_SETTINGS_FILES]) expect(existsSync(path.join(root, "public/data", f)), f).toBe(true)
+    expect(refs).toEqual([...STATIC_SETTINGS_FILES].sort()) // settings/users.json (the per-person seed) is no longer read by the web since B8 Task 24: the demo seed script only
+    for (const f of STATIC_SETTINGS_FILES) expect(existsSync(path.join(root, "public/data", f)), f).toBe(true)
   })
 })
 

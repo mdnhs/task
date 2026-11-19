@@ -64,12 +64,12 @@ describe("T6.5 fix I3: session timeout read-only; deactivate and last active are
     expect(src).toMatch(/set by the platform/i)
     expect(src).not.toMatch(/set\("sessionIdleHours"|sessionTimeout/)
   })
-  test("deactivate and last active exist only behind mock modules and never call the API", () => {
+  test("deactivate and last active are the API's since B8 Task 24 (no mock flag, no mock seed)", () => {
     const panel = read("features/settings/components/users-panel.tsx")
-    expect(panel).toMatch(/mockActivity/)
-    expect(panel).not.toMatch(/deactivate.*api\.|client\.deactivate/i)
+    expect(panel).not.toMatch(/mockActivity/)
+    expect(panel).toMatch(/client\.deactivate\(/)
     const page = read("app/(app)/settings/[tab]/page.tsx")
-    expect(page).toMatch(/mockEnabled\(\)\s*\?[^\n]*getMockUserActivity/)
+    expect(page).not.toMatch(/getMockUserActivity/)
   })
 })
 

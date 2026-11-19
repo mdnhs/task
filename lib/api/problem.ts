@@ -214,6 +214,9 @@ const CODE_COPY: Record<string, string> = {
   invalid_report_deadline: "Choose the report deadline.",
   request_open: "A request like that is already open.",
   last_owner: "The last owner can't be removed.",
+  self_deactivation: "You can't deactivate yourself.",
+  already_deactivated: "Already deactivated.",
+  not_deactivated: "Already active.",
   self_request_not_allowed: "You can't make that request about yourself.",
   // Rosters (B8). Short, never the server's text.
   roster_locked: "This week is published. Ask for a change instead.",

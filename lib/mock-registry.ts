@@ -74,5 +74,3 @@ export const STATIC_LOADING_READERS: readonly string[] = ["getSkeletonSession", 
 
 /** The static JSON files under public/data/settings that are option lists, not tenant data (T6.5 carry-in): the settings pages read them through features/settings/api.ts. */
 export const STATIC_SETTINGS_FILES: readonly string[] = ["settings/organisation.json", "settings/branding.json", "settings/notifications.json", "settings/delivery-log.json"]
-/** The one settings seed that holds per-person data (status and last-active, no API route): read only behind mockEnabled() by getMockUserActivity. */
-export const MOCK_SETTINGS_FILES: readonly string[] = ["settings/users.json"]

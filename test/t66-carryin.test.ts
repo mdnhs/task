@@ -47,24 +47,7 @@ describe("T6.5 carry-in 3: the fresh highlight is keyed by role key", () => {
   })
 })
 
-describe("T6.5 carry-in 4: the demo column is labelled, and without mockActivity there is no Deactivate or Status", () => {
-  const base = {
-    users: [{ id: "u1", name: "Ann", email: "ann@x.test", role: "employee", dept: "Cleaning" }],
-    invites: [], roles: [], today: "2026-11-18T09:00", tzLabel: "GMT", seatLimit: 5, seatsUsed: 1, planName: "Business", canWrite: true, meId: "u9",
-  }
-  test("UsersPanel without mockActivity has no Deactivate button and no Status column", async () => {
-    const { UsersPanel } = await import("@/features/settings/components/users-panel")
-    const html = renderToStaticMarkup(createElement(UsersPanel, base))
-    expect(html).not.toMatch(/Deactivate/)
-    expect(html).not.toMatch(/>Status</)
-    expect(html).not.toMatch(/Last active/)
-  })
-  test("with mockActivity the columns are marked Demo", async () => {
-    const { UsersPanel } = await import("@/features/settings/components/users-panel")
-    const html = renderToStaticMarkup(createElement(UsersPanel, { ...base, mockActivity: { "ann@x.test": { status: "active", lastActive: "2026-11-17T09:00:00" } } }))
-    expect(html).toMatch(/Status <span[^>]*>Demo</)
-  })
-})
+// T6.5 carry-in 4 (demo-only Status/Deactivate columns) is superseded by B8 Task 24: the columns are the API's now (features/settings/t24-users-deactivate.dom.test.ts).
 
 describe("T6.5 carry-in 5: inviteDaysOf takes the median", () => {
   const inv = (d: number) => ({ createdAt: "2026-11-01T09:00:00", expiresAt: `2026-11-${String(1 + d).padStart(2, "0")}T09:00:00` })

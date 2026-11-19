@@ -39,11 +39,12 @@ export const loadRoles = async (api: Reader) => toRoles(await api.get("/v1/roles
 export async function loadMatrix(api: Reader): Promise<MatrixData> {
   return { modules: MATRIX_MODULE_LABELS, roles: await loadRoles(api) }
 }
-export async function loadUsers(api: Reader): Promise<SettingsUser[]> {
-  const [people, depts] = await Promise.all([api.get("/v1/people"), api.get("/v1/teams", { query: { kind: "department" } })])
+/** The workspace's people. With `tz` (Settings -> Users, settings:read) also the deactivated ones, with the API's status and last active in tenant wall time; without it the active people only. */
+export async function loadUsers(api: Reader, tz?: string): Promise<SettingsUser[]> {
+  const [people, depts] = await Promise.all([api.get("/v1/people", tz ? { query: { status: "all" } } : undefined), api.get("/v1/teams", { query: { kind: "department" } })])
   const dept = new Map<string, string>()
   for (const t of depts) for (const id of t.memberIds) if (!dept.has(id)) dept.set(id, t.name)
-  return toUsers(people, (id) => dept.get(id) ?? "")
+  return toUsers(people, (id) => dept.get(id) ?? "", tz)
 }
 export const loadInvites = async (api: Reader, tz: string): Promise<Invite[]> => toInvites(await api.get("/v1/invites"), tz)
 export const loadDevices = async (api: Reader, tz: string): Promise<Device[]> => (await api.get("/v1/devices")).map((d) => toDevice(d, tz))
@@ -79,14 +80,6 @@ export const loadSessionIdleHours = async (api: Reader): Promise<number | null> 
   return typeof h === "number" && Number.isFinite(h) ? h : null // a missing field renders as a dash; it never breaks the tab
 }
 
-/**
- * MOCK: no backend (the API has no deactivate route and no last-active). Per-email status and last-active from the demo seed, read only on a demo deployment
- * (ENABLE_MOCK_MODULES=1, ruling J2). It never calls the API. Isolated: the page loads it only behind mockEnabled().
- */
-export async function getMockUserActivity(): Promise<Record<string, { status: "active" | "deactivated"; lastActive: string }>> {
-  const { users } = await getData<{ users: { email: string; status: "active" | "deactivated"; lastActive: string }[] }>("settings/users.json")
-  return Object.fromEntries(users.map((u) => [u.email.toLowerCase(), { status: u.status, lastActive: u.lastActive }]))
-}
 
 // The report template (T6.7): the API's, one department per team (matched by name).
 export const loadReportTemplate = (api: Reader) => fetchTemplate(api) // { data, etag }: the tag is the If-Match of the first save

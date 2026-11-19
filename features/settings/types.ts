@@ -30,8 +30,11 @@ export type Branding = { primaryColor: string | null; logoFileId: string | null 
 /** A department is a team of kind "department" (GET /v1/teams?kind=department): name and member count. Sites, report owners and deactivation have no backend. */
 export type Department = { id: string; name: string; members: number }
 
-/** A member of the workspace (GET /v1/people). `id` is the user id and `role` the role KEY. There is no deactivated state: the API has no such member route. */
-export type SettingsUser = { id: string; name: string; email: string; role: string; dept: string }
+/**
+ * A member of the workspace (GET /v1/people). `id` is the user id and `role` the role KEY. `active` and `lastActiveAt` are the API's (B8 Task 24: deactivate/reactivate routes; last active is
+ * the last authenticated request in tenant wall time, null = never seen, and null for everyone unless the caller can read settings). Optional for the screens that list active people only.
+ */
+export type SettingsUser = { id: string; name: string; email: string; role: string; dept: string; active?: boolean; lastActiveAt?: string | null }
 /** A pending invite (GET /v1/invites): no token, ever. Times are the tenant's wall clock. */
 export type Invite = { id: string; email: string; role: string; createdAt: string; expiresAt: string; invitedBy: string }
 export type RoleOption = { id: string; label: string }

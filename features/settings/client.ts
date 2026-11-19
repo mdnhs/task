@@ -45,6 +45,13 @@ export function makeSettingsClient(api: ApiClient, nav: Navigator) {
     },
 
     // roles and members: the UI holds role KEYS, the routes take uuids
+    /** B8 Task 24: deactivate (409 last_owner | already_deactivated, 422 self_deactivation) and reactivate (409 seat_limit | not_deactivated); the API's answer is the row's new status. */
+    async deactivate(userId: string) {
+      return api.post("/v1/members/{userId}/deactivate", { path: { userId } })
+    },
+    async reactivate(userId: string) {
+      return api.post("/v1/members/{userId}/reactivate", { path: { userId } })
+    },
     async changeRole(userId: string, roleKey: string, roles: readonly MatrixRole[]) {
       return api.patch("/v1/members/{userId}", { path: { userId }, body: { roleId: roleUuid(roles, roleKey) } })
     },

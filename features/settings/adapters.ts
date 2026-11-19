@@ -77,8 +77,16 @@ export function roleUuid(roles: readonly MatrixRole[], key: string): string {
 const FORMER = "Former member"
 const isErased = (p: { name: string; email: string }) => p.name.trim() === "Erased user" || /^erased\+.+@invalid$/i.test(p.email)
 
-export function toUsers(people: readonly { userId: string; name: string; email: string; roleKey: string }[], deptOf: (userId: string) => string): SettingsUser[] {
-  return people.map((p) => ({ id: p.userId, name: isErased(p) ? FORMER : p.name.trim() || p.email.split("@")[0]! || FORMER, email: p.email, role: p.roleKey, dept: deptOf(p.userId) }))
+export function toUsers(
+  people: readonly { userId: string; name: string; email: string; roleKey: string; status?: "active" | "deactivated"; lastActiveAt?: string | null }[],
+  deptOf: (userId: string) => string,
+  tz?: string,
+): SettingsUser[] {
+  return people.map((p) => ({
+    id: p.userId, name: isErased(p) ? FORMER : p.name.trim() || p.email.split("@")[0]! || FORMER, email: p.email, role: p.roleKey, dept: deptOf(p.userId),
+    // B8 Task 24: the API's status and last active (tenant wall time); only when the caller asked with the zone (Settings -> Users)
+    ...(tz ? { active: p.status !== "deactivated", lastActiveAt: nwall(p.lastActiveAt ?? null, tz) } : {}),
+  }))
 }
 
 export function toInvites(dto: { items: readonly unknown[] }, tz: string): Invite[] {

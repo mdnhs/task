@@ -43,13 +43,13 @@ type Props = {
   canWrite: boolean
   /** The signed-in member (a role change on yourself is asked about first). */
   meId: string
-  /** MOCK (J2): per-email status and last active, only on a demo deployment. Local to this tab, never sent to the API. */
-  mockActivity?: Record<string, { status: "active" | "deactivated"; lastActive: string }>
 }
 
 // Users and invites (GET /v1/people, GET/POST/DELETE /v1/invites, PATCH /v1/members/{id}). A role change or invite the API refuses (403 role_escalation, 422
-// role_not_invitable, 409 seat_limit...) is one toast with the mapped copy and the screen reverts to the server's record. There is no deactivate route, so none is offered.
-export function UsersPanel({ users, invites, roles, today, tzLabel, seatLimit, seatsUsed, planName, canWrite, meId, mockActivity }: Props) {
+// role_not_invitable, 409 seat_limit...) is one toast with the mapped copy and the screen reverts to the server's record. Deactivate (asked first) and reactivate are one call each
+// (POST /v1/members/{id}/deactivate|reactivate, B8 Task 24); the API's answer is the row's status at once, then the refresh brings the server's record. Yourself and the last active owner cannot
+// be deactivated (the button says why; the API refuses too: 422 self_deactivation, 409 last_owner). Last active is the API's (null = "Never").
+export function UsersPanel({ users, invites, roles, today, tzLabel, seatLimit, seatsUsed, planName, canWrite, meId }: Props) {
   const run = useApiAction()
   const client = makeSettingsClient(apiBrowser, { go: (u) => window.location.assign(u) })
   const dept = useDept()
@@ -60,8 +60,13 @@ export function UsersPanel({ users, invites, roles, today, tzLabel, seatLimit, s
   const [inviting, setInviting] = useState(0)
   const [confirmInvite, setConfirmInvite] = useState<Invite | null>(null)
   const [confirmRole, setConfirmRole] = useState<{ u: SettingsUser; next: string } | null>(null)
-  // MOCK (demo only): deactivated state kept in this tab; the real API has no such route.
-  const [off, setOff] = useState<Set<string>>(new Set())
+  // The API's answer to a deactivate/reactivate, shown until the refreshed list arrives (a new `users` prop resets it).
+  const [status, setStatus] = useState<{ base: SettingsUser[]; by: Record<string, boolean> }>({ base: users, by: {} })
+  const activeOf = (u: SettingsUser) => (status.base === users ? status.by[u.id] : undefined) ?? u.active !== false
+  const [confirmOff, setConfirmOff] = useState<SettingsUser | null>(null)
+  const activeOwners = users.filter((u) => u.role === "owner" && activeOf(u)).length
+  /** Why this row's Deactivate is off (null = allowed). */
+  const blockedOff = (u: SettingsUser): string | null => (u.id === meId ? "You can't deactivate yourself" : u.role === "owner" && activeOwners <= 1 ? "The last owner can't be deactivated" : null)
   const inviteDays = inviteDaysOf(invites)
 
   const roleLabel = (key: string) => roles.find((r) => r.id === key)?.label ?? key
@@ -91,6 +96,12 @@ export function UsersPanel({ users, invites, roles, today, tzLabel, seatLimit, s
   const askRole = (u: SettingsUser, next: string) => (needsRoleConfirm(u, meId) ? setConfirmRole({ u, next }) : void changeRole(u, next))
   const changeRole = (u: SettingsUser, next: string) =>
     run(`role:${u.id}`, () => client.changeRole(u.id, next, roles)).then((r) => r.ok && toast.success("Role updated", { description: `${u.name}: ${roleLabel(next)}` }))
+  const setActive = async (u: SettingsUser, on: boolean) => {
+    const r = await run(`active:${u.id}`, () => (on ? client.reactivate(u.id) : client.deactivate(u.id)))
+    if (!r.ok) return
+    setStatus((s) => ({ base: users, by: { ...(s.base === users ? s.by : {}), [u.id]: r.value.status === "active" } }))
+    toast.success(on ? "Reactivated" : "Deactivated", { description: u.name })
+  }
   const invite = async (v: { email: string; role: string }) => {
     const r = await run("invite", () => client.invite(v.email, v.role, roles))
     if (r.ok) toast.success("Invite sent", { description: v.email })
@@ -126,7 +137,7 @@ export function UsersPanel({ users, invites, roles, today, tzLabel, seatLimit, s
           <div className="table-wrap">
             <table className="rtable set-table">
               <thead>
-                <tr><th>User</th><th>Role</th><th>Department</th>{mockActivity && <><th>Status <span className="tm">Demo</span></th><th>Last active <span className="tm">Demo</span></th>{canWrite && <th>Actions <span className="tm">Demo</span></th>}</>}</tr>
+                <tr><th>User</th><th>Role</th><th>Department</th><th>Status</th><th>Last active</th>{canWrite && <th><span className="sr-only">Actions</span></th>}</tr>
               </thead>
               <tbody>
                 {paged.rows.map((u) => (
@@ -145,16 +156,20 @@ export function UsersPanel({ users, invites, roles, today, tzLabel, seatLimit, s
                       )}
                     </td>
                     <td data-label="Department">{u.dept ? <span className="dep-tag">{u.dept}</span> : <span className="tm">All departments</span>}</td>
-                    {mockActivity && (() => {
-                      const m = mockActivity[u.email.toLowerCase()]
-                      const deactivated = off.has(u.id) || m?.status === "deactivated"
+                    {(() => {
+                      const on = activeOf(u)
+                      const why = on ? blockedOff(u) : null
                       return (
                         <>
-                          <td data-label="Status"><StatusPill status={deactivated ? { tone: "mute", label: "Deactivated" } : { tone: "ok", label: "Active" }} /></td>
-                          <td data-label="Last active" className="num">{m ? <When iso={m.lastActive} today={today} tzLabel={tzLabel} /> : <span className="tm">None</span>}</td>
+                          <td data-label="Status"><StatusPill status={on ? { tone: "ok", label: "Active" } : { tone: "mute", label: "Deactivated" }} /></td>
+                          <td data-label="Last active" className="num">{u.lastActiveAt ? <When iso={u.lastActiveAt} today={today} tzLabel={tzLabel} /> : <span className="tm">Never</span>}</td>
                           {canWrite && (
                             <td data-label="Actions">
-                              <button type="button" className="btn btn-outline set-sm" onClick={() => { setOff((p) => { const n = new Set(p); if (deactivated) n.delete(u.id); else n.add(u.id); return n }); toast("Demo only: nothing was changed on the server") }}>{deactivated ? "Reactivate" : "Deactivate"}</button>
+                              {on ? (
+                                <button type="button" className="btn btn-outline set-sm" aria-label={`Deactivate ${u.name}`} title={why ?? undefined} disabled={why !== null} onClick={() => setConfirmOff(u)}>Deactivate</button>
+                              ) : (
+                                <button type="button" className="btn btn-outline set-sm" aria-label={`Reactivate ${u.name}`} disabled={full} title={full ? "No free seat" : undefined} onClick={() => void setActive(u, true)}>Reactivate</button>
+                              )}
                             </td>
                           )}
                         </>
@@ -228,6 +243,15 @@ export function UsersPanel({ users, invites, roles, today, tzLabel, seatLimit, s
         confirmLabel="Change role"
         destructive
         onConfirm={() => confirmRole && void changeRole(confirmRole.u, confirmRole.next)}
+      />
+      <ConfirmDialog
+        open={!!confirmOff}
+        onOpenChange={(o) => !o && setConfirmOff(null)}
+        title={`Deactivate ${confirmOff?.name ?? "this person"}?`}
+        text="They lose access at once. Their history and shifts stay; open shift assignments end today. You can reactivate them later."
+        confirmLabel="Deactivate"
+        destructive
+        onConfirm={() => confirmOff && void setActive(confirmOff, false)}
       />
       {inviting > 0 && <InviteDialog key={inviting} roles={roles} inviteDays={inviteDays} onClose={() => setInviting(0)} onInvite={invite} />}
       <ConfirmDialog

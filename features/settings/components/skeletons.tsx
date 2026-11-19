@@ -207,7 +207,7 @@ function Departments({ departments, canWrite }: { departments: number; canWrite:
   )
 }
 
-// Users: role filter + search, table (User, Role select when the member can write, Department) and the pending invites table (Email, Role, Expires, Resend and Revoke).
+// Users: role filter + search, table (User, Role select when the member can write, Department, Status, Last active, Deactivate when the member can write) and the pending invites table (Email, Role, Expires, Resend and Revoke).
 function Users({ users, invites, canWrite }: { users: number; invites: number; canWrite: boolean }) {
   const head = (ws: number[]) => <thead><tr>{ws.map((w, i) => <th key={i}><Sk w={w} h={10} lh={15.94} /></th>)}</tr></thead>
   return (
@@ -220,13 +220,17 @@ function Users({ users, invites, canWrite }: { users: number; invites: number; c
         </div>
         <div className="table-wrap">
           <table className="rtable set-table">
-            {head([36, 36, 70])}
+            {head([36, 36, 70, 44, 70, ...(canWrite ? [0] : [])])}
             <tbody>
               {Array.from({ length: pageRows(users, USERS_PAGE_SIZE) }, (_, i) => (
                 <tr key={i}>
                   <td data-label="User"><Sk w={120} h={13} lh={19} /><Sk w={160} h={10} lh={16} /></td>
                   <td data-label="Role">{canWrite ? <div className="od-filters set-access"><Sk w={140} h={48} r="pill" /></div> : <Sk w={90} h={13} lh={19} />}</td>
                   <td data-label="Department"><Sk w={80} h={13} lh={19} /></td>
+                  {/* B8 Task 24: the API's status pill, last active and the Deactivate control */}
+                  <td data-label="Status"><Sk w={64} h={24} r="pill" /></td>
+                  <td data-label="Last active"><Sk w={90} h={13} lh={19} /></td>
+                  {canWrite && <td data-label="Actions"><Sk w={104} h={38} r={12} /></td>}
                 </tr>
               ))}
             </tbody>
