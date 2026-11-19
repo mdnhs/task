@@ -218,7 +218,7 @@ const ATTENTION = {
   evidence_review: { kind: "blue", icon: "folder", status: { tone: "info", label: "Evidence" } },
   report_missing: { kind: "red", icon: "report", status: { tone: "bad", label: "Missing report" } },
   report_returned: { kind: "amber", icon: "report", status: { tone: "warn", label: "Returned" } },
-  // roster items (B8 T14); the roster screens come with the web tasks: they all open /rosters for now
+  // roster items (B8 T14); they open /rosters, except an unconfirmed shift: the person confirms it on /rosters/mine
   roster_leave: { kind: "blue", icon: "roster", status: { tone: "info", label: "Leave request" } },
   roster_change_request: { kind: "blue", icon: "roster", status: { tone: "info", label: "Change request" } },
   roster_open_shift: { kind: "amber", icon: "roster", status: { tone: "warn", label: "Open shift" } },
@@ -241,7 +241,7 @@ export function toAttention(dto: unknown): ManagerAttentionData & { nextCursor: 
       const ref = R.strOrNull(x, "ref")
       const reportId = R.strOrNull(x, "reportId")
       const key = R.strOrNull(x, "reportKey")
-      const href = kind.startsWith("roster_") || kind === "qualification_expiring" ? "/rosters" : ref ? `/tasks/${ref}` : reportId ? `/daily-reports/${reportId}` : key ? `/daily-reports/${encodeURIComponent(key)}` : "/daily-reports"
+      const href = kind === "roster_unconfirmed" ? "/rosters/mine" : kind.startsWith("roster_") || kind === "qualification_expiring" ? "/rosters" : ref ? `/tasks/${ref}` : reportId ? `/daily-reports/${reportId}` : key ? `/daily-reports/${encodeURIComponent(key)}` : "/daily-reports"
       return { ...ATTENTION[kind], title: R.str(x, "title"), by: R.str(x, "owner"), note: R.str(x, "reason"), href }
     }),
   }

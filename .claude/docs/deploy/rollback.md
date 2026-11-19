@@ -23,6 +23,8 @@ Deploy by tag, never by `latest`: set `API_IMAGE` and `WEB_IMAGE` (and `SEED_IMA
 2. Maintenance page up if users are hitting errors.
 3. Dokploy: Compose service, Deployments, pick the previous deployment, **Rollback** (or edit the env tags and redeploy).
 4. Wait for `api` `/readyz` and the worker heartbeat; run the smoke test ([runbook-go-live.md](runbook-go-live.md)).
+   - **Api and worker go together.** After an api rollout the worker must roll immediately too (the data-request job key `requestId` became `dsrId`: old workers reject new jobs, new workers reject old ones). The pending sweep enqueues the data requests again; a delayed `dsr.export-expire` job of the other image may fail permanently and the stale-request sweep expires that export.
+   - **Worker rolled back to an image WITHOUT the roster handlers** (before B8): remove the BullMQ job schedulers the newer worker registered, `queue.removeJobScheduler("roster.auto-repeat")` and `queue.removeJobScheduler("roster.qualification-expiry")` (from a one-off `node` or `tsx` shell on the queue, never by flushing Redis), or accept one failed job per tick (every 15 minutes and every hour) until the roster image is back. Re-rolling the new worker registers them again (`upsertJobScheduler`).
 5. Maintenance page down. Open an incident note: what failed, what was rolled back, what the follow-up fix is.
 6. The next release must still be a **forward** release: it includes the fix and any new migration, numbered after the existing ones. Never reuse or edit a number that has run.
 

@@ -47,7 +47,7 @@ Its tests are `scripts/audit-gate.test.ts`. To accept something new: add `{ "adv
 
 | Date | What |
 |---|---|
-| 2026-12-18 | picomatch allowlist entry expires: look for a fixed release (`npm view picomatch dist-tags`), re-run `npm audit`, renew with a new reason or remove |
+| 2026-11-20 | The picomatch allowlist entry (GHSA-fc5q-39xc-vjpf, was to expire 2026-12-18) was REMOVED: `npm audit` no longer reports it in the production or the full tree (the gate said "unused allowlist entry"). If the advisory comes back, the gate fails on purpose (high, no allowlist entry): triage it again and add a new entry with a reason and an expiry |
 | 2027-02-16 | uuid allowlist entry expires: check whether exceljs 4.x moved off the affected uuid |
 | Monthly | read the CI `security` job table of development-tooling findings |
 | On any change to how CI runs lint, tests or `shadcn` | re-triage |

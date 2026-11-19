@@ -113,6 +113,11 @@ describe("team tasks and attention", () => {
     expect(t.tasks[0]).toMatchObject({ name: "Ann Byrne", role: "Supervisor", initials: "AB", ref: "TSK-1001", dept: "Security", priority: 3, late: true, status: { tone: "warn", label: "In Progress" } })
     expect(t.tasks[0]!.due).toMatch(/1:30 AM/)
   })
+  test("attention: a roster item opens /rosters, an unconfirmed shift opens the person's own list /rosters/mine (R-final W1)", () => {
+    const row = (kind: string) => ({ kind, ref: null, taskId: null, reportId: null, reportKey: null, title: "Week of 23 Nov", ownerId: ME, owner: "Ann Byrne", dueAt: "2026-11-23T08:00:00.000Z", reason: "x" })
+    const a = toAttention({ items: ["roster_leave", "roster_draft_week", "qualification_expiring", "roster_unconfirmed"].map(row), total: 4, nextCursor: null })
+    expect(a.items.map((i) => i.href)).toEqual(["/rosters", "/rosters", "/rosters", "/rosters/mine"])
+  })
   test("attention: the FR-M1-79 feed in the API's order, with links to the task or report", () => {
     const a = toAttention({
       items: [

@@ -14,7 +14,7 @@ const Paging = { page: z.coerce.number().int().min(1).default(1).openapi({ examp
 // reason / days are checked by the service (422), not by zod (which would answer 400).
 const Reason = z.unknown().optional().openapi({ description: "Required: 1..500 characters (422 invalid_reason otherwise)", example: "Payment overdue 30 days" })
 
-const Health = z.enum(["green", "amber", "red"]).openapi({ description: "RED: payment state past_due or unpaid. AMBER: a trial ends within 7 days, or no activity for more than 30 days (a tenant that never had any counts from its creation). GREEN: everything else. No error-rate rule exists yet (the platform holds no per-tenant error metric)." })
+const Health = z.enum(["green", "amber", "red"]).openapi({ description: "RED: the tenant is suspended, or its payment state is past_due or unpaid. AMBER: a trial ends within 7 days, or no activity for more than 30 days (a tenant that never had any counts from its creation). GREEN: everything else. No error-rate rule exists yet (the platform holds no per-tenant error metric)." })
 const Usage = z.object({
   seats: z.number().int().openapi({ description: "Active members" }), activeUsers30d: z.number().int().openapi({ description: "Active members seen in the last 30 days" }),
   storageBytes: z.number().int().openapi({ description: "Bytes of uploaded files whose object is still stored" }),

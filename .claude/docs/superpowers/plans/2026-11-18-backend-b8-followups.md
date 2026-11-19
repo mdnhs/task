@@ -19,7 +19,7 @@ The plan's R8-1..R8-20 stand as written in the plan. These were made later, in r
 | AI1..AI3 | Week and `/mine` payloads carry `access { level, canEdit, locked, lockReason }` computed by the gate itself; web error states are distinct (conflict, locked, reason_required, rule_blocked + needsOffice, billing, mfa, rate limit, network) | the web must not re-derive authority; every answer has one UI | none |
 | AJ1, AK1, AL1, AM1, AN1 | Review carry-ins were folded into the next task (same feature, same files) instead of separate rounds; jsdom devDependency pinned to 27.4.0 | fewer rounds | a carry-in missed by the next reviewer: each was named in the next brief |
 | AO1 | Pre-existing e2e failures at the Task 25 base were fixed before the gate: DashboardBody React key warning (real bug), CR-06 spec premise (Leo has two running shifts), shifts week@390 filter bar, audit skeleton; ceilings re-set with reasons | the gate cannot be green on red specs | none |
-| Task 26 | The tenant audit log is NOT cut by roster scope (finding of the cross-role matrix, F-A1 below) | `audit:read` is a tenant-wide permission; cutting rows by site needs an entity-to-location join on every row | an office manager with `except` can read the excepted site's roster audit lines until F-A1 |
+| Task 26 | The tenant audit log is NOT cut by roster scope (finding of the cross-role matrix, F-A1 below) | `audit:read` is a tenant-wide permission; cutting rows by site needs an entity-to-location join on every row | an office manager with `except` reads the whole tenant audit trail (and can export it) until F-A1 |
 
 ## 2. Deferred in B8 (not built; each is a follow-up phase)
 
@@ -40,7 +40,7 @@ The plan's R8-1..R8-20 stand as written in the plan. These were made later, in r
 ## 3. Open follow-ups (collected from every review round)
 
 API and behaviour:
-- **F-A1 Audit scope.** An office manager cut by an `except` list reads the excepted site's roster audit lines (location name, reasons, ids) through `GET /v1/audit` (the Roster Manager template carries `audit:read`). Fix: cut roster audit rows by the site of the entity, or drop `audit:read` from the template. Pinned by `api/test/roster-cross-role.test.ts` (flip its last assertion). Supervisors and staff are already 403.
+- **F-A1 Audit scope (OWNER DECISION NEEDED before the first client with a cut office manager).** The Roster Manager template carries `audit:read`, which is tenant-wide: an office manager cut from a site by an `except` list reads the WHOLE tenant audit trail through `GET /v1/audit` (all sites' roster lines with names, reasons and ids, plus the role, member and task audit) and can export it as CSV through `GET /v1/audit/export`. It is not only the excepted site's lines. Nothing is deployed yet and no client has a cut office manager, so nobody is exposed today. Recommended fix (a): set `audit: none` on the roster-manager role template and add a per-tenant migration that sets it on existing roster-manager roles (set_config per tenant, reset after the loop), then flip the pinned assertion in `api/test/roster-cross-role.test.ts` (the cut office manager gets 403 on `/v1/audit` and `/v1/audit/export`). Alternative (b), 403 on `/v1/audit*` for `rosterLevel: office` when cut, keeps the permission for the uncut. Supervisors and staff are already 403. Found by the cross-role matrix (Task 26) and widened by the final review. NOT changed in code on purpose (ruling AP1).
 - **F-A2** An exchange stores no shift version or time snapshot: approving after the shift was retimed uses the live shift. Add `shift_version` to `roster_exchanges` (stale_request like change requests).
 - **F-A3** Notification kind `member` is reused for roster notices (a dedicated `roster` kind needs a preferences migration and the settings screen).
 - **F-A4** The default `location-supervisor` role has `attention: none` (task attention items are tenant-wide for that scope, so granting it would show other sites' task titles). Supervisors therefore never see roster attention items. Needs team/site-scoped task attention first.
@@ -57,6 +57,10 @@ API and behaviour:
 - **F-A15** `.ics` edge cases: the download is rate limited to 20/min per person; filename decoding falls back to `roster.ics`; the file has no VTIMEZONE (UTC times only, by design).
 - **F-A16** Real Redis cache stamp and the live BullMQ scheduler (15 min and hourly cron cadence) were not observed under real conditions; the e2e stack runs the worker against real Redis but a scheduler tick was not asserted. Staging item (section 6).
 - **F-A17** Test debt: some UI flows are jsdom-only (shift type save/archive, supervisor save, swap dialog, keyboard-only moves, drag after add, the `reason_required` hover/disabled states in dark).
+- **F-A18 (M-4)** `POST /v1/platform/data-requests/{id}/resolve` is allowed for platform owner AND support staff. Resolving as `completed` asserts that an erasure or export really happened, so consider owner only (support keeps `rejected`).
+- **F-A19 (M-7)** Every successful non-GET call busts the whole tenant read-model cache, including the pure-read `POST /v1/roster/weeks/{id}/check`. Fine at pilot size; skip the bust for that route (a `readOnlyPost` flag) when the cache hit rate matters.
+- **F-A20 (R-minors 8 to 10, left as is)** Leave matching uses the START date of a shift only (an overnight shift that runs into a leave day is not flagged); the qualification-expiry job reads dates in the tenant zone, not the person's site zone; qualification type matching is by lowercase text (no controlled list); the auto-repeat candidate ledger can list a source week that was meanwhile unpublished (re-read under the lock, so harmless).
+- **F-A21** Cross-image roll: after an api rollout the worker must roll at once (DSR job key `requestId` renamed `dsrId`); see migrations.md and rollback.md. A worker rolled back to a pre-B8 image needs the roster job schedulers removed.
 
 Web:
 - **F-W1** History panel shows a new entry only after reload (an edit re-reads the week, not the panels) and does not show the office's override reason on an approve over a block (it is in the API history's `after`).
@@ -66,7 +70,7 @@ Web:
 - **F-W5** Inbox "Submitted" chip has no number (the header shows "N open").
 - **F-W6** TypeCard "Try again" after a 409 may spin (the refreshed copy arrives after the click).
 - **F-W7** I3 card order: a new shift type created whose targets were refused jumps to the start of the grid.
-- **F-W8** `/rosters/mine` load fires a `POST /rosters/mine` server action whose purpose is unclear (m7).
+- **F-W8** (resolved: nothing to fix) The `POST /rosters/mine` seen on load is the global search warming its index: `features/search/components/global-search.tsx` calls the `searchIndex` server action (`features/search/actions.ts`) 1.2 s after any page is idle, and a server action posts to the current URL. It only READS (session plus the role-filtered static search index) and writes nothing; it is on every page, not specific to My roster. Not an RSC prefetch (those are GETs).
 - **F-W9** My roster's DST "9h" check only runs while the night is inside the four-weeks-back window (until 21 Nov 2026).
 - **F-W10** Location history is loaded by the admin page but not shown.
 - **F-W11** The dashboard team filter shows an error card when the team call fails (by design); a revert needs a shell setter.
@@ -87,8 +91,8 @@ Web:
 3. **Live Stripe double-checkout risk** (checklist C of the go-live runbook): two concurrent first checkouts can both pass the live-subscription check. Close it (conditional claim or advisory lock plus an alert on `foreign_subscription`) or accept it in writing; keep Stripe in test mode until then.
 4. **WhatsApp** (plan `2026-11-18-whatsapp-integration.md`, built after B8 to B11): open decisions W-x with default recommendations, and the consent text needs legal approval.
 5. **Light-brand contrast limit.** Light brand colours (yellow, white, cyan) give outline and focus fills under 3:1 against the surface (documented limit); text tokens are all at least 4.5:1.
-6. **picomatch advisory.** The accepted ReDoS advisory (dev tooling, no patched release) expires **2026-12-18**; CI goes red on purpose until reviewed.
-7. **Audit scope (F-A1).** Cut roster audit rows by site for an excepted office manager, or remove `audit:read` from the Roster Manager template.
+6. **picomatch advisory.** Removed from the allowlist on 20 Nov 2026: `npm audit` no longer reports it. If it returns, CI goes red on purpose until triaged (audit-triage.md).
+7. **Audit scope (F-A1).** Decide before the first client with a cut office manager. The cut office manager reads the whole tenant audit trail and can export it. Recommended: `audit: none` on the roster-manager template plus a per-tenant migration.
 8. **Resend domain verification** is done manually by the owner in the Resend dashboard (the in-app domain feature was dropped on 19 Nov 2026).
 9. **Staging verification list** (what could not be verified here, runbook B): Traefik trusted ranges and `TRUST_PROXY_HOPS=2` behind Cloudflare; the Cloudflare Transform Rule on the bucket domain; Dokploy rollback and domain behaviour; provider WAL and second EU backup copy; a timed restore drill WITH the roster tables; the full compose stack (ClamAV amd64); the load test with the BFF, two API instances and the worker (the 250-user roster profile); the roster worker cadence and real Redis stamps; a real calendar app reading the `.ics`; Safari and Firefox; a real phone.
 
@@ -118,7 +122,7 @@ See `.claude/docs/deploy/migrations.md`. 16 new tenant tables, all FORCE RLS, al
 | `npx eslint .` | 0 errors, 27 warnings (baseline) |
 | `npm run api:types:check` | current |
 | `npm run build`, `npm run check:bundle` | ok, clean (5 patterns) |
-| `npm run check:audit` | pass (note: the picomatch allowlist entry GHSA-fc5q-39xc-vjpf matches nothing now; remove it or keep it until its 2026-12-18 expiry) |
+| `npm run check:audit` | pass (the stale picomatch allowlist entry was removed in the final fix wave) |
 | Playwright desktop + android | 27 passed |
 | Playwright skeletons | 69 passed |
 | `npm run smoke` (fresh demo seed, flag off) | 75/75. On a database that already holds the Playwright roster world it is 70 to 73 of 75 (the shifts "19 people" text and Grace's "Access restricted" assume the plain seed; a platform TOTP code cannot be reused inside its 30 s window) |

@@ -16300,7 +16300,7 @@ export interface paths {
                                  */
                                 currency: string | null;
                                 /**
-                                 * @description RED: payment state past_due or unpaid. AMBER: a trial ends within 7 days, or no activity for more than 30 days (a tenant that never had any counts from its creation). GREEN: everything else. No error-rate rule exists yet (the platform holds no per-tenant error metric).
+                                 * @description RED: the tenant is suspended, or its payment state is past_due or unpaid. AMBER: a trial ends within 7 days, or no activity for more than 30 days (a tenant that never had any counts from its creation). GREEN: everything else. No error-rate rule exists yet (the platform holds no per-tenant error metric).
                                  * @enum {string}
                                  */
                                 health: "green" | "amber" | "red";
@@ -16404,7 +16404,7 @@ export interface paths {
                              */
                             currency: string | null;
                             /**
-                             * @description RED: payment state past_due or unpaid. AMBER: a trial ends within 7 days, or no activity for more than 30 days (a tenant that never had any counts from its creation). GREEN: everything else. No error-rate rule exists yet (the platform holds no per-tenant error metric).
+                             * @description RED: the tenant is suspended, or its payment state is past_due or unpaid. AMBER: a trial ends within 7 days, or no activity for more than 30 days (a tenant that never had any counts from its creation). GREEN: everything else. No error-rate rule exists yet (the platform holds no per-tenant error metric).
                              * @enum {string}
                              */
                             health: "green" | "amber" | "red";
