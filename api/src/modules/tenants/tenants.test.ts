@@ -315,7 +315,10 @@ test("T6.3: /v1/me/tenant carries the caller's own role (label, home, access) so
   expect(o.member.role).toMatchObject({ label: expect.any(String), home: "manager", access: { settings: "write", tasks: "write" } })
   const s = await mine(staff)
   expect(s.member).toMatchObject({ roleKey: "employee", role: { home: "staff", access: { settings: "none" } } })
-  expect(Object.keys(s.member.role).sort()).toEqual(["access", "description", "home", "label"])
+  expect(Object.keys(s.member.role).sort()).toEqual(["access", "description", "home", "label", "rosterLevel"])
+  // B8 Task 24 (Task 23 review I2): the role's roster level, so the shell offers Location Rosters only to a role with a location view
+  expect(o.member.role.rosterLevel).toBe("office")
+  expect(s.member.role.rosterLevel).toBeNull()
   // the matrix is the caller's own: staff never see another role's rows
   expect(JSON.stringify(s)).not.toContain('"settings":"write"')
 })

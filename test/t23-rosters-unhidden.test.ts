@@ -32,10 +32,16 @@ const shellNav = (role: Role, planId: string) => hideMockNav(filterByEntitlement
 afterEach(() => vi.unstubAllEnvs())
 
 describe("B8 Task 23: Location Rosters without the mock flag", () => {
-  test("without ENABLE_MOCK_MODULES the nav shows Location Rosters and My roster for a role with M1A and roster access, and hides them for a Starter tenant (not in plan) and for a platform user", () => {
+  test("without ENABLE_MOCK_MODULES the nav shows Location Rosters and My roster for a role with M1A and roster access (a location view for the week), and hides them for a Starter tenant (not in plan) and for a platform user", () => {
     vi.stubEnv("ENABLE_MOCK_MODULES", "")
     expect(strip(read("app/(app)/layout.tsx"))).toContain("hideMockNav(filterByEntitlement(filterNav(items, session.role), session.entitlements))")
-    for (const r of ["owner", "roster-manager", "location-supervisor", "ops", "employee"]) expect(shellNav(roleOf(r), "business"), r).toEqual(expect.arrayContaining(["/rosters", "/rosters/mine"]))
+    for (const r of ["owner", "roster-manager", "location-supervisor", "ops"]) expect(shellNav(roleOf(r), "business"), r).toEqual(expect.arrayContaining(["/rosters", "/rosters/mine"]))
+    // Task 23 review I2: the week view needs a location view (the domain's rosterAccess): a staff-home role without a roster level only has its own shifts, so it gets My roster and
+    // never a link to a page that would say "Access restricted".
+    for (const r of ["employee", "supervisor", "hr", "payroll"]) {
+      expect(shellNav(roleOf(r), "business"), r).toContain("/rosters/mine")
+      expect(shellNav(roleOf(r), "business"), r).not.toContain("/rosters")
+    }
     expect(shellNav(roleOf("owner"), "starter")).not.toEqual(expect.arrayContaining(["/rosters"]))
     expect(shellNav(roleOf("owner"), "starter").filter((h) => h.startsWith("/rosters"))).toEqual([])
     expect(shellNav(roleOf("platform"), "business").filter((h) => h.startsWith("/rosters"))).toEqual([])

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest"
 import { can, canReview, canWriteFor, filterNav, moduleForHref, reportScope, shiftScope } from "./permissions"
 import type { Access, Module, Role } from "./types"
 
-const mods: Module[] = ["dashboard", "tasks", "reports", "attention", "staff", "shifts", "recruitment", "files", "payroll", "orders", "settings", "audit"]
+const mods: Module[] = ["dashboard", "tasks", "reports", "attention", "staff", "shifts", "recruitment", "files", "payroll", "orders", "settings", "audit", "roster"]
 const mk = (id: string, over: Partial<Record<Module, Access>>): Role => ({
   id,
   label: id,
@@ -42,6 +42,14 @@ describe("filterNav", () => {
   const items = [{ href: "/" }, { href: "/tasks" }, { href: "/payroll-issues" }]
   it("hides modules the role can't read", () =>
     expect(filterNav(items, employee).map((i) => i.href)).toEqual(["/", "/tasks"]))
+  it("Location Rosters needs a location view (rosterAccess): a staff-home roster reader keeps only My roster; a supervisor level or a manager-home reader keeps both", () => {
+    const ros = [{ href: "/rosters" }, { href: "/rosters/mine" }, { href: "/rosters/locations" }]
+    expect(filterNav(ros, mk("employee", { roster: "read" })).map((i) => i.href)).toEqual(["/rosters/mine"])
+    expect(filterNav(ros, mk("employee", { roster: "write" })).map((i) => i.href)).toEqual(["/rosters/mine"]) // write without a level is still "own"
+    expect(filterNav(ros, { ...mk("lead", { roster: "write" }), rosterLevel: "supervisor" }).map((i) => i.href)).toHaveLength(3)
+    expect(filterNav(ros, { ...mk("ops", { roster: "read" }), home: "manager" }).map((i) => i.href)).toHaveLength(3)
+    expect(filterNav(ros, mk("none", { roster: "none" }))).toEqual([])
+  })
 })
 
 describe("canReview", () => {

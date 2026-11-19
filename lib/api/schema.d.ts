@@ -291,6 +291,11 @@ export interface paths {
                                     access: {
                                         [key: string]: "none" | "read" | "write";
                                     };
+                                    /**
+                                     * @description The role's roster level (null: none; an API key or support grant is always null). The shell offers Location Rosters only to a role with a location view; the roster API stays the authority
+                                     * @enum {string|null}
+                                     */
+                                    rosterLevel: "office" | "supervisor" | null;
                                 };
                             };
                             brand: {

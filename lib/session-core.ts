@@ -52,7 +52,7 @@ export type SessionDeps = {
   /** The API client; `tenant` overrides the cookie slug (see apiServer). */
   api: (o?: { tenant?: string | null }) => Promise<ApiClient>
   entitlementsData: () => Promise<EntitlementsData>
-  /** Mock-era role extras (rosterLevel, reportScope) and the console's platform role, from public/data/shell/roles.json. */
+  /** Mock-era role extras (reportScope) and the console's platform role, from public/data/shell/roles.json. The roster level comes from the API. */
   staticRoles: () => Promise<Role[]>
 }
 
@@ -94,7 +94,7 @@ const isStatus = (e: unknown, status: number, code?: string): e is ApiError => e
 
 type TenantCtx = {
   tenant: { id: string; slug: string; name: string; mfaPolicy: { mode: "off" | "all" | "roles"; roles: string[] } }
-  member: { roleKey: string; role: { label: string; description: string; home: "manager" | "staff"; access: Record<string, string> } }
+  member: { roleKey: string; role: { label: string; description: string; home: "manager" | "staff"; access: Record<string, string>; rosterLevel?: "office" | "supervisor" | null } }
   brand: { primaryColor: string | null }
   device: { id: string | null; label: string; trusted: boolean }
   features: { drive: boolean }
@@ -137,7 +137,8 @@ export async function resolveSession(deps: SessionDeps): Promise<Resolved> {
         description: ctx.member.role.description,
         home: ctx.member.role.home,
         access: accessOf(ctx.member.role.access),
-        ...(extras?.rosterLevel ? { rosterLevel: extras.rosterLevel } : {}),
+        // the API's roster level (a custom role may have one, a template may have lost it): it decides whether the shell offers Location Rosters (Task 23 review I2)
+        ...(ctx.member.role.rosterLevel ? { rosterLevel: ctx.member.role.rosterLevel } : {}),
         ...(extras?.reportScope ? { reportScope: extras.reportScope } : {}),
       },
       entitlements,

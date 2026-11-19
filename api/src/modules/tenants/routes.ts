@@ -6,6 +6,8 @@ import { requireTenant } from "../../core/middleware/tenant"
 import { UNREGISTERED_ID } from "@opsdesk/domain/devices"
 import { driveAllowed } from "../../core/middleware/device"
 import { loadRole } from "../../core/middleware/permission"
+import { and, eq } from "drizzle-orm"
+import { roles } from "../../db/schema"
 import { withTenant } from "../../db/tenant-tx"
 import { getBranding, getOrganisation } from "../settings"
 import { listUserTenants, loadMe, tenantDisplayName } from "./me"
@@ -69,6 +71,7 @@ export const MeTenantDto = z
       role: z.object({
         label: z.string(), description: z.string(), home: z.enum(["manager", "staff"]),
         access: z.record(z.string(), z.enum(["none", "read", "write"])).openapi({ description: "The caller's OWN role, module -> none|read|write (staff cannot read GET /v1/roles, so the shell gets it here)" }),
+        rosterLevel: z.enum(["office", "supervisor"]).nullable().openapi({ description: "The role's roster level (null: none; an API key or support grant is always null). The shell offers Location Rosters only to a role with a location view; the roster API stays the authority" }),
       }),
     }),
     brand: z.object({ primaryColor: z.string().nullable() }),
@@ -80,7 +83,7 @@ export const MeTenantDto = z
   .openapi({
     example: {
       tenant: { id: "0b6f4c1e-8f0e-4c53-9a3e-6a4c1b2d7e90", slug: "coppers", name: "Coppers", timezone: "Europe/Dublin", currency: "EUR", locale: "en-IE", sessionIdleHours: 12, mfaPolicy: { mode: "off", roles: [] } },
-      member: { userId: "usr_8Kq2mZ4tW1", roleId: "5e1c0d52-8d3a-4b7e-9c41-2a5b7e90d3f8", roleKey: "owner", role: { label: "Tenant Owner", description: "Full control of the company workspace", home: "manager", access: { dashboard: "write", tasks: "write", settings: "write" } } },
+      member: { userId: "usr_8Kq2mZ4tW1", roleId: "5e1c0d52-8d3a-4b7e-9c41-2a5b7e90d3f8", roleKey: "owner", role: { label: "Tenant Owner", description: "Full control of the company workspace", home: "manager", access: { dashboard: "write", tasks: "write", settings: "write" }, rosterLevel: "office" } },
       brand: { primaryColor: "#0A1B2C" }, reportDeadline: "17:30", reportDueAfterMinutes: 60,
       device: { id: null, type: "browser", label: "Unregistered browser", trusted: false }, features: { drive: false },
     },
@@ -115,16 +118,21 @@ export const tenantRoutes = newRouter()
   .openapi(meTenantRoute, async (c) => {
     const { tenant, member } = { tenant: c.get("tenant")!, member: c.get("member")! }
     const deps = c.get("deps")
-    const [name, role, { org, brand }] = await Promise.all([
+    const [name, role, { org, brand, level }] = await Promise.all([
       tenantDisplayName(deps.db, tenant.id),
       loadRole(c),
-      withTenant(deps.db, tenant.id, async (tx) => ({ org: await getOrganisation(tx, tenant.id), brand: await getBranding(tx, tenant.id) })),
+      withTenant(deps.db, tenant.id, async (tx) => ({
+        org: await getOrganisation(tx, tenant.id),
+        brand: await getBranding(tx, tenant.id),
+        // the member's role row (an API key or support grant has a sentinel role id: no row, so no level)
+        level: (await tx.select({ level: roles.rosterLevel }).from(roles).where(and(eq(roles.tenantId, tenant.id), eq(roles.id, member.roleId))))[0]?.level ?? null,
+      })),
     ])
     const d = c.get("device") // unset on the support-grant and API-key paths: the unregistered browser
     return c.json(
       {
         tenant: { ...tenant, name },
-        member: { ...member, role: { label: role.label, description: role.description, home: role.home, access: role.access } },
+        member: { ...member, role: { label: role.label, description: role.description, home: role.home, access: role.access, rosterLevel: level === "office" || level === "supervisor" ? level : null } },
         brand: { primaryColor: brand.primaryColor },
         reportDeadline: org.reportDeadline,
         reportDueAfterMinutes: org.reportDueAfterMinutes,

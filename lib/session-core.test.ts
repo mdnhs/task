@@ -116,6 +116,13 @@ describe("T6.3 resolveSession (I7, I8): the real session from /v1/me, /v1/me/ten
     expect(r.kind === "ok" && r.session.role.rosterLevel).toBeUndefined()
   })
 
+  test("the roster level is the API's (Task 23 review I2): a custom role the API gives a level has it; a template the API gives none has none, whatever the static list says", async () => {
+    const custom = await resolveSession(world({ tenants: { alpha: { roleKey: "night-lead", rosterLevel: "supervisor" } } }).deps)
+    expect(custom.kind === "ok" && custom.session.role.rosterLevel).toBe("supervisor")
+    const owner = await resolveSession(world({ tenants: { alpha: { roleKey: "owner", rosterLevel: null } } }).deps)
+    expect(owner.kind === "ok" && owner.session.role.rosterLevel).toBeUndefined()
+  })
+
   test("an access value outside none|read|write, or a missing module, is 'none' (never wider than the API said)", async () => {
     const { deps } = world()
     const base = deps.api

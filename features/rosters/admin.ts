@@ -59,6 +59,14 @@ function fieldsOf(f: LocationForm, base?: RosterLocation): LocationFields {
   }
 }
 
+/**
+ * Equality that ignores object key order (Task 23 review I1): the API returns jsonb (keys ordered by length, then bytes) while the form builds mon..sun, so a plain
+ * JSON.stringify compare saw a change on every save and sent openingHours back, reverting another session's edit. Arrays keep their order.
+ */
+const canon = (v: unknown): unknown =>
+  Array.isArray(v) ? v.map(canon) : typeof v === "object" && v !== null ? Object.fromEntries(Object.keys(v).sort().map((k) => [k, canon((v as Record<string, unknown>)[k])])) : v
+const sameValue = (a: unknown, b: unknown): boolean => JSON.stringify(canon(a)) === JSON.stringify(canon(b))
+
 /** The body of POST /v1/locations. */
 export const createBody = (f: LocationForm): LocationFields => fieldsOf(f)
 
@@ -69,7 +77,7 @@ export function patchBody(f: LocationForm, base: RosterLocation, version: number
     name: base.name, address: base.address, lat: base.lat, lng: base.lng, zoneRadiusM: base.zoneRadiusM, openingHours: base.openingHours, contact: base.contact,
     swapApprovalDelegated: base.swapApprovalDelegated, timeZone: base.timeZone,
   }
-  const changed = (Object.keys(next) as (keyof LocationFields)[]).filter((k) => JSON.stringify(next[k]) !== JSON.stringify(was[k]))
+  const changed = (Object.keys(next) as (keyof LocationFields)[]).filter((k) => !sameValue(next[k], was[k]))
   if (changed.length === 0) return null
   return { version, ...Object.fromEntries(changed.map((k) => [k, next[k]])) }
 }
@@ -80,7 +88,7 @@ export function patchBody(f: LocationForm, base: RosterLocation, version: number
  * objects (opening hours per day, targets per weekday) merge one level down; arrays and scalars are one value.
  */
 export function keepMine<T extends Record<string, unknown>>(mine: T, base: T, theirs: T): T {
-  const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b)
+  const same = sameValue
   const plain = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v)
   const out: Record<string, unknown> = {}
   for (const k of Object.keys(theirs)) {
@@ -132,7 +140,7 @@ export const typeCreateBody = (d: TypeDraft) => typeFields(d)
 export function typePatchBody(d: TypeDraft, t: ShiftType): (Partial<ReturnType<typeof typeFields>> & { version: number }) | null {
   const next = typeFields(d)
   const was = { name: t.name, role: t.role, start: t.start, end: t.end, unpaidBreakMin: t.unpaidBreakMin, requires: t.requires }
-  const changed = (Object.keys(next) as (keyof typeof next)[]).filter((k) => JSON.stringify(next[k]) !== JSON.stringify(was[k]))
+  const changed = (Object.keys(next) as (keyof typeof next)[]).filter((k) => !sameValue(next[k], was[k]))
   return changed.length ? { version: t.version, ...Object.fromEntries(changed.map((k) => [k, next[k]])) } : null
 }
 /** The whole target set for PUT /v1/shift-types/{id}/targets (weekdays with a count above 0), or null when it equals the saved one. */

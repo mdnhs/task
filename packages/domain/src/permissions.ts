@@ -1,3 +1,4 @@
+import { rosterAccess } from "./roster-access"
 import type { Access, Module, Role, Tenant } from "./types"
 
 export type { Access, Module, Role } from "./types"
@@ -42,9 +43,20 @@ export function canReview(role: Role, tenantStatus: Tenant["status"] = "active")
   return role.home === "manager" && canWriteFor(role, tenantStatus, "reports")
 }
 
-// Drops nav items whose module the role can't open (server-side, so hidden modules never reach the client).
+// Drops nav items whose module the role can't open (server-side, so hidden modules never reach the client). Location Rosters (the week view and the locations admin) also
+// needs a location view: a role whose roster access is only its own shifts (a staff-home role without a roster level) keeps My roster but never gets a link to a page that
+// would answer "Access restricted" (B8 Task 23 review I2). The API stays the authority on the page itself.
 export function filterNav<T extends { href: string }>(items: T[], role: Role): T[] {
-  return items.filter((n) => can(role, moduleForHref(n.href) ?? "dashboard"))
+  return items.filter((n) => can(role, moduleForHref(n.href) ?? "dashboard") && (!needsLocationView(n.href) || hasLocationView(role)))
+}
+const needsLocationView = (href: string) => {
+  const p = href.split(/[?#]/)[0]!
+  return (p === "/rosters" || p.startsWith("/rosters/")) && p !== "/rosters/mine" && !p.startsWith("/rosters/mine/")
+}
+/** The role may open a location's roster (scope all or locations, per the domain's rosterAccess), whatever its grants: the API cuts which ones. */
+export const hasLocationView = (role: Role): boolean => {
+  const scope = rosterAccess(role, "", [], [], []).scope
+  return scope === "all" || scope === "locations"
 }
 
 // Shifts (FR-M1-20/21, FR-M0-07): roles with write access edit everyone's shifts; manager-home readers (auditor) see everyone read-only;

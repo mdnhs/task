@@ -18,6 +18,14 @@ describe("location form", () => {
     expect(patchBody({ ...f, contact: "01 222", delegated: true }, loc, 4)).toEqual({ version: 4, contact: "01 222", swapApprovalDelegated: true })
     expect(patchBody({ ...f, hours: { ...f.hours, tue: "09:00-17:00" } }, loc, 1)).toEqual({ version: 1, openingHours: { mon: "08:00-22:00", tue: "09:00-17:00" } })
   })
+  it("an unchanged Save sends no openingHours when the API's jsonb key order differs from the form's (Task 23 review I1)", () => {
+    // jsonb orders keys by length, then bytes (all, fri, mon, sat, sun, ...); the form builds mon..sun. Same content = no change.
+    const jsonb = { ...loc, openingHours: { all: "x", fri: "08:00-20:00", sun: "10:00-18:00", mon: "08:00-22:00", sat: "09:00-18:00" } }
+    expect(patchBody(formOf(jsonb), jsonb, 2)).toBeNull()
+    const f = formOf(jsonb)
+    expect(patchBody({ ...f, contact: "01 9" }, jsonb, 2)).toEqual({ version: 2, contact: "01 9" }) // another field changed: hours stay out of the PATCH
+    expect(patchBody({ ...f, hours: { ...f.hours, sun: "" } }, jsonb, 2)).toMatchObject({ openingHours: { all: "x", mon: "08:00-22:00", fri: "08:00-20:00", sat: "09:00-18:00" } })
+  })
   it("keeps opening-hour keys the form does not show, and sends null for a cleared point or zone", () => {
     const odd = { ...loc, openingHours: { all: "Mon-Sun 24h" } }
     expect(patchBody({ ...formOf(odd), lat: "", lng: "", timeZone: "" }, odd, 1)).toEqual({ version: 1, lat: null, lng: null })

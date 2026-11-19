@@ -13,7 +13,7 @@ export type OpenRow = { shift: WeekShift; place: string; weekStatus: "draft" | "
 export type SwapRow = { exchange: ApiExchange; place: string; weekStatus: "draft" | "published"; delegated: boolean }
 
 // Open shifts of the shown range with who offered to take them, and swap requests waiting (FR-RS-38/42/43, D6, R8-11). Which buttons show is `exchangeActions` (the matrix); the API decides every one
-// again. Each open shift is also a derived gap in Staff & Rosters (D12): a plain link, features never import each other.
+// again. Staff & Rosters no longer derives its gaps from these (R8-15, B8 Task 23), so the panel links nowhere else.
 export function OpenShiftsPanel({ level, me, today, open, swaps, exchanges, nameOf, busy, onClaim, onRecommend, onDecide }: {
   /** The caller's user id (empty when unknown): nothing is offered on an exchange they are party to, and Claim goes once they have an open claim on the shift. */
   me: string

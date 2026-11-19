@@ -227,6 +227,20 @@ describe("Task 22 review carry-ins (I1 I2 I3 m6)", () => {
     expect(m.toast.error).not.toHaveBeenCalledWith("Changed by someone else.")
   })
 
+  it("m3 (Task 23 review): a successful targets PUT moves the card on to its answer, so the next Save sends that version and no targets again", async () => {
+    await mount(createElement(LocationFormPage, { location: loc, shiftTypes: [toShiftType(shiftTypeDto)], people, truncated: false }))
+    await typeInto(byLabel("Night Fri") as HTMLInputElement, "3")
+    m.setShiftTypeTargets.mockResolvedValueOnce(ok(toShiftType({ ...shiftTypeDto, targets: [{ weekday: 1, count: 2 }, { weekday: 5, count: 3 }], version: 2 })))
+    await click(inCard("Night", "Save")!)
+    expect(m.updateShiftType).not.toHaveBeenCalled() // only the targets changed
+    await waitTick()
+    await typeInto(field(`${STID}-break`), "45")
+    m.updateShiftType.mockResolvedValueOnce(ok(toShiftType({ ...shiftTypeDto, unpaidBreakMin: 45, targets: [{ weekday: 1, count: 2 }, { weekday: 5, count: 3 }], version: 3 })))
+    await click(inCard("Night", "Save")!)
+    expect(m.updateShiftType).toHaveBeenLastCalledWith(STID, { version: 2, unpaidBreakMin: 45 }) // the targets PUT's version, not the stale 1
+    expect(m.setShiftTypeTargets).toHaveBeenCalledTimes(1)
+  })
+
   it("I3: a new type created but its targets refused becomes the saved type (Archive, no Remove); saving again sends the targets, never a second create", async () => {
     await mount(createElement(LocationFormPage, { location: loc, shiftTypes: [], people, truncated: false }))
     await click(byText("Add")!)
