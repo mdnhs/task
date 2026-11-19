@@ -118,7 +118,7 @@ const dsrRoute = createRoute({
 
 const bellRoute = createRoute({
   method: "get", path: "/v1/platform/notifications", middleware: [requirePlatformStaff("owner", "support", "billing", "viewer")] as const,
-  responses: { 200: { description: "The bell, derived (no table of its own): pending data requests, past_due or unpaid subscriptions, trials ending within 7 days and your own support grants expiring within 24 h, newest first (at most 100). Ids, names and dates only. `unread` = items newer than your last `seen`", content: { "application/json": { schema: BellDto } } } },
+  responses: { 200: { description: "The bell, derived (no table of its own): data requests staff can act on (`running` or `failed`), past_due or unpaid subscriptions, trials ending within 7 days and your own support grants expiring within 24 h, newest first (at most 100). Ids, names and dates only. `unread` = items newer than your last `seen`", content: { "application/json": { schema: BellDto } } } },
 })
 const seenRoute = createRoute({
   method: "post", path: "/v1/platform/notifications/seen", middleware: [requirePlatformStaff("owner", "support", "billing", "viewer")] as const,
@@ -127,7 +127,7 @@ const seenRoute = createRoute({
 const resolveRoute = createRoute({
   method: "post", path: "/v1/platform/data-requests/{id}/resolve", middleware: [requirePlatformStaff("owner", "support")] as const,
   request: { params: z.object({ id: z.string().min(1).max(100).openapi({ param: { name: "id", in: "path" }, example: TID }) }), body: { content: { "application/json": { schema: ResolveBody } }, required: true } },
-  responses: { 200: { description: "Closes a request that is `running` (being processed) as completed or rejected; the tenant sees the status and the note and its requester is told. Audited in the tenant chain (actor platform:<staffId>) and the platform chain. 404 data_request_not_found; 409 request_not_processing (any other status, so a second call changes nothing); 422 invalid_outcome | invalid_note", content: { "application/json": { schema: ResolvedDto } } } },
+  responses: { 200: { description: "Closes a request that is `running` (being processed) or `failed` (stuck) as completed or rejected; a `pending` request is picked up by its job and is not resolvable; the tenant sees the status and the note and its requester is told. Audited in the tenant chain (actor platform:<staffId>) and the platform chain. 404 data_request_not_found; 409 request_not_processing (pending, completed or rejected, so a second call changes nothing); 422 invalid_outcome | invalid_note", content: { "application/json": { schema: ResolvedDto } } } },
 })
 
 const iso = (d: Date | null) => d?.toISOString() ?? null

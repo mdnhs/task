@@ -1,4 +1,4 @@
-import { and, eq, gt, isNull, lte } from "drizzle-orm"
+import { and, eq, gt, inArray, isNull, lte, sql } from "drizzle-orm"
 import { dataRequests, platformStaff, subscriptions, supportGrants, tenants } from "../../db/schema"
 import type { Db } from "../../deps"
 import { eachTenant } from "./tenants"
@@ -16,7 +16,8 @@ export type BellItem = { kind: BellKind; tenantId: string; tenantName: string; r
 
 /**
  * The platform bell (B8 Task 17): a feed DERIVED from what the platform already holds, no table of its own. Per tenant, under that tenant's own RLS context:
- *  - `data_request`  a GDPR request still `pending` (at = when it was opened, until = its due date, refId = its id);
+ *  - `data_request`  a GDPR request staff can act on: `running` or `failed` (stuck; resolve takes exactly these two states). A `pending` one is picked up by the job itself and is not listed
+ *                    (at = when it was opened, until = its due date, refId = its id);
  *  - `failed_payment` a subscription `past_due` or `unpaid` (at = the newest provider event applied, else the period end, else the tenant's creation);
  *  - `trial_ending`  a `trialing` subscription whose trial ends within 7 days from now (at = 7 days before the end, until = the end);
  *  - `grant_expiring` an ACTIVE support grant of THIS staff member (at = its start, until = its expiry: a grant lasts at most 24 hours, so every active one expires within 24 h; refId = its id).
@@ -30,7 +31,7 @@ export async function bellFeed(db: Db, now: Date, staffId: string): Promise<{ it
   const grantHorizon = new Date(now.getTime() + 24 * HOUR_MS)
   const rows = await eachTenant(db, ts.map((t) => t.id), async (tx, id) => ({
     sub: (await tx.select({ status: subscriptions.status, trialEndsAt: subscriptions.trialEndsAt, currentPeriodEnd: subscriptions.currentPeriodEnd, eventAt: subscriptions.updatedFromEventAt }).from(subscriptions).where(eq(subscriptions.tenantId, id)))[0],
-    dsrs: await tx.select({ id: dataRequests.id, createdAt: dataRequests.createdAt, dueAt: dataRequests.dueAt }).from(dataRequests).where(and(eq(dataRequests.tenantId, id), eq(dataRequests.status, "pending"))),
+    dsrs: await tx.select({ id: dataRequests.id, createdAt: dataRequests.createdAt, dueAt: dataRequests.dueAt }).from(dataRequests).where(and(eq(dataRequests.tenantId, id), inArray(dataRequests.status, ["running", "failed"]))),
     grants: await tx.select({ id: supportGrants.id, startsAt: supportGrants.startsAt, expiresAt: supportGrants.expiresAt }).from(supportGrants)
       .where(and(eq(supportGrants.tenantId, id), eq(supportGrants.staffUserId, staffId), isNull(supportGrants.revokedAt), lte(supportGrants.startsAt, now), gt(supportGrants.expiresAt, now), lte(supportGrants.expiresAt, grantHorizon))),
   }))
@@ -50,10 +51,15 @@ export async function bellFeed(db: Db, now: Date, staffId: string): Promise<{ it
   return { items: items.slice(0, BELL_MAX_ITEMS), unread: items.filter((i) => seen === null || i.at.getTime() > seen.getTime()).length }
 }
 
-/** Stamps the staff member's `notifications_seen_at` with `now` (the clock, never the database's) and answers the stamp; a call never moves it backwards. */
+/**
+ * Stamps the staff member's `notifications_seen_at` with `now` (the clock, never the database's) in ONE statement: `greatest(coalesce(seen, now), now)`, so a call never moves it backwards and
+ * concurrent calls cannot overwrite a later stamp with an earlier one (no read-then-write). Answers the stored value.
+ */
 export async function markBellSeen(db: Db, now: Date, staffId: string): Promise<{ seenAt: Date; unread: number }> {
-  const [row] = await db.select({ seen: platformStaff.notificationsSeenAt }).from(platformStaff).where(eq(platformStaff.userId, staffId))
-  const seenAt = row?.seen && row.seen.getTime() > now.getTime() ? row.seen : now
-  await db.update(platformStaff).set({ notificationsSeenAt: seenAt }).where(eq(platformStaff.userId, staffId))
-  return { seenAt, unread: 0 }
+  const [row] = await db
+    .update(platformStaff)
+    .set({ notificationsSeenAt: sql`greatest(coalesce(${platformStaff.notificationsSeenAt}, ${now.toISOString()}::timestamptz), ${now.toISOString()}::timestamptz)` })
+    .where(eq(platformStaff.userId, staffId))
+    .returning({ seenAt: platformStaff.notificationsSeenAt })
+  return { seenAt: row?.seenAt ?? now, unread: 0 }
 }

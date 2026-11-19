@@ -1,4 +1,6 @@
-import { beforeEach, describe, expect, test } from "vitest"
+import pg from "pg"
+import { afterAll, beforeEach, describe, expect, test } from "vitest"
+import { ownerQuery } from "../../../test/db"
 import { resetDb } from "../../../test/harness"
 import { resetSubscribers } from "../../core/events"
 import { runJob } from "../../core/queue/queue"
@@ -10,6 +12,7 @@ import { registerSearchIndexers } from "../search"
 import { sites, type Json, type Who } from "./testkit"
 import { ERASED_PERSON, rostersDsrHandler } from "./dsr"
 import { registerRosters } from "./jobs"
+import { ROSTER_LOCK_NS } from "./scope"
 
 // B8 Task 18: data-subject export and erasure of the roster tables. The subject is the employee (`p.employee`), the colleague `staff2` is a different person whose data must never appear in the subject's export
 // and must survive the erasure untouched. The clock is the testkit's (2026-11-16T09:00Z).
@@ -251,5 +254,84 @@ describe("erasure (FR-M0-18)", () => {
     await runDsrJobs(w)
     expect((await w.rows("select 1 from location_supervisors where user_id = $1", [sup.userId])).length).toBe(0)
     expect((await w.rows("select 1 from location_supervisors")).length).toBe(1) // the other site's supervisor stays
+  })
+})
+
+describe("AH1 erase takes the roster lock (lock order = deactivation)", () => {
+  const owner = new pg.Pool({ connectionString: process.env.TEST_DATABASE_OWNER_URL, max: 2 })
+  afterAll(() => owner.end())
+  const waitBlocked = async (notPid: number) => {
+    for (let i = 0; i < 100; i++) {
+      const r = await ownerQuery("select 1 from pg_locks where not granted and pid <> $1", [notPid])
+      if (r.length > 0) return
+      await new Promise((r2) => setTimeout(r2, 50))
+    }
+    throw new Error("the erase never waited on a lock")
+  }
+
+  test("a roster writer that owns the subject's shift row and then notifies the subject (KEY SHARE on the membership row) does not deadlock with the erase: the erase waits for the roster lock, the writer commits, the erase completes (no 40P01, no failed request)", async () => {
+    const { w, me, mine, wa } = await scene()
+    const id = await eraseRequest(w, me)
+    const c = await owner.connect()
+    try {
+      await c.query("begin")
+      await c.query("select set_config('app.tenant_id', $1, true)", [w.tenant.id])
+      const pid = (await c.query("select pg_backend_pid() as pid")).rows[0].pid as number
+      await c.query("select pg_advisory_xact_lock($1::int, hashtext($2::text))", [ROSTER_LOCK_NS, w.tenant.id]) // a roster writer: the roster lock first,
+      await c.query("update roster_shifts set user_id = null, version = version + 1 where id = $1", [mine[0]]) // then the subject's shift row (unassign),
+      const job = runJob("dsr.erase", { dsrId: id, tenantId: w.tenant.id }, w.deps) // the erase starts now,
+      await waitBlocked(pid) // and waits: for the roster lock (fixed) or, before the fix, on the shift row after taking the membership row
+      await c.query("insert into notifications (tenant_id, user_id, kind, title, body, created_at) values ($1, $2, 'system', 'Shift removed', 'A shift was removed', now())", [w.tenant.id, me.userId]) // ... then notifies the subject: needs KEY SHARE on the membership row
+      await c.query("commit")
+      await job
+    } catch (e) {
+      await c.query("rollback").catch(() => undefined)
+      throw e
+    } finally {
+      c.release()
+    }
+    expect((await w.ok("GET", `/v1/data-requests/${id}`, w.p.owner)).status).toBe("completed")
+    expect((await w.rows("select 1 from roster_shifts where user_id = $1", [me.userId])).length).toBe(0)
+    expect((await w.rows("select user_id from roster_shifts where id = any($1::uuid[])", [mine])).every((r) => r.user_id === null)).toBe(true)
+    const lines = (await w.rows("select week_id, after from roster_history where action = 'member_erased_shifts_opened'")) as Json[]
+    expect(lines.length).toBe(1) // one line for the published week
+    expect(lines[0]).toMatchObject({ week_id: wa })
+    expect((await w.rows("select 1 from memberships where user_id = $1", [me.userId])).length).toBe(0)
+  }, 20_000)
+
+  test("real roster writes racing the erase (publish, edit, unassign of the subject's shifts, all at once): the request completes, nothing fails with 40P01, the person has no shift left and the week history has exactly one erasure line", async () => {
+    const { w, me, them, mine, theirs } = await scene()
+    const id = await eraseRequest(w, me)
+    const draft = await w.week(w.p.owner, w.a, "2026-12-07")
+    await w.addOk(w.p.owner, draft, [{ date: "2026-12-08", userIds: [me.userId, them.userId], shiftTypeId: w.ta }])
+    const v = Number((await w.rows("select version from roster_weeks where id = $1", [draft]))[0].version)
+    const sv = Number((await w.rows("select version from roster_shifts where id = $1", [theirs[0]]))[0].version)
+    const results = await Promise.all([
+      runJob("dsr.erase", { dsrId: id, tenantId: w.tenant.id }, w.deps).then(() => "erase"),
+      w.req("POST", `/v1/roster/weeks/${draft}/publish`, w.p.owner, { version: v }),
+      w.req("PATCH", `/v1/roster/shifts/${theirs[0]}`, w.p.owner, { version: sv, patch: { start: "10:00", end: "18:00" }, reason: "Busy day" }),
+      w.req("DELETE", `/v1/roster/shifts/${mine[1]}?reason=${encodeURIComponent("Cover")}`, w.p.owner),
+    ])
+    for (const r of results) if (r instanceof Response) expect([200, 204, 404, 409, 422], `${r.status} ${await r.clone().text()}`).toContain(r.status) // a 409 is the documented retry answer, never a 500
+    expect((await w.ok("GET", `/v1/data-requests/${id}`, w.p.owner)).status).toBe("completed")
+    expect((await w.rows("select 1 from roster_shifts where user_id = $1", [me.userId])).length).toBe(0)
+    expect((await w.rows("select 1 from memberships where user_id = $1", [me.userId])).length).toBe(0)
+    expect((await w.rows("select 1 from roster_history where action = 'member_erased_shifts_opened' and week_id = (select week_id from roster_shifts where id = $1)", [mine[0]])).length).toBeLessThanOrEqual(1)
+  })
+
+  test("a second run of the same erase (the request put back to pending, as the sweep or a retry does): nothing changes, no second history line, no second member.removed, other people's rows untouched", async () => {
+    const { w, me } = await scene()
+    const id = await eraseRequest(w, me)
+    await runDsrJobs(w)
+    const snapshot = async () => JSON.stringify([
+      await w.rows("select * from roster_shifts order by id"), await w.rows("select * from roster_history order by id"), await w.rows("select * from roster_week_templates order by id"), await w.rows("select * from roster_weeks order by id"),
+      await w.rows("select * from leave_requests order by id"), await w.rows("select * from roster_exchanges order by id"), await w.rows("select action, entity_id from audit_events where action = 'member.removed'"),
+    ])
+    const once = await snapshot()
+    expect((await w.rows("select 1 from roster_history where action = 'member_erased_shifts_opened'")).length).toBe(1)
+    await w.rows("update data_requests set status = 'pending', started_at = null, completed_at = null where id = $1", [id])
+    await runJob("dsr.erase", { dsrId: id, tenantId: w.tenant.id }, w.deps)
+    expect((await w.ok("GET", `/v1/data-requests/${id}`, w.p.owner)).status).toBe("completed")
+    expect(await snapshot()).toBe(once)
   })
 })

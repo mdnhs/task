@@ -26,8 +26,7 @@ const ERASED_TEXT = "[erased]"
  * same step (not by the membership delete's silent SET NULL), and for every PUBLISHED week that had one a single history line (`member_erased_shifts_opened`, shift ids and a count, never the person)
  * says so; leave, availability, qualifications (their proof files expire), home site, grants, limits, their change requests and the exchanges they started are deleted, the exchanges that named them as the
  * colleague lose that link and the requester's note; the free text of the history lines they authored becomes "[erased]". History lines keep ids only (R8-13). There is no WhatsApp staging table in
- * this version, so no phone number is held by rosters. No roster lock here: the erase job already holds the subject's membership row, and a roster write holds the roster lock and then SHARES that
- * row, so taking the roster lock now could deadlock; the shift and week rows are locked in id order instead, as every roster write does.
+ * this version, so no phone number is held by rosters. The erase job takes the roster lock BEFORE it locks the subject's membership row (gdpr `runErase`: rbac, shifts, roster, dsr, then the row: the order of member deactivation), so this handler runs under it like every roster write; the shift and week rows are still locked in id order, as every roster write does. (The reverse, the membership row first, deadlocked with a roster writer that holds the roster lock and notifies the subject: a notification takes KEY SHARE on that row.) Not erased on purpose: pseudonymous ids that other people's records keep (roster_weeks.published_by, leave decided_by, decided_by of exchanges, ids inside other people's change-request patch JSON): ids only, no name, and the person no longer exists.
  */
 export const rostersDsrHandler: DsrHandler = {
   async export(tx, tenantId, userId) {

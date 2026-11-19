@@ -176,7 +176,7 @@ export async function repeatWeek(tx: TenantTx, ctx: RosterCtx, weekId: string, i
     if (!t && given[s] !== undefined) throw Conflict("version_conflict") // the caller saw a draft that is not there any more
   }
   const out = await copyWeek(tx, ctx, { week, zone: loaded.zone }, starts.map((s) => ({ weekStart: s, existing: found.get(s) ?? null })), "repeat")
-  await clearAutoRepeatBackoff(tx, ctx.tenantId, week.locationId) // a manual repeat made the next weeks: the site's auto-repeat failures are history
+  await clearAutoRepeatBackoff(tx, ctx, week.locationId, starts) // a manual repeat made the next weeks: the site's auto-repeat failures are history
   return { created: await weekDtos(tx, ctx, out.weeks), conflicts: out.conflicts, counts: out.counts }
 }
 

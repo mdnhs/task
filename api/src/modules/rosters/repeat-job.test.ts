@@ -309,6 +309,23 @@ describe("auto-repeat sweep (R8-12)", () => {
     expect(await failures(w, w.b)).toMatchObject({ n: 0, auto_repeat_attempt_at: null })
   })
 
+  test("AH3: only a week the sweep would draft itself clears the back-off: an unrelated or far-away hand-made week of a backed-off site does not", async () => {
+    const w = await world()
+    await due(w)
+    await failFor(`new.location_id = '${w.a}'`)
+    try {
+      await run(w)
+    } finally {
+      await healFor()
+    }
+    expect((await failures(w, w.a)).n).toBe(1)
+    await w.week(w.p.owner, w.a, "2027-03-01") // months away, no auto-repeat source before it
+    await w.week(w.p.owner, w.a, "2026-12-28") // NEXT+14: the week before it (2026-12-21) is no published source
+    expect((await failures(w, w.a)).n).toBe(1)
+    await w.week(w.p.owner, w.a, NEXT) // the week the sweep itself would draft
+    expect(await failures(w, w.a)).toMatchObject({ n: 0, auto_repeat_attempt_at: null })
+  })
+
   test("more than a batch of failing locations never starve a healthy one: candidates are ordered by last attempt, the failing ones back off", async () => {
     const w = await world()
     const GOOD = "ffffffff-ffff-4fff-8fff-ffffffffffff" // the largest id: last in a plain id order

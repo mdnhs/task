@@ -22,7 +22,10 @@ const pick = () => {
   return MIX[0][0]
 }
 
+// the most VUs any stage asks for: the stride of `nextDraft` (module scope runs in every VU, so each VU sees the same number)
+let maxVus = 1
 export function makeOptions(stages) {
+  maxVus = Math.max(1, ...stages.map((st) => st.target))
   const scenarios = { mix: { executor: "ramping-vus", startVUs: 0, stages, gracefulRampDown: "30s", exec: "mix" } }
   if (METRICS_URL) scenarios.pool = { executor: "constant-vus", vus: 1, duration: stages.reduce((n, s) => n + seconds(s.duration), 0) + "s", exec: "pool" }
   return { scenarios, thresholds: thresholds(), summaryTrendStats: ["avg", "med", "p(90)", "p(95)", "p(99)", "max"] }
@@ -110,9 +113,9 @@ const ACTIONS = {
 }
 
 // One DRAFT week per site (users file): each publish takes the next unpublished one, so every VU publishes different weeks and a draft is published once. VUs are separate JS runtimes, so the
-// draft a VU takes is chosen by its VU number and a per-VU counter (stride = the number of VUs that can publish).
+// draft a VU takes is chosen by its VU number and a per-VU counter (stride = the number of VUs the run asks for, `maxVus`: VU numbers 1..maxVus never land on the same draft in the same round).
 let publishes = 0
-const nextDraft = () => (ROSTER.drafts.length ? ROSTER.drafts[(__VU - 1 + publishes * 11) % ROSTER.drafts.length] : null)
+const nextDraft = () => (ROSTER.drafts.length ? ROSTER.drafts[(__VU - 1 + publishes * maxVus) % ROSTER.drafts.length] : null)
 const published = new Set()
 function publish(user) {
   const draft = nextDraft()

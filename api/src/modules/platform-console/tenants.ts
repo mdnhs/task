@@ -40,15 +40,15 @@ export type Health = "green" | "amber" | "red"
 
 /**
  * The health light of a tenant, from what the platform already holds (no tenant business data). Rules, first match wins:
- *  - RED   payment state: the subscription is `past_due` or `unpaid`;
- *  - AMBER a trial ends within 7 days (status `trialing`, end in the future and at most 7 days away), or there was no activity for more than 30 days
+ *  - RED   the tenant is `suspended`, or the payment state is bad: the subscription is `past_due` or `unpaid`;
+ *  - AMBER a trial ends within 7 days or its end has passed while the status is still `trialing` (a trial that was never converted), or there was no activity for more than 30 days
  *          (activity = the newest member activity or tenant audit event; a tenant that never had any counts from its creation day, so a new tenant is not amber on day one);
  *  - GREEN everything else (no subscription, canceled, active and recently used).
  * There is no per-tenant error-rate metric in the platform today, so no error-rate rule and no threshold setting exists yet; when one does, it is a third input here.
  */
-export function healthOf(i: { status: string | null; trialEndsAt: Date | null; lastActivityAt: Date | null; createdAt: Date }, now: Date): Health {
-  if (i.status === "past_due" || i.status === "unpaid") return "red"
-  if (i.status === "trialing" && i.trialEndsAt && i.trialEndsAt.getTime() >= now.getTime() && i.trialEndsAt.getTime() - now.getTime() <= HEALTH_TRIAL_DAYS * DAY_MS) return "amber"
+export function healthOf(i: { status: string | null; tenantStatus?: string | null; trialEndsAt: Date | null; lastActivityAt: Date | null; createdAt: Date }, now: Date): Health {
+  if (i.tenantStatus === "suspended" || i.status === "past_due" || i.status === "unpaid") return "red"
+  if (i.status === "trialing" && i.trialEndsAt && i.trialEndsAt.getTime() - now.getTime() <= HEALTH_TRIAL_DAYS * DAY_MS) return "amber" // ends within 7 days, or is already over while still `trialing` (nobody converted it)
   const since = i.lastActivityAt ?? i.createdAt
   if (now.getTime() - since.getTime() > HEALTH_IDLE_DAYS * DAY_MS) return "amber"
   return "green"
@@ -62,7 +62,7 @@ export type TenantFigures = { mrrCents: number; currency: string | null; health:
  * currency (rulings C10 and C11: seats never multiply it, past_due/trialing/canceled/unpaid are 0, the currency is never assumed; `null` without a subscription). Usage: `seats` = active members, `activeUsers30d`
  * = active members seen in the last 30 days, `storageBytes` = uploaded files whose object is still stored (deleted rows count until the object is really removed). Only counts and sums are selected.
  */
-export async function tenantFigures(tx: Parameters<Parameters<typeof withTenant>[2]>[0], meta: { id: string; createdAt: Date }, now: Date): Promise<TenantFigures> {
+export async function tenantFigures(tx: Parameters<Parameters<typeof withTenant>[2]>[0], meta: { id: string; createdAt: Date; status?: string }, now: Date): Promise<TenantFigures> {
   const id = meta.id
   const [s] = await tx
     .select({ planId: subscriptions.planId, status: subscriptions.status, seats: subscriptions.seats, trialEndsAt: subscriptions.trialEndsAt, price: plans.priceMonthlyMinor, currency: plans.currency })
@@ -81,7 +81,7 @@ export async function tenantFigures(tx: Parameters<Parameters<typeof withTenant>
   return {
     mrrCents: s && s.status === "active" ? monthlyEquivalentMinor(s.price) : 0,
     currency: s ? s.currency.toUpperCase() : null,
-    health: healthOf({ status: s?.status ?? null, trialEndsAt: s?.trialEndsAt ?? null, lastActivityAt, createdAt: meta.createdAt }, now),
+    health: healthOf({ status: s?.status ?? null, tenantStatus: meta.status ?? null, trialEndsAt: s?.trialEndsAt ?? null, lastActivityAt, createdAt: meta.createdAt }, now),
     usage: { seats: m.seats, activeUsers30d: m.active, storageBytes: Number(f.bytes) },
     lastActivityAt,
     sub: s ? { planId: s.planId, status: s.status, seats: s.seats, trialEndsAt: s.trialEndsAt } : null,

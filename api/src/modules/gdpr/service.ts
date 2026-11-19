@@ -11,6 +11,9 @@ import { expireFile, storeGeneratedFile } from "../files/service"
 import { notify, withTenantAfterCommit, type Enqueue } from "../notifications"
 import { recordPlatformAudit } from "../platform-audit"
 import { lockActor, lockRbac } from "../rbac"
+import { ROSTER_LOCK_TIMEOUT_MS } from "../rosters/scope"
+import { lockRoster } from "../rosters/scope"
+import { lockShifts } from "../shifts/scope"
 import { ERASED } from "./core-handlers"
 import { dsrHandlers } from "./registry"
 
@@ -237,8 +240,8 @@ export async function rejectRequest(deps: Deps, tenantId: string, actor: Actor, 
 }
 
 /**
- * Platform staff close a request that a worker is processing (status `running`; B8 Task 17): the tenant side goes through THIS service (the tenant's own RLS context, never a bypass), so
- * the tenant sees the same status, note and notification as for its own decision. `outcome` is `completed` (it was dealt with outside the job) or `rejected`. Any other status is 409
+ * Platform staff close a request that a worker is processing (status `running`) or that is stuck (`failed`; B8 Task 17, AH2). A `pending` request is picked up by the job itself, so it is not resolvable: the tenant side goes through THIS service (the tenant's own RLS context, never a bypass), so
+ * the tenant sees the same status, note and notification as for its own decision. `outcome` is `completed` (it was dealt with outside the job) or `rejected`. Any other status (pending, completed, rejected) is 409
  * `request_not_processing`, so a second call changes nothing; a job still running sees a finished request and stops (every job step re-checks `running`). Order: DSR lock, row FOR UPDATE,
  * the change, the tenant audit row (actor `platform:<staffId>`), the notification and event, and the PLATFORM audit row last (its lock is taken last). The note is stored on the request only.
  */
@@ -246,13 +249,13 @@ export async function resolveByPlatform(deps: Deps, tenantId: string, staff: Act
   return withTenantAfterCommit(deps, tenantId, async (tx, enqueue) => {
     await lockDsr(tx, tenantId)
     const cur = await requestIn(tx, tenantId, id, true)
-    if (cur.status !== "running") throw Conflict("request_not_processing")
+    if (cur.status !== "running" && cur.status !== "failed") throw Conflict("request_not_processing")
     const now = deps.clock.now()
     const [row] = await tx.update(dataRequests).set({ status: outcome, completedAt: now, notes: note }).where(and(eq(dataRequests.id, id), eq(dataRequests.tenantId, tenantId))).returning()
-    await recordAudit(tx, tenantId, { action: outcome === "completed" ? "dsr.completed" : "dsr.rejected", entity: "data_request", entityId: id, actorId: `platform:${staff.userId}`, before: { status: "running" }, after: { status: outcome, kind: cur.kind, subjectUserId: cur.subjectUserId } }, now)
+    await recordAudit(tx, tenantId, { action: outcome === "completed" ? "dsr.completed" : "dsr.rejected", entity: "data_request", entityId: id, actorId: `platform:${staff.userId}`, before: { status: cur.status }, after: { status: outcome, kind: cur.kind, subjectUserId: cur.subjectUserId } }, now)
     await tellRequester(tx, deps, enqueue, cur, outcome === "completed" ? "Data request completed" : "Data request rejected", outcome === "completed" ? "A data request was completed by the platform team." : "A data request was rejected by the platform team.")
     if (outcome === "completed") await publish(tx, { tenantId, type: "dsr.completed", payload: { requestId: id, kind: cur.kind, subjectUserId: cur.subjectUserId }, actorId: null }, now)
-    await recordPlatformAudit(tx, { action: `platform.data_request.${outcome}`, entity: "data_request", entityId: id, actorId: staff.userId, targetTenantId: tenantId, before: { status: "running" }, after: { status: outcome, kind: cur.kind, noteLength: note.length } }, now)
+    await recordPlatformAudit(tx, { action: `platform.data_request.${outcome}`, entity: "data_request", entityId: id, actorId: staff.userId, targetTenantId: tenantId, before: { status: cur.status }, after: { status: outcome, kind: cur.kind, noteLength: note.length } }, now)
     return dto(row, now)
   })
 }
@@ -451,7 +454,7 @@ export async function expireExport(data: unknown, deps: Deps): Promise<void> {
 
 /**
  * Job `dsr.erase` { dsrId, tenantId }. Three steps, each safe to repeat, so a crash in between just resumes:
- *  1. tenant tx: rbac lock then dsr lock; last active owner -> 409 last_owner (request fails with that code); every
+ *  1. tenant tx: rbac, shifts, roster, then dsr lock (the deactivation order); last active owner -> 409 last_owner (request fails with that code); every
  *     registered handler's erase; requests about the subject get reason/notes scrubbed to "[erased]" and their generated
  *     export files deleted; the membership is removed (audit `member.removed`, event `member.removed`);
  *  2. user tx: only when the person has NO membership left in any tenant, the global identity is anonymised
@@ -469,7 +472,12 @@ export async function runErase(data: unknown, deps: Deps): Promise<void> {
   try {
     const modules: string[] = []
     await withTenantAfterCommit(deps, job.tenantId, async (tx, enqueue) => {
+      // lock order = member deactivation (members/service.ts): RBAC, shifts, roster, then the DSR lock and the subject's membership row. A roster writer holds the roster lock, then its rows, and
+      // may notify the subject (KEY SHARE on the membership row): taking that row first would deadlock with it (40P01), so every advisory lock comes BEFORE the row.
+      await tx.execute(sql.raw(`set local lock_timeout = ${ROSTER_LOCK_TIMEOUT_MS}`))
       await lockRbac(tx, job.tenantId)
+      await lockShifts(tx, job.tenantId)
+      await lockRoster(tx, job.tenantId)
       await lockDsr(tx, job.tenantId)
       const [m] = await tx
         .select({ roleKey: roles.key, status: memberships.status })

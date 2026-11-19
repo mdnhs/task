@@ -9,6 +9,7 @@ import { dataRequests } from "../../db/schema"
 import { withTenant } from "../../db/tenant-tx"
 import { verifyChain } from "../audit"
 import { verifyPlatformChain } from "../platform-audit"
+import { markBellSeen } from "./bell"
 import { healthOf } from "./tenants"
 
 // B8 Task 17 (carry-ins C): the platform bell (derived feed + seen stamp), the platform-side resolve of a data request, and the per-tenant MRR / health / usage columns.
@@ -84,14 +85,15 @@ describe("access (C4)", () => {
 })
 
 describe("bell", () => {
-  test("lists the four item kinds (pending data request, past_due payment, trial ending within 7 days, own support grant expiring within 24 h) and nothing else; unread counts items newer than notifications_seen_at; seen stamps from the clock and clears unread", async () => {
+  test("lists the four item kinds (running or failed data request, past_due payment, trial ending within 7 days, own support grant expiring within 24 h) and nothing else; unread counts items newer than notifications_seen_at; seen stamps from the clock and clears unread", async () => {
     const w = await world()
     const failing = await mk(w, { name: "Failing Payment Ltd", subscription: { status: "past_due" } })
     const ending = await mk(w, { name: "Trial Ending Ltd", subscription: { planId: "starter", status: "trialing", trialEndsAt: ago(w, 3 * DAY) } })
     await mk(w, { name: "Trial Later Ltd", subscription: { planId: "starter", status: "trialing", trialEndsAt: ago(w, 20 * DAY) } }) // not within 7 days
     await mk(w, { name: "Healthy Ltd" })
-    const dsrId = await addDsr(w, failing.id, { createdAt: ago(w, -2 * DAY) })
-    await addDsr(w, failing.id, { status: "completed" }) // not pending
+    const dsrId = await addDsr(w, failing.id, { status: "running", createdAt: ago(w, -2 * DAY) })
+    await addDsr(w, failing.id, { status: "completed" }) // not actionable
+    await addDsr(w, failing.id, { status: "pending" }) // the job picks it up itself: staff cannot act on it, so it is not in the bell
     const grant = await w.json(await w.req("POST", `/v1/platform/tenants/${ending.id}/support-grants`, w.staff.cookie, { reason: "Look into the roster", hours: 2 }))
     const other = await makeStaff(w.deps, "support")
     const otherTenant = await mk(w, { name: "Other Grant Ltd" })
@@ -118,7 +120,7 @@ describe("bell", () => {
     expect([after.unread, after.items.length]).toEqual([0, 4]) // still listed, no longer unread
     // a later item is unread again; the other staff member still has all of theirs unread
     w.clock.advance({ hours: 1 })
-    await addDsr(w, ending.id)
+    await addDsr(w, ending.id, { status: "failed" })
     expect((await w.json(await w.req("GET", "/v1/platform/notifications"))).unread).toBe(1)
     expect((await w.json(await w.req("GET", "/v1/platform/notifications", other.cookie))).unread).toBeGreaterThanOrEqual(4)
     // seen does not move backwards and each call stamps the clock again
@@ -156,14 +158,41 @@ describe("bell", () => {
   })
 })
 
+describe("AH2 bell and resolve agree", () => {
+  test("every data request in the bell can be resolved (running, failed) and none that cannot (pending): after resolve it leaves the bell", async () => {
+    const w = await world()
+    const tn = await mk(w, { name: "Stuck Ltd" })
+    const running = await addDsr(w, tn.id, { status: "running" })
+    const failed = await addDsr(w, tn.id, { status: "failed" })
+    const pending = await addDsr(w, tn.id, { status: "pending" })
+    const feed = async () => ((await w.json(await w.req("GET", "/v1/platform/notifications"))).items as Json[]).filter((i) => i.kind === "data_request").map((i) => i.refId).sort()
+    expect(await feed()).toEqual([running, failed].sort())
+    for (const id of await feed()) expect((await w.req("POST", `/v1/platform/data-requests/${id}/resolve`, w.staff.cookie, { outcome: "completed", note: "by hand" })).status).toBe(200)
+    expect(await feed()).toEqual([])
+    expect((await w.req("POST", `/v1/platform/data-requests/${pending}/resolve`, w.staff.cookie, { outcome: "completed", note: "x" })).status).toBe(409)
+  })
+
+  test("AH3: markBellSeen is one atomic max-stamp: concurrent calls with different clocks end on the latest, a later call with an earlier clock never moves it back and answers the stored value", async () => {
+    const w = await world()
+    const base = w.clock.now().getTime()
+    const stamps = [5, 1, 9, 3, 7, 2, 8].map((m) => new Date(base + m * 60_000))
+    await Promise.all(stamps.map((at) => markBellSeen(w.deps.db, at, w.staff.userId)))
+    const row = async () => (await ownerQuery("select notifications_seen_at from platform_staff where user_id = $1", [w.staff.userId]))[0].notifications_seen_at as Date
+    expect((await row()).getTime()).toBe(base + 9 * 60_000)
+    const back = await markBellSeen(w.deps.db, new Date(base), w.staff.userId)
+    expect(back).toEqual({ seenAt: new Date(base + 9 * 60_000), unread: 0 })
+    expect((await row()).getTime()).toBe(base + 9 * 60_000)
+  })
+})
+
 describe("data request resolve", () => {
-  test("only from `running` (the job is processing it): pending, failed, completed and rejected are 409 request_not_processing; completed and rejected each audit once in BOTH chains; a second call is 409; the tenant sees the new status", async () => {
+  test("only from `running` or `failed` (stuck): pending (the job picks it up itself), completed and rejected are 409 request_not_processing; completed and rejected each audit once in BOTH chains; a second call is 409; the tenant sees the new status", async () => {
     const w = await world()
     const tn = await mk(w, { name: "Resolve Ltd" })
     const owner = await makeMember(w.deps, tn.id, "owner")
     const { cookie } = await signIn(w.app, owner.email, owner.password)
     const resolve = (id: string, body: unknown) => w.req("POST", `/v1/platform/data-requests/${id}/resolve`, w.staff.cookie, body)
-    for (const status of ["pending", "failed", "completed", "rejected"]) {
+    for (const status of ["pending", "completed", "rejected"]) {
       const id = await addDsr(w, tn.id, { status })
       const r = await resolve(id, { outcome: "completed", note: "nope" })
       expect([r.status, (await w.json(r)).code], status).toEqual([409, "request_not_processing"])
@@ -175,7 +204,7 @@ describe("data request resolve", () => {
     expect(await w.json(ok)).toMatchObject({ id: done, tenantId: tn.id, status: "completed" })
     const second = await resolve(done, { outcome: "completed", note: "again" })
     expect([second.status, (await w.json(second)).code]).toEqual([409, "request_not_processing"])
-    const rej = await addDsr(w, tn.id, { status: "running" })
+    const rej = await addDsr(w, tn.id, { status: "failed" }) // AH2: a failed (stuck) request can be closed by staff too
     expect((await resolve(rej, { outcome: "rejected", note: "Identity not verified" })).status).toBe(200)
     expect((await resolve(rej, { outcome: "rejected", note: "again" })).status).toBe(409)
     // the tenant side: the status and the note, through the ordinary data-request API (the platform changed it through the gdpr service)
@@ -187,6 +216,7 @@ describe("data request resolve", () => {
     const ta = (await tenantAudit(tn.id)).filter((r) => String(r.action).startsWith("dsr."))
     expect(ta.map((r) => [r.action, r.entity_id, r.actor_id])).toEqual([["dsr.completed", done, `platform:${w.staff.userId}`], ["dsr.rejected", rej, `platform:${w.staff.userId}`]])
     expect(ta[0].before).toMatchObject({ status: "running" })
+    expect(ta[1].before).toMatchObject({ status: "failed" })
     const pa = (await platAudit()).filter((r) => String(r.action).startsWith("platform.data_request."))
     expect(pa.map((r) => [r.action, r.entity, r.entity_id, r.actor_id, r.target_tenant_id])).toEqual([
       ["platform.data_request.completed", "data_request", done, w.staff.userId, tn.id], ["platform.data_request.rejected", "data_request", rej, w.staff.userId, tn.id],
@@ -249,7 +279,7 @@ describe("per-tenant MRR, health and usage", () => {
     expect(sum).toBe(Object.values(metrics.mrrMinor as Record<string, number>).reduce((a, b) => a + b, 0))
   })
 
-  test("health rules: past_due or unpaid is red; a trial ending within 7 days is amber; no activity in 30 days is amber; everything else green (red wins over amber)", () => {
+  test("health rules: past_due or unpaid or a suspended tenant is red; a trial ending within 7 days or already over (still trialing) is amber; no activity in 30 days is amber; everything else green (red wins over amber)", () => {
     const now = new Date("2026-11-16T09:00:00Z")
     const d = (days: number) => new Date(now.getTime() + days * DAY)
     const created = d(-200)
@@ -259,7 +289,11 @@ describe("per-tenant MRR, health and usage", () => {
       ["past_due and idle", { status: "past_due", trialEndsAt: null, lastActivityAt: d(-90), createdAt: created }, "red"],
       ["trial ends in 7 days", { status: "trialing", trialEndsAt: d(7), lastActivityAt: d(-1), createdAt: created }, "amber"],
       ["trial ends in 8 days", { status: "trialing", trialEndsAt: d(8), lastActivityAt: d(-1), createdAt: created }, "green"],
-      ["trial already ended", { status: "trialing", trialEndsAt: d(-1), lastActivityAt: d(-1), createdAt: created }, "green"],
+      ["AH3: trial already ended (still trialing)", { status: "trialing", trialEndsAt: d(-1), lastActivityAt: d(-1), createdAt: created }, "amber"],
+      ["AH3: trialing with no end date, active", { status: "trialing", trialEndsAt: null, lastActivityAt: d(-1), createdAt: created }, "green"],
+      ["AH3: suspended tenant, active subscription, busy", { status: "active", tenantStatus: "suspended", trialEndsAt: null, lastActivityAt: d(-1), createdAt: created }, "red"],
+      ["AH3: suspended tenant, no subscription", { status: null, tenantStatus: "suspended", trialEndsAt: null, lastActivityAt: d(-1), createdAt: created }, "red"],
+      ["AH3: active tenant status is not a reason", { status: "active", tenantStatus: "active", trialEndsAt: null, lastActivityAt: d(-1), createdAt: created }, "green"],
       ["active, last activity 29 days ago", { status: "active", trialEndsAt: null, lastActivityAt: d(-29), createdAt: created }, "green"],
       ["active, last activity exactly 30 days ago", { status: "active", trialEndsAt: null, lastActivityAt: d(-30), createdAt: created }, "green"],
       ["active, last activity 30 days and 1 s ago", { status: "active", trialEndsAt: null, lastActivityAt: new Date(d(-30).getTime() - 1000), createdAt: created }, "amber"],

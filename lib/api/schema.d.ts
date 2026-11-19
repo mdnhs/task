@@ -16458,7 +16458,7 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description The bell, derived (no table of its own): pending data requests, past_due or unpaid subscriptions, trials ending within 7 days and your own support grants expiring within 24 h, newest first (at most 100). Ids, names and dates only. `unread` = items newer than your last `seen` */
+                /** @description The bell, derived (no table of its own): data requests staff can act on (`running` or `failed`), past_due or unpaid subscriptions, trials ending within 7 days and your own support grants expiring within 24 h, newest first (at most 100). Ids, names and dates only. `unread` = items newer than your last `seen` */
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -16564,7 +16564,7 @@ export interface paths {
                 };
             };
             responses: {
-                /** @description Closes a request that is `running` (being processed) as completed or rejected; the tenant sees the status and the note and its requester is told. Audited in the tenant chain (actor platform:<staffId>) and the platform chain. 404 data_request_not_found; 409 request_not_processing (any other status, so a second call changes nothing); 422 invalid_outcome | invalid_note */
+                /** @description Closes a request that is `running` (being processed) or `failed` (stuck) as completed or rejected; a `pending` request is picked up by its job and is not resolvable; the tenant sees the status and the note and its requester is told. Audited in the tenant chain (actor platform:<staffId>) and the platform chain. 404 data_request_not_found; 409 request_not_processing (pending, completed or rejected, so a second call changes nothing); 422 invalid_outcome | invalid_note */
                 200: {
                     headers: {
                         [name: string]: unknown;
