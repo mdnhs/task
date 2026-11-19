@@ -169,6 +169,29 @@ describe("B8 Task 24: the platform bell", () => {
     expect(document.querySelector('button[aria-label^="Notifications"]')!.getAttribute("aria-label")).toBe("Notifications")
   })
 
+  test("a poll already in flight when Mark seen is clicked never brings the old unread count back", async () => {
+    m.get.mockResolvedValueOnce(feed)
+    await mount(createElement(NotificationsPanel, { items: [], today: "2026-11-19T10:00:00", tzLabel: "UTC", scope: "platform:s1", platform: true }))
+    await flush()
+    const badge = () => document.querySelector('button[aria-label^="Notifications"]')!.getAttribute("aria-label")
+    expect(badge()).toBe("Notifications, 2 unread")
+    // the next poll starts (the tab comes back into view) and its answer, read before "seen", is still on the wire
+    let answer!: (v: unknown) => void
+    m.get.mockImplementationOnce(() => new Promise((r) => { answer = r }))
+    await act(async () => document.dispatchEvent(new Event("visibilitychange")))
+    expect(m.get).toHaveBeenCalledTimes(2)
+    await click(document.querySelector('button[aria-label^="Notifications"]')!)
+    m.post.mockResolvedValueOnce({ seenAt: "2026-11-19T10:00:00.000Z", unread: 0 })
+    m.get.mockResolvedValue({ ...feed, unread: 0 })
+    await click([...document.querySelectorAll("button")].find((b) => b.textContent?.trim() === "Mark seen")!)
+    await act(async () => { await new Promise((r) => setTimeout(r, 600)) })
+    expect(badge()).toBe("Notifications")
+    // the stale answer lands last: it is dropped
+    await act(async () => answer(feed))
+    await flush()
+    expect(badge()).toBe("Notifications")
+  })
+
   test("a refused Mark seen puts the badge back with the app's copy", async () => {
     m.get.mockResolvedValue(feed)
     await mount(createElement(NotificationsPanel, { items: [], today: "2026-11-19T10:00:00", tzLabel: "UTC", scope: "platform:s1", platform: true }))
