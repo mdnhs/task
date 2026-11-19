@@ -98,13 +98,13 @@ let counter = 0
 /** A temporary id for a shift the API has not answered for yet (never sent anywhere). */
 export const newOpenId = (n: number): string => `local-${n}-${++counter}`
 
-/** The shifts of an add, at once, with temporary ids and version 0; the API's answer replaces them. */
-export function shiftsAddedLocal(p: RosterPayload, weekId: string, type: ShiftType, f: AddForm): RosterPayload {
+/** The shifts of an add, at once, with temporary ids and version 0; the API's answer replaces them. `key` fixes the ids (the same on every render while the add waits). */
+export function shiftsAddedLocal(p: RosterPayload, weekId: string, type: ShiftType, f: AddForm, key?: string): RosterPayload {
   const week = p.weeks.find((w) => w.id === weekId)
   if (!week) return p
   const who = f.people.length ? [...new Set(f.people)] : [null]
   const made: WeekShift[] = who.map((personId, i) => ({
-    id: newOpenId(i), weekId, locationId: week.locationId, date: f.date, personId, templateId: type.id, role: type.role, start: f.start, end: f.end, unpaidBreakMin: f.unpaidBreakMin, confirmedAt: null,
+    id: key ? `local-${key}-${i}` : newOpenId(i), weekId, locationId: week.locationId, date: f.date, personId, templateId: type.id, role: type.role, start: f.start, end: f.end, unpaidBreakMin: f.unpaidBreakMin, confirmedAt: null,
     version: 0, startAt: "", endAt: "",
   }))
   return recount({ ...p, shifts: [...p.shifts, ...made] }, new Set([weekId]))

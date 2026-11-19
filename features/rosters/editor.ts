@@ -14,7 +14,8 @@ type Gate = { reason?: string; overrideRuleIds?: string[] }
 
 export type Edit =
   | { kind: "patch"; shiftId: string; edit: ShiftEdit; gate?: Gate }
-  | { kind: "add"; weekId: string; type: ShiftType; form: AddForm; gate?: Gate }
+  /** `localKey` names the temporary cards of this add, so they keep the same ids on every render while it waits. */
+  | { kind: "add"; weekId: string; type: ShiftType; form: AddForm; gate?: Gate; localKey?: string }
   | { kind: "remove"; shiftId: string; reason?: string }
 
 type PatchBody = NonNullable<ReturnType<typeof patchBody>>
@@ -28,7 +29,8 @@ export type EditorApi = {
 }
 
 export type Ask = { kind: "reason" } | { kind: "override"; violations: RuleViolation[]; needsOffice: boolean }
-export type EditResult = { ok: boolean; state: EditorState; toast: RosterToast | null; ask: Ask | null }
+/** `sent`: a request really went out and was accepted. A missing shift (gone or never there) is NOT ok; an edit that changes nothing is ok but not `sent`, so no success toast follows either. */
+export type EditResult = { ok: boolean; sent: boolean; state: EditorState; toast: RosterToast | null; ask: Ask | null }
 
 /** The week read-only (published and not yours to change): what a 403 roster_locked means, whatever the reload says. */
 export function lockWeek(p: RosterPayload, weekId: string): RosterPayload {
@@ -39,8 +41,8 @@ function weekOf(p: RosterPayload, e: Edit): string | undefined {
   return e.kind === "add" ? e.weekId : p.shifts.find((s) => s.id === e.shiftId)?.weekId
 }
 
-function optimistic(p: RosterPayload, e: Edit): RosterPayload {
-  if (e.kind === "add") return shiftsAddedLocal(p, e.weekId, e.type, e.form)
+export function optimistic(p: RosterPayload, e: Edit): RosterPayload {
+  if (e.kind === "add") return shiftsAddedLocal(p, e.weekId, e.type, e.form, e.localKey)
   if (e.kind === "remove") return removeShiftLocal(p, e.shiftId)
   return setShiftLocal(p, e.shiftId, e.edit)
 }
@@ -48,13 +50,14 @@ function optimistic(p: RosterPayload, e: Edit): RosterPayload {
 export async function runEdit(before: EditorState, e: Edit, api: EditorApi, onOptimistic?: (s: EditorState) => void): Promise<EditResult> {
   const base = withoutLocal(before.payload)
   const week = weekOf(base, e)
-  const done = (state: EditorState, ok: boolean, toast: RosterToast | null = null, ask: Ask | null = null): EditResult => ({ ok, state, toast, ask })
+  const done = (state: EditorState, ok: boolean, toast: RosterToast | null = null, ask: Ask | null = null, sent = false): EditResult => ({ ok, sent, state, toast, ask })
   // The request. A shift that is gone from the payload, or an edit that changes nothing, sends nothing.
   let send: (() => Promise<RosterWriteResult<{ violations: RuleViolation[]; apply: (p: RosterPayload) => RosterPayload; touched: string[] }>>) | null = null
   if (e.kind === "patch") {
     const s = base.shifts.find((x) => x.id === e.shiftId)
-    const body = s && patchBody(s, e.edit, e.gate)
-    if (!s || !body) return done({ payload: base, violations: before.violations }, true)
+    if (!s) return done({ payload: base, violations: before.violations }, false) // the shift is gone (or only the card of an add that has not been answered): nothing to move, and nothing to celebrate
+    const body = patchBody(s, e.edit, e.gate)
+    if (!body) return done({ payload: base, violations: before.violations }, true)
     send = async () => {
       const r = await api.patchShift(s.id, body)
       return r.ok ? { ok: true, value: { violations: r.value.violations, apply: (p) => replaceShift(p, r.value.shift), touched: [s.id] } } : r
@@ -67,7 +70,7 @@ export async function runEdit(before: EditorState, e: Edit, api: EditorApi, onOp
     }
   } else {
     const s = base.shifts.find((x) => x.id === e.shiftId)
-    if (!s) return done({ payload: base, violations: before.violations }, true)
+    if (!s) return done({ payload: base, violations: before.violations }, false)
     send = async () => {
       const r = await api.deleteShift(s.id, { version: s.version, ...(e.reason ? { reason: e.reason } : {}) })
       return r.ok ? { ok: true, value: { violations: [], apply: (p) => removeShiftLocal(p, s.id), touched: [s.id] } } : r
@@ -86,9 +89,13 @@ export async function runEdit(before: EditorState, e: Edit, api: EditorApi, onOp
 
   if (result.ok) {
     const { violations, apply, touched } = result.value
-    const confirmed: EditorState = { payload: apply(local.payload), violations: [...before.violations.filter((v) => !touched.includes(v.shiftId)), ...violations] }
+    const applied = apply(local.payload)
+    // The edit went through (over a rule, perhaps): the blocking lines that stopped it, and any line about the shifts it touched, are stale now.
+    const people = new Set(applied.shifts.filter((x) => touched.includes(x.id)).map((x) => x.personId).filter((x): x is string => !!x))
+    const stale = (v: RuleViolation) => touched.includes(v.shiftId) || (v.severity === "block" && people.has(v.personId))
+    const confirmed: EditorState = { payload: applied, violations: [...before.violations.filter((v) => !stale(v)), ...violations] }
     const again = await settle(api)
-    return done(again ? { ...confirmed, payload: again } : confirmed, true)
+    return done(again ? { ...confirmed, payload: again } : confirmed, true, null, null, true)
   }
 
   const error: RosterError = result.error
@@ -121,5 +128,31 @@ async function settle(api: EditorApi): Promise<RosterPayload | null> {
     return r.ok ? r.value : null
   } catch {
     return null
+  }
+}
+
+// ----------------------------------------------------------------------------------------------------------------- what is on screen while edits wait
+/** The payload with the edits that are still waiting for the API applied in order (each on top of the one before): the second queued edit shows its place at once, not when the first one is answered. */
+export function pendingView(p: RosterPayload, waiting: Edit[]): RosterPayload {
+  return waiting.reduce((acc, e) => optimistic(acc, e), p)
+}
+
+/** One edit at a time, in order (the second sees the first's answer and its new `version`). `reset` is the shown range changing (a navigation): an answer for the old range is dropped, never laid over the new one (m2). */
+export class EditQueue {
+  private tail: Promise<unknown> = Promise.resolve()
+  private epoch = 0
+  reset(): void {
+    this.epoch++
+  }
+  /** `work` runs after the earlier ones; `apply` gets its result only while the range it was queued for is still the one shown. */
+  add<T>(work: (current: () => boolean) => Promise<T>, apply: (r: T) => void): Promise<void> {
+    const e = this.epoch
+    const current = () => e === this.epoch
+    const next = this.tail.then(async () => {
+      const r = await work(current)
+      if (current()) apply(r)
+    })
+    this.tail = next.catch(() => undefined)
+    return next
   }
 }
