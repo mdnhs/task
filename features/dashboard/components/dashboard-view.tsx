@@ -2,16 +2,11 @@ import type { ReactNode } from "react"
 
 import type { ManagerHome } from "../adapters"
 import type { CoverageData, DashboardPerms, HeaderData, ManagerAttentionData, ReportDeadlineCardData, TeamTasksData, TodayData } from "../types"
-import { DeptNote } from "./dept-note"
 import { CoverageFiles } from "./coverage-files"
+import { DashboardBody, type DashboardClock } from "./dashboard-body"
 import { ManagerAttention } from "./manager-attention"
 import { PageHeader } from "./page-header"
-import { ReportDeadlineCard } from "./report-deadline-card"
-import { SectionCards } from "./section-cards"
-import { TaskProgress } from "./task-progress"
 import { TodayCard } from "./today-card"
-import { TasksClosedChart } from "./tasks-closed-chart"
-import { TeamTasksTable } from "./team-tasks-table"
 
 /**
  * The manager home on the API's read models (B6 T6.7): every figure is the DTO's. `newTask` / `assignTask` are New task triggers built by the page from the tasks feature (features don't import each
@@ -31,6 +26,7 @@ export function DashboardView({
   remind = false,
   queue = false,
   clock,
+  departments = [],
 }: {
   header: HeaderData
   data: ManagerHome
@@ -50,27 +46,32 @@ export function DashboardView({
   remind?: boolean
   /** The "View queue" link to the mock Manager Attention page: a demo deployment only. */
   queue?: boolean
-  /** The tenant zone and wall "now" the table's date words use when it loads more rows. */
-  clock: { tz: string; today: string }
+  /** The tenant zone and wall "now" the table's date words use when it loads more rows (and, for a department's figures, the instant now, zone label and report delay). */
+  clock: DashboardClock
+  /** Department teams: the topbar department becomes the API's `teamId` (B8 Task 24). */
+  departments?: { id: string; name: string }[]
 }) {
   return (
     <>
       <PageHeader data={header} perms={perms} newTask={newTask} />
       {today && <TodayCard data={today} />}
-      <DeptNote />
-      <SectionCards data={data.summary} />
-      <section className="grid-3 dash-fix dash-fix-a">
-        <TasksClosedChart data={data.tasksClosed} />
-        <TaskProgress data={data.progress} />
-        {deadline && <ReportDeadlineCard data={deadline} canRemind={perms.reports && remind} />}
-      </section>
-      {(attention || coverage) && (
-        <section className="grid-2 dash-fix dash-fix-c" style={coverage ? undefined : { gridTemplateColumns: "minmax(0,1fr)" }}>
-          {attention && <ManagerAttention data={attention} queue={queue} />}
-          {coverage && <CoverageFiles data={coverage} />}
-        </section>
-      )}
-      {teamTasks && <TeamTasksTable data={teamTasks} assignTask={perms.tasks && assignTask} ctx={clock} />}
+      <DashboardBody
+        data={data}
+        teamTasks={teamTasks}
+        deadline={deadline}
+        departments={departments}
+        clock={clock}
+        canRemind={perms.reports && remind}
+        assignTask={perms.tasks && assignTask}
+        middle={
+          (attention || coverage) && (
+            <section className="grid-2 dash-fix dash-fix-c" style={coverage ? undefined : { gridTemplateColumns: "minmax(0,1fr)" }}>
+              {attention && <ManagerAttention data={attention} queue={queue} />}
+              {coverage && <CoverageFiles data={coverage} />}
+            </section>
+          )
+        }
+      />
     </>
   )
 }

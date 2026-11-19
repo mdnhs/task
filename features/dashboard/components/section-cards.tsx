@@ -4,17 +4,15 @@ import Link from "next/link"
 
 import { CountUp } from "@/components/count-up"
 import { Icon } from "@/components/icon"
-import { useDept } from "@/hooks/use-dept"
 import type { SummaryData } from "../types"
 import { Sparkline } from "./sparkline"
 
-// The topbar department filter swaps in that department's figures; CountUp rolls each value to the new one.
-export function SectionCards({ data }: { data: SummaryData }) {
-  const dep = useDept()
+// The figures are the API's for the scope or the picked department (B8 Task 24: the dashboard asks with teamId); CountUp rolls each value to the new one. `busy` while a team is asked for.
+export function SectionCards({ data, busy = false }: { data: SummaryData; busy?: boolean }) {
   return (
-    <section className="stats dash-stats" aria-label="Summary">
+    <section className="stats dash-stats" aria-label="Summary" aria-busy={busy || undefined}>
       {data.stats.map((stat, i) => {
-        const s = { ...stat, ...(dep === "all" ? undefined : stat.byDept?.[dep]) }
+        const s = stat
         return (
           <article key={s.title} className={s.hero ? "stat hero" : "stat"}>
             <div className="stat-top">

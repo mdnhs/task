@@ -2,9 +2,10 @@
 
 import { useDept } from "@/hooks/use-dept"
 
-/** The API's summary, closed-tasks chart and attention feed have no department split, so a department picked in the topbar does not narrow them: say so in one line. */
-export function DeptNote() {
+/** With a department picked, the figures, chart, deadline rows and table are that team's (B8 Task 24, `teamId`); the attention feed has no team filter, so say so in one line. A department
+ * no team has (`unknown`) keeps the whole scope's figures. */
+export function DeptNote({ unknown = false }: { unknown?: boolean }) {
   const dep = useDept()
   if (dep === "all") return null
-  return <p className="td-muted">Figures and attention show all departments.</p>
+  return <p className="td-muted">{unknown ? "Figures show all departments." : "Attention shows all departments."}</p>
 }

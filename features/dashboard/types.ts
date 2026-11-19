@@ -19,7 +19,6 @@ export type SummaryData = {
     /** Last 7 days, oldest first, ending on today's value: the sparkline beside the figure. */
     trend?: number[]
     /** Per-department figures (keyed by department name), shown when the topbar filter picks one. Missing = the overall figure. */
-    byDept?: Record<string, { value: string; valueSuffix?: string; trend?: number[]; note?: { tone?: "up" | "down"; highlight?: string; text: string } }>
   }[]
 }
 export type TasksClosedDay = {

@@ -3,7 +3,7 @@ import { cookies } from "next/headers"
 import { Icon } from "@/components/icon"
 import { DashboardView, StaffDashboardView, dashboardScreenData, getCoverage, getDashboardPerms, loadManagerHome, loadStaffHome, loadToday } from "@/features/dashboard"
 import { AccessRestricted, apiFailureView } from "@/features/shell"
-import { NewTaskButton } from "@/features/tasks"
+import { NewTaskButton, loadDepartmentTeams } from "@/features/tasks"
 import { formatDateYear } from "@/lib/dates"
 import { mockEnabled } from "@/lib/mock-registry"
 import { getOrg } from "@/lib/org"
@@ -37,8 +37,11 @@ export default async function Page() {
         return { ok: true as const, org, staff: { home, todayCard } }
       }
       const perms = getDashboardPerms(session)
-      const [home, todayCard] = await Promise.all([loadManagerHome(api, { org, people, perms, withAttention: can(session.role, "attention") }), loadToday(api, { meId, subject, org, cookies: cookie })])
-      return { ok: true as const, org, manager: { home, todayCard, perms } }
+      const [home, todayCard, departments] = await Promise.all([
+        loadManagerHome(api, { org, people, perms, withAttention: can(session.role, "attention") }), loadToday(api, { meId, subject, org, cookies: cookie }),
+        loadDepartmentTeams(api).catch(() => [] as { id: string; name: string }[]),
+      ])
+      return { ok: true as const, org, manager: { home, todayCard, perms, departments } }
     })
     .catch((e: unknown) => ({ ok: false as const, e }))
   if (!loaded.ok) {
@@ -61,7 +64,7 @@ export default async function Page() {
       />
     )
   }
-  const { home, todayCard, perms } = loaded.manager!
+  const { home, todayCard, perms, departments } = loaded.manager!
   const demo = mockEnabled()
   return (
     <DashboardView
@@ -75,7 +78,8 @@ export default async function Page() {
       coverage={demo ? await getCoverage() : undefined}
       remind={demo}
       queue={demo}
-      clock={{ tz: org.timezone, today: org.today }}
+      clock={{ tz: org.timezone, today: org.today, nowAt: org.nowAt, tzLabel: org.tzLabel, dueAfterMinutes: org.reportDueAfterMinutes }}
+      departments={departments}
       newTask={
         <NewTaskButton className="btn btn-primary" from="/">
           <Icon name="plus" />

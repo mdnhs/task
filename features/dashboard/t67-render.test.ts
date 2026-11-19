@@ -69,12 +69,14 @@ describe("the home screens render the API's numbers", () => {
     expect(renderToStaticMarkup(createElement(DashboardView, base))).not.toContain('href="/manager-attention"')
     expect(renderToStaticMarkup(createElement(DashboardView, { ...base, queue: true }))).toContain('href="/manager-attention"')
   })
-  test("O2: a department picked in the topbar shows why the summary does not change; 'all' shows nothing", () => {
+  test("O2 (B8 Task 24): a department picked in the topbar narrows the figures on the server; only the attention feed stays whole, and the note says so; 'all' shows nothing", () => {
     const home = toDashboard(dashboardDto(), { tz: TZ, nowAt: org.nowAt, tzLabel: "Irish time", dueAfterMinutes: 60 })
     const props = { header: { title: "Dashboard", subtitle: "x" }, data: home, teamTasks: null, attention: null, perms: { tasks: true, reports: true, attention: true }, clock: { tz: TZ, today: org.today } }
     const render = (dep: string) => renderToStaticMarkup(createElement(DeptContext.Provider, { value: dep }, createElement(DashboardView, props)))
     expect(render("all")).not.toContain("all departments")
-    expect(render("Security")).toContain("Figures and attention show all departments.")
+    expect(render("Security")).toContain("Figures show all departments.") // no department teams known here: the whole scope's figures
+    const withTeams = (dep: string) => renderToStaticMarkup(createElement(DeptContext.Provider, { value: dep }, createElement(DashboardView, { ...props, departments: [{ id: "t1", name: "Security" }] })))
+    expect(withTeams("Security")).toContain("Attention shows all departments.")
   })
   test("the skeletons render the typical home for a manager and for staff (no data in)", () => {
     expect(renderToStaticMarkup(createElement(DashboardSkeleton, { today: { mode: "chip", tiles: 5, team: true }, cards: 4, teamRows: 5, teamTotal: 25 }))).toContain("Loading dashboard")

@@ -5,7 +5,6 @@ import { AnimatePresence, motion } from "motion/react"
 
 import { Icon } from "@/components/icon"
 import { StatusPill } from "@/components/status-pill"
-import { useDept } from "@/hooks/use-dept"
 import { layoutTransition, listItem } from "@/lib/motion"
 import type { ReportDeadlineCardData } from "../types"
 import { DeadlineCountdown } from "./deadline-countdown"
@@ -16,9 +15,8 @@ import { RemindButton } from "./remind-button"
  * their scope. The due time comes from the shift model (lib/report-deadline.ts), not a fixed daily deadline.
  */
 export function ReportDeadlineCard({ data, canRemind }: { data: ReportDeadlineCardData; canRemind: boolean }) {
-  // The topbar department filter hides the other teams' rows (enter/leave like every filtered list).
-  const dep = useDept()
-  const rows = data.kind === "team" ? data.rows.filter((r) => dep === "all" || r.key === dep) : data.rows
+  // With a department picked the rows are already that team's (the dashboard asks the API with teamId, B8 Task 24); rows still enter/leave like every list.
+  const rows = data.rows
   const remind = data.kind === "team" && canRemind && data.missing > 0
 
   return (
