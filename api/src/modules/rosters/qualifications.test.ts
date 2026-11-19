@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, test } from "vitest"
 import { ownerTenantQuery } from "../../../test/db"
 import { makeMember, makeTenant, signIn } from "../../../test/factories"
 import { call, resetDb, testApp } from "../../../test/harness"
-import { isExpired } from "./qualifications"
+import { DUE_SOON_DAYS, isDueSoon, isExpired } from "./qualifications"
 
 // B8 Task 6: member qualifications (FR-RS-40) and the home location.
 
@@ -50,7 +50,7 @@ describe("qualifications (FR-RS-40)", () => {
     await w.ok("PUT", `/v1/locations/${a}/supervisors`, w.p.owner, { userIds: [sup.userId] })
     const staff = w.p.employee
     const put = await w.ok("PUT", q(staff.userId), w.p.owner, { qualifications: [{ type: " SIA licence ", expiresOn: "2027-03-31" }, { type: "First aid", expiresOn: null }] })
-    expect(put).toEqual({ userId: staff.userId, items: [{ type: "first aid", expiresOn: null, expired: false }, { type: "sia licence", expiresOn: "2027-03-31", expired: false }] }) // canonical lower-case keys
+    expect(put).toEqual({ userId: staff.userId, items: [{ type: "first aid", expiresOn: null, expired: false, dueSoon: false }, { type: "sia licence", expiresOn: "2027-03-31", expired: false, dueSoon: false }] }) // canonical lower-case keys
     expect((await w.rows("select action from audit_events where action = 'roster.qualifications_changed'")).length).toBe(1)
     // office (admin) reads; the person reads their own; a colleague (staff) reads nobody else's
     expect((await w.ok("GET", q(staff.userId), w.p.admin)).items).toHaveLength(2)
@@ -112,11 +112,24 @@ describe("qualifications (FR-RS-40)", () => {
     expect([isExpired(null, "2026-01-01"), isExpired("2026-01-01", "2026-01-01"), isExpired("2025-12-31", "2026-01-01")]).toEqual([false, false, true])
   })
 
+  test("B8 Task 22: dueSoon is true from 30 days before the expiry through the expiry date (the first notice lead), never for an expired or open-ended one", async () => {
+    const w = await world()
+    const staff = w.p.employee // Europe/Dublin today is 2026-11-16
+    await w.ok("PUT", q(staff.userId), w.p.owner, {
+      qualifications: [{ type: "Past", expiresOn: "2026-11-15" }, { type: "Today", expiresOn: "2026-11-16" }, { type: "In30", expiresOn: "2026-12-16" }, { type: "In31", expiresOn: "2026-12-17" }, { type: "Never" }],
+    })
+    const got = await w.ok("GET", q(staff.userId), staff)
+    expect(Object.fromEntries(got.items.map((i: Json) => [i.type, [i.expired, i.dueSoon]]))).toEqual({ past: [true, false], today: [false, true], in30: [false, true], in31: [false, false], never: [false, false] })
+    const { EXPIRY_LEADS } = await import("./jobs")
+    expect(DUE_SOON_DAYS).toBe(Math.max(...EXPIRY_LEADS)) // the editor's "due soon" starts when the first expiry notice goes out
+    expect([isDueSoon(null, "2026-01-01"), isDueSoon("2026-01-01", "2026-01-01"), isDueSoon("2025-12-31", "2026-01-01"), isDueSoon("2026-01-31", "2026-01-01"), isDueSoon("2026-02-01", "2026-01-01")]).toEqual([false, true, false, true, false])
+  })
+
   test("'First Aid' == 'first aid': keys are case-insensitive, one row per key, and a shift type's requires compares equal", async () => {
     const w = await world()
     const staff = w.p.employee
     const out = await w.ok("PUT", q(staff.userId), w.p.owner, { qualifications: [{ type: "First Aid", expiresOn: "2027-01-01" }] })
-    expect(out.items).toEqual([{ type: "first aid", expiresOn: "2027-01-01", expired: false }])
+    expect(out.items).toEqual([{ type: "first aid", expiresOn: "2027-01-01", expired: false, dueSoon: false }])
     expect(await w.code("PUT", q(staff.userId), w.p.owner, { qualifications: [{ type: "First Aid" }, { type: "first aid" }] }, 422)).toBe("invalid_qualification") // the same key twice
     await w.ok("PUT", q(staff.userId), w.p.owner, { qualifications: [{ type: "FIRST AID", expiresOn: "2027-01-01" }] }) // same key: unchanged, nothing written
     expect((await w.rows("select 1 from audit_events where action = 'roster.qualifications_changed'")).length).toBe(1)

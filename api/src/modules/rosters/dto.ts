@@ -86,10 +86,10 @@ export const OfficeLimitOut = z.object({ userId: z.string(), except: z.array(z.u
 
 // ------------------------------------------------------------------ member qualifications and home location
 
-const QualOut = z.object({ type: z.string(), expiresOn: z.string().nullable(), expired: z.boolean() })
+const QualOut = z.object({ type: z.string(), expiresOn: z.string().nullable(), expired: z.boolean(), dueSoon: z.boolean().openapi({ description: "Expires within 30 days (the first expiry notice) and not yet expired" }) })
 export const QualificationsOut = z
   .object({ userId: z.string(), items: z.array(QualOut) })
-  .openapi({ example: { userId: UID, items: [{ type: "SIA licence", expiresOn: "2027-03-31", expired: false }, { type: "First aid", expiresOn: null, expired: false }] } })
+  .openapi({ example: { userId: UID, items: [{ type: "SIA licence", expiresOn: "2027-03-31", expired: false, dueSoon: false }, { type: "First aid", expiresOn: null, expired: false, dueSoon: false }] } })
 export type QualificationsDto = z.infer<typeof QualificationsOut>
 export const QualificationsBody = z
   .object({ qualifications: z.array(z.object({ type: z.string().max(200), expiresOn: z.string().max(10).nullable().optional() })).max(100) })

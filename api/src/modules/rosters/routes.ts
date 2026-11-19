@@ -95,7 +95,7 @@ const limitR = createRoute({
 
 const qualsR = createRoute({
   method: "get", path: "/v1/members/{userId}/qualifications", middleware: guard("read"), request: { params: RosterUserParam },
-  responses: { 200: json(QualificationsOut, "The person's qualifications with `expired` computed on the clock (valid through the expiry date). Read: the person, an office role, a supervisor of a location the person is homed or rostered at. 404 member_not_found for a person who does not exist, is of another tenant or out of the caller's reach") },
+  responses: { 200: json(QualificationsOut, "The person's qualifications with `expired` (valid through the expiry date) and `dueSoon` (within 30 days of it) computed on the clock. Read: the person, an office role, a supervisor of a location the person is homed or rostered at. 404 member_not_found for a person who does not exist, is of another tenant or out of the caller's reach") },
 })
 const putQualsR = createRoute({
   method: "put", path: "/v1/members/{userId}/qualifications", middleware: guard("write"), request: { params: RosterUserParam, body: body(QualificationsBody) },

@@ -9316,7 +9316,7 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description The person's qualifications with `expired` computed on the clock (valid through the expiry date). Read: the person, an office role, a supervisor of a location the person is homed or rostered at. 404 member_not_found for a person who does not exist, is of another tenant or out of the caller's reach */
+                /** @description The person's qualifications with `expired` (valid through the expiry date) and `dueSoon` (within 30 days of it) computed on the clock. Read: the person, an office role, a supervisor of a location the person is homed or rostered at. 404 member_not_found for a person who does not exist, is of another tenant or out of the caller's reach */
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -9328,6 +9328,8 @@ export interface paths {
                                 type: string;
                                 expiresOn: string | null;
                                 expired: boolean;
+                                /** @description Expires within 30 days (the first expiry notice) and not yet expired */
+                                dueSoon: boolean;
                             }[];
                         };
                     };
@@ -9366,6 +9368,8 @@ export interface paths {
                                 type: string;
                                 expiresOn: string | null;
                                 expired: boolean;
+                                /** @description Expires within 30 days (the first expiry notice) and not yet expired */
+                                dueSoon: boolean;
                             }[];
                         };
                     };

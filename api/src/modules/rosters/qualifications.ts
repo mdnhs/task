@@ -18,15 +18,22 @@ export const todayOf = (ctx: Pick<RosterCtx, "now" | "tz">): string => epochToWa
 /** A qualification is valid THROUGH its expiry date: expired is true from the day after. No expiry date never expires. */
 export const isExpired = (expiresOn: string | null, today: string): boolean => expiresOn !== null && expiresOn < today
 
+/** "Due soon" starts with the first expiry notice (the expiry job's largest lead, jobs.ts EXPIRY_LEADS) and runs through the expiry date; an expired one is not due soon, it is expired. */
+export const DUE_SOON_DAYS = 30
+export const isDueSoon = (expiresOn: string | null, today: string): boolean => {
+  if (expiresOn === null || expiresOn < today) return false
+  return Date.parse(`${expiresOn}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`) <= DUE_SOON_DAYS * 86_400_000
+}
+
 export const realDate = (d: string): boolean => {
   const ms = /^\d{4}-\d{2}-\d{2}$/.test(d) ? Date.parse(`${d}T00:00:00Z`) : Number.NaN
   return Number.isFinite(ms) && epochToWall(ms, "UTC").slice(0, 10) === d
 }
 
-const view = (rows: { type: string; expiresOn: string | null }[], today: string) => rows.map((r) => ({ type: r.type, expiresOn: r.expiresOn, expired: isExpired(r.expiresOn, today) }))
+const view = (rows: { type: string; expiresOn: string | null }[], today: string) => rows.map((r) => ({ type: r.type, expiresOn: r.expiresOn, expired: isExpired(r.expiresOn, today), dueSoon: isDueSoon(r.expiresOn, today) }))
 const snap = (rows: { type: string; expiresOn: string | null }[]) => rows.map((r) => ({ type: r.type, expiresOn: r.expiresOn }))
 
-/** The person's qualifications, ordered by type, each with `expired` computed on the clock. Read: the person, an office role, a supervisor of one of the person's locations (else the same 404 member_not_found). */
+/** The person's qualifications, ordered by type, each with `expired` and `dueSoon` computed on the clock. Read: the person, an office role, a supervisor of one of the person's locations (else the same 404 member_not_found). */
 export async function getQualifications(tx: TenantTx, ctx: RosterCtx, userId: string): Promise<QualificationsDto> {
   await reachablePerson(tx, ctx, userId)
   const rows = await tx.select({ type: memberQualifications.type, expiresOn: memberQualifications.expiresOn }).from(memberQualifications).where(and(eq(memberQualifications.tenantId, ctx.tenantId), eq(memberQualifications.userId, userId))).orderBy(asc(memberQualifications.type))
