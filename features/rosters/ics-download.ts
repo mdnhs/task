@@ -11,7 +11,12 @@ const FALLBACK = "roster.ics"
 /** The filename of an `attachment` Content-Disposition (quoted or not); the fallback when there is none. Path parts are never trusted. */
 export function filenameOf(disposition: string | null): string {
   const m = /filename\*?=(?:UTF-8'')?"?([^";]+)"?/i.exec(disposition ?? "")
-  const name = m?.[1] ? decodeURIComponent(m[1]).split(/[\\/]/).pop() ?? "" : ""
+  let name = ""
+  try {
+    name = m?.[1] ? decodeURIComponent(m[1]).split(/[\\/]/).pop() ?? "" : ""
+  } catch {
+    return FALLBACK // a malformed escape (Task 22 review m5)
+  }
   return /^[\w .-]{1,100}$/.test(name) ? name : FALLBACK
 }
 

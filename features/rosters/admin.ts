@@ -75,6 +75,28 @@ export function patchBody(f: LocationForm, base: RosterLocation, version: number
 }
 
 /**
+ * "Keep mine" after a conflict (O1; Task 22 review I1): a three-way merge of what is typed (`mine`) with the copy it was opened on (`base`) and the newer saved copy (`theirs`). A field I changed
+ * since `base` keeps my value; a field I did not touch takes theirs, so the next save (diffed against theirs) sends only my edits and never writes their change of another field back over. Plain
+ * objects (opening hours per day, targets per weekday) merge one level down; arrays and scalars are one value.
+ */
+export function keepMine<T extends Record<string, unknown>>(mine: T, base: T, theirs: T): T {
+  const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b)
+  const plain = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v)
+  const out: Record<string, unknown> = {}
+  for (const k of Object.keys(theirs)) {
+    const [m, b, t] = [mine[k], base[k], theirs[k]]
+    out[k] = plain(m) && plain(b) && plain(t) ? keepMine(m, b, t) : same(m, b) ? t : m
+  }
+  return out as T
+}
+/** The same merge for a set (the picked supervisors): theirs, plus what I added, minus what I removed. */
+export function keepMineSet(mine: string[], base: string[], theirs: string[]): string[] {
+  const added = mine.filter((x) => !base.includes(x))
+  const removed = base.filter((x) => !mine.includes(x))
+  return [...new Set([...theirs, ...added])].filter((x) => !removed.includes(x))
+}
+
+/**
  * The supervisor picker. `people` are the active people the API lets this caller pick (already cut to their sites); a current supervisor the caller cannot see is never named or listed, only
  * COUNTED (`hidden`), and is kept on save (`saveIds`): the caller cannot remove someone they cannot see.
  */

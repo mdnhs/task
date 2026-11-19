@@ -52,7 +52,13 @@ const when = (x: Pick<MineShift, "date" | "start" | "end">) => `${formatTime(`${
 // claims and swaps (cancel, or decline a swap offered to you), availability and leave. Every refusal is the API's, shown short.
 export function MyRosterView({ mine, queue, names, exchanges, people, peopleTruncated, me, today, nowAt }: MyRosterProps) {
   const router = useRouter()
+  // Confirmations made here show at once, but only until the API's next payload arrives: from then the server's `confirmedAt` wins (an office edit clears it; Task 22 review m4).
   const [confirmed, setConfirmed] = useState<Record<string, string>>({})
+  const [seenMine, setSeenMine] = useState(mine)
+  if (mine !== seenMine) {
+    setSeenMine(mine)
+    setConfirmed({})
+  }
   const [tab, setTab] = useState<Tab>("calendar")
   const tabDir = useSlideDir(TABS.indexOf(tab))
   const [swapping, setSwapping] = useState<{ id: string; n: number } | null>(null)

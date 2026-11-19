@@ -16,7 +16,7 @@ import { StatusPill } from "@/components/status-pill"
 import { TimePicker } from "@/components/time-picker"
 import { Input } from "@/components/ui/input"
 import {
-  DAYS, createBody, draftOf, formOf, oddHours, patchBody, sameSet, saveIds, supervisorChoice, targetsBody, typeAction, typeCreateBody, typePatchBody, validateLocation, validateType,
+  DAYS, createBody, draftOf, formOf, keepMine, keepMineSet, oddHours, patchBody, sameSet, saveIds, supervisorChoice, targetsBody, typeAction, typeCreateBody, typePatchBody, validateLocation, validateType,
   type LocationErrors, type LocationForm, type TypeDraft,
 } from "../admin"
 import type { RosterError } from "../errors"
@@ -69,10 +69,15 @@ function LocationDetails({ location, people, truncated }: { location: RosterLoca
     const r = await readLocation(id)
     setTheirs(r.ok ? { state: "loaded", location: r.value } : { state: "unavailable" })
   }
-  function keepMine() {
-    if (theirs.state !== "loaded") return
-    setBase(theirs.location) // the next save compares with their copy and sends their version: my edits go on top
-    setVersion(theirs.location.version)
+  const visible = (l: RosterLocation) => l.supervisorIds.filter((id) => people.some((p) => p.id === id))
+  function onKeepMine() {
+    if (theirs.state !== "loaded" || !base) return
+    const t = theirs.location
+    // Three-way merge (Task 22 review I1): what I changed since `base` stays mine, everything else takes theirs; the next save diffs against theirs and sends only my edits on their version.
+    setForm((f) => keepMine(f, formOf(base), formOf(t)))
+    setPicked((p) => keepMineSet(p, visible(base), visible(t)))
+    setBase(t)
+    setVersion(t.version)
     setTheirs({ state: "none" })
   }
   function reloadTheirs() {
@@ -81,7 +86,7 @@ function LocationDetails({ location, people, truncated }: { location: RosterLoca
     setBase(l)
     setVersion(l.version)
     setForm(formOf(l))
-    setPicked(l.supervisorIds.filter((id) => people.some((p) => p.id === id)))
+    setPicked(visible(l))
     setTheirs({ state: "none" })
   }
 
@@ -122,6 +127,10 @@ function LocationDetails({ location, people, truncated }: { location: RosterLoca
           return fail(r.error)
         }
         next = r.value
+        // The details are saved: from here the form is on the new copy, even if the supervisors fail below (Task 22 review I2: no stale version, no false conflict on the next Save).
+        setBase(next)
+        setVersion(next.version)
+        setForm(formOf(next))
       }
       if (supsChanged) {
         const s = await setLocationSupervisors(base.id, ids)
@@ -151,7 +160,7 @@ function LocationDetails({ location, people, truncated }: { location: RosterLoca
           <div className="sr-banner-actions">
             {theirs.state === "loaded" ? (
               <>
-                <button type="button" className="btn btn-primary" onClick={keepMine}>Keep mine</button>
+                <button type="button" className="btn btn-primary" onClick={onKeepMine}>Keep mine</button>
                 <button type="button" className="btn btn-outline" onClick={reloadTheirs}>Reload theirs</button>
               </>
             ) : (
@@ -231,9 +240,14 @@ function LocationDetails({ location, people, truncated }: { location: RosterLoca
   )
 }
 
+/** A type this page created, with what was typed and the short error when its targets were refused (it is saved; only the targets are left to save). */
+type Made = { type: ShiftType; draft: TypeDraft; error: string }
+
 function ShiftTypes({ locationId, types, archivedSite }: { locationId: string; types: ShiftType[]; archivedSite: boolean }) {
   const [drafts, setDrafts] = useState<number[]>([])
-  const live = types.filter((t) => !t.archived)
+  const [made, setMade] = useState<Made[]>([])
+  // Created here but not yet in the refreshed props: shown as saved cards at once, so a refused targets PUT never leaves a draft that Add would create twice (Task 22 review I3).
+  const live = [...types.filter((t) => !t.archived), ...made.map((x) => x.type).filter((t) => !types.some((s) => s.id === t.id))]
   const archived = types.filter((t) => t.archived)
   const skills = [...new Set(types.flatMap((t) => t.requires))].sort()
   return (
@@ -246,8 +260,20 @@ function ShiftTypes({ locationId, types, archivedSite }: { locationId: string; t
         >
           {live.length === 0 && drafts.length === 0 && <p className="rl-empty">No shift types yet.</p>}
           <div className="rl-type-grid">
-            {live.map((t) => <TypeCard key={`${t.id}:${t.version}`} locationId={locationId} type={t} skills={skills} readOnly={archivedSite} />)}
-            {drafts.map((n) => <TypeCard key={`new-${n}`} locationId={locationId} skills={skills} onRemove={() => setDrafts((d) => d.filter((x) => x !== n))} />)}
+            {/* keyed by id only: a refresh with a newer version updates the card in place and never drops an unsaved edit (Task 22 review m6) */}
+            {live.map((t) => <TypeCard key={t.id} locationId={locationId} type={t} skills={skills} readOnly={archivedSite} initial={made.find((x) => x.type.id === t.id)} />)}
+            {drafts.map((n) => (
+              <TypeCard
+                key={`new-${n}`}
+                locationId={locationId}
+                skills={skills}
+                onRemove={() => setDrafts((d) => d.filter((x) => x !== n))}
+                onCreated={(x) => {
+                  setMade((all) => [...all, x])
+                  setDrafts((d) => d.filter((y) => y !== n))
+                }}
+              />
+            ))}
           </div>
           {archived.length > 0 && (
             <details className="ev-earlier">
@@ -269,47 +295,73 @@ function ShiftTypes({ locationId, types, archivedSite }: { locationId: string; t
 }
 
 /** One shift type: name, role, times, break, required skills and the staffing target per weekday. Saved alone with its own version; targets are their own whole set. */
-function TypeCard({ locationId, type, skills, readOnly, onRemove }: { locationId: string; type?: ShiftType; skills: string[]; readOnly?: boolean; onRemove?: () => void }) {
+function TypeCard({ locationId, type, skills, readOnly, onRemove, onCreated, initial }: {
+  locationId: string; type?: ShiftType; skills: string[]; readOnly?: boolean; onRemove?: () => void; onCreated?: (x: Made) => void; initial?: Made
+}) {
   const router = useRouter()
-  const [d, setD] = useState<TypeDraft>(() => draftOf(type))
+  // `cur` is the saved copy this card edits on (its version goes with the next save). It moves on with every successful write, so a later refused step never resends an old version (I2).
+  const [cur, setCur] = useState<ShiftType | undefined>(type)
+  const [d, setD] = useState<TypeDraft>(() => initial?.draft ?? draftOf(type))
   const [skill, setSkill] = useState("")
   const [extra, setExtra] = useState<string[]>([])
-  const [error, setError] = useState("")
+  const [error, setError] = useState(initial?.error ?? "")
+  const [conflict, setConflict] = useState(false)
   const busy = useRef(false)
-  const action = typeAction(type)
-  const id = type?.id ?? `new-${locationId}`
+  const action = typeAction(cur)
+  const id = cur?.id ?? `new-${locationId}`
   const patch = (p: Partial<TypeDraft>) => { setD((x) => ({ ...x, ...p })); setError("") }
   const options = [...new Set([...skills, ...d.requires, ...extra])].sort()
-  const dirty = !type || typePatchBody(d, type) !== null || targetsBody(d, type) !== null
-  const label = type?.name || "New shift type"
+  const dirty = !cur || typePatchBody(d, cur) !== null || targetsBody(d, cur) !== null
+  const label = cur?.name || "New shift type"
+  // A refresh brought a newer saved copy. Untouched card: take it. Edited card: keep the edit; a save then meets the conflict and the person chooses (m6, like the location form).
+  const theirs = type && cur && type.version > cur.version ? type : null
+  const [seen, setSeen] = useState(type)
+  if (type !== seen) {
+    setSeen(type)
+    if (theirs && !conflict && !dirty) {
+      setCur(theirs)
+      setD(draftOf(theirs))
+    }
+  }
 
   async function save(): Promise<boolean> {
-    if (busy.current) return false
+    if (busy.current || conflict) return false
     const bad = validateType(d)
     setError(bad ?? "")
     if (bad) return false
     busy.current = true
     try {
-      let saved = type
-      if (!type) {
+      let saved = cur
+      if (!saved) {
         const r = await createShiftType(locationId, typeCreateBody(d))
         if (!r.ok) return refused(r.error)
         saved = r.value
       } else {
-        const body = typePatchBody(d, type)
+        const body = typePatchBody(d, saved)
         if (body) {
-          const r = await updateShiftType(type.id, body)
+          const r = await updateShiftType(saved.id, body)
           if (!r.ok) return refused(r.error)
           saved = r.value
+          setCur(saved)
         }
       }
-      const targets = targetsBody(d, type)
-      if (saved && targets) {
+      const targets = targetsBody(d, saved)
+      if (targets) {
         const r = await setShiftTypeTargets(saved.id, targets)
-        if (!r.ok) return refused(r.error)
+        if (!r.ok) {
+          // Created but the targets refused: the type exists on the API now, so this draft becomes the saved card (Archive, Save sends only the targets), never a second create (I3).
+          if (!cur) {
+            onCreated?.({ type: saved, draft: d, error: short(r.error) })
+            router.refresh()
+            return false
+          }
+          return refused(r.error)
+        }
+        saved = r.value
+        setCur(saved)
       }
       toast.success(`${d.name.trim()} saved`)
-      onRemove?.()
+      if (!cur) onCreated?.({ type: saved, draft: d, error: "" })
       router.refresh()
       return true
     } finally {
@@ -318,20 +370,27 @@ function TypeCard({ locationId, type, skills, readOnly, onRemove }: { locationId
   }
   function refused(e: RosterError): false {
     if (e.state === "conflict") {
-      toast.error("Changed by someone else.")
+      // Someone saved first: keep what is typed, fetch their copy and let the person choose (the banner below).
+      setConflict(true)
       router.refresh()
       return false
     }
     setError(short(e))
     return false
   }
+  function choose(keep: boolean) {
+    if (!theirs || !cur) return
+    setD((x) => (keep ? keepMine(x, draftOf(cur), draftOf(theirs)) : draftOf(theirs)))
+    setCur(theirs)
+    setConflict(false)
+  }
   async function archive(): Promise<boolean> {
-    if (!type || busy.current) return false
+    if (!cur || busy.current) return false
     busy.current = true
     try {
-      const r = await archiveShiftType(type.id)
+      const r = await archiveShiftType(cur.id)
       if (!r.ok) return refused(r.error)
-      toast.success(`${type.name} archived`)
+      toast.success(`${cur.name} archived`)
       router.refresh()
       return true
     } finally {
@@ -390,6 +449,22 @@ function TypeCard({ locationId, type, skills, readOnly, onRemove }: { locationId
           </span>
         </div>
       </div>
+      {conflict && (
+        <div className="td-state warn sr-banner" role="alert">
+          <strong>Changed by someone else</strong>
+          <span>Your edits are kept.</span>
+          <div className="sr-banner-actions">
+            {theirs ? (
+              <>
+                <button type="button" className="btn btn-primary" onClick={() => choose(true)}>Keep mine</button>
+                <button type="button" className="btn btn-outline" onClick={() => choose(false)}>Reload theirs</button>
+              </>
+            ) : (
+              <button type="button" className="btn btn-primary" onClick={() => router.refresh()}>Try again</button>
+            )}
+          </div>
+        </div>
+      )}
       {error && <p className="rl-err" role="alert">{error}</p>}
       {!readOnly && (
         <div className="rl-tpl-foot">
@@ -399,7 +474,7 @@ function TypeCard({ locationId, type, skills, readOnly, onRemove }: { locationId
           {action === "remove" && (
             <button type="button" className="fs-act bad" aria-label={`Remove ${label}`} onClick={onRemove}><Icon name="close" size={24} />Remove</button>
           )}
-          <ActionButton className="btn btn-primary mr-btn" disabled={!dirty} onAction={save}>{type ? "Save" : "Add"}</ActionButton>
+          <ActionButton className="btn btn-primary mr-btn" disabled={!dirty || conflict} onAction={save}>{cur ? "Save" : "Add"}</ActionButton>
         </div>
       )}
     </fieldset>

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest"
 import { toLocation, toShiftType } from "./adapters"
 import { locationDto, shiftTypeDto } from "./fixtures"
 import {
-  createBody, draftOf, formOf, patchBody, qualBody, qualState, saveIds, supervisorChoice, targetsBody, typeAction, typePatchBody, validateLocation, validateQuals, validateType,
+  createBody, draftOf, formOf, keepMine, keepMineSet, patchBody, qualBody, qualState, saveIds, supervisorChoice, targetsBody, typeAction, typePatchBody, validateLocation, validateQuals, validateType,
 } from "./admin"
 
 // B8 Task 22: the locations admin helpers on the API's shapes.
@@ -28,6 +28,28 @@ describe("location form", () => {
     expect(validateLocation(f)).toEqual({ name: "Enter a name" })
     expect(validateLocation({ ...f, name: "A", lat: "53" })).toEqual({ lng: "Add both or neither" })
     expect(validateLocation({ ...f, name: "A", lat: "91", lng: "0", radius: "6000", timeZone: "dublin" })).toEqual({ lat: "-90 to 90", radius: "0 to 5000 m", timeZone: "e.g. Europe/Dublin" })
+  })
+})
+
+describe("Keep mine after a conflict (Task 22 review I1): a three-way merge", () => {
+  it("a field I changed keeps my value; a field I did not touch takes theirs (per opening-hours day too), so their edit is never sent back over", () => {
+    const base = formOf(loc)
+    const mine = { ...base, address: "1 Quay St", hours: { ...base.hours, tue: "09:00-17:00" } }
+    const theirs = { ...base, contact: "their phone", name: "Harbour St", hours: { ...base.hours, mon: "07:00-23:00" } }
+    const merged = keepMine(mine, base, theirs)
+    expect(merged).toEqual({ ...theirs, address: "1 Quay St", hours: { ...theirs.hours, tue: "09:00-17:00" } })
+    const theirLoc = { ...loc, version: 3, contact: "their phone", name: "Harbour St", openingHours: { mon: "07:00-23:00" } }
+    expect(patchBody(merged, theirLoc, 3)).toEqual({ version: 3, address: "1 Quay St", openingHours: { mon: "07:00-23:00", tue: "09:00-17:00" } }) // only my edits
+  })
+  it("works on a shift type draft too (targets per weekday, skills as one value)", () => {
+    const base = draftOf(type)
+    const merged = keepMine({ ...base, breakMin: "45", targets: { ...base.targets, 5: "3" } }, base, { ...base, name: "Late", targets: { ...base.targets, 1: "4" } })
+    expect(merged).toMatchObject({ name: "Late", breakMin: "45", requires: base.requires })
+    expect(merged.targets).toMatchObject({ 1: "4", 5: "3" })
+  })
+  it("a set merges by what I added and removed", () => {
+    expect(keepMineSet(["a", "c"], ["a", "b"], ["a", "b", "d"]).sort()).toEqual(["a", "c", "d"]) // I added c and removed b; they added d
+    expect(keepMineSet(["a"], ["a"], ["d"])).toEqual(["d"]) // I changed nothing: theirs
   })
 })
 

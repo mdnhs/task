@@ -106,7 +106,8 @@ describe("location form (B8 Task 22)", () => {
     await click(byText("Keep mine")!)
     m.updateLocation.mockResolvedValueOnce(ok({ ...loc, version: 4, contact: "01 999", name: "Harbour St" }))
     await click(byText("Save location")!)
-    expect(m.updateLocation).toHaveBeenLastCalledWith(LID, { version: 3, contact: "01 999", name: "Harbour Street" }) // on THEIR version: my fields go on top of theirs
+    expect(m.updateLocation).toHaveBeenLastCalledWith(LID, { version: 3, contact: "01 999" }) // on THEIR version: only my edit goes on top (their name change stays: Task 22 review I1)
+    expect((document.getElementById("lf-name") as HTMLInputElement).value).toBe("Harbour St")
     expect(m.refresh).toHaveBeenCalled()
     await act(async () => { await new Promise((r) => setTimeout(r, 800)) }) // the button's "done" tick (ACTION.done) ends before the next save
 
@@ -169,6 +170,106 @@ describe("location form (B8 Task 22)", () => {
   })
 })
 
+describe("Task 22 review carry-ins (I1 I2 I3 m6)", () => {
+  const field = (id: string) => document.getElementById(id) as HTMLInputElement
+  const card = (label: string) => document.querySelector<HTMLFieldSetElement>(`fieldset[aria-label="${label}"]`)!
+  const inCard = (label: string, text: string) => [...card(label).querySelectorAll("button")].find((b) => b.textContent?.trim() === text)
+  const waitTick = () => act(async () => { await new Promise((r) => setTimeout(r, 800)) }) // the button's "done" tick ends before the next action
+
+  it("I1: Keep mine sends only the fields I changed; another session's edit of a different field (and of the supervisors) is kept, never sent back over", async () => {
+    await mount(createElement(LocationFormPage, { location: loc, shiftTypes: [], people, truncated: false }))
+    await typeInto(field("lf-address"), "2 Quay St")
+    m.updateLocation.mockResolvedValueOnce(fail(409, "version_conflict"))
+    m.readLocation.mockResolvedValueOnce(ok({ ...loc, version: 3, contact: "their phone", supervisorIds: [...loc.supervisorIds, "u-ben"] }))
+    await click(byText("Save location")!)
+    await click(byText("Keep mine")!)
+    expect(field("lf-contact").value).toBe("their phone") // I never touched it: theirs shows
+    expect(field("lf-address").value).toBe("2 Quay St") // mine stays
+    m.updateLocation.mockResolvedValueOnce(ok({ ...loc, version: 4, contact: "their phone", address: "2 Quay St", supervisorIds: [...loc.supervisorIds, "u-ben"] }))
+    await click(byText("Save location")!)
+    expect(m.updateLocation).toHaveBeenLastCalledWith(LID, { version: 3, address: "2 Quay St" })
+    expect(m.setLocationSupervisors).not.toHaveBeenCalled() // their new supervisor is not removed
+  })
+
+  it("I2: details saved but the supervisors refused: the next Save sends the new version and only what is still unsaved (no false conflict)", async () => {
+    await mount(createElement(LocationFormPage, { location: loc, shiftTypes: [], people, truncated: false }))
+    await typeInto(field("lf-contact"), "01 777")
+    await choose(document.querySelector<HTMLSelectElement>('select[aria-label="Supervisors"]')!, "u-ann")
+    m.updateLocation.mockResolvedValueOnce(ok({ ...loc, version: 2, contact: "01 777" }))
+    m.setLocationSupervisors.mockResolvedValueOnce(fail(403, "forbidden"))
+    await click(byText("Save location")!)
+    expect(document.querySelector(".rl-err")?.textContent).toBeTruthy()
+    await waitTick()
+    m.setLocationSupervisors.mockResolvedValueOnce(ok(["u-ann", locationDto.supervisorIds[0]]))
+    await click(byText("Save location")!)
+    expect(m.updateLocation).toHaveBeenCalledTimes(1) // the details were saved: not sent again on the old version
+    expect(m.setLocationSupervisors).toHaveBeenLastCalledWith(LID, ["u-ann", locationDto.supervisorIds[0]])
+    await waitTick()
+    await typeInto(field("lf-contact"), "01 888")
+    m.updateLocation.mockResolvedValueOnce(ok({ ...loc, version: 3, contact: "01 888" }))
+    await click(byText("Save location")!)
+    expect(m.updateLocation).toHaveBeenLastCalledWith(LID, { version: 2, contact: "01 888" })
+  })
+
+  it("I2: a shift type PATCH saved but its targets refused: the next Save sends only the targets, never the old version again", async () => {
+    await mount(createElement(LocationFormPage, { location: loc, shiftTypes: [toShiftType(shiftTypeDto)], people, truncated: false }))
+    await typeInto(field(`${STID}-break`), "45")
+    await typeInto(byLabel("Night Fri") as HTMLInputElement, "3")
+    m.updateShiftType.mockResolvedValueOnce(ok(toShiftType({ ...shiftTypeDto, unpaidBreakMin: 45, version: 2 })))
+    m.setShiftTypeTargets.mockResolvedValueOnce(fail(422, "invalid_targets"))
+    await click(inCard("Night", "Save")!)
+    expect(card("Night").querySelector(".rl-err")?.textContent).toBeTruthy()
+    await waitTick()
+    m.setShiftTypeTargets.mockResolvedValueOnce(ok(toShiftType({ ...shiftTypeDto, unpaidBreakMin: 45, targets: [{ weekday: 1, count: 2 }, { weekday: 5, count: 3 }], version: 3 })))
+    await click(inCard("Night", "Save")!)
+    expect(m.updateShiftType).toHaveBeenCalledTimes(1)
+    expect(m.setShiftTypeTargets).toHaveBeenCalledTimes(2)
+    expect(m.toast.error).not.toHaveBeenCalledWith("Changed by someone else.")
+  })
+
+  it("I3: a new type created but its targets refused becomes the saved type (Archive, no Remove); saving again sends the targets, never a second create", async () => {
+    await mount(createElement(LocationFormPage, { location: loc, shiftTypes: [], people, truncated: false }))
+    await click(byText("Add")!)
+    await typeInto(byLabel("New shift type")!.querySelector<HTMLInputElement>('input[placeholder="Night"]')!, "Early")
+    await typeInto(byLabel("New shift type")!.querySelector<HTMLInputElement>('input[placeholder="Security officer"]')!, "Porter")
+    await typeInto(byLabel("New shift type Mon") as HTMLInputElement, "2")
+    const created = toShiftType({ ...shiftTypeDto, id: "st-new", name: "Early", role: "Porter", start: "09:00", end: "17:00", requires: [], targets: [], version: 1 })
+    m.createShiftType.mockResolvedValueOnce(ok(created))
+    m.setShiftTypeTargets.mockResolvedValueOnce(fail(422, "invalid_targets"))
+    await click(inCard("New shift type", "Add")!)
+    expect(m.createShiftType).toHaveBeenCalledTimes(1)
+    expect(byLabel("Remove New shift type")).toBeNull()
+    expect(byLabel("Remove Early")).toBeNull()
+    expect(byLabel("Archive Early")).not.toBeNull() // it exists on the API now
+    expect(card("Early").querySelector(".rl-err")?.textContent).toBeTruthy() // the short error stays
+    expect((byLabel("Early Mon") as HTMLInputElement).value).toBe("2") // the unsaved target is kept
+    await waitTick()
+    m.setShiftTypeTargets.mockResolvedValueOnce(ok({ ...created, targets: [{ weekday: 1, count: 2 }], version: 2 }))
+    await click(inCard("Early", "Save")!)
+    expect(m.createShiftType).toHaveBeenCalledTimes(1)
+    expect(m.setShiftTypeTargets).toHaveBeenLastCalledWith("st-new", [{ weekday: 1, count: 2 }])
+  })
+
+  it("m6: a 409 on a shift type keeps my edit and shows the conflict; Keep mine saves only my change on their version", async () => {
+    const night = toShiftType(shiftTypeDto)
+    await mount(createElement(LocationFormPage, { location: loc, shiftTypes: [night], people, truncated: false }))
+    await typeInto(field(`${STID}-break`), "45")
+    m.updateShiftType.mockResolvedValueOnce(fail(409, "version_conflict"))
+    await click(inCard("Night", "Save")!)
+    expect(m.refresh).toHaveBeenCalled()
+    // the refresh brings their copy (they renamed it): my edit must survive the new props
+    await rerender(createElement(LocationFormPage, { location: loc, shiftTypes: [{ ...night, name: "Late", version: 2 }], people, truncated: false }))
+    expect(field(`${STID}-break`).value).toBe("45")
+    expect(card("Night").textContent).toContain("Changed by someone else")
+    expect(inCard("Night", "Save")!.disabled).toBe(true)
+    await click(inCard("Night", "Keep mine")!)
+    expect(field(`${STID}-name`).value).toBe("Late")
+    m.updateShiftType.mockResolvedValueOnce(ok({ ...night, name: "Late", unpaidBreakMin: 45, version: 3 }))
+    await click(inCard("Late", "Save")!)
+    expect(m.updateShiftType).toHaveBeenLastCalledWith(STID, { version: 2, unpaidBreakMin: 45 })
+  })
+})
+
 describe("licence editor (B8 Task 22)", () => {
   it("qualifications editor shows expiry state (expired, due soon) from the API, never from the dates", async () => {
     await mount(createElement(LocationsView, { locations: [loc], people, truncated: false, today: "2026-11-19" }))
@@ -225,6 +326,19 @@ describe("My roster (B8 Task 22)", () => {
     expect(byLabel("Confirm Fri 20 Nov")).toBeNull()
     expect(byLabel("Confirm Sat 21 Nov")).not.toBeNull()
     expect(document.querySelectorAll(".mr-shift .st").length).toBe(1) // one Confirmed pill
+  })
+
+  it("m4: a confirmation made here never outlives the server's confirmedAt (the office cleared it: Confirm again)", async () => {
+    await mount(createElement(MyRosterView, props({ mine: mineOf([coppers]) })))
+    await click(byText("Shifts · 1")!)
+    m.confirmShift.mockResolvedValueOnce(ok({ id: "s1", confirmedAt: "2026-11-19T09:01:00.000Z" }))
+    await click(byLabel("Confirm Fri 20 Nov")!)
+    expect(document.querySelectorAll(".mr-tile b.num")[0]?.textContent).toMatch(/^0+$/) // To confirm: 1 -> 0
+    // a later refresh: the API says not confirmed (an office edit cleared it): the server wins
+    await rerender(createElement(MyRosterView, props({ mine: mineOf([{ ...coppers, confirmedAt: null }]) })))
+    await flush()
+    expect(document.querySelectorAll(".mr-tile b.num")[0]?.textContent).toMatch(/^1+$/)
+    expect(byLabel("Confirm Fri 20 Nov")).not.toBeNull()
   })
 
   it("a refused confirm stays unconfirmed with a short toast", async () => {

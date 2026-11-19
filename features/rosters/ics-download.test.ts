@@ -1,5 +1,5 @@
 import { describe, expect, test, vi } from "vitest"
-import { downloadMyCalendar } from "./ics-download"
+import { downloadMyCalendar, filenameOf } from "./ics-download"
 
 // B8 Task 22 (R8-16): "Add to calendar" asks the API's ONE builder through the BFF (same-origin /v1, the session cookie, the page's tenant) and hands the browser the file as an attachment.
 const ICS = "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nEND:VCALENDAR\r\n"
@@ -30,5 +30,12 @@ describe("downloadMyCalendar", () => {
     const notCal = await downloadMyCalendar({ from: "2026-11-16", to: "2026-12-13" }, { get: async () => new Response("<html>", { status: 200, headers: { "content-type": "text/html" } }), save })
     expect(notCal.ok).toBe(false)
     expect(save).not.toHaveBeenCalled()
+  })
+})
+
+describe("filenameOf (Task 22 review m5)", () => {
+  test("a malformed percent escape falls back to the default name instead of throwing", () => {
+    expect(filenameOf("attachment; filename*=UTF-8''%E0%A4%A.ics")).toBe("roster.ics")
+    expect(filenameOf("attachment; filename*=UTF-8''my%20roster.ics")).toBe("my roster.ics")
   })
 })
