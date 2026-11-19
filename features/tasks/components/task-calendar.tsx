@@ -10,6 +10,7 @@ import { useDept } from "@/hooks/use-dept"
 import { apiBrowser } from "@/lib/api/browser"
 import { userMessage } from "@/lib/api/problem"
 import { toCard } from "../adapters"
+import { departmentFilter } from "../filters"
 import { addDays } from "../recurrence"
 import { byDueDay, monthGrid, monthLabel, shiftMonth, weekLabel, weekOf } from "../calendar"
 import { STATUS } from "../types"
@@ -41,9 +42,10 @@ export const rangeOf = (anchor: string, mode: "month" | "week") => {
 
 /**
  * Calendar view by due date (FR-M1-05): month or week, Monday first. The days are the TENANT's (the API cuts them in the tenant zone, DST days included); each window is one
- * call, and moving to another month or week asks again. The API has no filter on the calendar, so the search, project and assignee narrow the cards of the loaded window.
+ * call, and moving to another month or week asks again. The topbar department is the API's `teamId` (B8 Task 24: filed under the team or assigned to one of its members, ruling S8), so a
+ * department change asks again; a department no team has shows nothing. The search, project and assignee narrow the cards of the loaded window.
  */
-export function TaskCalendar({ tasks: first, truncated: firstTruncated, range, people, projects, today, staff }: {
+export function TaskCalendar({ tasks: first, truncated: firstTruncated, range, people, projects, today, staff, departments = [] }: {
   tasks: Task[]
   truncated: boolean
   /** The window `tasks` covers (the server's first answer). */
@@ -53,27 +55,30 @@ export function TaskCalendar({ tasks: first, truncated: firstTruncated, range, p
   today: string
   tzLabel: string
   staff: boolean
+  /** Department teams: the shell's department (a name) becomes the API's `teamId`. */
+  departments?: { id: string; name: string }[]
 }) {
   const dept = useDept()
+  const { teamId, unknown } = departmentFilter(dept, departments)
   const [f, setF] = useState<BoardFilterValues>(NO_BOARD_FILTERS)
   const [mode, setMode] = useState<"month" | "week">("month")
   const day0 = today.slice(0, 10)
   const [anchor, setAnchor] = useState(day0)
-  const [loaded, setLoaded] = useState<{ from: string; to: string; tasks: Task[]; truncated: boolean }>({ ...range, tasks: first, truncated: firstTruncated })
+  const [loaded, setLoaded] = useState<{ from: string; to: string; teamId?: string; tasks: Task[]; truncated: boolean }>({ ...range, tasks: first, truncated: firstTruncated })
   const [loading, setLoading] = useState(false)
   const want = rangeOf(anchor, mode)
   const seq = useRef(0)
-  const covers = loaded.from <= want.from && want.to <= loaded.to
+  const covers = loaded.teamId === teamId && loaded.from <= want.from && want.to <= loaded.to
   useEffect(() => {
-    if (covers) return
+    if (covers || unknown) return
     const mine = ++seq.current
     void (async () => {
       setLoading(true)
       try {
         const win = rangeOf(anchor, "month")
         const w = mode === "month" ? win : want
-        const c = await apiBrowser.get("/v1/tasks/calendar", { query: { from: w.from, to: w.to } })
-        if (mine === seq.current) setLoaded({ ...w, tasks: c.days.flatMap((d) => d.tasks.map(toCard)), truncated: c.truncated })
+        const c = await apiBrowser.get("/v1/tasks/calendar", { query: { from: w.from, to: w.to, ...(teamId ? { teamId } : {}) } })
+        if (mine === seq.current) setLoaded({ ...w, ...(teamId ? { teamId } : {}), tasks: c.days.flatMap((d) => d.tasks.map(toCard)), truncated: c.truncated })
       } catch (e) {
         toast.error(userMessage(e).text)
       } finally {
@@ -81,19 +86,20 @@ export function TaskCalendar({ tasks: first, truncated: firstTruncated, range, p
       }
     })()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [anchor, mode, covers])
+  }, [anchor, mode, covers, teamId, unknown])
 
   const byId = useMemo(() => new Map(people.map((x) => [x.id, x])), [people])
   const rows = useMemo(() => {
     const q = f.q.trim().toLowerCase()
-    return loaded.tasks.filter(
+    // the window of another department (or one still being asked for) is never shown under this one
+    const shown = unknown || loaded.teamId !== teamId ? [] : loaded.tasks
+    return shown.filter(
       (t) =>
-        (dept === "all" || t.dept === dept) &&
         (f.project === "all" || t.projectId === f.project) &&
         (f.assignee === "all" || t.assignee === f.assignee || t.assignees?.includes(f.assignee)) &&
         (!q || [t.title, t.ref, byId.get(t.assignee)?.name ?? "", ...t.tags].some((s) => s.toLowerCase().includes(q))),
     )
-  }, [loaded.tasks, dept, f, byId])
+  }, [loaded.tasks, loaded.teamId, teamId, unknown, f, byId])
   const days = byDueDay(rows)
   const month = anchor.slice(0, 7)
   const step = (n: number) => setAnchor((a) => (mode === "month" ? shiftMonth(a, n) : addDays(a, 7 * n)))
