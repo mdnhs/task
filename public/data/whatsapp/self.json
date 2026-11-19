@@ -1,0 +1,15 @@
+{
+  "phase": "none",
+  "country": "IE",
+  "national": null,
+  "channels": {
+    "task_assigned": { "inApp": true, "email": false, "whatsapp": true },
+    "task_due": { "inApp": true, "email": true, "whatsapp": true },
+    "report_due": { "inApp": true, "email": false, "whatsapp": true },
+    "report_returned": { "inApp": true, "email": true, "whatsapp": true },
+    "roster_changed": { "inApp": true, "email": false, "whatsapp": true },
+    "leave_decided": { "inApp": true, "email": true, "whatsapp": true },
+    "billing": { "inApp": true, "email": true, "whatsapp": false },
+    "security": { "inApp": true, "email": true, "whatsapp": true }
+  }
+}

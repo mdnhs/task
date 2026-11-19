@@ -1,0 +1,16 @@
+{
+  "messages": [
+    { "id": "m1", "at": "2026-10-20T08:40:00", "recipient": "Amara Bello", "phoneLast3": "821", "template": "task_assigned_v2", "status": "read", "reason": null },
+    { "id": "m2", "at": "2026-10-20T08:02:00", "recipient": "Aoife Brennan", "phoneLast3": "095", "template": "report_due_v1", "status": "delivered", "reason": null },
+    { "id": "m3", "at": "2026-10-20T07:15:00", "recipient": "Rhys Edwards", "phoneLast3": "406", "template": "task_due_digest_v1", "status": "delivered", "reason": null },
+    { "id": "m4", "at": "2026-10-20T06:30:00", "recipient": "Grace Mensah", "phoneLast3": "652", "template": "report_returned_v1", "status": "sent", "reason": null },
+    { "id": "m5", "at": "2026-10-20T06:28:00", "recipient": "Daniel Okafor", "phoneLast3": "774", "template": "task_assigned_v2", "status": "failed", "reason": "Number not verified" },
+    { "id": "m6", "at": "2026-10-20T06:10:00", "recipient": "Priya Nair", "phoneLast3": "517", "template": "report_due_v1", "status": "queued", "reason": null },
+    { "id": "m7", "at": "2026-10-19T17:05:00", "recipient": "Lilianna Novak", "phoneLast3": "193", "template": "task_due_digest_v1", "status": "read", "reason": null },
+    { "id": "m8", "at": "2026-10-19T16:48:00", "recipient": "Priya Nair", "phoneLast3": "517", "template": "task_assigned_v2", "status": "delivered", "reason": null },
+    { "id": "m9", "at": "2026-10-19T12:20:00", "recipient": "Tomasz Kowalski", "phoneLast3": "338", "template": "report_due_v1", "status": "failed", "reason": "Opted out" },
+    { "id": "m10", "at": "2026-10-19T09:30:00", "recipient": "Kofi Asante", "phoneLast3": "984", "template": "security_alert_v1", "status": "read", "reason": null },
+    { "id": "m11", "at": "2026-10-18T09:10:00", "recipient": "Kofi Asante", "phoneLast3": "984", "template": "task_assigned_v2", "status": "delivered", "reason": null },
+    { "id": "m12", "at": "2026-10-18T08:55:00", "recipient": "Marta Silva", "phoneLast3": "260", "template": "report_due_v1", "status": "failed", "reason": "Number not on WhatsApp" }
+  ]
+}

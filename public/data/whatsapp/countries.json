@@ -1,0 +1,10 @@
+{
+  "countries": [
+    { "code": "IE", "name": "Ireland", "dial": "353" },
+    { "code": "GB", "name": "United Kingdom", "dial": "44" },
+    { "code": "US", "name": "United States", "dial": "1" },
+    { "code": "PL", "name": "Poland", "dial": "48" },
+    { "code": "NG", "name": "Nigeria", "dial": "234" },
+    { "code": "IN", "name": "India", "dial": "91" }
+  ]
+}

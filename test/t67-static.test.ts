@@ -26,7 +26,7 @@ describe("T6.7 deleted mock modules (ruling I17)", () => {
     const offenders: string[] = []
     for (const f of code) {
       const src = strip(read(f))
-      if (/(today-data|shift-reports-data|shifts-data|use-shifts|task-inbox|roster-overlay|reports\/store|["']\.\.?\/store["'])/.test(src) && !/features\/(rosters|tasks|files|orders|payroll|recruitment|staff-rosters|assistant|attention|search|billing|audit|account|settings|platform)\//.test(f)) offenders.push(f)
+      if (/(today-data|shift-reports-data|shifts-data|use-shifts|task-inbox|roster-overlay|reports\/store|["']\.\.?\/store["'])/.test(src) && !/features\/(rosters|tasks|files|orders|payroll|recruitment|staff-rosters|assistant|attention|search|billing|audit|account|settings|platform|whatsapp)\//.test(f)) offenders.push(f)
       if (/@\/lib\/(today-data|shift-reports-data|shifts-data|task-inbox|roster-overlay)|@\/hooks\/use-shifts/.test(src)) offenders.push(f)
     }
     expect(offenders).toEqual([])

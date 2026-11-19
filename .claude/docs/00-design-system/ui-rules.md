@@ -83,6 +83,19 @@ accents, small radius and different spacing, so it clashed with the rest of the 
     department change resets to page 1 (Tasks also drops `?page=`). Pages in the URL use `href`, client state uses `onPageChange`.
     The skeleton renders a `PagerSkeleton` row when the seed count exceeds the page size, and its row count is `min(count, size)`.
 
+11c. **Contrast: every text token reaches WCAG AA (4.5:1) on every surface it sits on, in both themes and for every brand.**
+    Text uses `--ink`, `--ink-2`, `--ink-3` (lightest grey: captions, helper text, "Not set up"), `--placeholder` (also 4.5:1 on field fills, not
+    just 4.0, so one rule has no exception), the status colours `--ok --warn --bad --info` (also on their own `-bg` chips), and `--brand-text`.
+    **Brand-coloured TEXT is `--brand-text`, never `--brand`** (links, active nav, outline buttons, today markers): `--brand` is the fill and
+    stays the tenant's exact colour; `--brand-text` is the same hue darkened in light (lightened in dark) until it passes. Text ON a brand fill
+    is `--on-brand` (white, or dark when white fails, e.g. yellow or the lighter dark-theme brand); on a `--bad` fill it is `--on-bad`.
+    Never hard-code `color:#fff` on a token background. Large text and icons need 3:1.
+    Only lightness may change to fix a pair (hue/chroma stay), in `app/opsdesk.css`, `DEFAULT_NEUTRALS_*`/`DEFAULT_STATUS_*` in
+    `lib/brand-neutrals.ts` and the derivation in `lib/brand.ts` `brandTokens()`. `lib/contrast.ts` lists every (text, surface) pair;
+    `lib/contrast.test.ts` runs it over the default theme and ~18 brands (purple, blue, red, yellow, grey, demo `#3b5bdb`, black, white, neon…)
+    in light and dark and fails below 4.5. New text colour or new surface: add the pair to `lib/contrast.ts` `pairs()`.
+    A light brand (yellow) cannot be both a fill and readable text: the fill is kept, text uses the darker `--brand-text`.
+
 ## Motion
 OpsDesk is a corporate ops tool, so motion is short, quiet and functional. It shows where things came from or went. It is never decoration.
 No GSAP. CSS covers most cases. The `motion` library (`motion/react`) is used only for what CSS can't do.

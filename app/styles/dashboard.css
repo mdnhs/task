@@ -18,12 +18,12 @@
 .dash-fix > .deadline > .sk:last-child{margin-top:auto !important}
 /* Shift report deadline rows link to the report (member) or the team's inbox (manager); hover = text colour only. */
 .rep-row a.dep{color:var(--ink);text-decoration:none;transition:color var(--dur-fast) var(--ease)}
-.rep-row a.dep:hover{color:var(--brand)}
+.rep-row a.dep:hover{color:var(--brand-text)}
 
 /* Staff dashboard (features/dashboard/components/staff-*). Reuses .stats/.card/.item/.deadline from opsdesk.css. */
 .staff-col{display:flex;flex-direction:column;gap:16px;min-width:0}
 .item-link{color:inherit;text-decoration:none}
-.item-link:hover .t{color:var(--brand)}
+.item-link:hover .t{color:var(--brand-text)}
 :root[data-theme="dark"] .item-link:hover .t{color:var(--brand-3)}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .item-link:hover .t{color:var(--brand-3)}}
 .item-link:focus-visible{outline:2px solid var(--brand);outline-offset:2px;border-radius:var(--r-md)}
@@ -69,11 +69,11 @@
 .today[data-slot="accordion-item"]{margin:0;padding:0 22px}
 .today .today-bar{display:flex;align-items:center;gap:12px;width:100%;height:56px;padding:0;border:0;border-radius:var(--r-lg);font:inherit;text-decoration:none;color:var(--ink);cursor:pointer}
 .today .today-bar:hover{text-decoration:none}
-.today .today-bar:hover .today-chip-t{color:var(--brand)}
+.today .today-bar:hover .today-chip-t{color:var(--brand-text)}
 .today .today-bar .today-chip-t{transition:color var(--dur-fast) var(--ease)}
 .today-peek{flex:1;min-width:0;display:flex;transition:opacity var(--dur) var(--ease)}
 .today-bar[aria-expanded="true"] .today-peek,.today-bar[aria-expanded="true"] .today-pulse{opacity:0;visibility:hidden;transition:opacity var(--dur) var(--ease),visibility 0s var(--dur)}
-.today-bar [data-slot="accordion-trigger-icon"]{width:16px;height:16px;margin-left:0;color:var(--brand);transition:transform var(--dur-slow) var(--ease-in-out)}
+.today-bar [data-slot="accordion-trigger-icon"]{width:16px;height:16px;margin-left:0;color:var(--brand-text);transition:transform var(--dur-slow) var(--ease-in-out)}
 .today-bar [data-slot="accordion-trigger-icon"]:last-of-type{display:none !important}
 .today-bar [data-slot="accordion-trigger-icon"]:first-of-type{display:inline !important}
 .today-bar[aria-expanded="true"] [data-slot="accordion-trigger-icon"]{transform:rotate(180deg)}
@@ -100,14 +100,14 @@
 .today-tile span{font-size:12.5px;line-height:18px;color:var(--ink-2);transition:color var(--dur-fast) var(--ease)}
 .today-tile[data-tone="bad"] b{color:var(--bad)}
 .today-tile[data-tone="warn"] b{color:var(--warn)}
-.today-tile:hover b,.today-tile:hover span{color:var(--brand)}
+.today-tile:hover b,.today-tile:hover span{color:var(--brand-text)}
 :root[data-theme="dark"] .today-tile:hover b,:root[data-theme="dark"] .today-tile:hover span{color:var(--brand-3)}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .today-tile:hover b,:root:not([data-theme="light"]) .today-tile:hover span{color:var(--brand-3)}}
 .today-team{border-radius:var(--r-md);background:var(--shell);padding:14px 16px;display:flex;flex-direction:column;gap:6px}
 .today-team-h{font-size:12.5px;line-height:18px;font-weight:600;color:var(--ink-2)}
 .today-team-l{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px;font-size:13.5px;line-height:20px}
 .today-team-l a{color:var(--ink);text-decoration:none;transition:color var(--dur-fast) var(--ease)}
-.today-team-l a:hover{color:var(--brand)}
+.today-team-l a:hover{color:var(--brand-text)}
 :root[data-theme="dark"] .today-team-l a:hover{color:var(--brand-3)}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .today-team-l a:hover{color:var(--brand-3)}}
 .today-team-m{color:var(--ink-3)}
@@ -115,7 +115,7 @@
 .today-sum-h{font-weight:600;font-size:14px;line-height:20px}
 .today-sum ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;font-size:13.5px;line-height:20px;color:var(--ink-2)}
 .today-sum a{color:inherit;text-decoration:none;transition:color var(--dur-fast) var(--ease)}
-.today-sum a:hover{color:var(--brand)}
+.today-sum a:hover{color:var(--brand-text)}
 :root[data-theme="dark"] .today-sum a:hover{color:var(--brand-3)}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .today-sum a:hover{color:var(--brand-3)}}
 /* compact entry that reopens the card after it was dismissed (or switched off) */
@@ -128,10 +128,10 @@
 .tc .ico{width:15px;height:15px;color:var(--ink-3)}
 .tc[data-tone="bad"],.tc[data-tone="bad"] .ico{color:var(--bad)}
 .tc[data-tone="warn"],.tc[data-tone="warn"] .ico{color:var(--warn)}
-.today-chip-a{font-size:13px;font-weight:600;color:var(--brand);transition:color var(--dur-fast) var(--ease)}
+.today-chip-a{font-size:13px;font-weight:600;color:var(--brand-text);transition:color var(--dur-fast) var(--ease)}
 :root[data-theme="dark"] .today-chip-a{color:var(--brand-3)}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .today-chip-a{color:var(--brand-3)}}
-.today-chip:hover .today-chip-t{color:var(--brand)}
+.today-chip:hover .today-chip-t{color:var(--brand-text)}
 /* Pulse dot beside "Open" when the closed card has something in it: a solid dot plus a ring that grows and fades (transform/opacity only). */
 .today-pulse{position:relative;width:8px;height:8px;border-radius:50%;background:var(--brand);flex:none}
 .today-pulse::after{content:"";position:absolute;inset:0;border-radius:50%;background:var(--brand);animation:today-pulse 1.8s var(--ease) infinite}
@@ -146,7 +146,7 @@
 .td-meta{font-size:13px;line-height:19px;color:var(--ink-2)}
 .td-ctl{display:flex;align-items:center;gap:6px}
 .td-ib{display:grid;place-items:center;width:38px;height:38px;border:0;border-radius:var(--r-pill);background:var(--card);color:var(--ink);cursor:pointer;transition:color var(--dur-fast) var(--ease),opacity var(--dur-fast) var(--ease)}
-.td-ib:hover:not(:disabled){color:var(--brand)}
+.td-ib:hover:not(:disabled){color:var(--brand-text)}
 .td-ib:disabled{opacity:.4;cursor:not-allowed}
 .td-play{width:44px;height:44px;background:var(--brand);color:var(--on-brand)}
 .td-play:hover:not(:disabled){color:var(--on-brand);background:var(--brand-deep)}
@@ -194,11 +194,11 @@
 .stat-ico .ico{width:17px;height:17px}
 :root[data-theme="dark"] .stat-ico{color:var(--brand-3)}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .stat-ico{color:var(--brand-3)}}
-.dash-stats .stat.hero .stat-ico{background:rgba(255,255,255,.16);color:#fff}
+.dash-stats .stat.hero .stat-ico{background:var(--hero-patch);color:var(--on-brand)}
 .dash-stats .note .up,.dash-stats .note .down{padding:1px 8px;border-radius:var(--r-pill);font-size:11.5px;line-height:17px}
 .dash-stats .note .up{background:var(--ok-bg)}
 .dash-stats .note .down{background:var(--bad-bg)}
-.dash-stats .stat.hero .note .up{background:rgba(255,255,255,.16)}
+.dash-stats .stat.hero .note .up{background:var(--hero-patch)}
 .dash-stats .arrow{transition:background var(--dur-fast) var(--ease),color var(--dur-fast) var(--ease),border-color var(--dur-fast) var(--ease)}
 .dash-stats .arrow .ico{transition:transform var(--dur) var(--ease)}
 .dash-stats .stat:hover .arrow .ico{transform:rotate(45deg)}
@@ -212,7 +212,7 @@
 .dash-stats .stat-mid{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-top:auto;color:var(--brand-2)}
 .dash-stats .stat-mid .value{margin-top:0;color:var(--ink)}
 .dash-stats .stat-mid.bad{color:var(--bad)}
-.dash-stats .stat.hero .stat-mid,.dash-stats .stat.hero .stat-mid .value{color:#fff}
+.dash-stats .stat.hero .stat-mid,.dash-stats .stat.hero .stat-mid .value{color:var(--on-brand)}
 .spark{width:120px;height:44px;flex:none;display:block;overflow:visible;transform-origin:bottom;animation:spark-in var(--dur-slow) var(--ease) .25s both}
 .spark-dot{filter:drop-shadow(0 0 0 currentColor)}
 @keyframes spark-in{from{opacity:0;transform:scaleY(.4)}to{opacity:1;transform:none}}

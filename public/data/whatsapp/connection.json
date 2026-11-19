@@ -1,0 +1,8 @@
+{
+  "status": "not_connected",
+  "number": "+353 1 555 0142",
+  "businessName": "OpsDesk Notifications",
+  "lastEvent": "Never connected",
+  "lastEventAt": null,
+  "today": { "sent": 42, "delivered": 38, "failed": 2 }
+}

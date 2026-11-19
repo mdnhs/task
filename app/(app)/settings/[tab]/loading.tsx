@@ -1,5 +1,7 @@
 import { BillingSkeleton, getEntitlements, getPlans } from "@/features/billing"
 import { SettingsLoading } from "@/features/settings"
+import { WhatsAppCardSkeleton } from "@/features/whatsapp"
+import { mockEnabled } from "@/lib/mock-registry"
 import { planModules } from "@/lib/entitlements"
 import { getSkeletonSession } from "@/lib/skeleton-session"
 import { can, canWrite } from "@/lib/permissions"
@@ -21,6 +23,7 @@ export default async function Loading() {
     <SettingsLoading
       counts={counts}
       canWrite={canWrite(session, "settings")}
+      extras={mockEnabled() ? { integrations: <WhatsAppCardSkeleton canWrite={canWrite(session, "settings")} />, usersWhatsApp: true } : undefined} // the mock WhatsApp card (demo flag only)
       billing={<BillingSkeleton plans={plans.length} invoices={0} subscribed={false} canManage={manage} currentIndex={Math.max(0, plans.indexOf(plan))} modules={planModules(entitlements, plan.id)} planName={plan.name} />}
     />
   )

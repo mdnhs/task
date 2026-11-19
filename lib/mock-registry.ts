@@ -10,6 +10,8 @@ export const MOCK_ROUTES = [
   { prefix: "/recruitment", label: "Recruitment" },
   { prefix: "/payroll-issues", label: "Payroll Issues" },
   { prefix: "/files", label: "Files" },
+  // A sub-page of Settings -> Integrations (no nav entry of its own): the WhatsApp notifications management page.
+  { prefix: "/settings/integrations/whatsapp", label: "WhatsApp" },
 ] as const
 
 /** The permission modules whose screens are mock-only (popular search terms of these are hidden without the flag). */
@@ -47,6 +49,7 @@ export const MOCK_DATA_READERS: Readonly<Record<string, { kind: ReaderKind; why:
   "features/settings/api.ts": { kind: "catalogue", why: "time zone, colour preset and notification option lists; delivery log seed (no API)" },
   "features/shell/api.ts": { kind: "catalogue", why: "navigation tree" },
   "features/staff-rosters/api.ts": { kind: "mock", why: "Staff & Rosters" },
+  "features/whatsapp/api.ts": { kind: "mock", why: "WhatsApp notifications (Settings -> Integrations, Account -> Notifications): FE-only until the backend exists" },
   "lib/entitlements-data.ts": { kind: "catalogue", why: "module and entitlement catalogue" },
   "lib/org.ts": { kind: "catalogue", why: "getMockOrg for the mock pages and the loading skeleton's static org; the real org is the API's" },
   "lib/people.ts": { kind: "mock", why: "getMockPeople for the mock pages; role labels" },

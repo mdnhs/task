@@ -1,7 +1,7 @@
 /* Device policy (CR-02, CR-06): Drive link states, demo device switcher, device register, MFA gate. */
 .drive-link,.drive-locked{display:inline-flex;align-items:center;gap:6px;min-width:0;font-size:13px;font-weight:600;overflow-wrap:anywhere}
 .drive-link{color:var(--brand-deep);text-decoration:underline;text-underline-offset:3px;transition:color var(--dur-fast) var(--ease)}
-.drive-link:hover{color:var(--brand)}
+.drive-link:hover{color:var(--brand-text)}
 .drive-locked{color:var(--ink-3)}
 .drive-link .ico,.drive-locked .ico{width:15px;height:15px;flex:none}
 
