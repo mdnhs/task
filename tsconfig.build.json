@@ -1,0 +1,6 @@
+{
+  // Production build (Docker web image): the web image installs only the web app and @opsdesk/domain, not the API's dependencies, so the type check must not
+  // reach tests that import API sources (test/contract/*, *.test.ts). `npm run typecheck` and the editor keep using tsconfig.json (everything).
+  "extends": "./tsconfig.json",
+  "exclude": ["node_modules", "api", "packages", ".claude/worktrees", ".local-run", "test", "e2e", "**/*.test.ts", "**/*.test.tsx", "**/*.dom.test.ts", "**/*.dom.test.tsx", "vitest.config.*", "playwright.config.*"]
+}
