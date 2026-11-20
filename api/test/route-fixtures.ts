@@ -154,8 +154,8 @@ const DAY_MS = 86_400_000
 export const fixtureFutureFrom = (): string => new Date(Date.now() + 400 * DAY_MS).toISOString().slice(0, 10)
 /** The end date the PATCH control sends: after `fixtureFutureFrom` whatever today is. */
 export const fixtureFutureUntil = (): string => new Date(Date.now() + 430 * DAY_MS).toISOString().slice(0, 10)
-/** A day that is always in the past of the real clock (a shift that has started, so a report can be opened for it). */
-const fixturePastDay = (): string => new Date(Date.now() - 3 * DAY_MS).toISOString().slice(0, 10)
+/** A day that is always in the past of the APP's clock (the harness fake clock, not the wall clock: a shift that has started, so a report can be opened for it). It was the wall clock minus 3 days, which passed only until the real date moved past the fake clock's start. */
+const fixturePastDay = (clock: { now(): Date }): string => new Date(clock.now().getTime() - 3 * DAY_MS).toISOString().slice(0, 10)
 
 /** One member with a signed-in session in `tenant`. */
 export async function actorIn(t: { app: AppType; deps: Deps }, tenant: { id: string; slug: string }, roleKey: string): Promise<Actor & { email: string }> {
@@ -252,7 +252,7 @@ export async function fixtureIds(t: { app: AppType; deps: Deps }, tenant: { id: 
     const r = await call(t.app, method, path, { cookie: owner.cookie, tenant: tenant.slug, body })
     if (r.status !== 201 && r.status !== 200) throw new Error(`fixture report setup ${path} failed: ${r.status} ${await r.text()}`)
   }
-  const repRes = await call(t.app, "POST", "/v1/shift-reports/open", { cookie: owner.cookie, tenant: tenant.slug, body: { patternId: rpat.id, date: fixturePastDay() } })
+  const repRes = await call(t.app, "POST", "/v1/shift-reports/open", { cookie: owner.cookie, tenant: tenant.slug, body: { patternId: rpat.id, date: fixturePastDay(t.deps.clock) } })
   if (repRes.status !== 201) throw new Error(`fixture report failed: ${repRes.status} ${await repRes.text()}`)
   const report = (await repRes.json()) as { id: string }
   const rfRes = await call(t.app, "POST", `/v1/shift-reports/${report.id}/uploads`, { cookie: owner.cookie, tenant: tenant.slug, body: { name: `Shot ${uniq}.pdf`, mime: "application/pdf", sizeBytes: 1000 } })
