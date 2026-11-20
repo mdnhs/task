@@ -153,6 +153,13 @@ describe("T6.3 /api/session/tenant: repairs a missing or stale od-tenant from th
     expect((await repairTenant(post(decodeURIComponent("%2Ftasks"), C))).headers.get("location")).toBe(`${APP}/onboarding`)
   })
 
+  test("no membership + an invitation link (social sign-in lands here): the invitation is followed, not /onboarding; any other next is not", async () => {
+    const invite = "/invite?token=db6467e9c5c643729ca8219e0559d659SyfaUkKYE5XA2jrfLo9sCOK25TBBOScdsl8b-zuHueg"
+    script({ me: { ...ME, tenants: [] } })
+    expect((await repairTenant(post(invite, C))).headers.get("location")).toBe(`${APP}${invite}`)
+    expect((await repairTenant(post("/invite?token=a&x=1", C))).headers.get("location")).toBe(`${APP}/onboarding`)
+  })
+
   test("an expired session clears the cookies and goes to /sign-in?reason=expired; no session goes to /sign-in", async () => {
     script({ me: 401 })
     const r = await repairTenant(post(decodeURIComponent("%2F"), `${C}; od-tenant=alpha`))

@@ -116,3 +116,40 @@ export async function resetStep(deps: { resetPassword(token: string, newPassword
     return { ok: false, ...describe(e) }
   }
 }
+
+export type InviteFailKind = "invalid" | "expired" | "used" | "member" | "email_mismatch" | "seats" | "signed_out" | "rate_limited" | "error"
+export type AcceptInviteResult = { ok: true; slug: string } | ({ ok: false; kind: InviteFailKind } & Fail)
+
+const INVITE_COPY: Record<Exclude<InviteFailKind, "rate_limited" | "error">, string> = {
+  invalid: "This invitation is not valid any more. Ask your admin to send a new one.",
+  expired: "This invitation has expired. Ask your admin to send a new one.",
+  used: "This invitation was already used.",
+  member: "You are already a member of this company.",
+  email_mismatch: "This invitation was sent to a different email address. Sign in or sign up with the address it was sent to.",
+  seats: "This company has no free seats left. Ask your admin to make room, then try again.",
+  signed_out: "Your session ended. Sign in to accept the invitation.",
+}
+
+/**
+ * Accepts an invitation (POST /v1/invites/accept) and maps every answer to one short message. A revoked, replaced, malformed or suspended-company
+ * token is the one "invalid" state (the API answers them alike: nothing here says which). The token only goes to the injected function.
+ */
+export async function acceptInviteStep(deps: { accept(token: string): Promise<{ slug: string }> }, token: string): Promise<AcceptInviteResult> {
+  const fail = (kind: Exclude<InviteFailKind, "rate_limited" | "error">): AcceptInviteResult => ({ ok: false, kind, message: INVITE_COPY[kind] })
+  if (!token) return fail("invalid")
+  try {
+    return { ok: true, slug: (await deps.accept(token)).slug }
+  } catch (e) {
+    if (e instanceof ApiError) {
+      if (e.status === 401) return fail("signed_out")
+      if (e.status === 403 && e.code === "invite_email_mismatch") return fail("email_mismatch")
+      if (e.status === 404 || (e.status === 410 && e.code === "invite_invalid")) return fail("invalid")
+      if (e.status === 410) return fail("expired")
+      if (e.status === 409 && e.code === "invite_used") return fail("used")
+      if (e.status === 409 && e.code === "already_member") return fail("member")
+      if (e.status === 409 && e.code === "seat_limit") return fail("seats")
+      if (e.status === 429) return { ok: false, kind: "rate_limited", message: RATE_LIMITED }
+    }
+    return { ok: false, kind: "error", ...describe(e) }
+  }
+}

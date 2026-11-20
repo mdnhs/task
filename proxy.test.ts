@@ -40,7 +40,7 @@ describe("proxy: /data stays a 404, existing page redirect unchanged", () => {
     expect(proxy(next("/")).headers.get("location")).toBe(`${APP}/sign-in`)
     expect(proxy(next("/platform/tenants")).headers.get("location")).toContain("/sign-in")
     expect(proxy(next("/onboarding")).headers.get("location")).toContain("/sign-in") // needs a session; the page checks it for real
-    for (const p of ["/sign-in", "/sign-up", "/forgot-password", "/verify-email", "/reset-password", "/verify-email/x"]) expect(proxy(next(p)).headers.get("location"), p).toBeNull()
+    for (const p of ["/sign-in", "/sign-up", "/forgot-password", "/verify-email", "/reset-password", "/verify-email/x", "/invite", "/invite?token=abc"]) expect(proxy(next(p)).headers.get("location"), p).toBeNull()
   })
 
   test("T6.3: Next's _rsc marker is not carried into next", () => {

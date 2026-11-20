@@ -10,7 +10,7 @@ import { ApiError } from "@/lib/api/problem"
 import { apiServer } from "@/lib/api/server"
 import { isTenantSlug } from "@/lib/api/tenant"
 import { makeAuthClient } from "@/lib/auth-client"
-import { safeNext } from "@/lib/safe-next"
+import { isInviteTarget, safeNext } from "@/lib/safe-next"
 import { EXPIRED_PATH, canWrite, getSession } from "@/lib/session"
 import { clearTenantSlug, writeTenantSlug } from "@/lib/tenant-cookie"
 
@@ -43,6 +43,7 @@ export async function switchTenant(slug: string): Promise<{ ok: boolean }> {
 
 // Called by the sign-in flow once the browser holds the session cookie (after the password step, or the code step for 2FA users).
 // od-tenant = the first membership; staff with no company go to the console, anyone else with none to onboarding. `next` is validated (same origin, path only).
+// The one exception: an invitation link (/invite?token=...) is followed even with no company yet, so an invited member joins the inviter's company.
 export async function afterSignIn(next?: string): Promise<void> {
   let me
   try {
@@ -51,10 +52,11 @@ export async function afterSignIn(next?: string): Promise<void> {
     if (e instanceof ApiError && e.status === 401) return redirect("/sign-in")
     throw e
   }
+  const target = safeNext(next)
   const first = me.tenants[0]
-  if (!first) return redirect(me.platformRole ? "/platform" : "/onboarding")
+  if (!first) return redirect(isInviteTarget(target) ? target : me.platformRole ? "/platform" : "/onboarding")
   await writeTenantSlug(first.slug)
-  return redirect(safeNext(next))
+  return redirect(target)
 }
 
 // Ends the session on the API (Better Auth revokes it, so a stolen copy of the cookie dies too) and clears this browser's cookies. The cookies are cleared

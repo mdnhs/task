@@ -72,6 +72,17 @@ export function VerifyEmailSkeleton() {
   )
 }
 
+// The signed-out choice (the usual first visit of an invited person): heading, text, then Sign in and Create an account. The signed-in view is one button and a link.
+export function InviteSkeleton() {
+  return (
+    <SkGroup label="Loading invitation" className="auth-form">
+      <Head />
+      <ButtonSk />
+      <ButtonSk />
+    </SkGroup>
+  )
+}
+
 export function ResetPasswordSkeleton() {
   return (
     <SkGroup label="Loading password reset" className="auth-form">

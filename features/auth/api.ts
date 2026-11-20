@@ -1,3 +1,6 @@
+import { cookies } from "next/headers"
+
+import { hasSessionCookie } from "@/lib/api/cookies"
 import { apiServer } from "@/lib/api/server"
 import { getData } from "@/lib/data"
 import type { AuthProviders, OnboardingData, OnboardingDefaults, PlanOption, RoleOption, SignUpData } from "./types"
@@ -34,4 +37,14 @@ export async function getSignUpData(): Promise<SignUpData> {
 export async function getOnboardingData(): Promise<OnboardingData> {
   const [defaults, roles] = await Promise.all([getDefaults(), getRoles()])
   return { defaults, roles }
+}
+
+/** The signed-in person's email for the invitation page, or null when nobody (or a dead session) is signed in: the page then offers sign-in or sign-up. Never throws. */
+export async function getInviteViewer(): Promise<string | null> {
+  if (!hasSessionCookie((await cookies()).getAll().map((c) => c.name))) return null
+  try {
+    return (await (await apiServer({ tenant: null })).get("/v1/me")).user.email
+  } catch {
+    return null
+  }
 }

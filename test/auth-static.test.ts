@@ -54,7 +54,7 @@ const sources = ["app", "features", "lib", "components", "hooks", "proxy.ts", "i
 
 describe("T6.3 skeletons: every changed or new auth page has an exact-match skeleton and a loading.tsx", () => {
   test("loading.tsx exists for every auth route and renders its own skeleton", () => {
-    const routes: Record<string, string> = { "sign-in": "SignInSkeleton", "sign-up": "SignUpSkeleton", "forgot-password": "ForgotSkeleton", onboarding: "OnboardingSkeleton", "verify-email": "VerifyEmailSkeleton", "reset-password": "ResetPasswordSkeleton" }
+    const routes: Record<string, string> = { "sign-in": "SignInSkeleton", "sign-up": "SignUpSkeleton", "forgot-password": "ForgotSkeleton", onboarding: "OnboardingSkeleton", "verify-email": "VerifyEmailSkeleton", "reset-password": "ResetPasswordSkeleton", invite: "InviteSkeleton" }
     for (const [route, sk] of Object.entries(routes)) {
       const f = `app/(auth)/${route}/loading.tsx`
       expect(existsSync(path.join(root, f)), f).toBe(true)
@@ -148,7 +148,15 @@ describe("T6.3 verification and reset links: rendering calls nothing, tokens sta
   })
 
   test("both token pages opt out of Referer and indexing", () => {
-    for (const f of ["app/(auth)/verify-email/page.tsx", "app/(auth)/reset-password/page.tsx"]) expect(read(f), f).toContain('referrer: "no-referrer"')
+    for (const f of ["app/(auth)/verify-email/page.tsx", "app/(auth)/reset-password/page.tsx", "app/(auth)/invite/page.tsx"]) expect(read(f), f).toContain('referrer: "no-referrer"')
+  })
+
+  test("the invite page and component use the invitation only inside the Accept click and the verified step (a link scanner must not consume it)", () => {
+    expect(read("app/(auth)/invite/page.tsx")).not.toMatch(/acceptInvite|auth-client|invites\/accept/)
+    const comp = read("features/auth/components/accept-invite.tsx")
+    expect(comp).not.toContain("useEffect")
+    expect(comp).not.toMatch(/console\.|localStorage|sessionStorage/)
+    expect(comp.indexOf("function accept()")).toBeLessThan(comp.indexOf("acceptInvite(token)"))
   })
 })
 
@@ -210,7 +218,9 @@ describe("K2: pages and actions that call the API use requireMfaOk()", () => {
   test("every server action that calls the API gates itself, except the ones that exist to establish or leave a session", () => {
     // session.ts: switchTenant/afterSignIn/signOut run before any workspace page; onboarding creates the first company (no tenant, so no tenant MFA policy);
     // platform-search: the console's own gate (it returns nothing unless session.mfa is ok; test/t68-static.test.ts checks it).
-    const exempt = new Set(["app/actions/session.ts", "app/actions/onboarding.ts", "app/actions/platform-search.ts"])
+    // invite: accepting an invitation creates the caller's FIRST membership of that company (like onboarding): they have no company yet, so there is no tenant
+    // MFA policy to gate on; the API's accept route needs only a session, and the (app) layout shows the MFA gate once they are inside the company.
+    const exempt = new Set(["app/actions/session.ts", "app/actions/onboarding.ts", "app/actions/platform-search.ts", "app/actions/invite.ts"])
     const offenders: string[] = []
     for (const f of walkAll("app").filter((x) => /\/actions(\/[^/]+)?\.tsx?$/.test(x) && !/\.test\./.test(x))) {
       if (exempt.has(f)) continue

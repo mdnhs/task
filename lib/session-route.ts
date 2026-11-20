@@ -17,7 +17,7 @@ import { TENANT_COOKIE, isTenantSlug, tenantCookieOptions } from "./api/tenant"
 import { getData } from "./data"
 import type { EntitlementsData } from "./entitlements"
 import { violatesSameOrigin } from "./csrf"
-import { safeNext } from "./safe-next"
+import { isInviteTarget, safeNext } from "./safe-next"
 import { resolveSession, type SessionDeps } from "./session-core"
 import type { Role } from "./types"
 
@@ -127,7 +127,9 @@ export async function repairTenant(req: Request): Promise<NextResponse> {
       return res
     }
     case "no_tenant": {
-      const res = redirectTo(req, r.me.platformRole ? "/platform" : "/onboarding")
+      // An invitation link is followed even with no company yet (social sign-in lands here): the invited member joins the inviter's company.
+      const target = safeNext(nextParam)
+      const res = redirectTo(req, isInviteTarget(target) ? target : r.me.platformRole ? "/platform" : "/onboarding")
       if (deps.tenantCookie) clear(res, [TENANT_COOKIE])
       return res
     }

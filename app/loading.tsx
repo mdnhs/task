@@ -19,7 +19,7 @@ export default async function Loading() {
       </AppShellSkeleton>
     )
   }
-  if (!path || /^\/(?:sign-in|sign-up|forgot-password|verify-email|reset-password|onboarding)(?:\/|$)/.test(path)) return <PageSkeleton />
+  if (!path || /^\/(?:sign-in|sign-up|forgot-password|verify-email|reset-password|invite|onboarding)(?:\/|$)/.test(path)) return <PageSkeleton />
   const navigation = await getNavigation()
   // The mock-only entries and the assistant exist only on a demo deployment (ENABLE_MOCK_MODULES=1), same as the real shell.
   return (

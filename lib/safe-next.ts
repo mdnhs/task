@@ -22,3 +22,9 @@ export function safeNext(raw: unknown, fallback = "/"): string {
   if (FORBIDDEN_TARGET.test(out)) return fallback
   return out
 }
+
+/**
+ * An invitation link (`/invite?token=...`): the one target a signed-in person with NO company yet is sent to instead of /onboarding, so an invited
+ * member joins the inviter's company rather than creating a company of their own. Tested on the output of safeNext (path + query only).
+ */
+export const isInviteTarget = (target: string): boolean => /^\/invite\?token=[A-Za-z0-9_-]{1,256}$/.test(target)

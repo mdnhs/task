@@ -132,6 +132,16 @@ describe("T6.3 afterSignIn: od-tenant = the first membership, then home, /platfo
     expect(sets).toEqual([])
   })
 
+  test("an invitation link is followed even with no company yet (an invited member joins, they do not create a company); other targets still go to /onboarding", async () => {
+    const invite = "/invite?token=db6467e9c5c643729ca8219e0559d659SyfaUkKYE5XA2jrfLo9sCOK25TBBOScdsl8b-zuHueg"
+    script({ me: { ...ME, tenants: [] } })
+    expect(await redirectOf(afterSignIn(invite))).toBe(invite)
+    script({ me: { ...ME, tenants: [], platformRole: "support" } })
+    expect(await redirectOf(afterSignIn(invite))).toBe(invite)
+    expect(await redirectOf(afterSignIn("/invite?token=a&x=//evil.com"))).toBe("/platform")
+    expect(sets).toEqual([]) // no tenant cookie: accepting the invitation writes it
+  })
+
   test("no session behind the call: /sign-in, nothing written", async () => {
     script({ me: 401 })
     expect(await redirectOf(afterSignIn())).toBe("/sign-in")

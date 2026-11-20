@@ -1,6 +1,6 @@
 import { describe, expect, test, vi } from "vitest"
 import { ApiError } from "@/lib/api/problem"
-import { forgotStep, resetStep, secondFactorStep, signInStep, signUpStep, verifyEmailStep } from "@/lib/auth-flow"
+import { acceptInviteStep, forgotStep, resetStep, secondFactorStep, signInStep, signUpStep, verifyEmailStep } from "@/lib/auth-flow"
 
 const err = (status: number, code: string) => new ApiError(status, code, "req-9")
 const GENERIC = "Wrong email or password."
@@ -113,5 +113,43 @@ describe("T6.3 sign-up, verification and reset", () => {
     const spy = vi.fn()
     expect(await resetStep({ resetPassword: spy }, "tok", "short")).toMatchObject({ ok: false, message: expect.stringMatching(/8/) })
     expect(spy).not.toHaveBeenCalled()
+  })
+})
+
+describe("invitation accept step: every API answer maps to one short message", () => {
+  const run = (e: unknown) => acceptInviteStep({ accept: async () => { throw e } }, "tok")
+
+  test("success returns the company slug; the token goes only to the injected function", async () => {
+    const accept = vi.fn(async () => ({ slug: "acme" }))
+    expect(await acceptInviteStep({ accept }, "tok")).toEqual({ ok: true, slug: "acme" })
+    expect(accept).toHaveBeenCalledWith("tok")
+  })
+
+  test("an empty token never reaches the API", async () => {
+    const accept = vi.fn(async () => ({ slug: "acme" }))
+    expect(await acceptInviteStep({ accept }, "")).toMatchObject({ ok: false, kind: "invalid" })
+    expect(accept).not.toHaveBeenCalled()
+  })
+
+  test("404 (unknown, revoked, replaced or suspended company) and 410 invite_invalid are one 'invalid' state", async () => {
+    const a = await run(err(404, "invite_not_found"))
+    expect(a).toMatchObject({ ok: false, kind: "invalid" })
+    expect(await run(err(410, "invite_invalid"))).toEqual(a)
+  })
+
+  test("expired, used, already a member, other address, no seats, signed out", async () => {
+    expect(await run(err(410, "invite_expired"))).toMatchObject({ kind: "expired" })
+    expect(await run(err(409, "invite_used"))).toMatchObject({ kind: "used" })
+    expect(await run(err(409, "already_member"))).toMatchObject({ kind: "member" })
+    expect(await run(err(403, "invite_email_mismatch"))).toMatchObject({ kind: "email_mismatch" })
+    expect(await run(err(409, "seat_limit"))).toMatchObject({ kind: "seats" })
+    expect(await run(err(401, "unauthenticated"))).toMatchObject({ kind: "signed_out" })
+  })
+
+  test("429 shows the rate-limit copy; anything else is a generic error with the request id, never the server's text", async () => {
+    expect(await run(err(429, "too_many_requests"))).toEqual({ ok: false, kind: "rate_limited", message: "Too many attempts, wait a minute." })
+    const r = await run(err(500, "boom"))
+    expect(r).toMatchObject({ ok: false, kind: "error", ref: "req-9" })
+    expect(JSON.stringify(r)).not.toContain("boom")
   })
 })

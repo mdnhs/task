@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest"
-import { safeNext } from "@/lib/safe-next"
+import { isInviteTarget, safeNext } from "@/lib/safe-next"
 
 describe("T6.3 safeNext: a post-sign-in redirect is same-origin and path-only", () => {
   test.each([
@@ -29,5 +29,16 @@ describe("T6.3 safeNext: a post-sign-in redirect is same-origin and path-only", 
   test("whatever goes in, the output never leaves the origin when resolved against it", () => {
     const inputs = ["/ok", "//evil.com", "/\\evil.com", "https://evil.com", "/a/../../evil.com", "/%2e%2e/%2e%2e/evil.com", "/x?next=//evil.com"]
     for (const i of inputs) expect(new URL(safeNext(i), "https://app.example.com").origin, i).toBe("https://app.example.com")
+  })
+})
+
+describe("isInviteTarget: the invitation link is the one target followed with no company", () => {
+  const token = "db6467e9c5c643729ca8219e0559d659SyfaUkKYE5XA2jrfLo9sCOK25TBBOScdsl8b-zuHueg"
+  test("a real invitation path passes safeNext and is recognised", () => {
+    expect(safeNext(`/invite?token=${token}`)).toBe(`/invite?token=${token}`)
+    expect(isInviteTarget(safeNext(`/invite?token=${token}`))).toBe(true)
+  })
+  test("anything else is not", () => {
+    for (const t of ["/", "/onboarding", "/invite", "/invite?token=", "/invite?token=a&next=/x", "/invite/x?token=a", "/tasks?token=a", "//evil.com/invite?token=a", "/invite?token=a b"]) expect(isInviteTarget(t), t).toBe(false)
   })
 })

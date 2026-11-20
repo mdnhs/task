@@ -11,7 +11,8 @@ import { violatesSameOrigin } from "@/lib/csrf"
 // 3. Visitors without a Better Auth session cookie never get app pages (tenant or platform console): a real redirect before render, so no data streams into the HTML.
 //    This is an optimistic check only (Next docs: proxy is not an authorisation layer); the real check is getSession() in the (app) layout (lib/session.ts).
 // /v1/* and /api/* are not matched at all: their route handlers (lib/api/bff.ts) own the tenant, cookie and CSRF rules.
-const PUBLIC_PAGE = /^\/(?:sign-in|forgot-password|sign-up|verify-email|reset-password)(?:\/|$)/
+// /invite is public: a new member opens it signed out and creates an account there (the page itself shows sign-in and sign-up, and Accept needs a session).
+const PUBLIC_PAGE = /^\/(?:sign-in|forgot-password|sign-up|verify-email|reset-password|invite)(?:\/|$)/
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
