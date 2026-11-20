@@ -32,6 +32,15 @@ Stage names are part of the contract: the root `Dockerfile` has `deps`, `build`,
 4. Build: the compose `build:` blocks use the repo as context. For a registry flow, build once in CI, push to your registry from CI (not from here), set `API_IMAGE` and `WEB_IMAGE` to pinned tags, and Dokploy only pulls. Pinned tags are what makes [rollback.md](rollback.md) work.
 5. First deploy and every release follow [runbook-go-live.md](runbook-go-live.md) and [migrations.md](migrations.md): backup, `migrate` with the new image, then api and worker, web last.
 
+## Demo variant on Dokploy
+
+`deploy/docker-compose.dokploy-demo.yml` is the compose file of the demo deployment (opsdesk.raynx.ie). It keeps every hardening of the production file and differs in three ways: Postgres 16 is a separate Dokploy Postgres service on the external `dokploy-network` (api, worker, migrate, bootstrap and seed join it; web, redis and clamav do not), there are no Traefik labels (add the domains in Dokploy), and every deploy runs **bootstrap, then migrate, then api and worker, then web** with no manual step.
+
+- `bootstrap` (`postgres:16-alpine`, one-shot, not profile-gated) waits for Postgres (bounded `pg_isready` loop), runs `api/src/db/bootstrap/roles.sql`, sets the `app_owner` and `app_user` login passwords and creates `pg_trgm`. Safe to re-run. The passwords are read by psql from the container environment (`\getenv`), so they never appear in the process list or logs. Variables: `PG_SUPERUSER_URL`, `APP_OWNER_PASSWORD`, `APP_USER_PASSWORD` ([env-matrix.md](env-matrix.md)).
+- `migrate` runs as `app_owner` with the new image; `api` and `worker` start only after it completes successfully.
+- **Auto-migration is for the demo database only.** A client's production deploy uses `docker-compose.prod.yml` and the backup-first procedure in [migrations.md](migrations.md).
+- `seed` stays profile `demo` and is run once by an operator through a custom command: `docker compose -p <appName> -f deploy/docker-compose.dokploy-demo.yml --profile demo run --rm seed`, with `ALLOW_DEMO_SEED=1` and `SEED_DEMO_PASSWORD` set for that run only ([demo-seed.md](demo-seed.md)).
+
 ## Edge
 
 - **One edge, a known number of proxies.** The API reads the caller's address from `x-forwarded-for` in one place (`api/src/core/net/client-ip.ts`) and takes the entry `TRUST_PROXY_HOPS` from the **right**. `TRUST_PROXY_HOPS` must equal the number of proxies that **append** to the header: Cloudflare plus Traefik is `2`, Traefik alone is `1`. Production refuses `0` unless `ALLOW_NO_PROXY=1`. Too low puts everyone in the proxy's rate-limit bucket; too high lets a caller choose their bucket.

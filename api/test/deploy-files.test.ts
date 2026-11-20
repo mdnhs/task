@@ -9,7 +9,8 @@ import { parse } from "yaml"
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..")
 const read = (p: string) => readFileSync(resolve(ROOT, p), "utf8")
 const COMPOSE_PATH = "deploy/docker-compose.prod.yml"
-type Service = { build?: { context: string; dockerfile?: string; target?: string }; image?: string; profiles?: string[]; healthcheck?: { test: unknown }; environment?: Record<string, unknown>; command?: string[]; volumes?: string[]; ports?: unknown }
+const DEMO_PATH = "deploy/docker-compose.dokploy-demo.yml"
+type Service = { depends_on?: Record<string, { condition?: string }>; networks?: string[]; restart?: string; expose?: unknown[]; stop_grace_period?: string; logging?: unknown; labels?: unknown; container_name?: string; build?: { context: string; dockerfile?: string; target?: string }; image?: string; profiles?: string[]; healthcheck?: { test: unknown }; environment?: Record<string, unknown>; command?: string[]; volumes?: string[]; ports?: unknown }
 const compose = parse(read(COMPOSE_PATH), { merge: true }) as { services: Record<string, Service> }
 const services = Object.entries(compose.services)
 const DEPLOY_DOCS = readdirSync(resolve(ROOT, ".claude/docs/deploy")).filter((f) => f.endsWith(".md"))
@@ -89,6 +90,111 @@ describe("deploy/docker-compose.prod.yml", () => {
   })
 })
 
+describe("deploy/docker-compose.dokploy-demo.yml", () => {
+  const demoText = read(DEMO_PATH)
+  const demo = parse(demoText, { merge: true }) as { services: Record<string, Service>; networks?: Record<string, { external?: boolean }> }
+  const dsv = Object.entries(demo.services)
+  const NET = ["default", "dokploy-network"]
+
+  test("every deploy file in deploy/ is a known compose variant (a new one must be covered here)", () => {
+    expect(readdirSync(resolve(ROOT, "deploy")).filter((f) => /\.ya?ml$/.test(f)).sort()).toEqual(["docker-compose.dokploy-demo.yml", "docker-compose.prod.yml"])
+  })
+
+  test("services: prod's api, worker, web, redis, clamav, migrate, seed plus a bootstrap; no local postgres or minio", () => {
+    expect(Object.keys(demo.services).sort()).toEqual(["api", "bootstrap", "clamav", "migrate", "redis", "seed", "web", "worker"])
+    expect(demo.networks?.["dokploy-network"]?.external).toBe(true)
+  })
+
+  test("only seed is profile-gated (demo); bootstrap and migrate are normal one-shots; every long-running service has a healthcheck", () => {
+    for (const [name, s] of dsv) {
+      if (name === "seed") expect(s.profiles).toEqual(["demo"])
+      else expect(s.profiles, name).toBeUndefined()
+      if (["bootstrap", "migrate", "seed"].includes(name)) { expect(s.restart, name).toBe("no"); expect(s.healthcheck, name).toBeUndefined() }
+      else expect(s.healthcheck?.test, `${name} needs a healthcheck`).toBeTruthy()
+    }
+  })
+
+  test("dependency chain: bootstrap -> migrate -> api and worker -> web", () => {
+    const d = demo.services
+    expect(d.migrate.depends_on?.bootstrap?.condition).toBe("service_completed_successfully")
+    for (const n of ["api", "worker"]) expect(d[n].depends_on?.migrate?.condition, n).toBe("service_completed_successfully")
+    expect(d.web.depends_on?.api?.condition).toBe("service_healthy")
+  })
+
+  test("networks: api, worker, migrate, bootstrap and seed join dokploy-network; web, redis and clamav do not", () => {
+    for (const n of ["api", "worker", "migrate", "bootstrap", "seed"]) expect([...(demo.services[n].networks ?? [])].sort(), n).toEqual(NET)
+    for (const n of ["web", "redis", "clamav"]) expect(demo.services[n].networks, n).toBeUndefined()
+  })
+
+  test("no published port, no container_name, no Traefik labels, no literal secret", () => {
+    const SECRETISH = /(SECRET|PASSWORD|TOKEN|KEY|DATABASE_URL|DATABASE_OWNER_URL|PG_SUPERUSER_URL|REDIS_URL|TOTP)/
+    for (const [name, s] of dsv) {
+      expect(s.ports, `${name} ports`).toBeUndefined()
+      expect(s.container_name, `${name} container_name`).toBeUndefined()
+      expect(s.labels, `${name} labels`).toBeUndefined()
+      for (const [k, v] of Object.entries(s.environment ?? {})) {
+        if (SECRETISH.test(k) && !/_ID$|_MAX_BYTES$/.test(k)) expect(String(v), `${name}.${k} must be a \${VAR} reference`).toMatch(/\$\{/)
+      }
+    }
+    expect(demoText).not.toMatch(/traefik\./)
+    expect(demoText).not.toMatch(/sk_(live|test)_|whsec_|odk_|BEGIN [A-Z ]*PRIVATE KEY/)
+    expect(demo.services.web.expose).toEqual(["3000"])
+    expect(demo.services.api.expose).toEqual(["8080"])
+    expect(String(demo.services.api.environment?.METRICS_HOST)).toBe("0.0.0.0")
+  })
+
+  test("hardening kept: logging, stop_grace_period, liveness healthcheck, shared api env", () => {
+    for (const n of ["web", "api", "worker", "redis", "clamav"]) expect(demo.services[n].logging, n).toBeTruthy()
+    expect(demo.services.api.stop_grace_period).toBe("30s")
+    expect(demo.services.worker.stop_grace_period).toBe("60s")
+    expect(JSON.stringify(demo.services.api.healthcheck?.test)).toContain("/healthz")
+    expect(demoText).toContain("x-api-env: &api-env")
+    for (const k of Object.keys(parse(read(COMPOSE_PATH), { merge: true }).services.api.environment)) expect(Object.keys(demo.services.api.environment ?? {}), `api env ${k} (same as prod)`).toContain(k)
+    expect(demo.services.worker.image).toBe(demo.services.api.image)
+  })
+
+  test("DATABASE_OWNER_URL only on migrate and seed; the superuser URL only on bootstrap", () => {
+    for (const [name, s] of dsv) {
+      const keys = Object.keys(s.environment ?? {})
+      if (name === "migrate" || name === "seed") expect(keys, name).toContain("DATABASE_OWNER_URL")
+      else expect(keys, name).not.toContain("DATABASE_OWNER_URL")
+      if (name === "bootstrap") expect(keys.sort()).toEqual(["APP_OWNER_PASSWORD", "APP_USER_PASSWORD", "PG_SUPERUSER_URL"])
+      else expect(keys, name).not.toContain("PG_SUPERUSER_URL")
+    }
+    expect(Object.keys(demo.services.migrate.environment ?? {})).toEqual(["DATABASE_OWNER_URL"])
+  })
+
+  test("bootstrap: postgres:16 client, roles.sql mounted read-only, passwords via \\getenv (never -v or argv), bounded wait, ON_ERROR_STOP, pg_trgm", () => {
+    const b = demo.services.bootstrap
+    expect(b.image).toMatch(/^postgres:16/)
+    expect(b.volumes?.[0]).toBe("../api/src/db/bootstrap/roles.sql:/opt/bootstrap/roles.sql:ro")
+    const script = (b.command ?? []).join("\n")
+    expect(script).toContain("pg_isready")
+    expect(script).toMatch(/-ge \d+/)
+    expect(script).toContain("ON_ERROR_STOP=1")
+    expect(script).toContain("\\getenv owner_pw APP_OWNER_PASSWORD")
+    expect(script).toContain("\\getenv user_pw APP_USER_PASSWORD")
+    expect(script).toContain("ALTER ROLE app_owner LOGIN PASSWORD :'owner_pw'")
+    expect(script).toContain("ALTER ROLE app_user LOGIN PASSWORD :'user_pw'")
+    expect(script).toContain("CREATE EXTENSION IF NOT EXISTS pg_trgm")
+    expect(script).not.toMatch(/-v\s+\w*pw\w*=|PASSWORD\s+'/) // no password on a command line or inline literal
+  })
+
+  test("files and Dockerfile targets the demo file points at exist", () => {
+    expect(existsSync(resolve(ROOT, "api/src/db/bootstrap/roles.sql"))).toBe(true)
+    for (const [name, s] of dsv) {
+      if (!s.build) continue
+      const rel = resolve(ROOT, "deploy", s.build.context, s.build.dockerfile ?? "Dockerfile").slice(ROOT.length + 1)
+      expect(stagesOf(rel), `${name} target ${s.build.target}`).toContain(s.build.target)
+    }
+  })
+
+  test("the header says it auto-migrates because it is demo-only and points production at docker-compose.prod.yml", () => {
+    expect(demoText).toMatch(/AUTO-MIGRATES ON EACH DEPLOY ONLY BECAUSE IT TARGETS THE DEMO DATABASE/)
+    expect(demoText).toMatch(/PRODUCTION deploy MUST use docker-compose\.prod\.yml/)
+  })
+})
+
 describe("env matrix", () => {
   const matrix = read(".claude/docs/deploy/env-matrix.md")
   const mentioned = (name: string) => new RegExp("`" + name + "`").test(matrix)
@@ -118,7 +224,7 @@ describe("env matrix", () => {
   })
 
   test("every variable the compose file interpolates is in the matrix doc and in deploy/.env.matrix.example (names only, no real value)", () => {
-    const text = read(COMPOSE_PATH)
+    const text = read(COMPOSE_PATH) + read(DEMO_PATH)
     const vars = new Set([...text.matchAll(/\$\{([A-Z][A-Z0-9_]*)/g)].map((m) => m[1]))
     const example = read("deploy/.env.matrix.example")
     for (const v of vars) {

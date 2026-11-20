@@ -1,0 +1,227 @@
+# OpsDesk DEMO deployment on Dokploy (opsdesk.raynx.ie). FILES ONLY: nothing here deploys itself. A derivative of docker-compose.prod.yml with the same hardening
+# (no published ports, healthchecks, logging, grace periods, DATABASE_OWNER_URL never given to api, worker or web). Read .claude/docs/deploy/dokploy.md ("Demo variant on Dokploy").
+#
+# DIFFERENCES FROM docker-compose.prod.yml
+#  * Postgres 16 is NOT in this file: it is a separate Dokploy Postgres service (host opsdesk-db-1f0tlc, port 5432, db opsdesk, superuser opsdesk_admin) on Dokploy's external
+#    overlay network `dokploy-network`. api, worker, migrate, bootstrap and seed join it; web, redis and clamav stay on the default network only.
+#  * Every deploy runs bootstrap -> migrate -> api and worker -> web, automatically:
+#      bootstrap  one-shot, as the superuser: roles.sql, app_owner and app_user login passwords, pg_trgm. Idempotent, retries until Postgres answers.
+#      migrate    one-shot, as app_owner, the NEW image (deploy/scripts/migrate.sh). api and worker wait for it to complete successfully.
+#    THIS VARIANT AUTO-MIGRATES ON EACH DEPLOY ONLY BECAUSE IT TARGETS THE DEMO DATABASE (disposable data). A client's PRODUCTION deploy MUST use docker-compose.prod.yml
+#    with the backup-first procedure (.claude/docs/deploy/migrations.md): verified backup, then `migrate` by hand, then api and worker.
+#  * No Traefik labels and no container_name: Dokploy adds the domains itself (web:3000 on the host, /webhooks to api:8080).
+#
+# SEED (demo data, profile `demo`, never started by a deploy). An operator runs it ONCE after the first successful deploy, with a custom command in Dokploy
+# (Compose service, Advanced, custom command; or the host shell), using the project name Dokploy gave the stack (its appName):
+#   docker compose -p <appName> -f deploy/docker-compose.dokploy-demo.yml --profile demo run --rm seed
+# ALLOW_DEMO_SEED=1 and SEED_DEMO_PASSWORD must be set in the Environment tab for that run, then removed again. Extra flags (--reset) go in a full command: demo-seed.md.
+#
+# Validate: docker compose -f deploy/docker-compose.dokploy-demo.yml --env-file <your env file> config
+name: opsdesk
+
+x-logging: &logging
+  driver: json-file
+  options: { max-size: "10m", max-file: "5" }
+
+# Shared by api and worker (same image). The DDL-capable DATABASE_OWNER_URL is deliberately NOT here: only `migrate` and the demo `seed` get it (`bootstrap` uses the superuser PG_SUPERUSER_URL). No port is published anywhere: Traefik reaches web:3000 and api:8080 through the Dokploy domain settings only.
+x-api-env: &api-env
+  NODE_ENV: production
+  DATABASE_URL: ${DATABASE_URL:?set the app_user connection string}
+  REDIS_URL: redis://:${REDIS_PASSWORD:?set a hex password}@redis:6379
+  BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?set 32+ random characters}
+  SECRETS_KEY: ${SECRETS_KEY:?set base64 of 32 random bytes}
+  SECRETS_KEYS: ${SECRETS_KEYS:-}
+  SECRETS_KEY_ID: ${SECRETS_KEY_ID:-}
+  APP_URL: ${APP_URL:?set the public web origin, https}
+  DATA_REGION: ${DATA_REGION:?eu-west-1 or eu-central-1}
+  TRUST_PROXY_HOPS: ${TRUST_PROXY_HOPS:?proxies that append to x-forwarded-for, Cloudflare plus Traefik is 2}
+  ALLOW_NO_PROXY: ${ALLOW_NO_PROXY:-}
+  CLAMD_HOST: clamav
+  CLAMD_PORT: "3310"
+  FILE_MAX_BYTES: ${FILE_MAX_BYTES:-}
+  TASK_EVIDENCE_MAX_BYTES: ${TASK_EVIDENCE_MAX_BYTES:-}
+  TASK_VIDEO_MAX_BYTES: ${TASK_VIDEO_MAX_BYTES:-}
+  TASK_VOICE_MAX_BYTES: ${TASK_VOICE_MAX_BYTES:-}
+  AUTH_RATE_LIMIT_PER_MIN: ${AUTH_RATE_LIMIT_PER_MIN:-}
+  TENANT_CREATE_MAX_PER_USER: ${TENANT_CREATE_MAX_PER_USER:-}
+  GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+  GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+  GOOGLE_INTEGRATION_CLIENT_ID: ${GOOGLE_INTEGRATION_CLIENT_ID:-}
+  GOOGLE_INTEGRATION_CLIENT_SECRET: ${GOOGLE_INTEGRATION_CLIENT_SECRET:-}
+  GOOGLE_INTEGRATION_REDIRECT_URI: ${GOOGLE_INTEGRATION_REDIRECT_URI:-}
+  MICROSOFT_CLIENT_ID: ${MICROSOFT_CLIENT_ID:-}
+  MICROSOFT_CLIENT_SECRET: ${MICROSOFT_CLIENT_SECRET:-}
+  LOG_LEVEL: ${LOG_LEVEL:-info}
+  # The metrics listener binds the container's private address and is never published or given a Dokploy domain (observability.md).
+  METRICS_HOST: 0.0.0.0
+
+services:
+  web:
+    build: { context: .., dockerfile: Dockerfile, target: run }
+    image: ${WEB_IMAGE:-opsdesk-web:local}
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      API_URL: http://api:8080
+      APP_ORIGIN: ${APP_URL:?set the public web origin, https}
+      ENABLE_MOCK_MODULES: ${ENABLE_MOCK_MODULES:-}
+    expose: ["3000"]
+    depends_on:
+      api: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/sign-in >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    logging: *logging
+
+  api:
+    build: { context: .., dockerfile: api/Dockerfile, target: run }
+    image: ${API_IMAGE:-opsdesk-api:local}
+    restart: unless-stopped
+    environment:
+      <<: *api-env
+      PORT: "8080"
+      METRICS_PORT: "9464"
+    expose: ["8080"]
+    networks: [default, dokploy-network]
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      redis: { condition: service_healthy }
+      clamav: { condition: service_healthy }
+    # Container health is LIVENESS (GET /healthz): a Redis or database blip must not mark the container unhealthy and cascade into restarts. Readiness (GET /readyz, and
+    # /readyz/details on the internal metrics port) is the deploy gate in .claude/docs/deploy/runbook-go-live.md, not a container healthcheck.
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/healthz >/dev/null || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
+    stop_grace_period: 30s
+    logging: *logging
+
+  worker:
+    image: ${API_IMAGE:-opsdesk-api:local}
+    restart: unless-stopped
+    command: ["../node_modules/.bin/tsx", "src/worker.ts"]
+    environment:
+      <<: *api-env
+      WORKER_METRICS_PORT: "9465"
+    networks: [default, dokploy-network]
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      redis: { condition: service_healthy }
+      clamav: { condition: service_healthy }
+    # No port to call: the worker writes a heartbeat key to Redis every 10 s (api/src/core/queue/heartbeat.ts), the check reads it.
+    healthcheck:
+      test: ["CMD", "node", "scripts/worker-healthcheck.mjs"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    stop_grace_period: 60s
+    logging: *logging
+
+  # One-shot, every deploy, FIRST. Runs as the Postgres superuser against the Dokploy Postgres service. Safe to re-run: roles.sql is idempotent, ALTER ROLE and
+  # CREATE EXTENSION IF NOT EXISTS repeat harmlessly. The two role passwords never reach argv or the logs: they stay in the container environment, psql reads them
+  # with \getenv and quotes them with :'var' (a `-v name=value` flag would show them in the process list). `$$` is compose's escape for a literal `$`.
+  bootstrap:
+    image: postgres:16-alpine
+    restart: "no"
+    environment:
+      PG_SUPERUSER_URL: ${PG_SUPERUSER_URL:?set postgres://opsdesk_admin:<password>@opsdesk-db-1f0tlc:5432/opsdesk}
+      APP_OWNER_PASSWORD: ${APP_OWNER_PASSWORD:?set the app_owner login password}
+      APP_USER_PASSWORD: ${APP_USER_PASSWORD:?set the app_user login password}
+    volumes:
+      - ../api/src/db/bootstrap/roles.sql:/opt/bootstrap/roles.sql:ro
+    networks: [default, dokploy-network]
+    command:
+      - sh
+      - -ec
+      - |
+        tries=0
+        until pg_isready -q -d "$$PG_SUPERUSER_URL"; do
+          tries=$$((tries + 1))
+          if [ "$$tries" -ge 60 ]; then echo "bootstrap: Postgres not ready after 60 tries" >&2; exit 1; fi
+          echo "bootstrap: waiting for Postgres ($$tries/60)"
+          sleep 2
+        done
+        psql -v ON_ERROR_STOP=1 -q -d "$$PG_SUPERUSER_URL" -f /opt/bootstrap/roles.sql
+        psql -v ON_ERROR_STOP=1 -q -d "$$PG_SUPERUSER_URL" <<'SQL'
+        \getenv owner_pw APP_OWNER_PASSWORD
+        \getenv user_pw APP_USER_PASSWORD
+        ALTER ROLE app_owner LOGIN PASSWORD :'owner_pw';
+        ALTER ROLE app_user LOGIN PASSWORD :'user_pw';
+        CREATE EXTENSION IF NOT EXISTS pg_trgm;
+        SQL
+        echo "bootstrap: done"
+
+  # One-shot, every deploy, after bootstrap: applies pending migrations as app_owner with the NEW image. api and worker wait for it (demo only, see the header).
+  migrate:
+    image: ${API_IMAGE:-opsdesk-api:local}
+    restart: "no"
+    command: ["sh", "/opt/deploy/migrate.sh"]
+    environment:
+      DATABASE_OWNER_URL: ${DATABASE_OWNER_URL:?set the app_owner connection string}
+    volumes:
+      - ./scripts/migrate.sh:/opt/deploy/migrate.sh:ro
+    networks: [default, dokploy-network]
+    depends_on:
+      bootstrap: { condition: service_completed_successfully }
+
+  # DEMO DEPLOYMENT ONLY, never started by default and never on a client's database (.claude/docs/deploy/demo-seed.md). Its own target and image.
+  seed:
+    build: { context: .., dockerfile: api/Dockerfile, target: seed }
+    image: ${SEED_IMAGE:-opsdesk-seed:local}
+    profiles: ["demo"]
+    restart: "no"
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: ${DATABASE_URL:?set the app_user connection string}
+      DATABASE_OWNER_URL: ${DATABASE_OWNER_URL:?set the app_owner connection string}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?set 32+ random characters}
+      APP_URL: ${APP_URL:?set the public web origin, https}
+      ALLOW_DEMO_SEED: ${ALLOW_DEMO_SEED:-}
+      SEED_DEMO_PASSWORD: ${SEED_DEMO_PASSWORD:-}
+      SEED_EMAIL_DOMAIN: ${SEED_EMAIL_DOMAIN:-}
+      SEED_PLATFORM_TOTP_SECRET: ${SEED_PLATFORM_TOTP_SECRET:-}
+    networks: [default, dokploy-network]
+
+  redis:
+    image: redis:7
+    restart: unless-stopped
+    # BullMQ needs noeviction. The queue is rebuilt by the sweeps if it is lost; Redis holds no system of record (.claude/docs/deploy/backup-restore.md).
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory-policy", "noeviction", "--requirepass", "${REDIS_PASSWORD:?set a hex password}"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" --no-auth-warning ping | grep -q PONG"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?set a hex password}
+    logging: *logging
+
+  clamav:
+    image: clamav/clamav:stable
+    platform: linux/amd64
+    restart: unless-stopped
+    volumes:
+      - clamav-db:/var/lib/clamav
+    healthcheck:
+      test: ["CMD", "clamdcheck.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 20
+      start_period: 180s
+    logging: *logging
+
+volumes:
+  redis-data: {}
+  clamav-db: {}
+
+networks:
+  dokploy-network:
+    external: true
