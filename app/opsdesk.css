@@ -397,7 +397,9 @@ body{padding:0;background:#fff}
   .app{padding:0}
   .main{padding:12px}
   .sidebar{margin:0}
-  .sidebar{position:fixed;height:auto;border-radius:0 calc(24px * var(--radius-scale,1)) calc(24px * var(--radius-scale,1)) 0}
+  /* `align-self:stretch` undoes the desktop sticky rule's `align-self:start`: .app is a grid, and a fixed grid child that is start-aligned with `height:auto` shrinks to its content
+     instead of filling top to bottom. In Safari that collapsed the scrolling menu (flex:1 + overflow, min-height 0) to nothing: only the logo and the app card showed. */
+  .sidebar{position:fixed;height:auto;align-self:stretch;border-radius:0 calc(24px * var(--radius-scale,1)) calc(24px * var(--radius-scale,1)) 0}
 }
 
 .app-card{padding:14px}
