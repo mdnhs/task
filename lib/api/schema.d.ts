@@ -524,6 +524,97 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/invites/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query: {
+                    token: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description What the invitation link is for, so the join page can show it before anyone signs in: the company, the invited address and role, who invited, the expiry, and whether a verified account with that address already exists (then the person signs in instead of registering). Public, rate limited per client address, never cached, writes nothing, never echoes the token. 404 invite_not_found (unknown, malformed, revoked or suspended company: alike), 409 invite_used, 410 invite_expired | invite_invalid (the inviter's standing, as accept judges it). */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            company: string;
+                            email: string;
+                            roleKey: string;
+                            roleLabel: string;
+                            invitedBy: string | null;
+                            expiresAt: string;
+                            accountExists: boolean;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/invites/register": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        token: string;
+                        name: string;
+                        password: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Holding the invitation link proves the invited address, so ONE call creates the account (address from the invitation, never from the request; email verified), joins the company with the invited role and spends the invitation, atomically. Creates no session and sends no mail: the caller then signs in with the password. A verified account with that address is never touched (409 account_exists: sign in, then accept); an unverified one (never usable) is taken over by the invitation holder. Same checks as accept (404 invite_not_found, 409 invite_used | seat_limit, 410 invite_expired | invite_invalid). Public, rate limited per client address, fails closed when the limiter store is down. */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            slug: string;
+                            email: string;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/roles": {
         parameters: {
             query?: never;

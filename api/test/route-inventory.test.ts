@@ -76,7 +76,7 @@ describe("route inventory", () => {
     const ta = await makeTenant(t.deps, { slug: "inv-alpha", name: "Inventory Alpha Ltd" })
     const owner = await makeMember(t.deps, ta.id, "owner")
     const targets = routeInventory(t.app).filter((e) => (e.classification === "public" || e.classification === "webhook") && !e.path.includes("*") && e.key !== "GET /v1/openapi.json")
-    expect(targets.map((e) => e.key).sort()).toEqual(["GET /healthz", "GET /readyz", "GET /v1/auth/providers", "POST /webhooks/billing/stripe"])
+    expect(targets.map((e) => e.key).sort()).toEqual(["GET /healthz", "GET /readyz", "GET /v1/auth/providers", "GET /v1/invites/preview", "POST /v1/invites/register", "POST /webhooks/billing/stripe"])
     const norm = async (r: Response) => {
       const text = await r.text()
       return { status: r.status, text: text.replace(/"requestId":"[^"]+"/, '"requestId":"-"') }

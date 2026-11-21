@@ -1,9 +1,11 @@
 import { cookies } from "next/headers"
 
 import { hasSessionCookie } from "@/lib/api/cookies"
+import { ApiError } from "@/lib/api/problem"
 import { apiServer } from "@/lib/api/server"
 import { getData } from "@/lib/data"
-import type { AuthProviders, OnboardingData, OnboardingDefaults, PlanOption, RoleOption, SignUpData } from "./types"
+import { inviteFailure } from "@/lib/auth-flow"
+import type { AuthProviders, InviteData, OnboardingData, OnboardingDefaults, PlanOption, RoleOption, SignUpData } from "./types"
 
 type ShellRole = { id: string; label: string }
 
@@ -46,5 +48,21 @@ export async function getInviteViewer(): Promise<string | null> {
     return (await (await apiServer({ tenant: null })).get("/v1/me")).user.email
   } catch {
     return null
+  }
+}
+
+/**
+ * The /invite page: what the link is for plus who (if anyone) is signed in. Reads only (the invitation is not used up by looking). A bad, revoked, expired or used
+ * link, or the API being unavailable, is one `unusable` state with its short copy, never a thrown error.
+ */
+export async function getInviteData(token: string): Promise<InviteData> {
+  if (!token) return { kind: "unusable", reason: "invalid", message: inviteFailure(new ApiError(404, "invite_not_found")).message }
+  try {
+    const [preview, viewer] = await Promise.all([(await apiServer({ tenant: null })).get("/v1/invites/preview", { query: { token } }), getInviteViewer()])
+    return { kind: "ready", preview, viewer }
+  } catch (e) {
+    const f = inviteFailure(e)
+    const reason = f.kind === "expired" || f.kind === "used" || f.kind === "rate_limited" || f.kind === "invalid" ? f.kind : "error"
+    return { kind: "unusable", reason, message: f.message }
   }
 }

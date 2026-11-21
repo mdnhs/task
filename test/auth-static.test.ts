@@ -151,12 +151,19 @@ describe("T6.3 verification and reset links: rendering calls nothing, tokens sta
     for (const f of ["app/(auth)/verify-email/page.tsx", "app/(auth)/reset-password/page.tsx", "app/(auth)/invite/page.tsx"]) expect(read(f), f).toContain('referrer: "no-referrer"')
   })
 
-  test("the invite page and component use the invitation only inside the Accept click and the verified step (a link scanner must not consume it)", () => {
-    expect(read("app/(auth)/invite/page.tsx")).not.toMatch(/acceptInvite|auth-client|invites\/accept/)
+  test("the invite page only READS (the preview); the invitation is used only by the button handlers (accept, join, sign in & join), never on render", () => {
+    const page = read("app/(auth)/invite/page.tsx")
+    expect(page).not.toMatch(/acceptInvite|registerInvite|auth-client|invites\/accept|invites\/register/)
     const comp = read("features/auth/components/accept-invite.tsx")
     expect(comp).not.toContain("useEffect")
     expect(comp).not.toMatch(/console\.|localStorage|sessionStorage/)
-    expect(comp.indexOf("function accept()")).toBeLessThan(comp.indexOf("acceptInvite(token)"))
+    for (const call of ["acceptInvite(token)", "registerInvite({"]) {
+      const at = comp.indexOf(call)
+      expect(at, call).toBeGreaterThan(-1)
+      // every use sits inside one of the three handlers
+      const before = comp.slice(0, at)
+      expect(Math.max(before.lastIndexOf("function accept()"), before.lastIndexOf("function join("), before.lastIndexOf("function signInAndJoin(")), call).toBeGreaterThan(-1)
+    }
   })
 })
 

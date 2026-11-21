@@ -1,15 +1,17 @@
-import { createHash, randomBytes } from "node:crypto"
+import { createHash, randomBytes, randomUUID } from "node:crypto"
+import { getConnInfo } from "@hono/node-server/conninfo"
 import { createRoute, z } from "@hono/zod-openapi"
-import { and, desc, eq, isNull } from "drizzle-orm"
+import { and, count, desc, eq, isNull } from "drizzle-orm"
 import { AppError, Conflict, Forbidden, NotFound } from "../../core/errors"
 import type { Deps } from "../../deps"
 import { requirePermission } from "../../core/middleware/permission"
 import { RATE, assertRateLimit, hashKey } from "../../core/middleware/rate-limit"
+import { clientIp, ipBucket } from "../../core/net/client-ip"
 import { requireSession } from "../../core/middleware/session"
 import { requireTenant } from "../../core/middleware/tenant"
 import { newRouter } from "../../core/router"
 import { sanitizeMailError } from "../../core/mail/sanitize"
-import { invites, memberships, roles, tenants, tenantSettings, user } from "../../db/schema"
+import { account, invites, memberships, roles, session, tenants, tenantSettings, user } from "../../db/schema"
 import { withTenant, type TenantTx } from "../../db/tenant-tx"
 import { publish } from "../../core/events"
 import { emailHmac } from "../../core/crypto/audit-hmac"
@@ -91,6 +93,41 @@ const acceptRoute = createRoute({
   responses: { 200: { description: "Joined the tenant. Re-validates the inviter's CURRENT standing: a demoted, suspended or removed inviter, or an invited role above the inviter's current access, is 410 invite_invalid (nothing is written). 404 invite_not_found, 403 invite_email_mismatch, 409 invite_used | already_member | seat_limit, 410 invite_expired.", content: { "application/json": { schema: z.object({ slug: z.string() }) } } } },
 })
 
+// ---- one-step join (public: the token in the link is the credential; the person has no session yet) ----
+const PreviewQuery = z.object({ token: z.string().min(1).max(256) })
+const Preview = z
+  .object({ company: z.string(), email: z.string(), roleKey: z.string(), roleLabel: z.string(), invitedBy: z.string().nullable(), expiresAt: z.string(), accountExists: z.boolean() })
+  .openapi({ example: { company: "Acme", email: "new.hire@example.com", roleKey: "employee", roleLabel: "Employee", invitedBy: "Alex Admin", expiresAt: "2026-11-25T09:00:00.000Z", accountExists: false } })
+const RegisterInvite = z
+  .object({ token: z.string().min(1).max(256), name: z.string().trim().min(2).max(100), password: z.string().min(8).max(128) })
+  .openapi({ example: { token: "invite-token", name: "New Hire", password: "a-long-password" } })
+const Registered = z.object({ slug: z.string(), email: z.string() }).openapi({ example: { slug: "acme", email: "new.hire@example.com" } })
+
+const previewRoute = createRoute({
+  method: "get",
+  path: "/v1/invites/preview",
+  request: { query: PreviewQuery },
+  responses: {
+    200: {
+      description:
+        "What the invitation link is for, so the join page can show it before anyone signs in: the company, the invited address and role, who invited, the expiry, and whether a verified account with that address already exists (then the person signs in instead of registering). Public, rate limited per client address, never cached, writes nothing, never echoes the token. 404 invite_not_found (unknown, malformed, revoked or suspended company: alike), 409 invite_used, 410 invite_expired | invite_invalid (the inviter's standing, as accept judges it).",
+      content: { "application/json": { schema: Preview } },
+    },
+  },
+})
+const registerRoute = createRoute({
+  method: "post",
+  path: "/v1/invites/register",
+  request: { body: { content: { "application/json": { schema: RegisterInvite } }, required: true } },
+  responses: {
+    201: {
+      description:
+        "Holding the invitation link proves the invited address, so ONE call creates the account (address from the invitation, never from the request; email verified), joins the company with the invited role and spends the invitation, atomically. Creates no session and sends no mail: the caller then signs in with the password. A verified account with that address is never touched (409 account_exists: sign in, then accept); an unverified one (never usable) is taken over by the invitation holder. Same checks as accept (404 invite_not_found, 409 invite_used | seat_limit, 410 invite_expired | invite_invalid). Public, rate limited per client address, fails closed when the limiter store is down.",
+      content: { "application/json": { schema: Registered } },
+    },
+  },
+})
+
 /** Emails the invite link. A failure never fails the request (the invite exists; the admin can resend): only a sanitized error and the invite id are logged, never the token or the link. */
 async function sendInviteMail(deps: Deps, tenantId: string, o: { to: string; token: string; expiresAt: Date; inviteId: string }): Promise<void> {
   const [t] = await deps.db.select({ name: tenants.name }).from(tenants).where(eq(tenants.id, tenantId))
@@ -98,7 +135,7 @@ async function sendInviteMail(deps: Deps, tenantId: string, o: { to: string; tok
     await deps.mailer.send({
       to: o.to,
       subject: `You are invited to ${t.name}`,
-      text: `You have been invited to join ${t.name}.\n\nSign up or sign in with this email address, then accept:\n\n${deps.env.APP_URL}/invite?token=${o.token}\n\nThe link expires on ${o.expiresAt.toISOString().slice(0, 10)}.`,
+      text: `You have been invited to join ${t.name}.\n\nOpen this link to join. If you do not have an account yet, you can create one there in a minute; no other email is needed:\n\n${deps.env.APP_URL}/invite?token=${o.token}\n\nThe link expires on ${o.expiresAt.toISOString().slice(0, 10)}. If you were not expecting this, ignore this email.`,
     })
   } catch (err) {
     deps.logger.error({ error: sanitizeMailError(err), inviteId: o.inviteId }, "invite email send failed")
@@ -136,6 +173,34 @@ async function assertInviterStillValid(tx: TenantTx, tenantId: string, inv: { in
     if (e instanceof AppError && e.status === 403) throw invalid()
     throw e
   }
+}
+
+/** The calling address (the socket on a node server; behind a proxy the entry TRUST_PROXY_HOPS from the right), as one rate-limit bucket. */
+function callerBucket(c: Parameters<typeof getConnInfo>[0], deps: Deps): string {
+  let socket: string | undefined
+  try {
+    socket = getConnInfo(c).remote.address
+  } catch {
+    socket = undefined // not on a node socket (tests)
+  }
+  return ipBucket(clientIp(c.req.raw.headers, socket, deps.env.TRUST_PROXY_HOPS))
+}
+
+/**
+ * The invitation a public call may act on, judged exactly like accept except that the caller has no session (so no address match: the link IS the proof):
+ * the company must be active, the token must match (unknown, malformed and suspended company are one 404), unused, unexpired, and the inviter must still
+ * be allowed to hand out the role. `lock` takes the invite row FOR UPDATE (register: serialises double use); preview reads without it.
+ */
+async function usableInvite(tx: TenantTx, tenantId: string, token: string, now: Date, lock: boolean) {
+  const [tn] = await tx.select({ status: tenants.status, name: tenants.name, slug: tenants.slug }).from(tenants).where(eq(tenants.id, tenantId))
+  if (tn?.status !== "active") throw NotFound("invite_not_found")
+  const q = tx.select().from(invites).where(eq(invites.tokenHash, sha256(token)))
+  const [inv] = lock ? await q.for("update") : await q
+  if (!inv) throw NotFound("invite_not_found")
+  if (inv.acceptedAt) throw new AppError(409, "invite_used", "Conflict")
+  if (inv.expiresAt.getTime() <= now.getTime()) throw new AppError(410, "invite_expired", "Gone")
+  await assertInviterStillValid(tx, tenantId, inv)
+  return { inv, tenant: tn }
 }
 
 export const inviteRoutes = newRouter()
@@ -304,4 +369,85 @@ export const inviteRoutes = newRouter()
       return t.slug
     })
     return c.json({ slug }, 200)
+  })
+  .openapi(previewRoute, async (c) => {
+    const deps = c.get("deps")
+    const { token } = c.req.valid("query")
+    await assertRateLimit(c, "invite-preview", RATE.invitePublicIp, callerBucket(c, deps))
+    const now = deps.clock.now()
+    const m = TOKEN_RE.exec(token)
+    if (!m) throw NotFound("invite_not_found")
+    const tenantId = uuidFromHex(m[1])
+    const out = await withTenant(deps.db, tenantId, async (tx) => {
+      const { inv, tenant } = await usableInvite(tx, tenantId, token, now, false)
+      const [role] = await tx.select({ key: roles.key, label: roles.label }).from(roles).where(and(eq(roles.id, inv.roleId), eq(roles.tenantId, tenantId)))
+      const [inviter] = await tx.select({ name: user.name }).from(user).where(eq(user.id, inv.invitedBy))
+      const [existing] = await tx.select({ verified: user.emailVerified }).from(user).where(eq(user.email, inv.email))
+      return { company: tenant.name, email: inv.email, roleKey: role?.key ?? "", roleLabel: role?.label ?? "", invitedBy: inviter?.name ?? null, expiresAt: inv.expiresAt.toISOString(), accountExists: existing?.verified === true }
+    })
+    c.header("cache-control", "no-store")
+    return c.json(out, 200)
+  })
+  .openapi(registerRoute, async (c) => {
+    const deps = c.get("deps")
+    const { token, name, password } = c.req.valid("json")
+    // Fails closed: this route creates accounts and spends CPU on password hashing, so an unreachable limiter must not leave it open.
+    await assertRateLimit(c, "invite-register", RATE.invitePublicIp, callerBucket(c, deps), { failClosed: true })
+    const now = deps.clock.now()
+    const m = TOKEN_RE.exec(token)
+    if (!m) throw NotFound("invite_not_found")
+    const authCtx = await deps.auth.$context
+
+    const tenantId = uuidFromHex(m[1])
+    const out = await withTenant(deps.db, tenantId, async (tx) => {
+      const { inv, tenant } = await usableInvite(tx, tenantId, token, now, true)
+      const email = inv.email // from the invitation, never from the request
+
+      const [existing] = await tx.select({ id: user.id, verified: user.emailVerified }).from(user).where(eq(user.email, email))
+      if (existing?.verified) throw Conflict("account_exists") // a real account is never touched: sign in, then accept
+      if (existing) {
+        const [any] = await tx.select({ n: count() }).from(memberships).where(eq(memberships.userId, existing.id))
+        if ((any?.n ?? 0) > 0) throw Conflict("account_exists")
+      }
+      await assertSeatAvailable(tx, tenantId) // takes the per-tenant seat lock BEFORE anything is created; 409 seat_limit
+
+      const hash = await authCtx.password.hash(password)
+      let userId: string
+      if (existing) {
+        // An UNVERIFIED account with this address was never usable (no session without a verified address), so the holder of the invitation, who has just proven the
+        // address, takes it over: everything attached to it (credentials, social links, sessions) goes, so whoever pre-registered the address keeps no way in.
+        userId = existing.id
+        await tx.delete(session).where(eq(session.userId, userId))
+        await tx.delete(account).where(eq(account.userId, userId))
+        await tx.update(user).set({ name, emailVerified: true, updatedAt: now }).where(eq(user.id, userId))
+      } else {
+        userId = authCtx.generateId({ model: "user" }) || randomUUID()
+        try {
+          await tx.transaction((sp) => sp.insert(user).values({ id: userId, name, email, emailVerified: true, createdAt: now, updatedAt: now }))
+        } catch (err) {
+          if (isPgError(err, "23505")) throw Conflict("account_exists") // an account for this address appeared meanwhile
+          throw err
+        }
+      }
+      await tx.insert(account).values({ id: authCtx.generateId({ model: "account" }) || randomUUID(), accountId: userId, providerId: "credential", userId, password: hash, createdAt: now, updatedAt: now })
+
+      try {
+        await tx.transaction((sp) => sp.insert(memberships).values({ tenantId, userId, roleId: inv.roleId, joinedAt: now }))
+      } catch (err) {
+        if (isPgError(err, "23505")) throw Conflict("already_member")
+        throw err
+      }
+      await tx.update(invites).set({ acceptedAt: now }).where(eq(invites.id, inv.id))
+      const [role] = await tx.select({ key: roles.key }).from(roles).where(eq(roles.id, inv.roleId))
+      await recordAudit(
+        tx,
+        tenantId,
+        { action: "member.joined", entity: "membership", entityId: userId, actorId: userId, before: null, after: { userId, roleKey: role?.key ?? null, inviteId: inv.id, registered: true } },
+        now,
+      )
+      await publish(tx, { tenantId, type: "member.joined", payload: { userId, roleKey: role?.key ?? null, inviteId: inv.id }, actorId: userId }, now)
+      return { slug: tenant.slug, email }
+    })
+    c.header("cache-control", "no-store")
+    return c.json(out, 201)
   })

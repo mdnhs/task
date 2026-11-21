@@ -16,7 +16,7 @@ vi.mock("next/headers", () => ({
 vi.mock("next/navigation", () => ({ redirect: (url: string) => { throw Object.assign(new Error("NEXT_REDIRECT"), { url }) } }))
 vi.mock("next/cache", () => ({ revalidatePath: (...a: unknown[]) => { revalidated.push(a) } }))
 
-import { acceptInvite } from "@/app/actions/invite"
+import { acceptInvite, registerInvite } from "@/app/actions/invite"
 
 const TOKEN = "db6467e9c5c643729ca8219e0559d659SyfaUkKYE5XA2jrfLo9sCOK25TBBOScdsl8b-zuHueg"
 let calls: { method: string; path: string; tenant: string | null; origin: string | null; body: unknown }[]
@@ -68,5 +68,37 @@ describe("acceptInvite: joins the company the invitation names", () => {
     expect(await outcome(acceptInvite({ evil: 1 } as unknown as string))).toMatchObject({ returned: { ok: false, kind: "invalid" } })
     expect(calls).toEqual([])
     expect(sets).toEqual([])
+  })
+})
+
+describe("registerInvite: one-step join for a visitor with no account", () => {
+  const IN = { token: TOKEN, name: "Nina Newhire", password: "Passw0rd!long" }
+
+  test("POSTs the token, name and password to /v1/invites/register with NO tenant header and an Origin, needs no session, and writes no cookie", async () => {
+    jar.clear() // nobody is signed in
+    script({ status: 201, body: { slug: "acme", email: "new@x.ie" } })
+    expect(await outcome(registerInvite(IN))).toEqual({ returned: { ok: true, slug: "acme", email: "new@x.ie" } })
+    expect(calls).toEqual([{ method: "POST", path: "/v1/invites/register", tenant: null, origin: "https://app.example.com", body: IN }])
+    expect(sets).toEqual([]) // the sign-in that follows (and afterSignIn) sets the cookies, not this
+  })
+
+  test("the address is never sent: only what the person typed (name, password) and the token", async () => {
+    script({ status: 201, body: { slug: "acme", email: "new@x.ie" } })
+    await registerInvite({ ...IN, email: "attacker@x.ie" } as never)
+    expect(Object.keys((calls[0]!.body as Record<string, unknown>)).sort()).toEqual(["name", "password", "token"])
+  })
+
+  test("API refusals come back as results: account_exists, expired, seats, validation", async () => {
+    for (const [status, code, kind] of [[409, "account_exists", "account_exists"], [410, "invite_expired", "expired"], [409, "seat_limit", "seats"], [422, "validation_error", "validation"]] as const) {
+      script({ status, body: { status, code, requestId: "r" } })
+      expect(await outcome(registerInvite(IN)), code).toMatchObject({ returned: { ok: false, kind } })
+    }
+    expect(sets).toEqual([])
+  })
+
+  test("a non-string token, name or password is sent as empty (an empty token never reaches the API)", async () => {
+    script({ status: 201, body: { slug: "acme", email: "new@x.ie" } })
+    expect(await outcome(registerInvite({ token: { evil: 1 }, name: 1, password: null } as never))).toMatchObject({ returned: { ok: false, kind: "invalid" } })
+    expect(calls).toEqual([])
   })
 })

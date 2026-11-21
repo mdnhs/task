@@ -117,8 +117,9 @@ export async function resetStep(deps: { resetPassword(token: string, newPassword
   }
 }
 
-export type InviteFailKind = "invalid" | "expired" | "used" | "member" | "email_mismatch" | "seats" | "signed_out" | "rate_limited" | "error"
-export type AcceptInviteResult = { ok: true; slug: string } | ({ ok: false; kind: InviteFailKind } & Fail)
+export type InviteFailKind = "invalid" | "expired" | "used" | "member" | "email_mismatch" | "seats" | "signed_out" | "account_exists" | "validation" | "rate_limited" | "error"
+export type InviteFailure = { ok: false; kind: InviteFailKind } & Fail
+export type AcceptInviteResult = { ok: true; slug: string } | InviteFailure
 
 const INVITE_COPY: Record<Exclude<InviteFailKind, "rate_limited" | "error">, string> = {
   invalid: "This invitation is not valid any more. Ask your admin to send a new one.",
@@ -128,28 +129,54 @@ const INVITE_COPY: Record<Exclude<InviteFailKind, "rate_limited" | "error">, str
   email_mismatch: "This invitation was sent to a different email address. Sign in or sign up with the address it was sent to.",
   seats: "This company has no free seats left. Ask your admin to make room, then try again.",
   signed_out: "Your session ended. Sign in to accept the invitation.",
+  account_exists: "An account with this address already exists. Sign in to join.",
+  validation: "Check your name and password (at least 8 characters) and try again.",
 }
 
 /**
- * Accepts an invitation (POST /v1/invites/accept) and maps every answer to one short message. A revoked, replaced, malformed or suspended-company
- * token is the one "invalid" state (the API answers them alike: nothing here says which). The token only goes to the injected function.
+ * Maps whatever an invitation call threw (preview, register or accept) to one kind and one short message. A revoked, replaced, malformed or suspended-company
+ * token is the one "invalid" state (the API answers them alike: nothing here says which). The server's own text is never shown.
  */
+export function inviteFailure(e: unknown): InviteFailure {
+  const fail = (kind: Exclude<InviteFailKind, "rate_limited" | "error">): InviteFailure => ({ ok: false, kind, message: INVITE_COPY[kind] })
+  if (e instanceof ApiError) {
+    if (e.status === 401) return fail("signed_out")
+    if (e.status === 403 && e.code === "invite_email_mismatch") return fail("email_mismatch")
+    if (e.status === 404 || (e.status === 410 && e.code === "invite_invalid")) return fail("invalid")
+    if (e.status === 410) return fail("expired")
+    if (e.status === 409 && e.code === "invite_used") return fail("used")
+    if (e.status === 409 && e.code === "already_member") return fail("member")
+    if (e.status === 409 && e.code === "account_exists") return fail("account_exists")
+    if (e.status === 409 && e.code === "seat_limit") return fail("seats")
+    if (e.status === 400 || e.status === 422) return fail("validation")
+    if (e.status === 429) return { ok: false, kind: "rate_limited", message: RATE_LIMITED }
+  }
+  return { ok: false, kind: "error", ...describe(e) }
+}
+
+/** Accepts an invitation (POST /v1/invites/accept) for the signed-in caller. The token only goes to the injected function. */
 export async function acceptInviteStep(deps: { accept(token: string): Promise<{ slug: string }> }, token: string): Promise<AcceptInviteResult> {
-  const fail = (kind: Exclude<InviteFailKind, "rate_limited" | "error">): AcceptInviteResult => ({ ok: false, kind, message: INVITE_COPY[kind] })
-  if (!token) return fail("invalid")
+  if (!token) return inviteFailure(new ApiError(404, "invite_not_found"))
   try {
     return { ok: true, slug: (await deps.accept(token)).slug }
   } catch (e) {
-    if (e instanceof ApiError) {
-      if (e.status === 401) return fail("signed_out")
-      if (e.status === 403 && e.code === "invite_email_mismatch") return fail("email_mismatch")
-      if (e.status === 404 || (e.status === 410 && e.code === "invite_invalid")) return fail("invalid")
-      if (e.status === 410) return fail("expired")
-      if (e.status === 409 && e.code === "invite_used") return fail("used")
-      if (e.status === 409 && e.code === "already_member") return fail("member")
-      if (e.status === 409 && e.code === "seat_limit") return fail("seats")
-      if (e.status === 429) return { ok: false, kind: "rate_limited", message: RATE_LIMITED }
-    }
-    return { ok: false, kind: "error", ...describe(e) }
+    return inviteFailure(e)
+  }
+}
+
+/**
+ * One-step join (POST /v1/invites/register): the invitation link proves the address, so it creates a verified account and joins the company at once.
+ * The address comes from the invitation, not from here. Name and password only go to the injected function.
+ */
+export async function registerInviteStep(
+  deps: { register(b: { token: string; name: string; password: string }): Promise<{ slug: string; email: string }> },
+  b: { token: string; name: string; password: string },
+): Promise<{ ok: true; slug: string; email: string } | InviteFailure> {
+  if (!b.token) return inviteFailure(new ApiError(404, "invite_not_found"))
+  try {
+    const r = await deps.register({ token: b.token, name: b.name.trim(), password: b.password })
+    return { ok: true, slug: r.slug, email: r.email }
+  } catch (e) {
+    return inviteFailure(e)
   }
 }

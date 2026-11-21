@@ -1,6 +1,6 @@
 import { describe, expect, test, vi } from "vitest"
 import { ApiError } from "@/lib/api/problem"
-import { acceptInviteStep, forgotStep, resetStep, secondFactorStep, signInStep, signUpStep, verifyEmailStep } from "@/lib/auth-flow"
+import { acceptInviteStep, inviteFailure, registerInviteStep, forgotStep, resetStep, secondFactorStep, signInStep, signUpStep, verifyEmailStep } from "@/lib/auth-flow"
 
 const err = (status: number, code: string) => new ApiError(status, code, "req-9")
 const GENERIC = "Wrong email or password."
@@ -151,5 +151,43 @@ describe("invitation accept step: every API answer maps to one short message", (
     const r = await run(err(500, "boom"))
     expect(r).toMatchObject({ ok: false, kind: "error", ref: "req-9" })
     expect(JSON.stringify(r)).not.toContain("boom")
+  })
+})
+
+describe("one-step join: register step and the shared invitation error mapping", () => {
+  const B = { token: "tok", name: "  Nina Newhire ", password: "Passw0rd!long" }
+  const run = (e: unknown) => registerInviteStep({ register: async () => { throw e } }, B)
+
+  test("success trims the name, sends the token, name and password to the injected function only, and returns the slug and the invited address", async () => {
+    const register = vi.fn(async () => ({ slug: "acme", email: "new@x.ie" }))
+    expect(await registerInviteStep({ register }, B)).toEqual({ ok: true, slug: "acme", email: "new@x.ie" })
+    expect(register).toHaveBeenCalledWith({ token: "tok", name: "Nina Newhire", password: "Passw0rd!long" })
+  })
+
+  test("an empty token never reaches the API", async () => {
+    const register = vi.fn(async () => ({ slug: "acme", email: "a@b.c" }))
+    expect(await registerInviteStep({ register }, { ...B, token: "" })).toMatchObject({ ok: false, kind: "invalid" })
+    expect(register).not.toHaveBeenCalled()
+  })
+
+  test("account_exists asks the person to sign in; 400 and 422 are one validation message; the rest follow the accept mapping", async () => {
+    expect(await run(err(409, "account_exists"))).toMatchObject({ ok: false, kind: "account_exists", message: expect.stringContaining("Sign in") })
+    expect(await run(err(422, "unprocessable"))).toMatchObject({ kind: "validation" })
+    expect(await run(err(400, "validation_error"))).toMatchObject({ kind: "validation" })
+    expect(await run(err(404, "invite_not_found"))).toMatchObject({ kind: "invalid" })
+    expect(await run(err(410, "invite_expired"))).toMatchObject({ kind: "expired" })
+    expect(await run(err(409, "invite_used"))).toMatchObject({ kind: "used" })
+    expect(await run(err(409, "seat_limit"))).toMatchObject({ kind: "seats" })
+    expect(await run(err(429, "rate_limited"))).toMatchObject({ kind: "rate_limited" })
+  })
+
+  test("the server's text and the password never appear in a failure", async () => {
+    const r = await run(err(500, "boom-secret"))
+    expect(r).toMatchObject({ ok: false, kind: "error", ref: "req-9" })
+    expect(JSON.stringify(r)).not.toMatch(/boom-secret|Passw0rd/)
+  })
+
+  test("inviteFailure treats a non-API error (a network failure) as a generic error", () => {
+    expect(inviteFailure(new TypeError("fetch failed"))).toMatchObject({ ok: false, kind: "error" })
   })
 })

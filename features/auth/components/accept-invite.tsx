@@ -1,34 +1,63 @@
 "use client"
 
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { useState, useTransition } from "react"
 import { toast } from "sonner"
 
-import { acceptInvite } from "@/app/actions/invite"
+import { acceptInvite, registerInvite } from "@/app/actions/invite"
+import { afterSignIn } from "@/app/actions/session"
 import { Field } from "@/components/field"
 import { SecretInput } from "@/components/secret-input"
 import { Input } from "@/components/ui/input"
-import { resendVerification, signInEmail, signUpEmail } from "@/lib/auth-client"
-import { signInStep, signUpStep, type InviteFailKind } from "@/lib/auth-flow"
-import { PASSWORD_RULES, ownerSchema, passwordScore } from "../schemas"
+import { signInEmail } from "@/lib/auth-client"
+import { signInStep, type InviteFailKind } from "@/lib/auth-flow"
+import { PASSWORD_RULES, ownerSchema, passwordScore, signInSchema } from "../schemas"
+import type { InviteData, InvitePreview } from "../types"
 
 type Fail = { kind: InviteFailKind; message: string }
-type Mode = "choice" | "signup" | "verify"
 
-// /invite?token=...: the page the invitation email links to. Rendering it calls nothing (a mail scanner or link preview opening the URL must not use the
-// invitation): only the Accept click does. Signed in: confirm the account and accept. Signed out: sign in, or create an account here (an invited person
-// joins the inviter's company, they do not create their own; the address must be verified before a session exists, like sign-up). The token stays in
-// memory and in the `next` of the sign-in link; the API checks that the invited address is the signed-in one.
-export function AcceptInvite({ token, email }: { token: string; email: string | null }) {
-  const [mode, setMode] = useState<Mode>("choice")
-  const [owner, setOwner] = useState({ name: "", email: "", password: "" })
+// /invite?token=...: where the invitation email leads. The page shows what the link is for (company, role, invited address) and needs ONE action:
+//  - signed in as the invited address: "Accept invitation";
+//  - no account for that address: name + password, one button. The link proves the address, so the account is created verified and joined in one call, then
+//    signed in with the same password (no second email, no second tab);
+//  - an account already exists: its password, one button (sign in, then accept).
+// Rendering calls nothing that uses the invitation (a mail scanner or link preview must not consume it): only the button does.
+export function AcceptInvite({ token, data }: { token: string; data: InviteData }) {
+  if (data.kind === "unusable") return <Unusable data={data} />
+  return <Ready token={token} preview={data.preview} viewer={data.viewer} />
+}
+
+function Unusable({ data }: { data: Extract<InviteData, { kind: "unusable" }> }) {
+  return (
+    <div className="auth-form" role="alert">
+      <header className="auth-head">
+        <h1>{data.reason === "expired" ? "Invitation expired" : data.reason === "used" ? "Invitation already used" : "Cannot open this invitation"}</h1>
+        <p>{data.message}</p>
+      </header>
+      <Link href="/sign-in" className="btn btn-primary auth-submit">Go to sign in</Link>
+    </div>
+  )
+}
+
+function Ready({ token, preview, viewer }: { token: string; preview: InvitePreview; viewer: string | null }) {
+  const [accountExists, setAccountExists] = useState(preview.accountExists)
+  const [name, setName] = useState("")
+  const [password, setPassword] = useState("")
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [fail, setFail] = useState<Fail | null>(null)
-  const [signedUpAs, setSignedUpAs] = useState("") // "email\n"+password of the account created here (a second click must not sign up twice)
   const [pending, start] = useTransition()
+  const router = useRouter()
 
   const here = `/invite?token=${encodeURIComponent(token)}`
   const signInHref = `/sign-in?next=${encodeURIComponent(here)}`
+  const who = preview.invitedBy ? `${preview.invitedBy} invited you` : "You are invited"
+  const headline = `Join ${preview.company}`
+  const sub = `${who} to join ${preview.company} as ${preview.roleLabel}.`
+
+  // A failure that ends the flow: the reason and the one thing that helps. (account_exists is not one of them: it switches to the sign-in form.)
+  const endsFlow = fail && fail.kind !== "rate_limited" && fail.kind !== "error" && fail.kind !== "validation" && fail.kind !== "account_exists"
+  const note = fail && !endsFlow ? <p className="od-field-err" role="alert">{fail.message}</p> : null
 
   function accept() {
     setFail(null)
@@ -38,59 +67,57 @@ export function AcceptInvite({ token, email }: { token: string; email: string | 
     })
   }
 
-  function submitSignUp(e: React.FormEvent) {
+  // No account yet: create it (verified, joined), sign in with the same password, then go to the company (its only membership is this one).
+  function join(e: React.FormEvent) {
     e.preventDefault()
-    const r = ownerSchema.safeParse(owner)
+    const r = ownerSchema.safeParse({ name, email: preview.email, password })
     if (!r.success) {
       const next: Record<string, string> = {}
       for (const i of r.error.issues) next[String(i.path[0])] ??= i.message
       return setErrors(next)
     }
-    const who = `${owner.email.trim().toLowerCase()}\n${owner.password}`
-    if (signedUpAs === who) return setMode("verify")
+    setErrors({})
+    setFail(null)
     start(async () => {
-      const out = await signUpStep({ signUpEmail }, owner)
-      if (!out.ok) return setErrors({ email: out.message })
-      setSignedUpAs(who)
-      setErrors({})
-      setMode("verify")
+      const made = await registerInvite({ token, name, password })
+      if (!made.ok) {
+        if (made.kind === "account_exists") {
+          setAccountExists(true)
+          setPassword("")
+          return void toast.info("You already have an account. Sign in to join.")
+        }
+        return setFail(made)
+      }
+      const s = await signInStep({ signInEmail }, { email: made.email, password })
+      setPassword("")
+      if (s.kind !== "signed_in") {
+        toast.success("Account created. Sign in to continue.")
+        router.push(signInHref)
+        return
+      }
+      await afterSignIn("/")
     })
   }
 
-  // The visitor opened the verification link (in another tab): sign in with what they typed, then accept. Until then Better Auth answers 403 email_not_verified.
-  function confirmVerified() {
+  // An account exists for this address: its password, then accept (sign-in puts the person in their first company; accept then switches to this one).
+  function signInAndJoin(e: React.FormEvent) {
+    e.preventDefault()
+    const r = signInSchema.safeParse({ email: preview.email, password })
+    if (!r.success) return setErrors({ password: r.error.issues[0]!.message })
+    setErrors({})
     setFail(null)
     start(async () => {
-      const r = await signInStep({ signInEmail }, owner)
-      if (r.kind === "unverified") return void toast.error("Not verified yet. Open the link in your inbox, then try again.")
-      if (r.kind === "error") return void toast.error(r.message)
-      if (r.kind === "mfa") return void toast.error("Sign in to continue.")
-      setOwner((o) => ({ ...o, password: "" }))
+      const s = await signInStep({ signInEmail }, { email: preview.email, password })
+      setPassword("")
+      if (s.kind === "mfa") return void router.push(signInHref) // the code step lives on the sign-in page; it returns here
+      if (s.kind === "unverified") return setFail({ kind: "error", message: "Verify your email first: open the link we sent you, then try again." })
+      if (s.kind === "error") return setFail({ kind: "error", message: s.message })
       const a = await acceptInvite(token)
       if (a) setFail(a)
     })
   }
 
-  function resend() {
-    start(async () => {
-      await resendVerification(owner.email.trim()).catch(() => {})
-      toast.success(`If ${owner.email.trim()} needs a link, a new one is on its way`)
-    })
-  }
-
-  if (!token)
-    return (
-      <div className="auth-form">
-        <header className="auth-head">
-          <h1>Invitation link incomplete</h1>
-          <p>This link has no invitation in it. Open the link from your invitation email again, or ask your admin to send a new one.</p>
-        </header>
-        <Link href="/sign-in" className="btn btn-primary auth-submit">Go to sign in</Link>
-      </div>
-    )
-
-  // A failed accept ends the flow with the reason and the one thing that helps: another account, a new link, or (already a member) just carry on.
-  if (fail && fail.kind !== "rate_limited" && fail.kind !== "error")
+  if (endsFlow)
     return (
       <div className="auth-form" role="alert">
         <header className="auth-head">
@@ -103,89 +130,91 @@ export function AcceptInvite({ token, email }: { token: string; email: string | 
       </div>
     )
 
-  const failNote = fail && (fail.kind === "rate_limited" || fail.kind === "error") ? <p className="od-field-err" role="alert">{fail.message}</p> : null
-
-  if (email)
+  // Signed in.
+  if (viewer) {
+    if (viewer.toLowerCase() !== preview.email.toLowerCase())
+      return (
+        <div className="auth-form">
+          <header className="auth-head">
+            <h1>{headline}</h1>
+            <p>{sub}</p>
+          </header>
+          <div className="auth-notice" role="status">
+            <h2>Different account</h2>
+            <p>You are signed in as <strong>{viewer}</strong>, but this invitation is for <strong>{preview.email}</strong>.</p>
+          </div>
+          <Link href={signInHref} className="btn btn-primary auth-submit">Sign in with {preview.email}</Link>
+        </div>
+      )
     return (
       <div className="auth-form">
         <header className="auth-head">
-          <h1>Join your team</h1>
-          <p>You are signed in as <strong>{email}</strong>. Accept the invitation to join the company that invited you.</p>
+          <h1>{headline}</h1>
+          <p>{sub}</p>
         </header>
-        {failNote}
-        <button type="button" className="btn btn-primary auth-submit" disabled={pending} onClick={accept}>{pending ? "Joining…" : "Accept invitation"}</button>
-        <p className="auth-alt">
-          Invited with a different address? <Link href={signInHref} className="auth-link">Use another account</Link>
-        </p>
+        {note}
+        <button type="button" className="btn btn-primary auth-submit" disabled={pending} onClick={accept}>{pending ? "Joining…" : `Join ${preview.company}`}</button>
       </div>
-    )
-
-  if (mode === "signup") {
-    const score = passwordScore(owner.password)
-    const set = (k: "name" | "email" | "password", v: string) => { setOwner({ ...owner, [k]: v }); setErrors({}) }
-    return (
-      <form className="auth-form" onSubmit={submitSignUp} noValidate>
-        <header className="auth-head">
-          <h1>Create your account</h1>
-          <p>Use the email address this invitation was sent to.</p>
-        </header>
-        <Field label="Full name" htmlFor="iv-name" error={errors.name} required>
-          <Input id="iv-name" autoComplete="name" value={owner.name} onChange={(e) => set("name", e.target.value)} />
-        </Field>
-        <Field label="Work email" htmlFor="iv-email" error={errors.email} required>
-          <Input id="iv-email" type="email" autoComplete="username" value={owner.email} placeholder="name@company.com" onChange={(e) => set("email", e.target.value)} />
-        </Field>
-        <Field label="Password" htmlFor="iv-password" error={errors.password} required>
-          <SecretInput noun="password" id="iv-password" autoComplete="new-password" value={owner.password} onChange={(e) => set("password", e.target.value)} />
-        </Field>
-        <div className="auth-strength">
-          <div suppressHydrationWarning className="progress" role="progressbar" aria-label="Password strength" aria-valuemin={0} aria-valuemax={PASSWORD_RULES.length} aria-valuenow={score} data-score={score}>
-            <i style={{ transform: `scaleX(${score / PASSWORD_RULES.length})` }} />
-          </div>
-          <ul className="auth-rules" aria-label="Password rules">
-            {PASSWORD_RULES.map((r) => {
-              const ok = r.test(owner.password)
-              return (
-                <li key={r.id} data-ok={ok ? "" : undefined}>
-                  <span aria-hidden="true">{ok ? "✓" : "○"}</span> {r.label}
-                  <span className="sr-only">{ok ? " (met)" : " (not met)"}</span>
-                </li>
-              )
-            })}
-          </ul>
-        </div>
-        <div className="auth-actions">
-          <button type="button" className="btn btn-outline" onClick={() => { setMode("choice"); setErrors({}) }}>Back</button>
-          <button type="submit" className="btn btn-primary" disabled={pending}>{pending ? "Creating…" : "Continue"}</button>
-        </div>
-      </form>
     )
   }
 
-  if (mode === "verify")
+  const emailField = (
+    <Field label="Email" htmlFor="iv-email" hint="The address this invitation was sent to">
+      <Input id="iv-email" type="email" value={preview.email} readOnly autoComplete="username" />
+    </Field>
+  )
+
+  if (accountExists)
     return (
-      <div className="auth-form">
-        <div className="auth-notice" role="status">
-          <h2>Check your inbox</h2>
-          <p>We sent a link to <strong>{owner.email.trim()}</strong>. Open it to confirm your address, then come back here to join.</p>
+      <form className="auth-form" onSubmit={signInAndJoin} noValidate>
+        <header className="auth-head">
+          <h1>{headline}</h1>
+          <p>{sub} Sign in to your account to join.</p>
+        </header>
+        {emailField}
+        <Field label="Password" htmlFor="iv-password" error={errors.password} required>
+          <SecretInput noun="password" id="iv-password" autoComplete="current-password" value={password} onChange={(e) => { setPassword(e.target.value); setErrors({}) }} />
+        </Field>
+        <div className="auth-row">
+          <Link href="/forgot-password" className="auth-link">Forgot password?</Link>
         </div>
-        {failNote}
-        <div className="auth-actions">
-          <button type="button" className="btn btn-outline" onClick={() => setMode("signup")}>Back</button>
-          <button type="button" className="btn btn-primary" disabled={pending} onClick={confirmVerified}>{pending ? "Joining…" : "I’ve verified"}</button>
-        </div>
-        <button type="button" className="auth-link" disabled={pending} onClick={resend}>Resend the link</button>
-      </div>
+        {note}
+        <button type="submit" className="btn btn-primary auth-submit" disabled={pending}>{pending ? "Joining…" : "Sign in & join"}</button>
+      </form>
     )
 
+  const score = passwordScore(password)
   return (
-    <div className="auth-form">
+    <form className="auth-form" onSubmit={join} noValidate>
       <header className="auth-head">
-        <h1>You are invited</h1>
-        <p>Sign in or create an account with the email address this invitation was sent to, then accept it to join the team.</p>
+        <h1>{headline}</h1>
+        <p>{sub} Choose a password to create your account.</p>
       </header>
-      <Link href={signInHref} className="btn btn-primary auth-submit">Sign in</Link>
-      <button type="button" className="btn btn-outline auth-submit" onClick={() => setMode("signup")}>Create an account</button>
-    </div>
+      {emailField}
+      <Field label="Full name" htmlFor="iv-name" error={errors.name} required>
+        <Input id="iv-name" autoComplete="name" value={name} onChange={(e) => { setName(e.target.value); setErrors({}) }} />
+      </Field>
+      <Field label="Password" htmlFor="iv-password" error={errors.password} required>
+        <SecretInput noun="password" id="iv-password" autoComplete="new-password" value={password} onChange={(e) => { setPassword(e.target.value); setErrors({}) }} />
+      </Field>
+      <div className="auth-strength">
+        <div suppressHydrationWarning className="progress" role="progressbar" aria-label="Password strength" aria-valuemin={0} aria-valuemax={PASSWORD_RULES.length} aria-valuenow={score} data-score={score}>
+          <i style={{ transform: `scaleX(${score / PASSWORD_RULES.length})` }} />
+        </div>
+        <ul className="auth-rules" aria-label="Password rules">
+          {PASSWORD_RULES.map((r) => {
+            const ok = r.test(password)
+            return (
+              <li key={r.id} data-ok={ok ? "" : undefined}>
+                <span aria-hidden="true">{ok ? "✓" : "○"}</span> {r.label}
+                <span className="sr-only">{ok ? " (met)" : " (not met)"}</span>
+              </li>
+            )
+          })}
+        </ul>
+      </div>
+      {note}
+      <button type="submit" className="btn btn-primary auth-submit" disabled={pending}>{pending ? "Joining…" : `Join ${preview.company}`}</button>
+    </form>
   )
 }

@@ -72,12 +72,21 @@ export function VerifyEmailSkeleton() {
   )
 }
 
-// The signed-out choice (the usual first visit of an invited person): heading, text, then Sign in and Create an account. The signed-in view is one button and a link.
+// The usual first visit of an invited person: the join form (heading and text, the read-only email with its hint, name, password with its strength meter and rules, the button).
+// A signed-in visit is one button and an existing account only a password: the page replaces this once it knows.
 export function InviteSkeleton() {
   return (
     <SkGroup label="Loading invitation" className="auth-form">
       <Head />
-      <ButtonSk />
+      <FieldSk hint />
+      <FieldSk />
+      <FieldSk />
+      <div className="auth-strength">
+        <div suppressHydrationWarning className="progress"><Sk h={6} r={6} /></div>
+        <ul className="auth-rules">
+          {Array.from({ length: 4 }, (_, i) => <li key={i}><Sk w="80%" h={11} lh={19} /></li>)}
+        </ul>
+      </div>
       <ButtonSk />
     </SkGroup>
   )

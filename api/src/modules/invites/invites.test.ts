@@ -1,5 +1,5 @@
 import { beforeEach, expect, test } from "vitest"
-import { call, resetDb, testApp } from "../../../test/harness"
+import { call, resetDb, testApp, testEnv } from "../../../test/harness"
 import { ownerQuery, ownerTenantQuery } from "../../../test/db"
 import { makeMember, makeTenant, roleIdOf, signIn, signUp } from "../../../test/factories"
 
@@ -477,4 +477,230 @@ test("an accept racing a revoke or a resend: exactly one outcome, never a 500, a
       expect(act.status).toBeLessThan(300)
     }
   }
+})
+
+// ---- one-step join: GET /v1/invites/preview and POST /v1/invites/register (public, the token is the credential) ----
+const ORIGIN = { origin: testEnv.APP_URL }
+const preview = (w: Awaited<ReturnType<typeof world>>, token: string) => call(w.app, "GET", `/v1/invites/preview?token=${encodeURIComponent(token)}`)
+const register = (w: Awaited<ReturnType<typeof world>>, token: string, body: Record<string, unknown> = {}) =>
+  call(w.app, "POST", "/v1/invites/register", { headers: ORIGIN, body: { token, name: "Nina Newhire", password: "Passw0rd!long", ...body } })
+async function invited(w: Awaited<ReturnType<typeof world>>, email = "new@x.ie") {
+  expect((await invite(w, email)).status).toBe(201)
+  return tokenFrom(w.mailer.last())
+}
+const userRows = (email: string) => ownerQuery("select id, name, email_verified from \"user\" where email = $1", [email])
+const memberRows = (w: Awaited<ReturnType<typeof world>>, email: string) =>
+  ownerTenantQuery(w.tenant.id, "select r.key from memberships m join roles r on r.id = m.role_id join \"user\" u on u.id = m.user_id where u.email = $1", [email])
+
+test("preview: a valid token shows the company, the role and the invited address (never the token), without a session", async () => {
+  const w = await world()
+  const token = await invited(w)
+  const r = await preview(w, token)
+  expect(r.status).toBe(200)
+  const body = (await r.json()) as Json
+  expect(body).toMatchObject({ company: "acme", email: "new@x.ie", roleKey: "employee", accountExists: false })
+  expect(typeof body.expiresAt).toBe("string")
+  expect(JSON.stringify(body)).not.toContain(token)
+  expect(await userRows("new@x.ie")).toEqual([]) // a GET writes nothing
+})
+
+test("preview: unknown, malformed, revoked and suspended-company tokens are all the same 404; expired is 410 and used is 409", async () => {
+  const w = await world()
+  const token = await invited(w)
+  for (const bad of ["x", "0".repeat(32) + "A".repeat(43), token.slice(0, -1) + (token.endsWith("A") ? "B" : "A")]) {
+    const r = await preview(w, bad)
+    expect(r.status, bad).toBe(404)
+    expect(((await r.json()) as Json).code).toBe("invite_not_found")
+  }
+  await ownerTenantQuery(w.tenant.id, "update invites set accepted_at = now()")
+  expect(((await (await preview(w, token)).json()) as Json).code).toBe("invite_used")
+  await ownerTenantQuery(w.tenant.id, "update invites set accepted_at = null")
+  await ownerQuery("update tenants set status = 'suspended' where id = $1", [w.tenant.id])
+  expect((await preview(w, token)).status).toBe(404)
+  await ownerQuery("update tenants set status = 'active' where id = $1", [w.tenant.id])
+  const list = (await (await call(w.app, "GET", "/v1/invites", { cookie: w.adminCookie, tenant: w.tenant.slug })).json()) as Json
+  await call(w.app, "DELETE", `/v1/invites/${list.items[0].id}`, { cookie: w.adminCookie, tenant: w.tenant.slug, headers: ORIGIN })
+  expect((await preview(w, token)).status).toBe(404)
+})
+
+test("preview: an expired invitation is 410 invite_expired (measured with the clock)", async () => {
+  const w = await world()
+  const token = await invited(w)
+  expect((await preview(w, token)).status).toBe(200)
+  w.clock.advance({ days: 8 })
+  const r = await preview(w, token)
+  expect(r.status).toBe(410)
+  expect(((await r.json()) as Json).code).toBe("invite_expired")
+})
+
+test("preview: accountExists is true only for a VERIFIED account with that address (an unverified one can be taken over by the invite, see register)", async () => {
+  const w = await world()
+  const token = await invited(w)
+  await signUp(w.app, "new@x.ie", "Other-Passw0rd!", "Existing", { verify: false })
+  expect(((await (await preview(w, token)).json()) as Json).accountExists).toBe(false)
+  await ownerQuery("update \"user\" set email_verified = true where email = 'new@x.ie'")
+  expect(((await (await preview(w, token)).json()) as Json).accountExists).toBe(true)
+})
+
+test("preview: an inviter who is demoted since is 410 invite_invalid (the same judgement as accept)", async () => {
+  const w = await world()
+  const token = await invited(w)
+  await ownerTenantQuery(w.tenant.id, "delete from memberships where user_id = $1", [w.admin.userId])
+  const r = await preview(w, token)
+  expect(r.status).toBe(410)
+  expect(((await r.json()) as Json).code).toBe("invite_invalid")
+})
+
+test("preview is rate limited per client address (429 with Retry-After)", async () => {
+  const w = await world()
+  const token = await invited(w)
+  let last = 200
+  for (let i = 0; i < 40 && last === 200; i++) last = (await preview(w, token)).status
+  expect(last).toBe(429)
+})
+
+test("register: one call creates a VERIFIED account for the invited address, joins the company with the invited role, sends no mail, and the password signs in at once", async () => {
+  const w = await world()
+  const token = await invited(w)
+  const mails = w.mailer.sent.length
+  const r = await register(w, token)
+  expect(r.status).toBe(201)
+  expect(await r.json()).toEqual({ slug: "acme", email: "new@x.ie" })
+  expect(JSON.stringify(await userRows("new@x.ie"))).toContain('"email_verified":true')
+  expect((await userRows("new@x.ie"))[0].name).toBe("Nina Newhire")
+  expect(await memberRows(w, "new@x.ie")).toEqual([{ key: "employee" }])
+  expect((await ownerTenantQuery(w.tenant.id, "select accepted_at from invites"))[0].accepted_at).not.toBeNull()
+  expect(w.mailer.sent).toHaveLength(mails) // no second (verification) mail
+  const { cookie } = await signIn(w.app, "new@x.ie", "Passw0rd!long") // verified, so no 403 email_not_verified
+  const me = (await (await call(w.app, "GET", "/v1/me", { cookie })).json()) as Json
+  expect(me.tenants).toEqual([{ slug: "acme", name: "acme", roleKey: "employee" }])
+  const audit = await ownerTenantQuery(w.tenant.id, "select action, entity from audit_events where action = 'member.joined'")
+  expect(audit).toEqual([{ action: "member.joined", entity: "membership" }])
+})
+
+test("register: the address comes from the invitation, never from the request (an extra email in the body is ignored); the token is single use", async () => {
+  const w = await world()
+  const token = await invited(w)
+  expect((await register(w, token, { email: "attacker@x.ie" })).status).toBe(201)
+  expect(await userRows("attacker@x.ie")).toEqual([])
+  expect(await userRows("new@x.ie")).toHaveLength(1)
+  const again = await register(w, token, { name: "Someone Else" })
+  expect(again.status).toBe(409)
+  expect(((await again.json()) as Json).code).toBe("invite_used")
+})
+
+test("register: two simultaneous calls with one token create exactly one account", async () => {
+  const w = await world()
+  const token = await invited(w)
+  const rs = await Promise.all([register(w, token), register(w, token, { name: "Second Try" })])
+  expect(rs.map((r) => r.status).sort()).toEqual([201, 409])
+  expect(await userRows("new@x.ie")).toHaveLength(1)
+  expect(await memberRows(w, "new@x.ie")).toHaveLength(1)
+})
+
+test("register: a bad, revoked or suspended-company token creates nothing", async () => {
+  const w = await world()
+  const token = await invited(w)
+  expect((await register(w, "x")).status).toBe(404)
+  expect((await register(w, "0".repeat(32) + "A".repeat(43))).status).toBe(404)
+  await ownerQuery("update tenants set status = 'suspended' where id = $1", [w.tenant.id])
+  expect((await register(w, token)).status).toBe(404)
+  await ownerQuery("update tenants set status = 'active' where id = $1", [w.tenant.id])
+  const list = (await (await call(w.app, "GET", "/v1/invites", { cookie: w.adminCookie, tenant: w.tenant.slug })).json()) as Json
+  await call(w.app, "DELETE", `/v1/invites/${list.items[0].id}`, { cookie: w.adminCookie, tenant: w.tenant.slug, headers: ORIGIN })
+  expect((await register(w, token)).status).toBe(404)
+  expect(await userRows("new@x.ie")).toEqual([])
+})
+
+test("register: an expired invitation is 410 invite_expired and creates nothing", async () => {
+  const w = await world()
+  const token = await invited(w)
+  w.clock.advance({ days: 8 })
+  const r = await register(w, token)
+  expect(r.status).toBe(410)
+  expect(((await r.json()) as Json).code).toBe("invite_expired")
+  expect(await userRows("new@x.ie")).toEqual([])
+})
+
+test("register re-validates the inviter like accept: a demoted, suspended or removed inviter's invitation creates nothing (410 invite_invalid)", async () => {
+  for (const how of ["demoted", "suspended", "removed"] as const) {
+    await resetDb()
+    const w = await world()
+    const token = await invited(w)
+    if (how === "demoted") await ownerTenantQuery(w.tenant.id, "update memberships set role_id = (select id from roles where key = 'employee' and tenant_id = $1) where user_id = $2", [w.tenant.id, w.admin.userId])
+    if (how === "suspended") await ownerTenantQuery(w.tenant.id, "update memberships set status = 'suspended' where user_id = $1", [w.admin.userId])
+    if (how === "removed") await ownerTenantQuery(w.tenant.id, "delete from memberships where user_id = $1", [w.admin.userId])
+    const r = await register(w, token)
+    expect(r.status, how).toBe(410)
+    expect(((await r.json()) as Json).code, how).toBe("invite_invalid")
+    expect(await userRows("new@x.ie"), how).toEqual([])
+  }
+})
+
+test("register: a full company (no free seat) is 409 seat_limit and leaves NO account behind (it is atomic)", async () => {
+  const t = testApp()
+  const tenant = await makeTenant(t.deps, { slug: "tiny", subscription: { seats: 1 } })
+  const admin = await makeMember(t.deps, tenant.id, "admin")
+  const { cookie } = await signIn(t.app, admin.email, admin.password)
+  const employee = await roleIdOf(t.deps, tenant.id, "employee")
+  expect((await call(t.app, "POST", "/v1/invites", { cookie, tenant: "tiny", body: { email: "new@x.ie", roleId: employee } })).status).toBe(201)
+  const token = tokenFrom(t.mailer.last())
+  const r = await call(t.app, "POST", "/v1/invites/register", { headers: ORIGIN, body: { token, name: "Nina Newhire", password: "Passw0rd!long" } })
+  expect(r.status).toBe(409)
+  expect(((await r.json()) as Json).code).toBe("seat_limit")
+  expect(await userRows("new@x.ie")).toEqual([])
+  expect((await ownerTenantQuery(tenant.id, "select accepted_at from invites"))[0].accepted_at).toBeNull()
+})
+
+test("register: a VERIFIED account with that address is never touched: 409 account_exists, its password still works (sign in, then accept)", async () => {
+  const w = await world()
+  const token = await invited(w)
+  await signUp(w.app, "new@x.ie", "Original-Passw0rd!", "Existing Person")
+  const r = await register(w, token, { name: "Hijacker", password: "Hijack-Passw0rd!" })
+  expect(r.status).toBe(409)
+  expect(((await r.json()) as Json).code).toBe("account_exists")
+  expect((await userRows("new@x.ie"))[0].name).toBe("Existing Person")
+  await signIn(w.app, "new@x.ie", "Original-Passw0rd!") // unchanged
+  await expect(signIn(w.app, "new@x.ie", "Hijack-Passw0rd!")).rejects.toThrow()
+  expect(await memberRows(w, "new@x.ie")).toEqual([]) // nothing joined
+})
+
+test("register: an UNVERIFIED account with that address is taken over by the invitation holder (it was never usable; a pre-registration by someone else is defeated)", async () => {
+  const w = await world()
+  const token = await invited(w)
+  await signUp(w.app, "new@x.ie", "Attacker-Passw0rd!", "Pre Registered", { verify: false })
+  await expect(signIn(w.app, "new@x.ie", "Attacker-Passw0rd!")).rejects.toThrow() // unverified: no session
+  const r = await register(w, token)
+  expect(r.status).toBe(201)
+  expect(await userRows("new@x.ie")).toHaveLength(1)
+  await signIn(w.app, "new@x.ie", "Passw0rd!long") // the invitee's password
+  await expect(signIn(w.app, "new@x.ie", "Attacker-Passw0rd!")).rejects.toThrow() // the earlier one is gone
+  expect(await memberRows(w, "new@x.ie")).toEqual([{ key: "employee" }])
+})
+
+test("register validates the input: a short password or name is refused and nothing is created", async () => {
+  const w = await world()
+  const token = await invited(w)
+  for (const bad of [{ password: "short" }, { password: "x".repeat(129) }, { name: "N" }, { name: "" }, { password: undefined }]) {
+    const r = await register(w, token, bad)
+    expect([400, 422], JSON.stringify(bad)).toContain(r.status)
+  }
+  expect(await userRows("new@x.ie")).toEqual([])
+  expect((await register(w, token)).status).toBe(201) // the token was not spent by the refusals
+})
+
+test("register is rate limited per client address, and fails closed when the limiter store is down", async () => {
+  const w = await world()
+  const token = await invited(w)
+  let last = 0
+  for (let i = 0; i < 40 && last !== 429; i++) last = (await register(w, "0".repeat(32) + "A".repeat(43))).status
+  expect(last).toBe(429)
+  await resetDb()
+  const w2 = await world()
+  const t2 = await invited(w2)
+  w2.rateLimiter.down = true
+  const r = await register(w2, t2)
+  expect(r.status).toBe(503)
+  expect(await userRows("new@x.ie")).toEqual([])
+  void token
 })

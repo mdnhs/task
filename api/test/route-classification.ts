@@ -28,6 +28,8 @@ export const ROUTE_CLASSIFICATION: Record<string, readonly [Classification, stri
   "DELETE /v1/invites/{id}": ["tenant-record", "path carries a tenant record id: walked by the isolation walker"],
   "POST /v1/invites/{id}/resend": ["tenant-record", "path carries a tenant record id: walked by the isolation walker"],
   "POST /v1/invites/accept": ["user", "redeems a token the invite mail carried; the token (not a header) names the tenant"],
+  "GET /v1/invites/preview": ["public", "shows what an invitation link is for (company, invited address and role) to the holder of its token, before anyone signs in; the token names the tenant, unknown and malformed tokens are one 404, rate limited per address"],
+  "POST /v1/invites/register": ["public", "the holder of an invitation token creates the account for the invited address and joins in one call; the token names the tenant and the address, a verified account is never touched, rate limited per address and fail closed"],
   "GET /v1/roles": ["tenant-static", "tenant resolved from X-Tenant and the caller membership; no record id in the path"],
   "POST /v1/roles/{id}/clone": ["tenant-record", "path carries a tenant record id: walked by the isolation walker"],
   "PATCH /v1/roles/{id}": ["tenant-record", "path carries a tenant record id: walked by the isolation walker"],

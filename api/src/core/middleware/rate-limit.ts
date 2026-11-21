@@ -26,6 +26,8 @@ export interface RateLimiter {
 export const RATE = {
   authMailAddress: { limit: 5, windowSec: 3600 },
   inviteMailAddress: { limit: 5, windowSec: 3600 },
+  // The two public invitation routes (preview, register): per client address. A whole office joining at once from one address stays well under it.
+  invitePublicIp: { limit: 30, windowSec: 60 },
   totpFailures: { limit: 5, windowSec: 900 },
   tenantCreateUser: { limit: 10, windowSec: 3600 },
 } as const satisfies Record<string, RateRule>
