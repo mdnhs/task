@@ -3,18 +3,30 @@
 import Link from "next/link"
 
 import { Icon } from "@/components/icon"
+import { Sk } from "@/components/sk"
 
 // Static sidebar pieces, shared by AppShell and AppShellSkeleton so the skeleton matches exactly.
 
 // The mark is a fixed 38px box with the brand icon. A tenant logo can be uploaded (Settings, Branding), but /v1/me/tenant carries no logo for staff yet, so the shell shows the
-// brand icon (B7 follow-up: expose the logo to every member). `tenantId` is accepted for callers and unused.
-export function Logo({ href = "/", onNavigate }: { tenantId?: string; href?: string; onNavigate?: () => void }) {
+// brand icon (B7 follow-up: expose the logo to every member). The tenant app shows the workspace's own name next to the mark (the session's tenant name), cut with an
+// ellipsis when long and with the full name as the tooltip; the console (href under /platform) and a missing name show the product name. `skeleton` swaps the text for a block.
+export function Logo({ name, href = "/", onNavigate, skeleton }: { name?: string; href?: string; onNavigate?: () => void; skeleton?: boolean }) {
+  const platform = href.startsWith("/platform")
+  const org = platform ? "" : (name ?? "").trim()
+  const label = org || "OpsDesk"
+  const where = platform ? "go to overview" : "go to dashboard"
   return (
-    <Link href={href} className="logo" aria-label={href === "/" ? "OpsDesk, go to dashboard" : "OpsDesk, go to overview"} onClick={onNavigate}>
+    <Link href={href} className="logo" aria-label={skeleton ? undefined : `${label}, ${where}`} title={org || undefined} onClick={onNavigate}>
       <span className="logo-mark">
         <Icon name="brand" />
       </span>
-      <span className="lbl">OpsDesk</span>
+      {skeleton ? (
+        <span className="lbl logo-org">
+          <Sk w={150} h={14} r="pill" className="sk-on-panel" />
+        </span>
+      ) : (
+        <span className={org ? "lbl logo-org" : "lbl"}>{label}</span>
+      )}
     </Link>
   )
 }

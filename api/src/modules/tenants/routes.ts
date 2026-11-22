@@ -83,7 +83,7 @@ export const MeTenantDto = z
   .openapi({
     example: {
       tenant: { id: "0b6f4c1e-8f0e-4c53-9a3e-6a4c1b2d7e90", slug: "coppers", name: "Coppers", timezone: "Europe/Dublin", currency: "EUR", locale: "en-IE", sessionIdleHours: 12, mfaPolicy: { mode: "off", roles: [] } },
-      member: { userId: "usr_8Kq2mZ4tW1", roleId: "5e1c0d52-8d3a-4b7e-9c41-2a5b7e90d3f8", roleKey: "owner", role: { label: "Tenant Owner", description: "Full control of the company workspace", home: "manager", access: { dashboard: "write", tasks: "write", settings: "write" }, rosterLevel: "office" } },
+      member: { userId: "usr_8Kq2mZ4tW1", roleId: "5e1c0d52-8d3a-4b7e-9c41-2a5b7e90d3f8", roleKey: "owner", role: { label: "Owner", description: "Full control of the company workspace", home: "manager", access: { dashboard: "write", tasks: "write", settings: "write" }, rosterLevel: "office" } },
       brand: { primaryColor: "#0A1B2C" }, reportDeadline: "17:30", reportDueAfterMinutes: 60,
       device: { id: null, type: "browser", label: "Unregistered browser", trusted: false }, features: { drive: false },
     },

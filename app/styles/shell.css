@@ -91,6 +91,12 @@
 /* ===== Tenant logo mark (FR-SAAS-11): same 38px box as the brand icon, logo contain-fit on a neutral chip ===== */
 .logo-mark.has-logo{background:var(--card);padding:4px;overflow:hidden}
 .logo-mark.has-logo img{width:100%;height:100%;object-fit:contain;display:block}
+/* Sidebar brand block, tenant app: the organization name beside the mark. min-width:0 lets the flex item shrink so a long name is cut with an ellipsis (full name in the link's title)
+   instead of wrapping or pushing past the sidebar; the collapsed rail hides .lbl (opsdesk.css) so only the mark shows. */
+.logo .lbl{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.logo .lbl.logo-org{font-size:16px;font-weight:700;letter-spacing:-.01em;line-height:1.3}
+/* the brand row has nothing on its right, so the name may run to the sidebar's own inner padding (the left stays on the nav's 30px line) */
+.sidebar .logo{padding-right:calc(18px * var(--space-scale,1))}
 /* D10: platform announcement banner (components/platform-notice.tsx), above every tenant page and in the console preview */
 .od-notice{display:flex;align-items:flex-start;gap:10px;padding:12px 14px 12px 18px;border-radius:var(--r-lg);font-size:13.5px;line-height:20px;font-weight:600;background:var(--info-bg);color:var(--info);margin-bottom:18px}
 .od-notice[data-kind="maintenance"]{background:var(--warn-bg);color:var(--warn)}

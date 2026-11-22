@@ -88,7 +88,7 @@ export function AppShellSkeleton({
     <>
       <div className="app">
         <aside className="sidebar" aria-hidden="true">
-          <Logo />
+          {platform ? <Logo href="/platform" /> : <Logo skeleton />}
           <div className="sidebar-scroll">
             {platform ? (
               <GroupedNavSkeleton items={platform.menu} />

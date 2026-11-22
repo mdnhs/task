@@ -13,7 +13,7 @@ describe("T6.3 resolveSession (I7, I8): the real session from /v1/me, /v1/me/ten
     expect(s.user).toEqual({ id: "u1", email: "ana@x.ie", name: "Ana Byrne" })
     expect(s.tenant).toMatchObject({ id: "id-alpha", slug: "alpha", name: "ALPHA", initials: "A", brand: "#3b5bdb", status: "active", plan: "Starter" })
     expect(s.tenants.map((t) => t.slug)).toEqual(["alpha", "bravo"])
-    expect(s.role).toMatchObject({ id: "owner", label: "Tenant Owner", home: "manager", rosterLevel: "office" })
+    expect(s.role).toMatchObject({ id: "owner", label: "Owner", home: "manager", rosterLevel: "office" })
     expect(s.roles).toEqual([s.role]) // I8: only the current role
     // plan M0+M1 only: files (M4) is outside the plan, so it reads as "none" even though the role says write
     expect(s.role.access.files).toBe("none")

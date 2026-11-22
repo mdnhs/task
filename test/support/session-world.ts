@@ -13,7 +13,7 @@ export const ENT_DATA: EntitlementsData = {
   plans: { starter: ["M0", "M1"], business: ["M0", "M1", "M4"] },
 }
 export const STATIC_ROLES: Role[] = [
-  { id: "owner", label: "Tenant Owner", description: "", home: "manager", access: {} as Role["access"], rosterLevel: "office" },
+  { id: "owner", label: "Owner", description: "", home: "manager", access: {} as Role["access"], rosterLevel: "office" },
   { id: "manager", label: "Manager", description: "", home: "manager", access: {} as Role["access"], reportScope: "team" },
   { id: "platform", label: "Platform", description: "", home: "manager", access: { dashboard: "read" } as Role["access"], platform: true },
 ]
@@ -31,7 +31,7 @@ export function world(o: {
   const me = o.me ?? { user: { id: "u1", email: "ana@x.ie", name: "Ana Byrne", emailVerified: true, twoFactorEnabled: false }, platformRole: null, tenants: [{ slug: "alpha", name: "Alpha Co", roleKey: "owner" }, { slug: "bravo", name: "Bravo Co", roleKey: "manager" }] }
   const tenantCtx = (slug: string, roleKey = "owner", rosterLevel: "office" | "supervisor" | null = roleKey === "owner" ? "office" : null) => ({
     tenant: { id: `id-${slug}`, slug, name: slug.toUpperCase(), timezone: "Europe/Dublin", currency: "EUR", locale: "en-IE", sessionIdleHours: 12, mfaPolicy: { mode: "off", roles: [] } },
-    member: { userId: "u1", roleId: "r1", roleKey, role: { label: roleKey === "owner" ? "Tenant Owner" : "Manager", description: "d", home: "manager", access: access("write"), rosterLevel } },
+    member: { userId: "u1", roleId: "r1", roleKey, role: { label: roleKey === "owner" ? "Owner" : "Manager", description: "d", home: "manager", access: access("write"), rosterLevel } },
     brand: { primaryColor: "#3b5bdb" }, reportDeadline: "17:30", reportDueAfterMinutes: 60,
     device: { id: null, type: "browser", label: "Unregistered browser", trusted: false }, features: { drive: false },
   })
