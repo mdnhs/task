@@ -38,6 +38,24 @@
 .mfa-banner>svg{width:18px;height:18px;flex:none}
 .mfa-banner>span{min-width:0}
 .mfa-banner .od-notice-x svg{width:16px;height:16px}
+.mfa-flow{display:flex;flex-direction:column;gap:14px;min-width:0}
+.mfa-stepper{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.mfa-step{display:flex;align-items:center;gap:8px;min-width:0;padding:6px 10px 6px 6px;border-radius:var(--r-pill);background:var(--shell);color:var(--ink-2);font-size:12.5px;font-weight:600;transition:background-color var(--dur-fast) var(--ease),color var(--dur-fast) var(--ease)}
+.mfa-step-n{flex:none;display:grid;place-items:center;width:22px;height:22px;border-radius:var(--r-pill);background:var(--card);font-size:12px;font-weight:700;font-variant-numeric:tabular-nums}
+.mfa-step-n svg{width:13px;height:13px}
+.mfa-step-t{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mfa-step[data-state="current"]{background:var(--brand);color:#fff}
+.mfa-step[data-state="current"] .mfa-step-n{background:#fff;color:var(--brand-deep)}
+.mfa-step[data-state="done"]{color:var(--brand-deep)}
+.mfa-step[data-state="done"] .mfa-step-n{background:var(--brand-soft);color:var(--brand-deep)}
+:root[data-theme="dark"] .mfa-step[data-state="done"]{color:var(--brand-3)}
+.mfa-step-h{margin:0;font-size:15px;font-weight:700;letter-spacing:-.005em;outline:none}
+.mfa-step-h:focus-visible{outline:2px solid var(--brand);outline-offset:3px;border-radius:6px}
+.mfa-foot{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.mfa-foot .btn svg{width:16px;height:16px}
+.mfa-confirm{display:flex;align-items:center;gap:10px;font-size:13.5px;font-weight:600;cursor:pointer}
+.mfa-confirm input{width:18px;height:18px;accent-color:var(--brand);cursor:pointer;flex:none}
+@media (max-width:600px){.mfa-stepper{grid-template-columns:repeat(4,auto);justify-content:start}.mfa-step{padding-right:6px}.mfa-step:not([data-state="current"]) .mfa-step-t{display:none}}
 .mfa-gate-lead{margin:0;font-size:13.5px;line-height:1.5;color:var(--ink-2)}
 .mfa-gate-effort{display:inline-flex;align-items:center;gap:6px;margin:0;font-size:13px;font-weight:600;color:var(--ink-2)}
 .mfa-gate-effort svg{width:16px;height:16px;flex:none}

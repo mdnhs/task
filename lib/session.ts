@@ -9,6 +9,7 @@ import { apiServer } from "./api/server"
 import { hasSessionCookie } from "./api/cookies"
 import { DEFAULT_BRAND } from "./brand"
 import { getData } from "./data"
+import { mfaSetupHref } from "./mfa-stepper"
 import type { EntitlementsData } from "./entitlements"
 import { resolvePlatformMfa, resolveSession, type Me, type Resolved, type Session } from "./session-core"
 import { TENANT_COOKIE, isTenantSlug } from "./api/tenant"
@@ -61,7 +62,7 @@ export const MFA_PATH = "/mfa"
  */
 export async function requireMfaOk(): Promise<Session> {
   const s = await getSession()
-  if (s.mfa !== "ok") return redirect(MFA_PATH)
+  if (s.mfa !== "ok") return redirect(mfaSetupHref(await landing())) // /mfa?next=<where they were>, checked: they come back to this page after set-up
   return s
 }
 

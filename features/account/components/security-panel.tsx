@@ -206,6 +206,7 @@ export function SecurityPanel({
           </DialogHeader>
           <TotpSetup
             account={email}
+            onCancel={() => setSetupOpen(false)}
             onDone={() => {
               setSetupOpen(false)
               setMfaOn(true)
