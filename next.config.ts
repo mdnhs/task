@@ -10,16 +10,15 @@ const nextConfig: NextConfig = {
   // Every route: nothing may frame the app (clickjacking), outbound links get no path/query in the referrer, no content sniffing.
   // Deliberately NOT a full Content-Security-Policy: only the frame-ancestors directive.
   async headers() {
+    const common = [
+      { key: "X-Frame-Options", value: "DENY" },
+      { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+      { key: "X-Content-Type-Options", value: "nosniff" },
+    ]
     return [
-      {
-        source: "/:path*",
-        headers: [
-          { key: "X-Frame-Options", value: "DENY" },
-          { key: "Content-Security-Policy", value: "frame-ancestors 'none'" },
-          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-          { key: "X-Content-Type-Options", value: "nosniff" },
-        ],
-      },
+      // /v1/* is the API behind the BFF: it sets its own Content-Security-Policy (the branding images carry `default-src 'none'; sandbox`) and a framework header would replace it.
+      { source: "/v1/:path*", headers: common },
+      { source: "/((?!v1(?:/|$)).*)", headers: [...common, { key: "Content-Security-Policy", value: "frame-ancestors 'none'" }] },
     ]
   },
 }
