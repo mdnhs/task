@@ -19,6 +19,7 @@ import { SUPPORT_STATUS, supportRows, type SupportAccess } from "@/lib/support-a
 import { DEVICE_TYPES, DEVICE_FEATURES, allowFor, describePolicy } from "@/lib/devices"
 import type { Device, DevicePolicy } from "@/lib/devices"
 import { describeMfaPolicy } from "@/lib/mfa"
+import { enforcementOf, enforcementText } from "@/lib/mfa-enforcement"
 import type { MfaPolicy } from "@/lib/mfa"
 import { SETTINGS_TABS } from "../types"
 import type { DeliveryRow, Department, Integration, Invite, MatrixData, NotificationsData, SettingsTabId, SettingsUser, TemplateData } from "../types"
@@ -486,10 +487,17 @@ function DevicePolicies({ canWrite, policies }: { canWrite: boolean; policies: D
 
 // Two-step rule card under Roles (MfaPolicyCard). The rule is a FilterSeg (Optional / Everyone / Chosen roles), browser-measured.
 const MFA_SEG_W = 292
+const MFA_HOW_W = 196 // measured in the browser (Soft prompt | Strict)
 function MfaPolicySk({ canWrite, policy, roleLabels }: { canWrite: boolean; policy: MfaPolicy; roleLabels: Record<string, string> }) {
   return (
     <section className="card set-card">
       <CardHead title="Two-step verification" sub={describeMfaPolicy(policy, roleLabels)} extra={canWrite ? <div className="od-filters"><Sk w={MFA_SEG_W} h={48} r="pill" style={{ maxWidth: "100%" }} /></div> : null} />
+      {policy.mode !== "off" && (
+        <div className="mfa-enf">
+          <p className="mfa-enf-t">{g(enforcementText(enforcementOf(policy)))}</p>
+          {canWrite && <Sk w={MFA_HOW_W} h={48} r="pill" style={{ maxWidth: "100%" }} />}
+        </div>
+      )}
       {policy.mode === "roles" && (
         <div className="dev-roles">
           {Object.entries(roleLabels).map(([id, text]) => (

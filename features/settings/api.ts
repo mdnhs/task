@@ -52,7 +52,7 @@ export const loadPolicies = async (api: Reader): Promise<DevicePolicy[]> => (awa
 export const loadMfaPolicy = async (api: Reader): Promise<MfaPolicy> => {
   const p = await api.get("/v1/settings/mfa-policy")
   if (p.mode !== "off" && p.mode !== "all" && p.mode !== "roles") throw new Error("settings: mfa mode must be off, all or roles")
-  return { mode: p.mode, roles: p.roles }
+  return { mode: p.mode, roles: p.roles, ...(p.enforcement === "prompt" || p.enforcement === "strict" ? { enforcement: p.enforcement } : {}) }
 }
 export const loadIntegrations = async (api: Reader, tz: string): Promise<Integration[]> => (await api.get("/v1/integrations")).map((i) => toIntegration(i, tz))
 export async function loadRequests(api: Reader, tz: string, nameOf: (id: string) => string): Promise<DataRequestRow[]> {
