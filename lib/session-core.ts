@@ -9,6 +9,7 @@ import type { ApiClient } from "./api/client"
 import { ApiError } from "./api/problem"
 import { DEFAULT_BRAND } from "./brand"
 import { initialsOf } from "./branding"
+import { mfaGraceEndsAtOf } from "./mfa-gate"
 import { restrictRole, toTenantEntitlements, type EntitlementsData, type TenantEntitlements } from "./entitlements"
 import type { Access, Module, Role, Tenant } from "./types"
 
@@ -41,6 +42,10 @@ export type Session = {
   mfa: "ok" | "enrol" | "challenge"
   twoFactorEnabled: boolean
   mfaPolicy: { mode: "off" | "all" | "roles"; roles: string[] }
+  /** Server-provided end of the two-step grace period (ISO), read through the adapter in lib/mfa-gate.ts. Absent or null: no grace. */
+  mfaGraceEndsAt?: string | null
+  /** Only while the MFA gate is up: the role CATALOGUE entry (not the API's), used by the sidebar alone so people can still navigate. Never an authorisation: `role` stays fail-closed. */
+  navRole?: Role
   platformRole: PlatformRoleKey | null
 }
 
@@ -154,7 +159,7 @@ export async function resolveSession(deps: SessionDeps): Promise<Resolved> {
       signedIn: true, role, roles: [role], tenant, tenants: me.tenants.map((t) => (t.slug === ctx.tenant.slug ? tenant : listed(t))), entitlements,
       user: { id: me.user.id, email: me.user.email, name: me.user.name }, tenantSlug: ctx.tenant.slug, billingState: ent.billingState, trialEndsAt: ent.trialEndsAt, graceEndsAt: ent.graceEndsAt,
       device: { id: ctx.device.id, label: ctx.device.label, trusted: ctx.device.trusted }, drive: ctx.features.drive === true,
-      mfa: "ok", twoFactorEnabled: me.user.twoFactorEnabled, mfaPolicy: ctx.tenant.mfaPolicy, platformRole: me.platformRole,
+      mfa: "ok", twoFactorEnabled: me.user.twoFactorEnabled, mfaPolicy: ctx.tenant.mfaPolicy, mfaGraceEndsAt: mfaGraceEndsAtOf(ctx.tenant), platformRole: me.platformRole,
     }
     return { kind: "ok", session, me, cookieStale: slug !== deps.tenantCookie }
   }
@@ -163,12 +168,14 @@ export async function resolveSession(deps: SessionDeps): Promise<Resolved> {
 
 /** The workspace is closed until the second factor is in place: no role, no plan, no tenant data (the API refused them). */
 async function gate(me: Me, slug: string, mfa: "enrol" | "challenge", deps: SessionDeps): Promise<Resolved> {
-  const entData = await deps.entitlementsData()
+  const [entData, statics] = await Promise.all([deps.entitlementsData(), deps.staticRoles()])
   const t = me.tenants.find((x) => x.slug === slug)!
   const role: Role = { id: t.roleKey, label: t.roleKey, description: "", home: "staff", access: { ...NO_ACCESS } }
   const tenant = listed(t)
+  // Sidebar only: a custom role the catalogue does not know gets Dashboard alone (never a guess at its grants).
+  const navRole: Role = statics.find((r) => r.id === t.roleKey && !r.platform) ?? { ...role, access: { ...NO_ACCESS, dashboard: "read" } }
   const session: Session = {
-    signedIn: true, role, roles: [role], tenant, tenants: me.tenants.map(listed),
+    signedIn: true, role, navRole, roles: [role], tenant, tenants: me.tenants.map(listed),
     entitlements: { planId: entData.defaultPlan, allowed: [], modules: entData.modules, assistant: entData.assistant },
     user: { id: me.user.id, email: me.user.email, name: me.user.name }, tenantSlug: slug, billingState: "ok", trialEndsAt: null, graceEndsAt: null,
     device: { id: null, label: "Unregistered browser", trusted: false }, drive: false, mfa,

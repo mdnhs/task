@@ -39,7 +39,7 @@ export default async function PlatformLayout({ children }: { children: React.Rea
       departments={false}
       search={op && mfaOk ? <GlobalSearch key="search" scope="platform" load={platformSearchIndex} departments={[]} today={nowUtc()} placeholder={requireStaff(op, "billing.read") ? "Search tenants and pages…" : "Search tenants, pages…"} /> : undefined}
     >
-      {op && session.mfa === "enrol" ? <MfaGate account={session.user.email} /> : op && session.mfa === "challenge" ? <MfaStepUp account={session.user.email} /> : children}
+      {op && session.mfa === "enrol" ? <MfaGate account={session.user.email} who="staff" /> : op && session.mfa === "challenge" ? <MfaStepUp account={session.user.email} /> : children}
     </AppShell>
   )
 }

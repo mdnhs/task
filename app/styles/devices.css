@@ -34,6 +34,15 @@
 .dev-switch-ico{width:16px;height:16px}
 .mfa-gate-h{margin:0;display:flex;align-items:center;gap:10px;font-size:20px;font-weight:700;letter-spacing:-.01em}
 .mfa-gate-h .ico{width:20px;height:20px}
+.mfa-banner{flex-wrap:nowrap}
+.mfa-banner>svg{width:18px;height:18px;flex:none}
+.mfa-banner>span{min-width:0}
+.mfa-banner .od-notice-x svg{width:16px;height:16px}
+.mfa-gate-lead{margin:0;font-size:13.5px;line-height:1.5;color:var(--ink-2)}
+.mfa-gate-effort{display:inline-flex;align-items:center;gap:6px;margin:0;font-size:13px;font-weight:600;color:var(--ink-2)}
+.mfa-gate-effort svg{width:16px;height:16px;flex:none}
+.mfa-gate-foot{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+@media (max-width:600px){.mfa-banner{flex-wrap:wrap}}
 
 /* Device register rows */
 .dev-row{display:flex;align-items:center;gap:14px;padding:14px 18px;border-radius:var(--r-lg);background:var(--shell)}

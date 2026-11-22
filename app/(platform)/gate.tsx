@@ -9,7 +9,7 @@ import { getPlatformSession } from "@/lib/session"
 export async function gate(action: PlatformAction, label: string): Promise<{ denied: React.ReactNode } | { op: StaffMember }> {
   const session = await getPlatformSession()
   if (!session.platformRole) return { denied: <AccessRestricted moduleLabel="the Platform console" /> }
-  if (session.mfa !== "ok") return { denied: session.mfa === "enrol" ? <MfaGate account={session.user.email} /> : <MfaStepUp account={session.user.email} /> }
+  if (session.mfa !== "ok") return { denied: session.mfa === "enrol" ? <MfaGate account={session.user.email} who="staff" /> : <MfaStepUp account={session.user.email} /> }
   const op = await getOperator()
   if (!op) return { denied: <AccessRestricted moduleLabel="the Platform console" /> }
   if (!requireStaff(op, action)) return { denied: <AccessRestricted moduleLabel={label} home={{ href: "/platform", label: "Back to Overview" }} /> }
