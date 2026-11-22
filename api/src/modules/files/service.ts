@@ -33,18 +33,23 @@ type Actor = { userId: string }
  * behaviour is the ordinary /v1/files one.
  */
 export type UploadPolicy = {
-  purpose: "task_evidence" | "task_attachment" | "task_voice" | "report_attachment"
+  purpose: "task_evidence" | "task_attachment" | "task_voice" | "report_attachment" | "branding_logo" | "branding_favicon"
   mimes: readonly string[]
   maxBytes: (mime: string) => number
   lock: (tx: TenantTx) => Promise<void>
   stripMimeParams?: boolean
+  /**
+   * Content check on the uploaded STAGING bytes (read whole, at most `maxBytes(mime)`), run by `complete` before anything is copied to the final key.
+   * It throws an AppError to refuse; the staging object is then deleted, so a refused file never reaches the scan or the final key.
+   */
+  inspect?: (bytes: Buffer, mime: string) => void
   after?: (tx: TenantTx, fileId: string, mime: string) => Promise<void>
 }
 /**
- * Files created through a module's own upload policy carry a SCOPED purpose (`task_%` ruling D9, `report_%` ruling F16): they are reachable only through
- * their module's routes, so /v1/files, the search index and the webhook fan-out all treat them as absent. THE one predicate; never test a prefix elsewhere.
+ * Files created through a module's own upload policy carry a SCOPED purpose (`task_%` ruling D9, `report_%` ruling F16, `branding_%` the organization logo and favicon): they are
+ * reachable only through their module's routes, so /v1/files, the search index and the webhook fan-out all treat them as absent. THE one predicate; never test a prefix elsewhere.
  */
-export const isScopedPurpose = (p: string | null | undefined): boolean => (p?.startsWith("task_") || p?.startsWith("report_")) ?? false
+export const isScopedPurpose = (p: string | null | undefined): boolean => (p?.startsWith("task_") || p?.startsWith("report_") || p?.startsWith("branding_")) ?? false
 const isScopedFile = (r: { purpose: string | null }): boolean => isScopedPurpose(r.purpose)
 /** A caller that may read: the role decides files:read, and who may open a DSR export. */
 export type FileReader = { userId: string; role: ResolvedRole }
@@ -169,6 +174,7 @@ export async function completeUpload(deps: Deps, tenantId: string, actor: Actor,
         if (head) await deps.storage.delete(staging) // a wrong object is never kept; the client must start a new upload
         throw new AppError(422, "upload_mismatch", "Unprocessable Entity")
       }
+      if (head && policy?.inspect) await inspectStaging(deps, staging, head, row.mime, policy)
       if (head) {
         try {
           await deps.storage.copy(staging, row.key, { ifMatchEtag: head.etag })
@@ -186,6 +192,26 @@ export async function completeUpload(deps: Deps, tenantId: string, actor: Actor,
     enqueue(SCAN_JOB, { fileId: id, tenantId }, { key: `${id}-${crypto.randomUUID()}` })
     return dto(cur)
   })
+}
+
+/** Reads the staging object (already size-checked, at most the policy cap) and lets the policy refuse its content; a refusal deletes it. The copy that follows is pinned to the same ETag, so what was inspected is what gets scanned and served. */
+async function inspectStaging(deps: Deps, staging: string, head: { size: number; etag: string }, mime: string, policy: UploadPolicy): Promise<void> {
+  const chunks: Buffer[] = []
+  const stream = await deps.storage.getStream(staging)
+  try {
+    for await (const c of stream) chunks.push(c as Buffer)
+  } finally {
+    stream.destroy()
+  }
+  const bytes = Buffer.concat(chunks)
+  const again = await deps.storage.head(staging)
+  if (!again || again.etag !== head.etag || bytes.length !== head.size) throw Conflict("upload_changed")
+  try {
+    policy.inspect!(bytes, mime)
+  } catch (e) {
+    await deps.storage.delete(staging) // a refused object is never kept; the client starts a new upload
+    throw e
+  }
 }
 
 export async function getFile(tx: TenantTx, tenantId: string, id: string, who: FileReader): Promise<FileDto> {

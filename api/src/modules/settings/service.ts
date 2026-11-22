@@ -1,13 +1,13 @@
 import { createHash } from "node:crypto"
 import { and, between, eq, sql } from "drizzle-orm"
 import { AppError } from "../../core/errors"
-import { files, publicHolidays, tenants, tenantSettings } from "../../db/schema"
+import { publicHolidays, tenants, tenantSettings } from "../../db/schema"
 import { withTenant, type TenantTx } from "../../db/tenant-tx"
 import type { Deps } from "../../deps"
 import { recordAudit } from "../audit"
-import { isScopedPurpose } from "../files"
 import { lockActor } from "../rbac"
 import { onboardingDefaults } from "../tenants"
+import { publicAsset, type BrandingAssetDto } from "./branding-assets"
 
 const SETTINGS_LOCK_NS = 0x73657474 // "sett"
 /** Serialises settings writes per tenant (take FIRST, before lockActor; the audit lock stays last). */
@@ -130,32 +130,25 @@ export async function patchOrganisation(deps: Deps, tenantId: string, actorId: s
 
 // ------------------------------------------------------------------ branding
 
-export type BrandingDto = { logoFileId: string | null; primaryColor: string | null }
+export type BrandingDto = { primaryColor: string | null; logo: BrandingAssetDto | null; favicon: BrandingAssetDto | null }
 
 async function readBranding(tx: TenantTx, tenantId: string): Promise<BrandingDto> {
-  const v = (await readSetting(tx, tenantId, "branding")) as Partial<BrandingDto> | undefined
-  return { logoFileId: typeof v?.logoFileId === "string" ? v.logoFileId : null, primaryColor: typeof v?.primaryColor === "string" ? v.primaryColor : null }
+  const v = (await readSetting(tx, tenantId, "branding")) as { primaryColor?: unknown } | undefined
+  return { primaryColor: typeof v?.primaryColor === "string" ? v.primaryColor : null, logo: publicAsset(v, "logo"), favicon: publicAsset(v, "favicon") }
 }
 export const getBranding = readBranding
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-
-export async function putBranding(deps: Deps, tenantId: string, actorId: string, input: BrandingDto): Promise<BrandingDto> {
+/** The brand colour only: the logo and favicon have their own upload, activate and remove routes (branding-assets.ts) and are kept as they are. */
+export async function putBranding(deps: Deps, tenantId: string, actorId: string, input: { primaryColor: string | null }): Promise<BrandingDto> {
   if (input.primaryColor !== null && !isColor(input.primaryColor)) throw unprocessable("invalid_color")
-  if (input.logoFileId !== null && !UUID.test(input.logoFileId)) throw unprocessable("invalid_logo")
   return withTenant(deps.db, tenantId, async (tx) => {
     await lockSettings(tx, tenantId)
     await lockActor(tx, tenantId, actorId, "settings", "write")
-    if (input.logoFileId !== null) {
-      // a CLEAN (scanned) file of this tenant; share-locked so it cannot be deleted under us
-      // not a task or report file (isScopedPurpose, C6): those are private to their task or report and 404 on /v1/files, so a settings:write holder must not publish one as the logo
-      const [f] = await tx.select({ id: files.id, purpose: files.purpose }).from(files).where(and(eq(files.id, input.logoFileId), eq(files.tenantId, tenantId), eq(files.status, "clean"))).for("share")
-      if (!f || isScopedPurpose(f.purpose)) throw unprocessable("invalid_logo")
-    }
     const before = await readBranding(tx, tenantId)
-    const after: BrandingDto = { logoFileId: input.logoFileId, primaryColor: input.primaryColor }
-    await writeSetting(tx, tenantId, "branding", after)
-    await recordAudit(tx, tenantId, { action: "tenant.branding_updated", entity: "tenant", entityId: tenantId, actorId, before, after }, deps.clock.now())
+    const raw = ((await readSetting(tx, tenantId, "branding")) as Record<string, unknown> | undefined) ?? {}
+    await writeSetting(tx, tenantId, "branding", { ...raw, primaryColor: input.primaryColor })
+    const after = { ...before, primaryColor: input.primaryColor }
+    await recordAudit(tx, tenantId, { action: "tenant.branding_updated", entity: "tenant", entityId: tenantId, actorId, before: { primaryColor: before.primaryColor }, after: { primaryColor: after.primaryColor } }, deps.clock.now())
     return after
   })
 }

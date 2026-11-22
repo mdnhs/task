@@ -3,7 +3,8 @@ import { requirePermission } from "../../core/middleware/permission"
 import { requireTenant } from "../../core/middleware/tenant"
 import { newRouter } from "../../core/router"
 import { withTenant } from "../../db/tenant-tx"
-import { getBranding, getHolidays, getOrganisation, currentYear, patchOrganisation, putBranding, replaceHolidays } from "./service"
+import { brandingWithStorage } from "./branding-routes"
+import { getHolidays, getOrganisation, currentYear, patchOrganisation, putBranding, replaceHolidays } from "./service"
 
 const Org = z.object({ name: z.string(), slug: z.string(), timezone: z.string(), currency: z.string(), locale: z.string(), reportDeadline: z.string(), reportDueAfterMinutes: z.number().int() })
 const OrgExample = { name: "Acme Ltd", slug: "acme", timezone: "Europe/Dublin", currency: "EUR", locale: "en-IE", reportDeadline: "17:30", reportDueAfterMinutes: 60 }
@@ -12,8 +13,14 @@ const OrgPatch = z
   .partial()
   .refine((v) => Object.values(v).some((x) => x !== undefined))
   .openapi({ example: { timezone: "Europe/London", currency: "GBP", locale: "en-GB", reportDeadline: "18:00", reportDueAfterMinutes: 90 } })
-const Branding = z.object({ logoFileId: z.string().max(64).nullable(), primaryColor: z.string().max(16).nullable() })
-const BrandingBody = Branding.openapi({ example: { logoFileId: "0b6f4c1e-8f0e-4c53-9a3e-6a4c1b2d7e90", primaryColor: "#0A1B2C" } })
+const Asset = z.object({ version: z.string(), mime: z.string(), width: z.number().int(), height: z.number().int(), sizeBytes: z.number().int() })
+const AssetExample = { version: "9f86d081884c7d65", mime: "image/png", width: 240, height: 64, sizeBytes: 8123 }
+const Branding = z.object({
+  primaryColor: z.string().max(16).nullable(), logo: Asset.nullable(), favicon: Asset.nullable(),
+  storageReady: z.boolean().openapi({ description: "false when no object storage is configured (the platform Storage settings): logo and favicon uploads cannot work yet" }),
+})
+const BrandingExample = { primaryColor: "#0A1B2C", logo: AssetExample, favicon: null, storageReady: true }
+const BrandingBody = z.object({ primaryColor: z.string().max(16).nullable() }).openapi({ example: { primaryColor: "#0A1B2C" } })
 const Holiday = z.object({ date: z.string().max(10), name: z.string().max(200) })
 const HolidaysBody = z
   .object({ year: z.number().int().min(1970).max(2200), holidays: z.array(Holiday).max(100) })
@@ -30,12 +37,12 @@ const orgPatch = createRoute({
 })
 const brandingGet = createRoute({
   method: "get", path: "/v1/settings/branding", middleware: [requireTenant, requirePermission("settings", "read")] as const,
-  responses: { 200: { description: "Branding", content: { "application/json": { schema: Branding.openapi({ example: { logoFileId: null, primaryColor: "#0A1B2C" } }) } } } },
+  responses: { 200: { description: "Branding", content: { "application/json": { schema: Branding.openapi({ example: BrandingExample }) } } } },
 })
 const brandingPut = createRoute({
   method: "put", path: "/v1/settings/branding", middleware: [requireTenant, requirePermission("settings", "write")] as const,
   request: { body: { content: { "application/json": { schema: BrandingBody } }, required: true } },
-  responses: { 200: { description: "Replaced branding. 422 invalid_logo (not a clean file of this tenant) | invalid_color (#RRGGBB)", content: { "application/json": { schema: Branding.openapi({ example: { logoFileId: null, primaryColor: "#0A1B2C" } }) } } } },
+  responses: { 200: { description: "The brand colour is saved; the logo and favicon are kept (they have their own routes under /v1/settings/branding/{kind}). 422 invalid_color (#RRGGBB)", content: { "application/json": { schema: Branding.openapi({ example: BrandingExample }) } } } },
 })
 const HolidaysOut = z.object({ year: z.number(), holidays: z.array(Holiday) }).openapi({ example: { year: 2026, holidays: [{ date: "2026-12-25", name: "Christmas Day" }] } })
 const holidaysGet = createRoute({
@@ -60,11 +67,13 @@ export const settingsRoutes = newRouter()
   })
   .openapi(brandingGet, async (c) => {
     const t = c.get("tenant")!
-    return c.json(await withTenant(c.get("deps").db, t.id, (tx) => getBranding(tx, t.id)), 200)
+    return c.json(await brandingWithStorage(c.get("deps"), t.id), 200)
   })
   .openapi(brandingPut, async (c) => {
     const t = c.get("tenant")!
-    return c.json(await putBranding(c.get("deps"), t.id, c.get("member")!.userId, c.req.valid("json")), 200)
+    const deps = c.get("deps")
+    await putBranding(deps, t.id, c.get("member")!.userId, c.req.valid("json"))
+    return c.json(await brandingWithStorage(deps, t.id), 200)
   })
   .openapi(holidaysGet, async (c) => {
     const t = c.get("tenant")!

@@ -54,7 +54,7 @@ describe("route inventory", () => {
       const isPlatform = e.path.startsWith("/v1/platform/")
       if (isPlatform !== (e.classification === "platform")) wrong.push(`${e.key}: ${e.classification} vs path`)
       const params = ROUTE_PARAMS[e.path]
-      const hasRecordId = params !== undefined && Object.values(params).some((r) => r !== "feature")
+      const hasRecordId = params !== undefined && Object.values(params).some((r) => r !== "feature" && r !== "brandingKind")
       if (e.classification === "tenant-record" && !hasRecordId) wrong.push(`${e.key}: tenant-record but no record id in ROUTE_PARAMS`)
       if (e.classification !== "tenant-record" && hasRecordId) wrong.push(`${e.key}: has a tenant record id in ROUTE_PARAMS but is ${e.classification}`)
       // a parameterised tenant-side route must declare what its params are, or the walker cannot build its fixtures

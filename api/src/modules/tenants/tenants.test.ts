@@ -250,7 +250,7 @@ test("GET /v1/me/tenant is typed: name, brand.primaryColor, reportDeadline, repo
   const first = (await (await call(t.app, "GET", "/v1/me/tenant", { cookie, tenant: "ctx2" })).json()) as Json
   expect(first.tenant).toMatchObject({ id: a.id, slug: "ctx2", name: "Ctx Two", timezone: "Europe/Dublin", currency: "EUR", locale: "en-IE", sessionIdleHours: 12 })
   expect(first.member).toMatchObject({ userId: u.userId, roleKey: "owner" })
-  expect(first.brand).toEqual({ primaryColor: null })
+  expect(first.brand).toEqual({ primaryColor: null, logo: null, favicon: null })
   expect(first.reportDeadline).toMatch(/^\d\d:\d\d$/)
   expect(Number.isInteger(first.reportDueAfterMinutes)).toBe(true)
   expect(first.device).toEqual({ id: null, type: "browser", label: "Unregistered browser", trusted: false })
@@ -272,7 +272,7 @@ test("a plain member (no settings permission) still gets brand, deadline and dev
   const { cookie } = await signIn(t.app, staff.email, staff.password)
   expect((await call(t.app, "GET", "/v1/settings/branding", { cookie, tenant: "ctx3" })).status).toBe(403)
   const r = (await (await call(t.app, "GET", "/v1/me/tenant", { cookie, tenant: "ctx3" })).json()) as Json
-  expect(r.brand).toEqual({ primaryColor: "#112233" })
+  expect(r.brand).toEqual({ primaryColor: "#112233", logo: null, favicon: null })
 })
 
 test("features.drive follows the device policy per request: false on an unregistered browser, true on the bound company PC, false again once trust is revoked", async () => {

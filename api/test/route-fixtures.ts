@@ -21,7 +21,7 @@ import { notify, withTenantAfterCommit } from "../src/modules/notifications"
 export type Fixture = { kind: "id" | "static"; value: string }
 export type TenantFixtures = Record<string, Record<string, Fixture>>
 
-type Resource = "rosterWeek" | "rosterTemplate" | "rosterShift" | "changeRequest" | "exchange" | "leave" | "role" | "member" | "team" | "device" | "feature" | "notification" | "pushToken" | "file" | "integration" | "dataRequest" | "supportGrant" | "apiKey" | "webhook" | "task" | "checklistItem" | "comment" | "taskFile" | "project" | "milestone" | "template" | "evidence" | "pattern" | "assignment" | "report" | "reportFile" | "reportExport" | "session" | "invite" | "location" | "shiftType" | "lifecycleMember"
+type Resource = "rosterWeek" | "rosterTemplate" | "rosterShift" | "changeRequest" | "exchange" | "leave" | "role" | "member" | "team" | "device" | "feature" | "notification" | "pushToken" | "file" | "integration" | "dataRequest" | "supportGrant" | "apiKey" | "webhook" | "task" | "checklistItem" | "comment" | "taskFile" | "project" | "milestone" | "template" | "evidence" | "pattern" | "assignment" | "report" | "reportFile" | "reportExport" | "session" | "invite" | "location" | "shiftType" | "lifecycleMember" | "brandingKind" | "brandingFile"
 
 /** path template -> param -> which resource that param names on that route. */
 export const ROUTE_PARAMS: Record<string, Record<string, Resource>> = {
@@ -41,6 +41,12 @@ export const ROUTE_PARAMS: Record<string, Record<string, Resource>> = {
   "/v1/invites/{id}": { id: "invite" },
   "/v1/invites/{id}/resend": { id: "invite" },
   "/v1/files/{id}": { id: "file" },
+  // the organization logo / favicon (kind is the vocabulary word logo|favicon, the file id is a tenant record)
+  "/v1/settings/branding/{kind}/uploads": { kind: "brandingKind" },
+  "/v1/settings/branding/{kind}/uploads/{fileId}/complete": { kind: "brandingKind", fileId: "brandingFile" },
+  "/v1/settings/branding/{kind}/uploads/{fileId}": { kind: "brandingKind", fileId: "brandingFile" },
+  "/v1/settings/branding/{kind}": { kind: "brandingKind" },
+  "/v1/branding/{kind}": { kind: "brandingKind" },
   "/v1/files/{id}/complete": { id: "file" },
   "/v1/files/{id}/download": { id: "file" },
   "/v1/integrations/{id}": { id: "integration" },
@@ -143,7 +149,7 @@ export type World = {
   /** a distinctive string per kind of tenant data; the walker greps 404 bodies for these */
   marks: string[]
   fixtures: TenantFixtures
-  resources: Record<Exclude<Resource, "feature">, string>
+  resources: Record<Exclude<Resource, "feature" | "brandingKind">, string>
 }
 
 let n = 0
@@ -181,6 +187,9 @@ export async function fixtureIds(t: { app: AppType; deps: Deps }, tenant: { id: 
   const fileRes = await call(t.app, "POST", "/v1/files/uploads", { cookie: owner.cookie, tenant: tenant.slug, body: { name: `File ${uniq}.pdf`, mime: "application/pdf", sizeBytes: 1024 } })
   if (fileRes.status !== 201) throw new Error(`fixture file intent failed: ${fileRes.status}`)
   const file = (await fileRes.json()) as { fileId: string }
+  const brandRes = await call(t.app, "POST", "/v1/settings/branding/logo/uploads", { cookie: owner.cookie, tenant: tenant.slug, body: { name: `Logo ${uniq}.png`, mime: "image/png", sizeBytes: 1024 } })
+  if (brandRes.status !== 201) throw new Error(`fixture branding intent failed: ${brandRes.status}`)
+  const brandingFile = (await brandRes.json()) as { fileId: string }
   // the tenant's (single) google connection, reset to `connected` by every call; the ciphertext is junk on purpose (never opened by the walked route)
   const [integ] = await ownerTenantQuery(
     tenant.id,
@@ -316,15 +325,15 @@ export async function fixtureIds(t: { app: AppType; deps: Deps }, tenant: { id: 
   const leaveRes = await call(t.app, "POST", "/v1/leave", { cookie: owner.cookie, tenant: tenant.slug, body: { from: leaveDay, to: leaveDay, kind: "annual", note: `Leave ${uniq}` } })
   if (leaveRes.status !== 201) throw new Error(`fixture leave failed: ${leaveRes.status} ${await leaveRes.text()}`)
   const leave = (await leaveRes.json()) as { id: string }
-  const resources = { rosterWeek: String(rosterWeek.id), rosterTemplate: rosterTemplate.id, rosterShift: rosterShift.id, changeRequest: changeRequest.id, exchange: exchange.id, leave: leave.id, lifecycleMember: lifecycle.userId, location: location.id, shiftType: shiftType.id, invite: invite.id, session: String(sess.id), pattern: pattern.id, assignment: assignment.id, report: report.id, reportFile: reportFile.fileId, reportExport: reportExport.id, evidence: evItem.id!, template: template.id, project: project.id, milestone: milestone.id, checklistItem: item.id!, comment: comment.id!, taskFile: taskFile.fileId!, task: task.id, apiKey: apiKey.id, webhook: hook.id, supportGrant: String(sg.id), dataRequest: dsr.id, integration: String(integ.id), file: file.fileId, role: await roleIdOf(t.deps, tenant.id, "employee"), member: staff.userId, team: team.id, device: device.id, notification: String(notif.id), pushToken: ((await tokRes.json()) as { id: string }).id }
+  const resources = { rosterWeek: String(rosterWeek.id), rosterTemplate: rosterTemplate.id, rosterShift: rosterShift.id, changeRequest: changeRequest.id, exchange: exchange.id, leave: leave.id, lifecycleMember: lifecycle.userId, location: location.id, shiftType: shiftType.id, invite: invite.id, session: String(sess.id), pattern: pattern.id, assignment: assignment.id, report: report.id, reportFile: reportFile.fileId, reportExport: reportExport.id, evidence: evItem.id!, template: template.id, project: project.id, milestone: milestone.id, checklistItem: item.id!, comment: comment.id!, taskFile: taskFile.fileId!, task: task.id, apiKey: apiKey.id, webhook: hook.id, supportGrant: String(sg.id), dataRequest: dsr.id, integration: String(integ.id), file: file.fileId, brandingFile: brandingFile.fileId, role: await roleIdOf(t.deps, tenant.id, "employee"), member: staff.userId, team: team.id, device: device.id, notification: String(notif.id), pushToken: ((await tokRes.json()) as { id: string }).id }
   const fixtures: TenantFixtures = {}
   for (const [path, params] of Object.entries(ROUTE_PARAMS)) {
     fixtures[path] = {}
     for (const [param, res] of Object.entries(params)) {
-      fixtures[path][param] = res === "feature" ? { kind: "static", value: "drive" } : { kind: "id", value: resources[res] }
+      fixtures[path][param] = res === "feature" ? { kind: "static", value: "drive" } : res === "brandingKind" ? { kind: "static", value: "logo" } : { kind: "id", value: resources[res] }
     }
   }
-  return { fixtures, resources, marks: [String(rosterWeek.id), rosterTemplate.id, `Week template ${uniq}`, rosterShift.id, String(pubWeek.id), pubShift.id, changeRequest.id, `Change ${uniq}`, String(claimWeek.id), claimShift.id, exchange.id, leave.id, `Leave ${uniq}`, lifecycle.userId, lifecycle.email, location.id, shiftType.id, `Location ${uniq}`, `Address ${uniq}`, `Shift type ${uniq}`, `Role ${uniq}`, tenant.id, tenant.slug, String(integ.id), `drive-${uniq}@example.com`, team.id, device.id, file.fileId, dsr.id, `Fix ${uniq}`, `Support ${uniq}`, String(sg.id), `File ${uniq}.pdf`, staff.userId, owner.userId, `Team ${uniq}`, `Device ${uniq}`, apiKey.id, apiKey.prefix, `Key ${uniq}`, hook.id, `hooks-${uniq}.example.com`, task.id, `Task ${uniq}`, `Desc ${uniq}`, item.id!, comment.id!, taskFile.fileId!, `Item ${uniq}`, `Comment ${uniq}`, `Attach ${uniq}.pdf`, project.id, milestone.id, template.id, `Template ${uniq}`, `Blueprint ${uniq}`, `Steps ${uniq}`, evItem.id!, evFile.fileId!, `Evid ${uniq}.pdf`, `Project ${uniq}`, `Plan ${uniq}`, pattern.id, assignment.id, `Pattern ${uniq}`, rpat.id, `Report pattern ${uniq}`, report.id, reportFile.fileId, reportExport.id, `Shot ${uniq}.pdf`, `Milestone ${uniq}`, String(sess.id), invite.id, invite.email] }
+  return { fixtures, resources, marks: [String(rosterWeek.id), rosterTemplate.id, `Week template ${uniq}`, rosterShift.id, String(pubWeek.id), pubShift.id, changeRequest.id, `Change ${uniq}`, String(claimWeek.id), claimShift.id, exchange.id, leave.id, `Leave ${uniq}`, lifecycle.userId, lifecycle.email, location.id, shiftType.id, `Location ${uniq}`, `Address ${uniq}`, `Shift type ${uniq}`, `Role ${uniq}`, tenant.id, tenant.slug, String(integ.id), `drive-${uniq}@example.com`, team.id, device.id, file.fileId, brandingFile.fileId, `Logo ${uniq}.png`, dsr.id, `Fix ${uniq}`, `Support ${uniq}`, String(sg.id), `File ${uniq}.pdf`, staff.userId, owner.userId, `Team ${uniq}`, `Device ${uniq}`, apiKey.id, apiKey.prefix, `Key ${uniq}`, hook.id, `hooks-${uniq}.example.com`, task.id, `Task ${uniq}`, `Desc ${uniq}`, item.id!, comment.id!, taskFile.fileId!, `Item ${uniq}`, `Comment ${uniq}`, `Attach ${uniq}.pdf`, project.id, milestone.id, template.id, `Template ${uniq}`, `Blueprint ${uniq}`, `Steps ${uniq}`, evItem.id!, evFile.fileId!, `Evid ${uniq}.pdf`, `Project ${uniq}`, `Plan ${uniq}`, pattern.id, assignment.id, `Pattern ${uniq}`, rpat.id, `Report pattern ${uniq}`, report.id, reportFile.fileId, reportExport.id, `Shot ${uniq}.pdf`, `Milestone ${uniq}`, String(sess.id), invite.id, invite.email] }
 }
 
 // ---- B7 Task 14: the route inventory ----

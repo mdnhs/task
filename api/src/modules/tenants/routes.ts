@@ -60,6 +60,7 @@ export const MeDto = z
   })
   .openapi({ example: { user: { id: "usr_8Kq2mZ4tW1", email: "alex@example.ie", name: "Alex Byrne", emailVerified: true, twoFactorEnabled: false }, platformRole: null, tenants: [{ slug: "coppers", name: "Coppers", roleKey: "owner" }] } })
 
+const AssetPublic = z.object({ version: z.string(), mime: z.string(), width: z.number().int(), height: z.number().int(), sizeBytes: z.number().int() })
 const MfaPolicyDto = z.object({ mode: z.enum(["off", "all", "roles"]), roles: z.array(z.string()) }).openapi({ example: { mode: "off", roles: [] } })
 export const MeTenantDto = z
   .object({
@@ -74,7 +75,11 @@ export const MeTenantDto = z
         rosterLevel: z.enum(["office", "supervisor"]).nullable().openapi({ description: "The role's roster level (null: none; an API key or support grant is always null). The shell offers Location Rosters only to a role with a location view; the roster API stays the authority" }),
       }),
     }),
-    brand: z.object({ primaryColor: z.string().nullable() }),
+    brand: z.object({
+      primaryColor: z.string().nullable(),
+      logo: AssetPublic.nullable().openapi({ description: "The uploaded organization logo, if any. Fetch the bytes from GET /v1/branding/logo?v=<version>" }),
+      favicon: AssetPublic.nullable().openapi({ description: "The uploaded favicon, if any. GET /v1/branding/favicon?v=<version>" }),
+    }),
     reportDeadline: z.string().openapi({ description: "HH:mm, tenant-local" }),
     reportDueAfterMinutes: z.number().int(),
     device: z.object({ id: z.string().nullable().openapi({ description: "null for the unregistered browser" }), type: z.string(), label: z.string(), trusted: z.boolean() }),
@@ -84,7 +89,7 @@ export const MeTenantDto = z
     example: {
       tenant: { id: "0b6f4c1e-8f0e-4c53-9a3e-6a4c1b2d7e90", slug: "coppers", name: "Coppers", timezone: "Europe/Dublin", currency: "EUR", locale: "en-IE", sessionIdleHours: 12, mfaPolicy: { mode: "off", roles: [] } },
       member: { userId: "usr_8Kq2mZ4tW1", roleId: "5e1c0d52-8d3a-4b7e-9c41-2a5b7e90d3f8", roleKey: "owner", role: { label: "Owner", description: "Full control of the company workspace", home: "manager", access: { dashboard: "write", tasks: "write", settings: "write" }, rosterLevel: "office" } },
-      brand: { primaryColor: "#0A1B2C" }, reportDeadline: "17:30", reportDueAfterMinutes: 60,
+      brand: { primaryColor: "#0A1B2C", logo: { version: "9f86d081884c7d65", mime: "image/png", width: 240, height: 64, sizeBytes: 8123 }, favicon: null }, reportDeadline: "17:30", reportDueAfterMinutes: 60,
       device: { id: null, type: "browser", label: "Unregistered browser", trusted: false }, features: { drive: false },
     },
   })
@@ -133,7 +138,7 @@ export const tenantRoutes = newRouter()
       {
         tenant: { ...tenant, name },
         member: { ...member, role: { label: role.label, description: role.description, home: role.home, access: role.access, rosterLevel: level === "office" || level === "supervisor" ? level : null } },
-        brand: { primaryColor: brand.primaryColor },
+        brand: { primaryColor: brand.primaryColor, logo: brand.logo, favicon: brand.favicon },
         reportDeadline: org.reportDeadline,
         reportDueAfterMinutes: org.reportDueAfterMinutes,
         device: d ? { id: d.id === UNREGISTERED_ID ? null : d.id, type: d.type, label: d.label, trusted: d.trusted } : { id: null, type: "browser", label: "Unregistered browser", trusted: false },

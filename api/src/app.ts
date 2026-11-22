@@ -23,7 +23,7 @@ import { mfaRoutes } from "./modules/mfa"
 import { notificationRoutes } from "./modules/notifications"
 import { integrationRoutes } from "./modules/integrations"
 import { searchRoutes } from "./modules/search"
-import { settingsRoutes } from "./modules/settings"
+import { brandingRoutes, settingsRoutes } from "./modules/settings"
 import { emailSettingsRoutes } from "./modules/platform-email"
 import { storageSettingsRoutes } from "./modules/platform-storage"
 import { platformAuditRoutes } from "./modules/platform-audit"
@@ -123,6 +123,7 @@ export function createApp(deps: Deps) {
   app.route("/", notificationRoutes)
   app.route("/", fileRoutes)
   app.route("/", settingsRoutes)
+  app.route("/", brandingRoutes)
   app.route("/", integrationRoutes)
   app.route("/", searchRoutes)
   app.route("/", gdprRoutes)

@@ -100,48 +100,40 @@ async function insertFile(w: Awaited<ReturnType<typeof world>>, tenantId: string
   return id
 }
 
-test("branding: a task or report file (scoped purposes) can never be the logo, whoever holds settings:write (C6, T5.2 review)", async () => {
+test("branding: a task, report or ordinary file can never become the logo or favicon, whoever holds settings:write (C6, T5.2 review)", async () => {
   const w = await world()
-  for (const purpose of ["task_attachment", "task_evidence", "task_voice", "report_attachment", "report_export"]) {
+  for (const purpose of ["task_attachment", "task_evidence", "task_voice", "report_attachment", "report_export", "dsr_export", null, "branding_favicon"]) {
     const id = await insertFile(w, w.tenant.id, w.owner.userId, "clean", purpose)
-    const r = await w.req("PUT", "/v1/settings/branding", w.co, { logoFileId: id, primaryColor: null })
-    expect([purpose, r.status, ((await r.json()) as Json).code]).toEqual([purpose, 422, "invalid_logo"])
+    const r = await w.req("PUT", "/v1/settings/branding/logo", w.co, { fileId: id })
+    expect([purpose, r.status, ((await r.json()) as Json).code]).toEqual([purpose, 404, "file_not_found"])
   }
-  expect(await (await w.req("GET", "/v1/settings/branding", w.ca)).json()).toEqual({ logoFileId: null, primaryColor: null })
-  // an ordinary clean upload (purpose null) is unchanged
-  const plain = await insertFile(w, w.tenant.id, w.owner.userId, "clean", null)
-  expect((await w.req("PUT", "/v1/settings/branding", w.co, { logoFileId: plain, primaryColor: null })).status).toBe(200)
+  expect(await (await w.req("GET", "/v1/settings/branding", w.ca)).json()).toMatchObject({ logo: null, favicon: null, primaryColor: null })
+  // the colour route no longer takes a file at all
+  expect((await w.req("PUT", "/v1/settings/branding", w.co, { logoFileId: crypto.randomUUID(), primaryColor: null })).status).toBe(200)
+  expect(await (await w.req("GET", "/v1/settings/branding", w.ca)).json()).toMatchObject({ logo: null })
 })
 
-test("branding: logo must be a clean file of THIS tenant (422 invalid_logo), colour #RRGGBB; audited", async () => {
+test("branding: colour #RRGGBB, settings:write to change it, audited with before/after", async () => {
   const w = await world()
   const empty = await w.req("GET", "/v1/settings/branding")
-  expect(await empty.json()).toEqual({ logoFileId: null, primaryColor: null })
-  const clean = await insertFile(w, w.tenant.id, w.owner.userId, "clean")
-  const pending = await insertFile(w, w.tenant.id, w.owner.userId, "pending")
-  const deleted = await insertFile(w, w.tenant.id, w.owner.userId, "deleted")
-  const foreign = await insertFile(w, w.other.id, w.otherOwner.userId, "clean")
-  for (const id of [pending, deleted, foreign, crypto.randomUUID()]) {
-    const r = await w.req("PUT", "/v1/settings/branding", w.co, { logoFileId: id, primaryColor: "#112233" })
-    expect([r.status, ((await r.json()) as Json).code]).toEqual([422, "invalid_logo"])
-  }
+  expect(await empty.json()).toEqual({ primaryColor: null, logo: null, favicon: null, storageReady: true })
   for (const c of ["red", "#12345", "#GGGGGG", "112233", "#1122334"]) {
-    const r = await w.req("PUT", "/v1/settings/branding", w.co, { logoFileId: null, primaryColor: c })
+    const r = await w.req("PUT", "/v1/settings/branding", w.co, { primaryColor: c })
     expect([c, r.status, ((await r.json()) as Json).code]).toEqual([c, 422, "invalid_color"])
   }
   expect(await audits(w.tenant.id, "tenant.branding_updated")).toHaveLength(0)
-  const ok = await w.req("PUT", "/v1/settings/branding", w.co, { logoFileId: clean, primaryColor: "#0A1B2c" })
+  const ok = await w.req("PUT", "/v1/settings/branding", w.co, { primaryColor: "#0A1B2c" })
   expect(ok.status).toBe(200)
-  expect(await ok.json()).toEqual({ logoFileId: clean, primaryColor: "#0A1B2c" })
-  expect(await (await w.req("GET", "/v1/settings/branding", w.ca)).json()).toEqual({ logoFileId: clean, primaryColor: "#0A1B2c" })
+  expect(await ok.json()).toEqual({ primaryColor: "#0A1B2c", logo: null, favicon: null, storageReady: true })
+  expect(await (await w.req("GET", "/v1/settings/branding", w.ca)).json()).toMatchObject({ primaryColor: "#0A1B2c" })
   expect((await w.req("GET", "/v1/settings/branding", w.cs)).status).toBe(403)
-  expect((await w.req("PUT", "/v1/settings/branding", w.ca, { logoFileId: null, primaryColor: null })).status).toBe(403)
-  const cleared = await w.req("PUT", "/v1/settings/branding", w.co, { logoFileId: null, primaryColor: null })
-  expect(await cleared.json()).toEqual({ logoFileId: null, primaryColor: null })
+  expect((await w.req("PUT", "/v1/settings/branding", w.ca, { primaryColor: null })).status).toBe(403)
+  const cleared = await w.req("PUT", "/v1/settings/branding", w.co, { primaryColor: null })
+  expect(await cleared.json()).toMatchObject({ primaryColor: null })
   const a = await audits(w.tenant.id, "tenant.branding_updated")
   expect(a).toHaveLength(2)
-  expect(a[0].before).toEqual({ logoFileId: null, primaryColor: null })
-  expect(a[0].after).toEqual({ logoFileId: clean, primaryColor: "#0A1B2c" })
+  expect(a[0].before).toEqual({ primaryColor: null })
+  expect(a[0].after).toEqual({ primaryColor: "#0A1B2c" })
 })
 
 test("holidays: PUT replaces the year's set; dates must be inside the year, real and unique; audited; other years and tenants untouched", async () => {

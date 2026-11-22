@@ -41,6 +41,8 @@ const EXT: Record<string, string[]> = {
   "image/jpeg": ["jpg", "jpeg"],
   "image/webp": ["webp"],
   "image/heic": ["heic"],
+  "image/x-icon": ["ico"],
+  "image/vnd.microsoft.icon": ["ico"],
   "application/pdf": ["pdf"],
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document": ["docx"],
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": ["xlsx"],

@@ -36,6 +36,8 @@ export type Storage = {
   probe(): Promise<void>
   /** Drops cached configuration (called after the platform admin saves storage settings). */
   invalidate?(): void
+  /** Whether storage has a configuration at all (no network call). The settings screens use it to say "Storage is not set up" instead of offering an upload that cannot work. */
+  configured?(): Promise<boolean>
 }
 
 /** The only place an object key is built. Inputs are server-generated uuids, never client text. */
@@ -70,5 +72,5 @@ export function unconfiguredStorage(): Storage {
   const fail = (): never => {
     throw new Error("storage is not configured (set S3_BUCKET, S3_REGION, S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY)")
   }
-  return { presignPut: async () => fail(), probe: async () => fail(), put: async () => fail(), presignGet: async () => fail(), copy: async () => fail(), head: async () => fail(), getStream: async () => fail(), delete: async () => fail() }
+  return { configured: async () => false, presignPut: async () => fail(), probe: async () => fail(), put: async () => fail(), presignGet: async () => fail(), copy: async () => fail(), head: async () => fail(), getStream: async () => fail(), delete: async () => fail() }
 }

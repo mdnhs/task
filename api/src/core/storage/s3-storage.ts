@@ -54,6 +54,15 @@ export function makeS3Storage(source: StorageConfigSource, o: { now?: () => numb
   }
 
   return {
+    async configured() {
+      try {
+        await current()
+        return true
+      } catch (e) {
+        if (e instanceof AppError && e.code === "storage_not_configured") return false
+        throw e
+      }
+    },
     async presignPut(Key, p) {
       const { cfg, client } = await current()
       const url = await getSignedUrl(

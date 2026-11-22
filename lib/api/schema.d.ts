@@ -300,6 +300,22 @@ export interface paths {
                             };
                             brand: {
                                 primaryColor: string | null;
+                                /** @description The uploaded organization logo, if any. Fetch the bytes from GET /v1/branding/logo?v=<version> */
+                                logo: {
+                                    version: string;
+                                    mime: string;
+                                    width: number;
+                                    height: number;
+                                    sizeBytes: number;
+                                } | null;
+                                /** @description The uploaded favicon, if any. GET /v1/branding/favicon?v=<version> */
+                                favicon: {
+                                    version: string;
+                                    mime: string;
+                                    width: number;
+                                    height: number;
+                                    sizeBytes: number;
+                                } | null;
                             };
                             /** @description HH:mm, tenant-local */
                             reportDeadline: string;
@@ -15488,8 +15504,23 @@ export interface paths {
                     };
                     content: {
                         "application/json": {
-                            logoFileId: string | null;
                             primaryColor: string | null;
+                            logo: {
+                                version: string;
+                                mime: string;
+                                width: number;
+                                height: number;
+                                sizeBytes: number;
+                            } | null;
+                            favicon: {
+                                version: string;
+                                mime: string;
+                                width: number;
+                                height: number;
+                                sizeBytes: number;
+                            } | null;
+                            /** @description false when no object storage is configured (the platform Storage settings): logo and favicon uploads cannot work yet */
+                            storageReady: boolean;
                         };
                     };
                 };
@@ -15505,21 +15536,35 @@ export interface paths {
             requestBody: {
                 content: {
                     "application/json": {
-                        logoFileId: string | null;
                         primaryColor: string | null;
                     };
                 };
             };
             responses: {
-                /** @description Replaced branding. 422 invalid_logo (not a clean file of this tenant) | invalid_color (#RRGGBB) */
+                /** @description The brand colour is saved; the logo and favicon are kept (they have their own routes under /v1/settings/branding/{kind}). 422 invalid_color (#RRGGBB) */
                 200: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
                         "application/json": {
-                            logoFileId: string | null;
                             primaryColor: string | null;
+                            logo: {
+                                version: string;
+                                mime: string;
+                                width: number;
+                                height: number;
+                                sizeBytes: number;
+                            } | null;
+                            favicon: {
+                                version: string;
+                                mime: string;
+                                width: number;
+                                height: number;
+                                sizeBytes: number;
+                            } | null;
+                            /** @description false when no object storage is configured (the platform Storage settings): logo and favicon uploads cannot work yet */
+                            storageReady: boolean;
                         };
                     };
                 };
@@ -15603,6 +15648,309 @@ export interface paths {
                 };
             };
         };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/settings/branding/{kind}/uploads": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description logo (PNG, JPEG or WebP, up to 1 MB, 32-4096 px per side) or favicon (square PNG 32-512 px, or an ICO, up to 256 KB) */
+                    kind: "logo" | "favicon";
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        name: string;
+                        mime: string;
+                        sizeBytes: number;
+                    };
+                };
+            };
+            responses: {
+                /** @description A presigned PUT (300 s) to a staging key; send exactly `headers`. 422 mime_not_allowed (SVG and every non-listed type), invalid_name or file_too_large (logo 1 MB, favicon 256 KB); 503 storage_not_configured */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            fileId: string;
+                            upload: {
+                                /** @enum {string} */
+                                method: "PUT";
+                                url: string;
+                                headers: {
+                                    [key: string]: string;
+                                };
+                            };
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/settings/branding/{kind}/uploads/{fileId}/complete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description logo (PNG, JPEG or WebP, up to 1 MB, 32-4096 px per side) or favicon (square PNG 32-512 px, or an ICO, up to 256 KB) */
+                    kind: "logo" | "favicon";
+                    fileId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Upload confirmed and its bytes checked (magic bytes, structure, size, squareness; markup and trailing data refused); the malware scan runs next. 422 image_type_mismatch | image_corrupt | image_not_square | image_dimensions | image_suspicious | upload_mismatch, 409 upload_missing. Idempotent */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            fileId: string;
+                            /** @enum {string} */
+                            status: "pending" | "clean" | "infected";
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/settings/branding/{kind}/uploads/{fileId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description logo (PNG, JPEG or WebP, up to 1 MB, 32-4096 px per side) or favicon (square PNG 32-512 px, or an ICO, up to 256 KB) */
+                    kind: "logo" | "favicon";
+                    fileId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Scan state of an upload: pending until the malware scan decided, then clean or infected. 404 file_not_found */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            fileId: string;
+                            /** @enum {string} */
+                            status: "pending" | "clean" | "infected";
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/settings/branding/{kind}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description logo (PNG, JPEG or WebP, up to 1 MB, 32-4096 px per side) or favicon (square PNG 32-512 px, or an ICO, up to 256 KB) */
+                    kind: "logo" | "favicon";
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        fileId: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description The clean upload becomes the live asset; the previous one is deleted. Audited without file contents. 404 file_not_found (another tenant, another kind, an ordinary file), 409 file_not_ready, 410 file_infected, 422 image_* */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            primaryColor: string | null;
+                            logo: {
+                                version: string;
+                                mime: string;
+                                width: number;
+                                height: number;
+                                sizeBytes: number;
+                            } | null;
+                            favicon: {
+                                version: string;
+                                mime: string;
+                                width: number;
+                                height: number;
+                                sizeBytes: number;
+                            } | null;
+                            /** @description false when no object storage is configured (the platform Storage settings): uploads cannot work yet */
+                            storageReady: boolean;
+                        };
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description logo (PNG, JPEG or WebP, up to 1 MB, 32-4096 px per side) or favicon (square PNG 32-512 px, or an ICO, up to 256 KB) */
+                    kind: "logo" | "favicon";
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The asset is removed and its file deleted. Idempotent */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            primaryColor: string | null;
+                            logo: {
+                                version: string;
+                                mime: string;
+                                width: number;
+                                height: number;
+                                sizeBytes: number;
+                            } | null;
+                            favicon: {
+                                version: string;
+                                mime: string;
+                                width: number;
+                                height: number;
+                                sizeBytes: number;
+                            } | null;
+                            /** @description false when no object storage is configured (the platform Storage settings): uploads cannot work yet */
+                            storageReady: boolean;
+                        };
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/branding/{kind}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    /** @description The asset version from GET /v1/me/tenant. A request that names the CURRENT version may be cached for a year; any other value is revalidated */
+                    v?: string;
+                };
+                header?: never;
+                path: {
+                    /** @description logo (PNG, JPEG or WebP, up to 1 MB, 32-4096 px per side) or favicon (square PNG 32-512 px, or an ICO, up to 256 KB) */
+                    kind: "logo" | "favicon";
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The logo or favicon bytes, for any member of the tenant. Content-Type is the stored (verified) type, nosniff, inline, ETag = version */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "image/png": string;
+                        "image/jpeg": string;
+                        "image/webp": string;
+                        "image/x-icon": string;
+                    };
+                };
+                /** @description If-None-Match matches the current version */
+                304: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description None is set, or its file is not clean */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
         post?: never;
         delete?: never;
         options?: never;

@@ -39,6 +39,10 @@ const NIL_UUID = "00000000-0000-4000-8000-000000000000"
  * Those are still exercised, with the stronger check in the "static-param routes" test below.
  */
 const NOT_APPLICABLE: Record<string, string> = {
+  "POST /v1/settings/branding/{kind}/uploads": "{kind} is a vocabulary word (logo|favicon); the upload row is created in the caller's tenant. Checked in branding-assets.test.ts.",
+  "PUT /v1/settings/branding/{kind}": "{kind} is a vocabulary word; the file id is in the body and is looked up in the caller's tenant (another tenant's id is 404 file_not_found, branding-assets.test.ts).",
+  "DELETE /v1/settings/branding/{kind}": "{kind} is a vocabulary word; it removes the caller tenant's own asset.",
+  "GET /v1/branding/{kind}": "{kind} is a vocabulary word; it serves the caller tenant's own asset (another tenant's member gets 404, branding-assets.test.ts).",
   "PUT /v1/device-policies/{feature}": "{feature} is a vocabulary word (drive|payroll); the policy row is keyed by the caller's tenant. Checked instead: B's policies are unchanged by A's PUT.",
 }
 
@@ -120,6 +124,8 @@ const SPECS: Record<string, Spec> = {
   "GET /v1/tasks/{id}/comments": { actor: "owner", expect: "task_not_found" },
   "POST /v1/tasks/{id}/comments": { actor: "owner", expect: "task_not_found" },
   "DELETE /v1/tasks/{id}/comments/{commentId}": { actor: "owner", expect: "task_not_found" },
+  "POST /v1/settings/branding/{kind}/uploads/{fileId}/complete": { actor: "owner", expect: "file_not_found" }, // control: 409 upload_missing
+  "GET /v1/settings/branding/{kind}/uploads/{fileId}": { actor: "owner", expect: "file_not_found" }, // control: 200 pending
   "POST /v1/tasks/{id}/uploads": { actor: "owner", expect: "task_not_found" },
   "POST /v1/tasks/{id}/uploads/{fileId}/complete": { actor: "owner", expect: "task_not_found" }, // control: 409 upload_missing
   "GET /v1/tasks/{id}/files/{fileId}/download": { actor: "owner", expect: "task_not_found" }, // control: 409 file_not_ready
