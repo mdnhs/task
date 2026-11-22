@@ -11,7 +11,7 @@ const ALLOW = (path: string) => path === "/v1/me" || path === "/v1/me/mfa" || pa
  * required + strict + no 2FA enrolled -> 401 mfa_enrolment_required (prompt mode, the default: pass, the web app asks); enrolled but THIS session
  * has not passed a second factor -> 401 mfa_challenge. Not required -> pass, enrolled or not.
  */
-export const enforceMfa: MiddlewareHandler<AppEnv> = async (c, next) => {
+const enforce = (sensitive: boolean): MiddlewareHandler<AppEnv> => async (c, next) => {
   const tenant = c.get("tenant")
   const member = c.get("member")
   const user = c.get("user")
@@ -20,8 +20,13 @@ export const enforceMfa: MiddlewareHandler<AppEnv> = async (c, next) => {
   if (!ALLOW(c.req.path) && mfaRequired(tenant.mfaPolicy, member.roleKey)) {
     // "prompt" (the default): someone who has not enrolled yet is asked by the app but not refused; "strict" refuses them. Enrolled people must always pass the code step.
     if (!user.twoFactorEnabled) {
-      if (mfaStrict(tenant.mfaPolicy)) throw Unauthorized("mfa_enrolment_required")
+      if (sensitive || mfaStrict(tenant.mfaPolicy)) throw Unauthorized("mfa_enrolment_required")
     } else if (!session.mfaPassed) throw Unauthorized("mfa_challenge")
   }
   await next()
 }
+
+/** General tenant access: "prompt" mode lets an unenrolled person in (the app asks them). */
+export const enforceMfa = enforce(false)
+/** A sensitive action that re-checks MFA itself (e.g. the integration OAuth callback): whenever the tenant REQUIRES two-step verification an unenrolled person is refused, prompt or strict. */
+export const enforceMfaSensitive = enforce(true)

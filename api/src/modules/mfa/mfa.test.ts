@@ -326,3 +326,18 @@ test("limiter store down: auth and totp fail closed", async () => {
   ;(w.deps.rateLimiter as unknown as { down: boolean }).down = false
   expect((await verifyTotp(w, stale, await totpCode(secret, 30_000))).status).toBe(200)
 })
+
+test("enforceMfaSensitive refuses an unenrolled person whenever MFA is required, in prompt mode too; enforceMfa lets them in", async () => {
+  const { enforceMfa, enforceMfaSensitive } = await import("../../core/middleware/mfa")
+  const ctx = (policy: MfaPolicy, enrolled: boolean) => {
+    const vars: Record<string, unknown> = { tenant: { mfaPolicy: policy }, member: { roleKey: "owner" }, user: { twoFactorEnabled: enrolled }, session: { mfaPassed: false } }
+    return { get: (k: string) => vars[k], req: { path: "/v1/integrations/google/callback" } } as never
+  }
+  const run = async (mw: typeof enforceMfa, c: never) => { try { await mw(c, async () => {}); return "ok" } catch (e) { return (e as { code?: string }).code ?? "error" } }
+  for (const policy of [{ mode: "all", roles: [] }, { mode: "all", roles: [], enforcement: "prompt" }] as MfaPolicy[]) {
+    expect(await run(enforceMfa, ctx(policy, false))).toBe("ok")
+    expect(await run(enforceMfaSensitive, ctx(policy, false))).toBe("mfa_enrolment_required")
+  }
+  expect(await run(enforceMfaSensitive, ctx({ mode: "off", roles: [] }, false))).toBe("ok")
+  expect(await run(enforceMfaSensitive, ctx({ mode: "all", roles: [] }, true))).toBe("mfa_challenge")
+})

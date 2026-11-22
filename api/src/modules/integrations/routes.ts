@@ -1,7 +1,7 @@
 import { createRoute, z } from "@hono/zod-openapi"
 import { and, eq } from "drizzle-orm"
 import { AppError } from "../../core/errors"
-import { enforceMfa } from "../../core/middleware/mfa"
+import { enforceMfaSensitive } from "../../core/middleware/mfa"
 import { requirePermission } from "../../core/middleware/permission"
 import { requireSession } from "../../core/middleware/session"
 import { requireTenant } from "../../core/middleware/tenant"
@@ -75,7 +75,7 @@ export const integrationRoutes = newRouter()
     if (!tenant || tenant.status !== "active" || !member || member.status !== "active") throw invalidState()
     c.set("tenant", { id: tenant.id, slug: tenant.slug, timezone: tenant.timezone, currency: tenant.currency, locale: tenant.locale, sessionIdleHours: tenant.sessionIdleHours, mfaPolicy: tenant.mfaPolicy })
     c.set("member", { userId: user.id, roleId: member.roleId, roleKey: member.roleKey })
-    await enforceMfa(c, async () => {})
+    await enforceMfaSensitive(c, async () => {})
     if (q.error) return c.redirect(landingUrl(deps, "error", q.error === "access_denied" ? "access_denied" : "provider_error"), 302)
     if (!q.code) return c.redirect(landingUrl(deps, "error", "missing_code"), 302)
     const r = await completeGoogle(deps, s, user.id, q.code)
