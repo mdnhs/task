@@ -400,7 +400,12 @@ body{padding:0;background:#fff}
   /* `align-self:stretch` undoes the desktop sticky rule's `align-self:start`: .app is a grid, and a fixed grid child that is start-aligned with `height:auto` shrinks to its content
      instead of filling top to bottom. In Safari that collapsed the scrolling menu (flex:1 + overflow, min-height 0) to nothing: only the logo and the app card showed.
      `top:0` likewise undoes the desktop rule's `top:18px` (the drawer is flush with the screen edges, as the first mobile rule says). */
-  .sidebar{position:fixed;top:0;height:auto;align-self:stretch;border-radius:0 calc(24px * var(--radius-scale,1)) calc(24px * var(--radius-scale,1)) 0}
+  /* iOS Safari/Chrome: pin all four edges and give the dynamic viewport height (100vh is the LARGEST viewport there, so the bottom promo card sat under the toolbar); the 100vh line is the fallback. */
+  .sidebar{position:fixed;inset:0 auto 0 0;height:100vh;height:100dvh;max-height:none;margin:0;align-self:stretch;border-radius:0 calc(24px * var(--radius-scale,1)) calc(24px * var(--radius-scale,1)) 0}
+  /* notch / dynamic island: the floating logo bar and the menu start below the safe area, the promo card clears the home indicator */
+  .logo{padding-top:calc(28px * var(--space-scale,1) + env(safe-area-inset-top,0px))}
+  .sidebar-scroll{padding-top:calc(38px + 50px * var(--space-scale,1) + env(safe-area-inset-top,0px))}
+  .sidebar{padding-bottom:calc(18px * var(--space-scale,1) + env(safe-area-inset-bottom,0px))}
 }
 
 .app-card{padding:14px}

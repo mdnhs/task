@@ -136,7 +136,7 @@ export async function resolveSession(deps: SessionDeps): Promise<Resolved> {
     const role: Role = restrictRole(
       {
         id: ctx.member.roleKey,
-        label: ctx.member.role.label,
+        label: ctx.member.role.label.replace(/^tenant\s+/i, ""), // roles stored before migration 0050 read "Tenant Owner"; the tenant app never says tenant
         description: ctx.member.role.description,
         home: ctx.member.role.home,
         access: accessOf(ctx.member.role.access),
