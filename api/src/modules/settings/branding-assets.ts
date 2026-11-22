@@ -104,6 +104,24 @@ async function expireStale(deps: Deps, tx: TenantTx, tenantId: string, kind: Bra
   for (const r of rows) await expireFile(tx, tenantId, r.id, enqueue)
 }
 
+/** At most this many unfinished uploads of one kind per company at a time. */
+export const MAX_PENDING_UPLOADS = 5
+
+/**
+ * Runs before every upload intent: expires the abandoned uploads of this kind (older than an hour, never the live one) and refuses the intent with 429 `too_many_uploads` when
+ * MAX_PENDING_UPLOADS others are still unfinished, so a settings:write holder cannot fill storage with intents.
+ */
+export async function prepareIntent(deps: Deps, tenantId: string, actorId: string, kind: BrandingKind): Promise<void> {
+  await withTenantAfterCommit(deps, tenantId, async (tx, enqueue) => {
+    await lockSettings(tx, tenantId)
+    await lockActor(tx, tenantId, actorId, "settings", "write")
+    const live = assetOf(await readRaw(tx, tenantId), kind)
+    await expireStale(deps, tx, tenantId, kind, live?.fileId ?? null, enqueue)
+    const open = await tx.select({ id: files.id }).from(files).where(and(eq(files.tenantId, tenantId), eq(files.purpose, purposeOf(kind)), ne(files.status, "deleted"), live ? ne(files.id, live.fileId) : undefined))
+    if (open.length >= MAX_PENDING_UPLOADS) throw new AppError(429, "too_many_uploads", "Too Many Requests")
+  })
+}
+
 /** Makes a CLEAN upload the live logo or favicon: re-checks the bytes of the scanned object, replaces the previous one (its file is expired), audits (never the contents). */
 export async function activateAsset(deps: Deps, tenantId: string, actorId: string, kind: BrandingKind, fileId: string): Promise<void> {
   await withTenantAfterCommit(deps, tenantId, async (tx, enqueue) => {

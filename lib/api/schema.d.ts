@@ -15684,7 +15684,7 @@ export interface paths {
                 };
             };
             responses: {
-                /** @description A presigned PUT (300 s) to a staging key; send exactly `headers`. 422 mime_not_allowed (SVG and every non-listed type), invalid_name or file_too_large (logo 1 MB, favicon 256 KB); 503 storage_not_configured */
+                /** @description A presigned PUT (300 s) to a staging key; send exactly `headers`. 422 mime_not_allowed (SVG and every non-listed type), invalid_name or file_too_large (logo 1 MB, favicon 256 KB); 429 too_many_uploads (5 unfinished uploads of that kind); 503 storage_not_configured */
                 201: {
                     headers: {
                         [name: string]: unknown;

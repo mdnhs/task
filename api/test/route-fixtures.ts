@@ -188,8 +188,11 @@ export async function fixtureIds(t: { app: AppType; deps: Deps }, tenant: { id: 
   if (fileRes.status !== 201) throw new Error(`fixture file intent failed: ${fileRes.status}`)
   const file = (await fileRes.json()) as { fileId: string }
   const brandRes = await call(t.app, "POST", "/v1/settings/branding/logo/uploads", { cookie: owner.cookie, tenant: tenant.slug, body: { name: `Logo ${uniq}.png`, mime: "image/png", sizeBytes: 1024 } })
-  if (brandRes.status !== 201) throw new Error(`fixture branding intent failed: ${brandRes.status}`)
-  const brandingFile = (await brandRes.json()) as { fileId: string }
+  // the fixture is made again and again in one tenant: past the pending-upload allowance (429) reuse an existing pending branding file
+  let brandingFile: { fileId: string }
+  if (brandRes.status === 201) brandingFile = (await brandRes.json()) as { fileId: string }
+  else if (brandRes.status === 429) brandingFile = { fileId: String((await ownerTenantQuery(tenant.id, "select id from files where purpose = 'branding_logo' and status = 'pending' limit 1"))[0].id) }
+  else throw new Error(`fixture branding intent failed: ${brandRes.status}`)
   // the tenant's (single) google connection, reset to `connected` by every call; the ciphertext is junk on purpose (never opened by the walked route)
   const [integ] = await ownerTenantQuery(
     tenant.id,

@@ -167,6 +167,7 @@ test("complete checks the BYTES, never the client mime: SVG, wrong type, not squ
     await drain(w)
     expect((await status(w, j.fileId))?.status).toBe("pending")
     expect(w.queue.jobs.some((x) => x.name === "file.scan")).toBe(false)
+    await q(w.tenant.id, "update files set status = 'deleted' where id = $1", [j.fileId]) // frees the pending-upload allowance for the next case
   }
   await bad("logo", SVG, "image/png", "image_suspicious")
   await bad("logo", png(64, 64), "image/jpeg", "image_type_mismatch")
@@ -178,8 +179,6 @@ test("complete checks the BYTES, never the client mime: SVG, wrong type, not squ
   await bad("favicon", png(16, 16), "image/png", "image_dimensions")
   await bad("favicon", ico([32], { trailing: Buffer.from("MZ....") }), "image/x-icon", "image_suspicious")
   await bad("favicon", Buffer.from("this is not an icon at all"), "image/x-icon", "image_type_mismatch")
-  const staging = await q<{ c: string }>(w.tenant.id, "select count(*)::text c from files where status = 'pending'")
-  expect(Number(staging[0].c)).toBeGreaterThan(0) // rows exist but none became live
   expect(await (await w.req("GET", "/v1/settings/branding")).json()).toMatchObject({ logo: null, favicon: null })
 })
 
@@ -303,6 +302,22 @@ test("an object swapped in storage after the scan is never served (the stored ET
   await putObject(`t/${w.tenant.id}/${id}`, SVG, "image/png") // a replaced object, as an attacker with bucket access might leave it
   const r = await serve(w, "logo")
   expect([r.status, ((await r.json()) as Json).code]).toEqual([404, "branding_asset_not_found"])
+})
+
+test("at most 5 pending uploads per kind: the 6th intent is 429 too_many_uploads; older abandoned ones are expired on every intent; the live file is never touched", async () => {
+  const w = await world()
+  const { id: liveId } = await live(w, "logo", png(64, 64), "image/png")
+  const mk = () => intent(w, "logo", { name: "logo.png", mime: "image/png", sizeBytes: 500 })
+  for (let i = 0; i < 5; i++) expect((await mk()).status).toBe(201)
+  const six = await mk()
+  expect([six.status, ((await six.json()) as Json).code]).toEqual([429, "too_many_uploads"])
+  expect((await intent(w, "favicon", { name: "f.png", mime: "image/png", sizeBytes: 500 })).status).toBe(201) // the other kind has its own allowance
+  w.clock.advance({ minutes: 61 })
+  expect((await mk()).status).toBe(201) // the abandoned five are expired now
+  const pending = await q<{ c: string }>(w.tenant.id, "select count(*)::text c from files where purpose = 'branding_logo' and status = 'pending'")
+  expect(Number(pending[0].c)).toBe(1)
+  expect((await status(w, liveId))?.status).toBe("clean")
+  expect((await serve(w, "logo")).status).toBe(200)
 })
 
 test("storageReady says whether uploads can work (false when no storage is configured)", async () => {

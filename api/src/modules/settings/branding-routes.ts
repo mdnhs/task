@@ -7,7 +7,7 @@ import { newRouter } from "../../core/router"
 import { withTenant } from "../../db/tenant-tx"
 import type { Deps } from "../../deps"
 import { completeUpload, createUpload } from "../files"
-import { activateAsset, brandingPolicy, removeAsset, servedAsset, uploadStatus } from "./branding-assets"
+import { activateAsset, brandingPolicy, prepareIntent, removeAsset, servedAsset, uploadStatus } from "./branding-assets"
 import { BRANDING_KINDS, type BrandingKind } from "./image-inspect"
 import { getBranding } from "./service"
 
@@ -30,7 +30,7 @@ const ActivateBody = z.object({ fileId: z.uuid() }).openapi({ example: { fileId:
 const intentRoute = createRoute({
   method: "post", path: "/v1/settings/branding/{kind}/uploads", middleware: [requireTenant, requirePermission("settings", "write")] as const,
   request: { params: Params, body: { content: { "application/json": { schema: IntentBody } }, required: true } },
-  responses: { 201: { description: "A presigned PUT (300 s) to a staging key; send exactly `headers`. 422 mime_not_allowed (SVG and every non-listed type), invalid_name or file_too_large (logo 1 MB, favicon 256 KB); 503 storage_not_configured", content: { "application/json": { schema: Intent } } } },
+  responses: { 201: { description: "A presigned PUT (300 s) to a staging key; send exactly `headers`. 422 mime_not_allowed (SVG and every non-listed type), invalid_name or file_too_large (logo 1 MB, favicon 256 KB); 429 too_many_uploads (5 unfinished uploads of that kind); 503 storage_not_configured", content: { "application/json": { schema: Intent } } } },
 })
 const completeRoute = createRoute({
   method: "post", path: "/v1/settings/branding/{kind}/uploads/{fileId}/complete", middleware: [requireTenant, requirePermission("settings", "write")] as const,
@@ -75,6 +75,7 @@ export const brandingRoutes = newRouter()
     const t = c.get("tenant")!
     const kind = asKind(c.req.valid("param").kind)
     const actor = { userId: c.get("member")!.userId }
+    await prepareIntent(c.get("deps"), t.id, actor.userId, kind)
     return c.json(await createUpload(c.get("deps"), t.id, actor, c.req.valid("json"), brandingPolicy(kind, t.id, actor.userId)), 201)
   })
   .openapi(completeRoute, async (c) => {
