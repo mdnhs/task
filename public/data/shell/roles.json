@@ -2,7 +2,7 @@
   "roles": [
     {
       "id": "owner",
-      "label": "Tenant Owner",
+      "label": "Owner",
       "description": "Full control of the company workspace, billing and users.",
       "home": "manager",
       "access": {
@@ -24,7 +24,7 @@
     },
     {
       "id": "admin",
-      "label": "Tenant Admin",
+      "label": "Admin",
       "description": "Manages settings, users and the audit trail.",
       "home": "manager",
       "access": {

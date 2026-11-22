@@ -281,7 +281,7 @@ const CODE_COPY: Record<string, string> = {
   invalid_days: "Days must be a whole number from 1 to 30.",
   invalid_hours: "Hours must be a whole number from 1 to 24.",
   not_trialing: "This tenant is not on a trial.",
-  tenant_not_found: "Tenant not found.",
+  tenant_not_found: "Workspace not found.",
   grant_exists: "You already have access to this tenant. Revoke it first.",
   grant_not_found: "That access grant is gone.",
   grant_inactive: "That access grant has already ended.",

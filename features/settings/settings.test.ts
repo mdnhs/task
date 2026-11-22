@@ -9,8 +9,8 @@ import { makeSettingsClient } from "./client"
 
 const UUID = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`
 const ROLE_DTOS = [
-  { id: UUID(1), key: "owner", label: "Tenant Owner", description: "", home: "manager", access: { settings: "write", tasks: "write", audit: "write" }, fieldRules: {}, isTemplate: true, clonedFrom: null },
-  { id: UUID(2), key: "admin", label: "Tenant Admin", description: "", home: "manager", access: { settings: "write", tasks: "read", audit: "write" }, fieldRules: {}, isTemplate: false, clonedFrom: null },
+  { id: UUID(1), key: "owner", label: "Owner", description: "", home: "manager", access: { settings: "write", tasks: "write", audit: "write" }, fieldRules: {}, isTemplate: true, clonedFrom: null },
+  { id: UUID(2), key: "admin", label: "Admin", description: "", home: "manager", access: { settings: "write", tasks: "read", audit: "write" }, fieldRules: {}, isTemplate: false, clonedFrom: null },
   { id: UUID(3), key: "employee", label: "Employee", description: "", home: "staff", access: { settings: "none", tasks: "write" }, fieldRules: {}, isTemplate: false, clonedFrom: null },
 ]
 const nav = () => ({ go: vi.fn() })
@@ -43,7 +43,7 @@ describe("T6.5 settings adapters: strict, keyed by role KEY, no silent defaults"
   test("toRoles: FE Role.id is the KEY, the uuid is kept for writes; roleUuid maps a key to its uuid and refuses an unknown key", () => {
     const roles = toRoles(ROLE_DTOS)
     expect(roles.map((r) => r.id)).toEqual(["owner", "admin", "employee"])
-    expect(roles[1]).toMatchObject({ id: "admin", uuid: UUID(2), label: "Tenant Admin", locked: false })
+    expect(roles[1]).toMatchObject({ id: "admin", uuid: UUID(2), label: "Admin", locked: false })
     expect(roles[0]!.locked).toBe(true) // the owner column is fixed
     expect(toRoles([{ ...ROLE_DTOS[1]!, isTemplate: true }])[0]!.locked).toBe(true) // a built-in role is read-only (409 template_locked); a copy is editable
     expect(roles[2]!.access.settings).toBe("none")

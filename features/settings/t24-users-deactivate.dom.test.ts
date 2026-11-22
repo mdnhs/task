@@ -43,7 +43,7 @@ const users: SettingsUser[] = [
   { id: "u-bob", name: "Bob Lee", email: "bob@x.test", role: "employee", dept: "Cleaning", active: false, lastActiveAt: "2026-11-01T08:00:00" },
   { id: "u-me", name: "Me Admin", email: "me@x.test", role: "admin", dept: "", active: true, lastActiveAt: "2026-11-19T08:00:00" },
 ]
-const roles = [{ id: "owner", uuid: "r1", label: "Tenant Owner", access: {} as never, locked: true }, { id: "employee", uuid: "r2", label: "Employee", access: {} as never, locked: false }, { id: "admin", uuid: "r3", label: "Admin", access: {} as never, locked: false }]
+const roles = [{ id: "owner", uuid: "r1", label: "Owner", access: {} as never, locked: true }, { id: "employee", uuid: "r2", label: "Employee", access: {} as never, locked: false }, { id: "admin", uuid: "r3", label: "Admin", access: {} as never, locked: false }]
 async function mount(over: Partial<Parameters<typeof UsersPanel>[0]> = {}) {
   const host = document.createElement("div")
   document.body.appendChild(host)
