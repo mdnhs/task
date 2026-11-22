@@ -70,6 +70,13 @@ describe("B7 audit: filters go through the API query (actor, action, record type
   })
 })
 
+describe("organization logo and favicon audit actions have labels (the API builds them from a template, so the source scan cannot see them)", () => {
+  test.each(["tenant.branding_logo_updated", "tenant.branding_favicon_updated", "tenant.branding_logo_removed", "tenant.branding_favicon_removed"])("%s", (a) => {
+    expect(AUDIT_ACTIONS[a]).toBeDefined()
+    expect(actionInfo(a).label).not.toMatch(/branding_|\./)
+  })
+})
+
 describe("T6.5 audit: the actions catalogue holds every action the API records", () => {
   const apiRoot = path.resolve(__dirname, "../../api/src")
   const walk = (d: string, out: string[] = []): string[] => {

@@ -23,6 +23,10 @@ export const purposeOf = (kind: BrandingKind) => (kind === "logo" ? "branding_lo
 /** Uploads that were started but never made live are removed once they are this old, whenever the same kind is activated or removed. */
 const STALE_AFTER_MS = 60 * 60 * 1000
 
+// literal action names (the audit catalogue test scans the source for them)
+const UPDATED = { logo: "tenant.branding_logo_updated", favicon: "tenant.branding_favicon_updated" } as const
+const REMOVED = { logo: "tenant.branding_logo_removed", favicon: "tenant.branding_favicon_removed" } as const
+
 const unprocessable = (code: string) => new AppError(422, code, "Unprocessable Entity")
 const NotFoundFile = () => NotFound("file_not_found")
 
@@ -118,7 +122,7 @@ export async function activateAsset(deps: Deps, tenantId: string, actorId: strin
     await writeSetting(tx, tenantId, "branding", { ...raw, [kind]: after })
     if (before) await expireFile(tx, tenantId, before.fileId, enqueue)
     await expireStale(deps, tx, tenantId, kind, fileId, enqueue)
-    await recordAudit(tx, tenantId, { action: `tenant.branding_${kind}_updated`, entity: "tenant", entityId: tenantId, actorId, before: { [kind]: toDto(before) }, after: { [kind]: toDto(after) } }, deps.clock.now())
+    await recordAudit(tx, tenantId, { action: UPDATED[kind], entity: "tenant", entityId: tenantId, actorId, before: { [kind]: toDto(before) }, after: { [kind]: toDto(after) } }, deps.clock.now())
   })
 }
 
@@ -133,7 +137,7 @@ export async function removeAsset(deps: Deps, tenantId: string, actorId: string,
     if (!before) return
     await writeSetting(tx, tenantId, "branding", { ...raw, [kind]: null })
     await expireFile(tx, tenantId, before.fileId, enqueue)
-    await recordAudit(tx, tenantId, { action: `tenant.branding_${kind}_removed`, entity: "tenant", entityId: tenantId, actorId, before: { [kind]: toDto(before) }, after: { [kind]: null } }, deps.clock.now())
+    await recordAudit(tx, tenantId, { action: REMOVED[kind], entity: "tenant", entityId: tenantId, actorId, before: { [kind]: toDto(before) }, after: { [kind]: null } }, deps.clock.now())
   })
 }
 
