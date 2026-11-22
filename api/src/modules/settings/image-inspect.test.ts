@@ -25,7 +25,6 @@ describe("logo", () => {
     expect(code(logo("image/jpeg", SVG))).toBe("image_suspicious")
     expect(code(logo("image/webp", SVG))).toBe("image_suspicious")
     // an SVG with no script still is not one of the three raster formats
-    expect(code(logo("image/png", Buffer.from('<?xml version="1.0"?><x/>')))).toBe("image_suspicious")
     expect(code(logo("image/png", Buffer.from("  <g></g>                                      ")))).toBe("image_type_mismatch")
   })
   test("the declared type must be the real type (magic bytes), a favicon type is not a logo type", () => {
@@ -93,6 +92,13 @@ describe("corrupt and polyglot files", () => {
     expect(code(logo("image/png", png(64, 64, { extraChunk: Buffer.from("<svg onload=alert(1)>") })))).toBe("image_suspicious")
     expect(code(logo("image/jpeg", jpeg(64, 64, { comment: "<?php system($_GET[1]); ?>" })))).toBe("image_suspicious")
     expect(code(logo("image/jpeg", jpeg(64, 64, { comment: "javascript:alert(1)" })))).toBe("image_suspicious")
+  })
+  test("real editors write XMP (<?xml ... <x:xmpmeta>) into PNG iTXt and JPEG comments: that is ACCEPTED; <svg or <script in the same place is not", () => {
+    const xmp = '<?xml version="1.0" encoding="UTF-8"?><x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:RDF/></x:xmpmeta>'
+    expect(code(logo("image/png", png(64, 64, { extraChunk: Buffer.from(xmp) })))).toBeNull()
+    expect(code(logo("image/jpeg", jpeg(64, 64, { comment: xmp })))).toBeNull()
+    expect(code(logo("image/png", png(64, 64, { extraChunk: Buffer.from(xmp + "<svg onload=1>") })))).toBe("image_suspicious")
+    expect(code(logo("image/png", png(64, 64, { extraChunk: Buffer.from(xmp + "<script>1</script>") })))).toBe("image_suspicious")
   })
   test("JPEG must end with EOI; trailing bytes are refused", () => {
     expect(code(logo("image/jpeg", jpeg(64, 64, { trailing: Buffer.from("PK\x03\x04") })))).toBe("image_corrupt")

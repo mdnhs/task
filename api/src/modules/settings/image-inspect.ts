@@ -50,7 +50,7 @@ export const maxBytesOf = (kind: BrandingKind): number => (kind === "logo" ? LOG
 
 const PNG_SIG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
 // Markup or script anywhere in the bytes of an "image": compressed pixel data never spells these, a polyglot has to.
-const MARKUP = /<\s*(?:script|svg|html|iframe|object|embed|body|\?php|!doctype)|javascript\s*:|<\?xml/i
+const MARKUP = /<\s*(?:script|svg|html|iframe|object|embed|body|\?php|!doctype)|javascript\s*:/i // `<?xml` is deliberately NOT here: editors write XMP (`<?xml ...?><x:xmpmeta>`) into PNG iTXt, JPEG APP1 and WebP chunks
 
 function inspectPng(b: Buffer): { width: number; height: number } {
   if (b.length < 33 || !b.subarray(0, 8).equals(PNG_SIG)) return reject("image_type_mismatch")
