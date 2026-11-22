@@ -1,6 +1,5 @@
 import { MfaBanner, MfaGate, MfaStepUp } from "@/features/account"
-import { mfaPrompt } from "@/lib/mfa-gate"
-import { mfaRequired } from "@/lib/mfa"
+import { needsMfaPrompt } from "@/lib/mfa"
 import { AiAssistant, fillAssistant, getAssistant } from "@/features/assistant"
 import { GlobalSearch } from "@/features/search"
 import { DEFAULT_APPEARANCE, appearanceCss } from "@/lib/appearance"
@@ -37,8 +36,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const gated = session.mfa !== "ok"
   const inGate = <T extends { href: string }>(items: T[]) => hideMockNav(filterNav(items, session.navRole ?? session.role))
   const inPlan = <T extends { href: string }>(items: T[]) => hideMockNav(filterByEntitlement(filterNav(items, session.role), session.entitlements)) // mock-only routes are hidden unless ENABLE_MOCK_MODULES=1
-  // Grace period: a banner while the app still works (the API must keep answering 200 until the deadline; see lib/mfa-gate.ts).
-  const prompt = mfaPrompt({ required: mfaRequired(session.mfaPolicy, session.role.id), enrolled: session.twoFactorEnabled, graceEndsAt: session.mfaGraceEndsAt ?? null, now: new Date() })
+  // Prompt mode (the API's default): required and not set up, but the app works. A reminder banner, never a wall (strict mode answers 401 and shows the gate below).
+  const prompt = session.mfa === "ok" && needsMfaPrompt(session.mfaPolicy, session.role.id, session.twoFactorEnabled)
   // The department filter is the company's own departments (GET /v1/teams?kind=department), not the seed file's.
   const nav = { ...navigation, menu: (gated ? inGate : inPlan)(navigation.menu), general: (gated ? inGate : inPlan)(navigation.general), departments: [{ dep: "all", label: "All" }, ...org.departments.map((d) => ({ dep: d, label: d }))] }
 
@@ -89,7 +88,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <PlatformNoticeBanner notice={notice} today={org.today} tzLabel={org.tzLabel} />
       {/* AC-M0-02: when two-step verification is required and not set up, every page shows the setup gate instead; a sign-in that has not passed its
           code step (R14) shows the step-up. Both mirror the API's 401 mfa_enrolment_required / mfa_challenge, so no page data is rendered meanwhile. */}
-      {prompt.kind === "banner" && session.mfa === "ok" && <MfaBanner daysLeft={prompt.daysLeft} />}
+      {prompt && <MfaBanner />}
       {session.mfa === "enrol" ? <MfaGate account={user.email} who={session.role.id === "owner" ? "owner" : "member"} /> : session.mfa === "challenge" ? <MfaStepUp account={user.email} /> : children}
     </AppShell>
     </>

@@ -11,7 +11,7 @@ vi.mock("sonner", () => ({ toast: { success() {}, error() {} } }))
 import { MfaGate } from "./components/mfa-gate"
 import { MfaBanner } from "./components/mfa-banner"
 
-const html = (who: "owner" | "member" | "staff", onSkip?: () => void) => renderToStaticMarkup(createElement(MfaGate, { account: "ana@x.ie", who, onSkip }))
+const html = (who: "owner" | "member" | "staff", soft = false) => renderToStaticMarkup(createElement(MfaGate, { account: "ana@x.ie", who, soft }))
 
 describe("the MFA gate card", () => {
   test("owner and non-owner copy, the effort line, and the old wording is gone", () => {
@@ -22,21 +22,21 @@ describe("the MFA gate card", () => {
     expect(html("member")).toContain("Your workspace admin turned on two-step verification.")
     expect(html("member")).not.toContain("Settings → Roles")
   })
-  test("Sign out is always there; Skip for now only when the caller passes it (grace)", () => {
+  test("Sign out is always there; Back only in the soft (prompt) card, where nothing is refused", () => {
     expect(html("owner")).toContain("Sign out")
-    expect(html("owner")).not.toContain("Skip for now")
-    expect(html("owner", () => {})).toContain("Skip for now")
+    expect(html("owner")).not.toContain(">Back<")
+    expect(html("owner", true)).toContain("Back")
+    expect(html("owner", true)).toContain("Sign out")
   })
 })
 
-describe("the grace banner", () => {
-  test("says days left, links to set-up and can be dismissed", () => {
-    const b = renderToStaticMarkup(createElement(MfaBanner, { daysLeft: 3 }))
-    expect(b).toContain("Secure your account in 2 minutes: 3 days left")
-    expect(b).toContain('href="/account/security"')
+describe("the prompt banner", () => {
+  test("a quiet reminder: set-up link to the card, dismissible", () => {
+    const b = renderToStaticMarkup(createElement(MfaBanner))
+    expect(b).toContain("Secure your account in 2 minutes")
+    expect(b).toContain('href="/mfa"')
     expect(b).toContain("Set up now")
     expect(b).toContain('aria-label="Dismiss"')
-    expect(renderToStaticMarkup(createElement(MfaBanner, { daysLeft: 1 }))).toContain("1 day left")
   })
 })
 

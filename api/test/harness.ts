@@ -104,7 +104,7 @@ const CALLBACKS = new Set(["/v1/integrations/google/callback"])
 export function tenantGetRoutes(app: AppType): string[] {
   const doc = app.getOpenAPI31Document({ openapi: "3.1.0", info: { title: "t", version: "1" } })
   return Object.entries(doc.paths ?? {})
-    .filter(([path, item]) => "get" in (item ?? {}) && !path.includes("{") && !path.startsWith("/v1/me") && path !== "/v1/auth/providers" && !path.startsWith("/v1/platform/") && path !== "/v1/openapi.json" && !CALLBACKS.has(path))
+    .filter(([path, item]) => "get" in (item ?? {}) && !path.includes("{") && !path.startsWith("/v1/me") && path !== "/v1/auth/providers" && path !== "/v1/invites/preview" && !path.startsWith("/v1/platform/") && path !== "/v1/openapi.json" && !CALLBACKS.has(path))
     .map(([path]) => path)
     .sort()
 }

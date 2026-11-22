@@ -41,6 +41,9 @@
 .mfa-gate-lead{margin:0;font-size:13.5px;line-height:1.5;color:var(--ink-2)}
 .mfa-gate-effort{display:inline-flex;align-items:center;gap:6px;margin:0;font-size:13px;font-weight:600;color:var(--ink-2)}
 .mfa-gate-effort svg{width:16px;height:16px;flex:none}
+.mfa-gate-foot .auth-link{display:inline-flex;align-items:center;gap:6px;margin:0;align-self:center}
+:root[data-theme="dark"] .mfa-gate-foot .auth-link{color:var(--brand-3)}
+.mfa-gate-foot svg{width:16px;height:16px;flex:none}
 .mfa-gate-foot{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 @media (max-width:600px){.mfa-banner{flex-wrap:wrap}}
 

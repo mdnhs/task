@@ -14,8 +14,9 @@ describe("mfa", () => {
     expect(mfaRequired({ mode: "roles", roles: ["admin"] }, "admin")).toBe(true)
     expect(mfaRequired({ mode: "roles", roles: ["admin"] }, "employee")).toBe(false)
   })
-  it("gates only when required and not enrolled (AC-M0-02)", () => {
-    const all: MfaPolicy = { mode: "all", roles: [] }
+  it("gates only when required, strict and not enrolled (AC-M0-02); prompt mode never gates", () => {
+    const all: MfaPolicy = { mode: "all", roles: [], enforcement: "strict" }
+    expect(needsMfaGate({ mode: "all", roles: [] }, "owner", false)).toBe(false)
     expect(needsMfaGate(all, "owner", false)).toBe(true)
     expect(needsMfaGate(all, "owner", true)).toBe(false)
     expect(needsMfaGate({ mode: "off", roles: [] }, "owner", false)).toBe(false)

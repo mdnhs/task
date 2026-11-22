@@ -14243,6 +14243,8 @@ export interface paths {
                         "application/json": {
                             mode: string;
                             roles: string[];
+                            /** @enum {string} */
+                            enforcement?: "prompt" | "strict";
                         };
                     };
                 };
@@ -14261,6 +14263,7 @@ export interface paths {
                         mode: string;
                         /** @default [] */
                         roles?: string[];
+                        enforcement?: string;
                     };
                 };
             };
@@ -14274,6 +14277,8 @@ export interface paths {
                         "application/json": {
                             mode: string;
                             roles: string[];
+                            /** @enum {string} */
+                            enforcement?: "prompt" | "strict";
                         };
                     };
                 };

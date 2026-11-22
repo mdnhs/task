@@ -19,6 +19,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { signOutAction, switchTenant } from "@/app/actions/session"
+import { runSignOut } from "@/lib/sign-out-client"
 import { clearClientStores } from "@/lib/client-stores"
 import { userMenu } from "../menu"
 import type { ShellSession, UserData } from "../types"
@@ -140,7 +141,7 @@ export function NavUser({ user, session, variant = "app" }: { user: UserData; se
           <Icon name="help" size={24} />
           Help
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => startTransition(() => { clearClientStores("sign_out"); return signOutAction() })}>
+        <DropdownMenuItem onClick={() => startTransition(() => runSignOut({ clear: () => clearClientStores("sign_out"), action: signOutAction, assign: (to) => window.location.assign(to) }))}>
           <Icon name="logout" size={24} />
           Log out
         </DropdownMenuItem>

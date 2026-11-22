@@ -26,8 +26,8 @@ async function world(policy: MfaPolicy = { mode: "off", roles: [] }) {
 }
 const codeOf = async (r: Response) => ((await r.clone().json()) as Json).code
 
-test("policy all: a member without TOTP gets 401 mfa_enrolment_required on every tenant route", async () => {
-  const w = await world({ mode: "all", roles: [] })
+test("policy all + strict: a member without TOTP gets 401 mfa_enrolment_required on every tenant route", async () => {
+  const w = await world({ mode: "all", roles: [], enforcement: "strict" })
   const m = await w.who("employee")
   const { cookie } = await signIn(w.app, m.email, m.password)
   const paths = tenantGetRoutes(w.app)
@@ -38,8 +38,34 @@ test("policy all: a member without TOTP gets 401 mfa_enrolment_required on every
     expect([path, r.status, await codeOf(r)]).toEqual([path, 401, "mfa_enrolment_required"])
   }
 })
-test("policy roles: only listed roles are gated; policy off gates nobody", async () => {
-  const w = await world({ mode: "roles", roles: ["manager"] })
+test("policy all in the default prompt mode: a member without TOTP is NOT refused (the app asks); enrolled-but-unverified sessions still are", async () => {
+  for (const policy of [{ mode: "all", roles: [] }, { mode: "all", roles: [], enforcement: "prompt" }] as MfaPolicy[]) {
+    await resetDb()
+    const w = await world(policy)
+    const m = await w.who("employee")
+    const { cookie } = await signIn(w.app, m.email, m.password)
+    for (const path of ["/v1/me/tenant", "/v1/entitlements"]) expect([path, (await w.req("GET", path, cookie)).status]).toEqual([path, 200])
+    const roles = await w.req("GET", "/v1/roles", cookie)
+    expect(await codeOf(roles)).not.toBe("mfa_enrolment_required")
+    const o = await w.who("manager")
+    const stale = (await signIn(w.app, o.email, o.password)).cookie
+    await enrollTotp(w.deps, o.email, o.password)
+    expect(await codeOf(await w.req("GET", "/v1/roles", stale))).toBe("mfa_challenge") // prompt mode never weakens the code step for enrolled people
+  }
+})
+test("PUT /v1/settings/mfa-policy stores enforcement; an unknown value is 422; strict can be switched on and off by the owner", async () => {
+  const w = await world()
+  const o = await w.who("owner")
+  const { cookie } = await signIn(w.app, o.email, o.password)
+  const bad = await w.req("PUT", "/v1/settings/mfa-policy", cookie, { mode: "all", roles: [], enforcement: "sometimes" })
+  expect(bad.status).toBe(422)
+  const ok = await w.req("PUT", "/v1/settings/mfa-policy", cookie, { mode: "all", roles: [], enforcement: "strict" })
+  expect([ok.status, await ok.json()]).toEqual([200, { mode: "all", roles: [], enforcement: "strict" }])
+  expect(await codeOf(await w.req("PUT", "/v1/settings/mfa-policy", cookie, { mode: "all", roles: [] }))).toBe("mfa_enrolment_required") // strict really locks an unenrolled owner out too
+  expect(await ownerQuery("select mfa_policy from tenants")).toEqual([{ mfa_policy: { mode: "all", roles: [], enforcement: "strict" } }])
+})
+test("policy roles + strict: only listed roles are gated; policy off gates nobody", async () => {
+  const w = await world({ mode: "roles", roles: ["manager"], enforcement: "strict" })
   const emp = await w.who("employee")
   const mgr = await w.who("manager")
   const e = (await signIn(w.app, emp.email, emp.password)).cookie

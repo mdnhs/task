@@ -6,10 +6,10 @@ import { newRouter } from "../../core/router"
 import { withTenant } from "../../db/tenant-tx"
 import { setMfaPolicy } from "./service"
 
-const Policy = z.object({ mode: z.string(), roles: z.array(z.string()) })
+const Policy = z.object({ mode: z.string(), roles: z.array(z.string()), enforcement: z.enum(["prompt", "strict"]).optional() })
 // mode is a free string here on purpose: parseMfaPolicy is the single validator and answers 422 (not 400).
 const PolicyBody = z
-  .object({ mode: z.string().max(20), roles: z.array(z.string().max(64)).max(100).default([]) })
+  .object({ mode: z.string().max(20), roles: z.array(z.string().max(64)).max(100).default([]), enforcement: z.string().max(10).optional() })
   .openapi({ example: { mode: "roles", roles: ["manager"] } })
 
 const stateRoute = createRoute({

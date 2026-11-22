@@ -1,7 +1,15 @@
 // Two-step verification (FR-M0-03, FR-M0-04, AC-M0-02). Pure mock rules, no cookies.
 // Mock TOTP: the authenticator secret is fixed and the code that verifies is fixed (a real backend replaces this).
 
-export type MfaPolicy = { mode: "off" | "all" | "roles"; roles: string[] }
+/**
+ * `enforcement` says what "required" means for a person who has not set up a code step yet. "prompt" (the default when absent): the app asks them, keeps working, and
+ * they can go back; "strict": the API refuses every tenant route until they enrol (401 mfa_enrolment_required). A person who HAS enrolled must always pass the
+ * code step on their session, in both modes (401 mfa_challenge).
+ */
+export type MfaEnforcement = "prompt" | "strict"
+export type MfaPolicy = { mode: "off" | "all" | "roles"; roles: string[]; enforcement?: MfaEnforcement }
+
+export const mfaStrict = (policy: MfaPolicy): boolean => policy.enforcement === "strict"
 
 export const MOCK_TOTP_SECRET = "JBSW Y3DP EHPK 3PXP"
 export const MOCK_TOTP_CODE = "123456"
@@ -13,15 +21,19 @@ export function mfaRequired(policy: MfaPolicy, roleId: string): boolean {
   return policy.mode === "all" || (policy.mode === "roles" && policy.roles.includes(roleId))
 }
 
-/** AC-M0-02: required and not set up means every page shows the setup gate. */
-export const needsMfaGate = (policy: MfaPolicy, roleId: string, enrolled: boolean) => mfaRequired(policy, roleId) && !enrolled
+/** AC-M0-02: required, strict and not set up means every page shows the setup gate (in "prompt" mode it is a dismissible prompt instead). */
+export const needsMfaGate = (policy: MfaPolicy, roleId: string, enrolled: boolean) => mfaRequired(policy, roleId) && mfaStrict(policy) && !enrolled
+/** Required, not strict and not set up: the app keeps working and asks. */
+export const needsMfaPrompt = (policy: MfaPolicy, roleId: string, enrolled: boolean) => mfaRequired(policy, roleId) && !mfaStrict(policy) && !enrolled
 
 export function parseMfaPolicy(input: unknown, validRoles: string[]): MfaPolicy | null {
-  const p = input as { mode?: unknown; roles?: unknown } | null
+  const p = input as { mode?: unknown; roles?: unknown; enforcement?: unknown } | null
   if (!p || (p.mode !== "off" && p.mode !== "all" && p.mode !== "roles")) return null
+  if (p.enforcement !== undefined && p.enforcement !== "prompt" && p.enforcement !== "strict") return null
   const roles = Array.isArray(p.roles) ? p.roles : []
   if (!roles.every((r) => typeof r === "string" && validRoles.includes(r))) return null
-  return { mode: p.mode, roles: p.mode === "roles" ? [...new Set(roles as string[])] : [] }
+  const base: MfaPolicy = { mode: p.mode, roles: p.mode === "roles" ? [...new Set(roles as string[])] : [] }
+  return p.enforcement === undefined ? base : { ...base, enforcement: p.enforcement }
 }
 
 export function describeMfaPolicy(policy: MfaPolicy, roleLabels: Record<string, string>): string {

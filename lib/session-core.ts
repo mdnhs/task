@@ -9,7 +9,7 @@ import type { ApiClient } from "./api/client"
 import { ApiError } from "./api/problem"
 import { DEFAULT_BRAND } from "./brand"
 import { initialsOf } from "./branding"
-import { mfaGraceEndsAtOf } from "./mfa-gate"
+import type { MfaPolicy } from "./mfa"
 import { restrictRole, toTenantEntitlements, type EntitlementsData, type TenantEntitlements } from "./entitlements"
 import type { Access, Module, Role, Tenant } from "./types"
 
@@ -41,9 +41,7 @@ export type Session = {
   drive: boolean
   mfa: "ok" | "enrol" | "challenge"
   twoFactorEnabled: boolean
-  mfaPolicy: { mode: "off" | "all" | "roles"; roles: string[] }
-  /** Server-provided end of the two-step grace period (ISO), read through the adapter in lib/mfa-gate.ts. Absent or null: no grace. */
-  mfaGraceEndsAt?: string | null
+  mfaPolicy: MfaPolicy
   /** Only while the MFA gate is up: the role CATALOGUE entry (not the API's), used by the sidebar alone so people can still navigate. Never an authorisation: `role` stays fail-closed. */
   navRole?: Role
   platformRole: PlatformRoleKey | null
@@ -98,7 +96,7 @@ const listed = (t: Me["tenants"][number]): Tenant => ({ id: t.slug, name: t.name
 const isStatus = (e: unknown, status: number, code?: string): e is ApiError => e instanceof ApiError && e.status === status && (code === undefined || e.code === code)
 
 type TenantCtx = {
-  tenant: { id: string; slug: string; name: string; mfaPolicy: { mode: "off" | "all" | "roles"; roles: string[] } }
+  tenant: { id: string; slug: string; name: string; mfaPolicy: MfaPolicy }
   member: { roleKey: string; role: { label: string; description: string; home: "manager" | "staff"; access: Record<string, string>; rosterLevel?: "office" | "supervisor" | null } }
   brand: { primaryColor: string | null }
   device: { id: string | null; label: string; trusted: boolean }
@@ -159,7 +157,7 @@ export async function resolveSession(deps: SessionDeps): Promise<Resolved> {
       signedIn: true, role, roles: [role], tenant, tenants: me.tenants.map((t) => (t.slug === ctx.tenant.slug ? tenant : listed(t))), entitlements,
       user: { id: me.user.id, email: me.user.email, name: me.user.name }, tenantSlug: ctx.tenant.slug, billingState: ent.billingState, trialEndsAt: ent.trialEndsAt, graceEndsAt: ent.graceEndsAt,
       device: { id: ctx.device.id, label: ctx.device.label, trusted: ctx.device.trusted }, drive: ctx.features.drive === true,
-      mfa: "ok", twoFactorEnabled: me.user.twoFactorEnabled, mfaPolicy: ctx.tenant.mfaPolicy, mfaGraceEndsAt: mfaGraceEndsAtOf(ctx.tenant), platformRole: me.platformRole,
+      mfa: "ok", twoFactorEnabled: me.user.twoFactorEnabled, mfaPolicy: ctx.tenant.mfaPolicy, platformRole: me.platformRole,
     }
     return { kind: "ok", session, me, cookieStale: slug !== deps.tenantCookie }
   }
