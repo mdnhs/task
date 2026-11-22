@@ -238,3 +238,39 @@ export function AccountSkeleton({ tab, counts, extras }: { tab: AccountTabId; co
     </SkGroup>
   )
 }
+
+// The two-step set-up card (/mfa, MfaGate), first step (Password). The same DOM as MfaGate + TotpSetup: head with the lock title and the reason line, the effort line,
+// the four-step stepper, the step heading, the password field and Continue + Cancel. Text is ghost (it wraps like the real one); controls are Sk.
+// K4 ceiling: steps 2 to 4 (key and link, code field, backup codes) have other heights and are not skeletons (they only appear after a click, never on load).
+export function MfaSkeleton() {
+  return (
+    <section className="card set-card mfa-gate" aria-hidden="true">
+      <div className="card-head">
+        <div>
+          <h1 className="mfa-gate-h"><Sk w={20} h={20} r={6} /> <span className="sk-ghost">Set up two-step verification</span></h1>
+          <div className="sub sk-ghost">Two-step verification is required for this workspace. You can change this under Settings → Roles.</div>
+        </div>
+      </div>
+      <p className="mfa-gate-effort"><Sk w={16} h={16} r="circle" /> <span className="sk-ghost">Takes about 2 minutes. You need an authenticator app on your phone.</span></p>
+      <div className="mfa-flow">
+        <ol className="mfa-stepper">
+          {["Password", "Scan", "Code", "Backup"].map((t, i) => (
+            <li key={t} className="mfa-step" data-state={i === 0 ? "current" : "todo"}>
+              <span className="mfa-step-n"><Sk w={22} h={22} r="circle" /></span>
+              <span className="mfa-step-t sk-ghost">{t}</span>
+            </li>
+          ))}
+        </ol>
+        <h2 className="mfa-step-h sk-ghost">Password</h2>
+        <div className="mfa-steps">
+          <p className="sk-ghost">Confirm your password for someone@company.example to start.</p>
+          <div className="od-field">
+            <Sk w={64} h={11} lh={18.1} />
+            <Sk h={48} r={14} />
+          </div>
+          <div className="mfa-foot"><Sk w={105} h={48} r={14} /><Sk w={86} h={38} r={12} /></div>
+        </div>
+      </div>
+    </section>
+  )
+}

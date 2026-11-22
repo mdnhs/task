@@ -487,7 +487,7 @@ function DevicePolicies({ canWrite, policies }: { canWrite: boolean; policies: D
 
 // Two-step rule card under Roles (MfaPolicyCard). The rule is a FilterSeg (Optional / Everyone / Chosen roles), browser-measured.
 const MFA_SEG_W = 292
-const MFA_HOW_W = 196 // measured in the browser (Soft prompt | Strict)
+const MFA_HOW_W = 178 // measured in the browser (Soft prompt | Strict)
 function MfaPolicySk({ canWrite, policy, roleLabels }: { canWrite: boolean; policy: MfaPolicy; roleLabels: Record<string, string> }) {
   return (
     <section className="card set-card">

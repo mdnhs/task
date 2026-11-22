@@ -218,10 +218,10 @@ describe("K2 requireMfaOk: every page and action that calls the API gates itself
 
   test("redirects to /mfa while enrolment or the code step is outstanding (a page that is not itself guarded, so no loop), never returning a session", async () => {
     state.current = world({ tenants: { alpha: { status: 401, code: "mfa_enrolment_required" } } })
-    expect(await redirectOf(requireMfaOk())).toBe("/mfa")
+    expect(await redirectOf(requireMfaOk())).toBe("/mfa?next=%2Ftasks%3Fview%3Dboard") // remembers where the person was (checked)
     state.memos.forEach((m) => m.clear())
     state.current = world({ tenants: { alpha: { status: 401, code: "mfa_challenge" } } })
-    expect(await redirectOf(requireMfaOk())).toBe("/mfa")
+    expect(await redirectOf(requireMfaOk())).toBe("/mfa?next=%2Ftasks%3Fview%3Dboard")
   })
 
   test("it keeps getSession's own redirects: signed out, expired, no company", async () => {

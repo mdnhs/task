@@ -50,7 +50,7 @@
 .mfa-step[data-state="current"] .mfa-step-n{background:#fff;color:var(--brand-deep)}
 .mfa-step[data-state="done"]{color:var(--brand-deep)}
 .mfa-step[data-state="done"] .mfa-step-n{background:var(--brand-soft);color:var(--brand-deep)}
-:root[data-theme="dark"] .mfa-step[data-state="done"]{color:var(--brand-3)}
+:root[data-theme="dark"] .mfa-step[data-state="done"],:root[data-theme="dark"] .mfa-step[data-state="done"] .mfa-step-n{color:var(--brand-3)}
 .mfa-step-h{margin:0;font-size:15px;font-weight:700;letter-spacing:-.005em;outline:none}
 .mfa-step-h:focus-visible{outline:2px solid var(--brand);outline-offset:3px;border-radius:6px}
 .mfa-foot{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
