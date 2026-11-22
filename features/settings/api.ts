@@ -8,7 +8,7 @@ import { getPeople } from "@/lib/people"
 import { toDataRequest, toDepartments, toDevice, toGrant, toIntegration, toInvites, toOrganisation, toRoles, toUsers } from "./adapters"
 import { MATRIX_MODULE_LABELS } from "./constants"
 import { fetchTemplate } from "@/lib/report-template"
-import type { BrandingData, DataRequestRow, DeliveryRow, Department, Integration, Invite, MatrixData, NotificationsData, Organisation, OrganisationData, SettingsUser, SupportGrant } from "./types"
+import type { Branding, BrandingData, DataRequestRow, DeliveryRow, Department, Integration, Invite, MatrixData, NotificationsData, Organisation, OrganisationData, SettingsUser, SupportGrant } from "./types"
 import type { Device, DevicePolicy } from "@/lib/devices"
 import type { MfaPolicy } from "@/lib/mfa"
 
@@ -30,9 +30,9 @@ export const getBrandingPresets = () => getData<BrandingData>("settings/branding
 
 // ---- the API ----
 export const loadOrganisation = async (api: Reader): Promise<Organisation> => toOrganisation(await api.get("/v1/settings/organisation"))
-export const loadBranding = async (api: Reader) => {
+export const loadBranding = async (api: Reader): Promise<Branding> => {
   const b = await api.get("/v1/settings/branding")
-  return { primaryColor: b.primaryColor, logoFileId: b.logoFileId }
+  return { primaryColor: b.primaryColor, logo: b.logo, favicon: b.favicon, storageReady: b.storageReady }
 }
 export const loadDepartments = async (api: Reader): Promise<Department[]> => toDepartments(await api.get("/v1/teams", { query: { kind: "department" } }))
 export const loadRoles = async (api: Reader) => toRoles(await api.get("/v1/roles"))

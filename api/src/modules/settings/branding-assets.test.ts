@@ -41,7 +41,7 @@ async function world(over: Parameters<typeof testApp>[0] = {}) {
 type W = Awaited<ReturnType<typeof world>>
 
 const put = async (up: Upload, buf: Buffer) => {
-  const { "Content-Length": _l, ...headers } = up.headers
+  const headers = Object.fromEntries(Object.entries(up.headers).filter(([k]) => k !== "Content-Length")) // fetch sets Content-Length itself
   return fetch(up.url, { method: "PUT", headers, body: buf })
 }
 const drain = async (w: W) => {

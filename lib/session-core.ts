@@ -8,7 +8,7 @@
 import type { ApiClient } from "./api/client"
 import { ApiError } from "./api/problem"
 import { DEFAULT_BRAND } from "./brand"
-import { initialsOf } from "./branding"
+import { initialsOf, type BrandAsset } from "./branding"
 import type { MfaPolicy } from "./mfa"
 import { restrictRole, toTenantEntitlements, type EntitlementsData, type TenantEntitlements } from "./entitlements"
 import type { Access, Module, Role, Tenant } from "./types"
@@ -98,7 +98,7 @@ const isStatus = (e: unknown, status: number, code?: string): e is ApiError => e
 type TenantCtx = {
   tenant: { id: string; slug: string; name: string; mfaPolicy: MfaPolicy }
   member: { roleKey: string; role: { label: string; description: string; home: "manager" | "staff"; access: Record<string, string>; rosterLevel?: "office" | "supervisor" | null } }
-  brand: { primaryColor: string | null }
+  brand: { primaryColor: string | null; logo?: BrandAsset | null; favicon?: BrandAsset | null }
   device: { id: string | null; label: string; trusted: boolean }
   features: { drive: boolean }
 }
@@ -149,6 +149,7 @@ export async function resolveSession(deps: SessionDeps): Promise<Resolved> {
     const status = statusOf(ent)
     const tenant: Tenant = {
       id: ctx.tenant.id, name: ctx.tenant.name, slug: ctx.tenant.slug, initials: initialsOf(ctx.tenant.name), brand: ctx.brand.primaryColor ?? DEFAULT_BRAND,
+      ...(ctx.brand.logo ? { logo: ctx.brand.logo } : {}), ...(ctx.brand.favicon ? { favicon: ctx.brand.favicon } : {}),
       status, plan: ent.status === "trialing" ? "Trial" : titleCase(ent.planId),
       ...(ent.trialEndsAt ? { trialEndsOn: dateOnly(ent.trialEndsAt) } : {}),
       ...(ent.graceEndsAt && (status === "past_due" || status === "suspended") ? { graceEndsOn: dateOnly(ent.graceEndsAt) } : {}),

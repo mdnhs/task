@@ -1,3 +1,4 @@
+import type { BrandAsset } from "@/lib/branding"
 import type { DeliveryStatus, TenantNotify } from "@/lib/notify"
 import type { Access, Module } from "@/lib/types"
 
@@ -25,7 +26,8 @@ export type OrganisationData = { timezones: Option[] }
 /** GET /v1/settings/organisation, mapped. The slug is shown, never edited. */
 export type Organisation = { name: string; slug: string; timezone: string; currency: string; locale: string; reportDeadline: string; reportDueAfterMinutes: number }
 /** GET /v1/settings/branding, mapped (the colour as the API stores it, a clean file id or null). */
-export type Branding = { primaryColor: string | null; logoFileId: string | null }
+/** Settings -> Branding: the colour and the live logo and favicon (null = none). `storageReady` false = no file storage is set up yet, so uploads cannot work. */
+export type Branding = { primaryColor: string | null; logo: BrandAsset | null; favicon: BrandAsset | null; storageReady: boolean }
 
 /** A department is a team of kind "department" (GET /v1/teams?kind=department): name and member count. Sites, report owners and deactivation have no backend. */
 export type Department = { id: string; name: string; members: number }

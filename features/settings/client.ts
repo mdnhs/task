@@ -1,6 +1,8 @@
 // The browser side of settings (B6 T6.5): every write is ONE call to the API through the BFF, with the API's shapes. Errors are ApiErrors: the caller shows
 // userMessage(e) (or fieldErrorOf for a form field). Nothing here keeps a secret: an enrolment code is only ever a return value.
 import type { ApiClient } from "@/lib/api/client"
+import { ApiError } from "@/lib/api/problem"
+import { brandAssetMime, type BrandAssetKind } from "@/lib/branding"
 import { isAllowedRedirect } from "@/features/billing/redirect"
 import type { DeviceAllow, DeviceFeature, DeviceOwner, DeviceType } from "@/lib/devices"
 import type { MfaPolicy } from "@/lib/mfa"
@@ -9,9 +11,26 @@ import { fetchTemplate, putTemplate, type TemplateWithEtag } from "@/lib/report-
 import type { TemplateData } from "@opsdesk/domain/shift-report"
 import { roleUuid } from "./adapters"
 import { OAUTH_REDIRECT_HOSTS } from "./constants"
-import type { MatrixRole, Organisation } from "./types"
+import type { Branding, MatrixRole, Organisation } from "./types"
 
 export type Navigator = { go: (url: string) => void }
+
+export type UploadStage = "uploading" | "checking" | "scanning" | "saving"
+/** PUTs the bytes to the presigned URL with exactly the signed headers; `onProgress` gets 0..1. */
+export type PutFn = (url: string, init: { headers: Record<string, string>; body: ArrayBuffer }, onProgress?: (p: number) => void) => Promise<{ ok: boolean }>
+export type UploadOptions = { put?: PutFn; wait?: (ms: number) => Promise<void>; onStage?: (s: UploadStage) => void; onProgress?: (p: number) => void }
+
+/** The browser's PUT with upload progress (fetch has none). Content-Length is set by the browser from the body, so it is not sent as a header. */
+const xhrPut: PutFn = (url, init, onProgress) =>
+  new Promise((resolve, reject) => {
+    const x = new XMLHttpRequest()
+    x.open("PUT", url)
+    for (const [k, v] of Object.entries(init.headers)) if (k.toLowerCase() !== "content-length") x.setRequestHeader(k, v)
+    x.upload.onprogress = (e) => { if (e.lengthComputable) onProgress?.(e.loaded / e.total) }
+    x.onload = () => resolve({ ok: x.status >= 200 && x.status < 300 })
+    x.onerror = () => reject(new Error("settings: the upload failed"))
+    x.send(init.body)
+  })
 
 export function makeSettingsClient(api: ApiClient, nav: Navigator) {
   return {
@@ -20,8 +39,8 @@ export function makeSettingsClient(api: ApiClient, nav: Navigator) {
       if (Object.keys(patch).length === 0) throw new Error("settings: nothing to save")
       return api.patch("/v1/settings/organisation", { body: patch })
     },
-    async saveBranding(b: { color: string; logoFileId: string | null }) {
-      return api.put("/v1/settings/branding", { body: { logoFileId: b.logoFileId, primaryColor: b.color } })
+    async saveBranding(b: { color: string }) {
+      return api.put("/v1/settings/branding", { body: { primaryColor: b.color } })
     },
 
     // the report template (FR-M1-25): the WHOLE template is replaced; the answer is what the API holds now (department names follow a team rename, I26). Over 64 KB it throws template_too_large before any request.
@@ -74,21 +93,35 @@ export function makeSettingsClient(api: ApiClient, nav: Navigator) {
     },
 
     /**
-     * Logo upload (plans with the files module only): presigned intent, a direct PUT of the bytes to storage with exactly the headers the API signed, confirm, then wait for the
-     * malware scan to finish (the branding route accepts only a CLEAN file). Resolves the clean file id; an infected or unreadable file throws.
+     * Organization logo or favicon: presigned intent, a direct PUT of the bytes to storage with exactly the headers the API signed (progress is reported), confirm (the API checks the real
+     * bytes and refuses anything but the allowed raster formats), wait for the malware scan to finish, then make it live. Resolves the branding the API holds now. A refusal is an ApiError
+     * with the API's code (image_*, file_infected, storage_not_configured...); the caller shows brandAssetProblem(kind, code).
      */
-    async uploadLogo(file: { name: string; type: string; size: number; arrayBuffer(): Promise<ArrayBuffer> }, put: typeof fetch = fetch, wait: (ms: number) => Promise<void> = (ms) => new Promise((r) => setTimeout(r, ms))): Promise<string> {
-      const intent = await api.post("/v1/files/uploads", { body: { name: file.name, mime: file.type, sizeBytes: file.size } })
-      const res = await put(intent.upload.url, { method: "PUT", headers: intent.upload.headers, body: await file.arrayBuffer() })
-      if (!res.ok) throw new Error("settings: the logo upload failed")
-      await api.post("/v1/files/{id}/complete", { path: { id: intent.fileId } })
-      for (let i = 0; i < 30; i++) {
-        const f = await api.get("/v1/files/{id}", { path: { id: intent.fileId } })
-        if (f.status === "clean") return intent.fileId
-        if (f.status === "infected" || f.status === "deleted") throw new Error("settings: the logo was refused")
+    async uploadBrandAsset(kind: BrandAssetKind, file: { name: string; type: string; size: number; arrayBuffer(): Promise<ArrayBuffer> }, o: UploadOptions = {}): Promise<Branding> {
+      const mime = brandAssetMime(kind, file)
+      if (!mime) throw new Error("settings: unsupported image type")
+      const { put = xhrPut, wait = (ms) => new Promise((r) => setTimeout(r, ms)), onStage, onProgress } = o
+      onStage?.("uploading")
+      const intent = await api.post("/v1/settings/branding/{kind}/uploads", { path: { kind }, body: { name: file.name, mime, sizeBytes: file.size } })
+      const res = await put(intent.upload.url, { headers: intent.upload.headers, body: await file.arrayBuffer() }, onProgress)
+      if (!res.ok) throw new Error("settings: the upload failed")
+      onStage?.("checking")
+      await api.post("/v1/settings/branding/{kind}/uploads/{fileId}/complete", { path: { kind, fileId: intent.fileId } })
+      onStage?.("scanning")
+      for (let i = 0; i < 60; i++) {
+        const st = await api.get("/v1/settings/branding/{kind}/uploads/{fileId}", { path: { kind, fileId: intent.fileId } })
+        if (st.status === "infected") throw new ApiError(410, "file_infected")
+        if (st.status === "clean") {
+          onStage?.("saving")
+          return api.put("/v1/settings/branding/{kind}", { path: { kind }, body: { fileId: intent.fileId } })
+        }
         await wait(1000)
       }
-      throw new Error("settings: the logo scan took too long")
+      throw new Error("settings: the scan took too long")
+    },
+    /** Removes the live logo or favicon (its file is deleted). */
+    async removeBrandAsset(kind: BrandAssetKind): Promise<Branding> {
+      return api.delete("/v1/settings/branding/{kind}", { path: { kind } })
     },
 
     // devices and policies

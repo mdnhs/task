@@ -168,12 +168,12 @@ describe("T6.5 settings client: every write is one API call with the API's shape
   })
 
   test("organisation and branding save only what the API accepts", async () => {
-    const { client, calls } = fakeApi({ "PATCH /v1/settings/organisation": { name: "Acme Ltd", slug: "acme", timezone: "Europe/Dublin", currency: "EUR", locale: "en-IE", reportDeadline: "17:30", reportDueAfterMinutes: 60 }, "PUT /v1/settings/branding": { logoFileId: null, primaryColor: "#1A8A3A" } })
+    const { client, calls } = fakeApi({ "PATCH /v1/settings/organisation": { name: "Acme Ltd", slug: "acme", timezone: "Europe/Dublin", currency: "EUR", locale: "en-IE", reportDeadline: "17:30", reportDueAfterMinutes: 60 }, "PUT /v1/settings/branding": { primaryColor: "#1A8A3A", logo: null, favicon: null, storageReady: true } })
     const c = makeSettingsClient(client, nav())
     await c.saveOrganisation({ name: "Acme Ltd" })
-    await c.saveBranding({ color: "#1a8a3a", logoFileId: null })
+    await c.saveBranding({ color: "#1a8a3a" })
     expect(calls[0]!.body).toEqual({ name: "Acme Ltd" })
-    expect(calls[1]!.body).toEqual({ logoFileId: null, primaryColor: "#1a8a3a" })
+    expect(calls[1]!.body).toEqual({ primaryColor: "#1a8a3a" })
     await expect(c.saveOrganisation({})).rejects.toThrow() // an empty patch is not sent
     expect(calls).toHaveLength(2)
   })
@@ -207,26 +207,59 @@ describe("T6.5 settings client: every write is one API call with the API's shape
   })
 })
 
-describe("T6.5 logo upload", () => {
-  test("intent, direct PUT with the signed headers, complete, then waits for a CLEAN scan before returning the id", async () => {
+describe("organization logo and favicon upload", () => {
+  const BRANDING = { primaryColor: null, logo: { version: "9f86d081884c7d65", mime: "image/png", width: 120, height: 40, sizeBytes: 3 }, favicon: null, storageReady: true }
+  const file = (name = "logo.png", type = "image/png", size = 3) => ({ name, type, size, arrayBuffer: async () => new ArrayBuffer(size) })
+  const intent = { fileId: "f1", upload: { method: "PUT", url: "https://storage.example/put?sig=1", headers: { "Content-Type": "image/png", "Content-Length": "3" } } }
+  test("intent, direct PUT with the signed headers (progress reported), complete, waits for a CLEAN scan, then makes it live", async () => {
     let polls = 0
     const { client, calls } = fakeApi({
-      "POST /v1/files/uploads": { fileId: "f1", upload: { method: "PUT", url: "https://storage.example/put?sig=1", headers: { "Content-Type": "image/png", "Content-Length": "3" } } },
-      "POST /v1/files/{id}/complete": { id: "f1", status: "pending" },
-      "GET /v1/files/{id}": () => ({ id: "f1", status: ++polls < 2 ? "pending" : "clean" }),
+      "POST /v1/settings/branding/{kind}/uploads": intent,
+      "POST /v1/settings/branding/{kind}/uploads/{fileId}/complete": { fileId: "f1", status: "pending" },
+      "GET /v1/settings/branding/{kind}/uploads/{fileId}": () => ({ fileId: "f1", status: ++polls < 2 ? "pending" : "clean" }),
+      "PUT /v1/settings/branding/{kind}": BRANDING,
     })
-    const put = vi.fn(async () => new Response(null, { status: 200 }))
-    const id = await makeSettingsClient(client, nav()).uploadLogo({ name: "logo.png", type: "image/png", size: 3, arrayBuffer: async () => new ArrayBuffer(3) }, put as never, async () => undefined)
-    expect(id).toBe("f1")
-    expect(put).toHaveBeenCalledWith("https://storage.example/put?sig=1", expect.objectContaining({ method: "PUT", headers: { "Content-Type": "image/png", "Content-Length": "3" } }))
-    expect(calls[0]!.body).toEqual({ name: "logo.png", mime: "image/png", sizeBytes: 3 })
+    const put = vi.fn(async (_url: string, _init: unknown, onProgress?: (p: number) => void) => { onProgress?.(0.5); onProgress?.(1); return { ok: true } })
+    const stages: string[] = []
+    const progress: number[] = []
+    const out = await makeSettingsClient(client, nav()).uploadBrandAsset("logo", file(), { put, wait: async () => undefined, onStage: (s) => stages.push(s), onProgress: (p) => progress.push(p) })
+    expect(out).toEqual(BRANDING)
+    expect(put).toHaveBeenCalledWith("https://storage.example/put?sig=1", expect.objectContaining({ headers: { "Content-Type": "image/png", "Content-Length": "3" } }), expect.any(Function))
+    expect(calls[0]).toMatchObject({ method: "post", path: "/v1/settings/branding/{kind}/uploads", body: { name: "logo.png", mime: "image/png", sizeBytes: 3 } })
+    expect(calls.at(-1)).toMatchObject({ method: "put", path: "/v1/settings/branding/{kind}", body: { fileId: "f1" } })
     expect(polls).toBe(2)
+    expect(stages).toEqual(["uploading", "checking", "scanning", "saving"])
+    expect(progress).toEqual([0.5, 1])
   })
-  test("an infected file or a failed PUT throws and nothing is saved", async () => {
-    const base = { "POST /v1/files/uploads": { fileId: "f1", upload: { method: "PUT", url: "https://s.example/x", headers: {} } }, "POST /v1/files/{id}/complete": { id: "f1" } }
-    const bad = fakeApi({ ...base, "GET /v1/files/{id}": { id: "f1", status: "infected" } })
-    await expect(makeSettingsClient(bad.client, nav()).uploadLogo({ name: "l.png", type: "image/png", size: 1, arrayBuffer: async () => new ArrayBuffer(1) }, (async () => new Response(null, { status: 200 })) as never, async () => undefined)).rejects.toThrow(/refused/)
-    const fail = fakeApi(base)
-    await expect(makeSettingsClient(fail.client, nav()).uploadLogo({ name: "l.png", type: "image/png", size: 1, arrayBuffer: async () => new ArrayBuffer(1) }, (async () => new Response(null, { status: 403 })) as never, async () => undefined)).rejects.toThrow(/upload failed/)
+  test("an .ico is sent as image/x-icon; a type the API never takes is refused before any call", async () => {
+    const { client, calls } = fakeApi({ "POST /v1/settings/branding/{kind}/uploads": intent })
+    const c = makeSettingsClient(client, nav())
+    await expect(c.uploadBrandAsset("favicon", file("f.svg", "image/svg+xml"), { put: async () => ({ ok: true }) })).rejects.toThrow(/unsupported/)
+    await expect(c.uploadBrandAsset("logo", file("a.ico", "image/x-icon"), { put: async () => ({ ok: true }) })).rejects.toThrow(/unsupported/)
+    expect(calls).toHaveLength(0)
+    await c.uploadBrandAsset("favicon", file("favicon.ico", ""), { put: async () => ({ ok: false }) }).catch(() => undefined)
+    expect(calls[0]!.body).toMatchObject({ name: "favicon.ico", mime: "image/x-icon" })
+  })
+  test("an infected file, a refused check and a failed PUT throw (nothing goes live); storage not set up is the API's 503", async () => {
+    const base = { "POST /v1/settings/branding/{kind}/uploads": intent }
+    const infected = fakeApi({ ...base, "POST /v1/settings/branding/{kind}/uploads/{fileId}/complete": { fileId: "f1", status: "pending" }, "GET /v1/settings/branding/{kind}/uploads/{fileId}": { fileId: "f1", status: "infected" } })
+    await expect(makeSettingsClient(infected.client, nav()).uploadBrandAsset("logo", file(), { put: async () => ({ ok: true }), wait: async () => undefined })).rejects.toMatchObject({ code: "file_infected" })
+    expect(infected.paths()).not.toContain("PUT /v1/settings/branding/{kind}")
+    const refused = fakeApi({ ...base, "POST /v1/settings/branding/{kind}/uploads/{fileId}/complete": problem(422, "image_not_square") })
+    await expect(makeSettingsClient(refused.client, nav()).uploadBrandAsset("favicon", file("f.png"), { put: async () => ({ ok: true }) })).rejects.toMatchObject({ status: 422, code: "image_not_square" })
+    const failed = fakeApi(base)
+    await expect(makeSettingsClient(failed.client, nav()).uploadBrandAsset("logo", file(), { put: async () => ({ ok: false }) })).rejects.toThrow(/upload failed/)
+    expect(failed.paths()).toEqual(["POST /v1/settings/branding/{kind}/uploads"])
+    const nostore = fakeApi({ "POST /v1/settings/branding/{kind}/uploads": problem(503, "storage_not_configured") })
+    await expect(makeSettingsClient(nostore.client, nav()).uploadBrandAsset("logo", file(), { put: async () => ({ ok: true }) })).rejects.toMatchObject({ status: 503, code: "storage_not_configured" })
+  })
+  test("a scan that never finishes stops waiting", async () => {
+    const { client } = fakeApi({ ...{ "POST /v1/settings/branding/{kind}/uploads": intent }, "POST /v1/settings/branding/{kind}/uploads/{fileId}/complete": { fileId: "f1", status: "pending" }, "GET /v1/settings/branding/{kind}/uploads/{fileId}": { fileId: "f1", status: "pending" } })
+    await expect(makeSettingsClient(client, nav()).uploadBrandAsset("logo", file(), { put: async () => ({ ok: true }), wait: async () => undefined })).rejects.toThrow(/took too long/)
+  })
+  test("remove is a DELETE of the kind", async () => {
+    const { client, calls } = fakeApi({ "DELETE /v1/settings/branding/{kind}": { ...BRANDING, logo: null } })
+    expect(await makeSettingsClient(client, nav()).removeBrandAsset("logo")).toMatchObject({ logo: null })
+    expect(calls[0]).toMatchObject({ method: "delete", path: "/v1/settings/branding/{kind}" })
   })
 })

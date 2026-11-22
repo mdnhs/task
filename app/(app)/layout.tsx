@@ -1,3 +1,4 @@
+import type { Metadata } from "next"
 import { MfaBanner, MfaGate, MfaStepUp } from "@/features/account"
 import { needsMfaPrompt } from "@/lib/mfa"
 import { AiAssistant, fillAssistant, getAssistant } from "@/features/assistant"
@@ -13,11 +14,19 @@ import { canOpenBilling } from "@/lib/billing-state"
 import { PlatformNoticeBanner } from "@/components/platform-notice"
 import { hideMockNav, mockEnabled } from "@/lib/mock-registry"
 import { filterNav } from "@/lib/permissions"
-import { getSession } from "@/lib/session"
+import { faviconIcons } from "@/lib/branding"
+import { getSession, peekSession } from "@/lib/session"
 import { AppShell, getNavigation, getUser } from "@/features/shell"
 
 import "../styles/search.css"
 import "../styles/devices.css"
+
+// The browser tab icon: the company's uploaded favicon (Settings, Branding), else the product favicon (app/favicon.ico). Reads the memoised session without redirecting (the layout below does that);
+// the console keeps the product icon because it lives under (platform), not here.
+export async function generateMetadata(): Promise<Metadata> {
+  const icons = faviconIcons((await peekSession())?.tenant.favicon)
+  return icons ? { icons } : {}
+}
 
 // Every signed-in page shares the shell (sidebar, topbar, AI assistant).
 export default async function AppLayout({ children }: { children: React.ReactNode }) {

@@ -34,6 +34,29 @@ describe("sidebar brand block", () => {
     expect(out).not.toContain("Northgate")
   })
 
+  it("an uploaded logo replaces the check mark inside the same 38px mark box, followed by the organization name", () => {
+    const out = html({ name: "Northgate Facilities", logo: { version: "9f86d081884c7d65", mime: "image/png", width: 240, height: 64, sizeBytes: 8123 } })
+    expect(out).toContain('class="logo-mark has-logo"')
+    expect(out).toContain('src="/v1/branding/logo?v=9f86d081884c7d65"')
+    expect(out).toContain('alt=""') // decorative: the name sits next to it and the link has its own label
+    expect(out).toContain("Northgate Facilities")
+    expect(out).not.toContain("<svg") // no check mark
+    expect(out.indexOf("<img")).toBeLessThan(out.indexOf(">Northgate Facilities<")) // the mark comes first, then the name
+  })
+
+  it("without a logo it is the check mark, byte for byte the old markup", () => {
+    const out = html({ name: "Northgate Facilities", logo: null })
+    expect(out).toContain('class="logo-mark"')
+    expect(out).toContain("<svg")
+    expect(out).not.toContain("<img")
+  })
+
+  it("the console never shows a company logo", () => {
+    const out = html({ href: "/platform", name: "Northgate Facilities", logo: { version: "v1", mime: "image/png", width: 40, height: 40, sizeBytes: 5 } })
+    expect(out).not.toContain("<img")
+    expect(out).toContain("<svg")
+  })
+
   it("the loading skeleton keeps the mark and replaces the text with a block", () => {
     const out = html({ skeleton: true })
     expect(out).toContain("logo-mark")

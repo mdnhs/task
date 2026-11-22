@@ -54,7 +54,7 @@ describe("T6.5 contract (real API): settings responses parse and map through the
     expect(org.slug).toBe("coppers")
     await c.saveOrganisation({ name: "Coppers Ltd" })
     expect(toOrganisation(await o.api.get("/v1/settings/organisation")).name).toBe("Coppers Ltd")
-    await c.saveBranding({ color: "#1a8a3a", logoFileId: null })
+    await c.saveBranding({ color: "#1a8a3a" })
     expect((await o.api.get("/v1/settings/branding")).primaryColor).toBe("#1a8a3a")
     expect(await o.api.get("/v1/settings/holidays")).toMatchObject({ holidays: expect.any(Array) })
 

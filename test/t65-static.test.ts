@@ -73,11 +73,10 @@ describe("T6.5 secrets and the enrolment code", () => {
   })
 })
 
-describe("T6.5 branding: colour only for now", () => {
-  test("the logo upload is hidden behind LOGO_UPLOAD_ENABLED (false) and the colour control stays", () => {
+describe("branding: colour, logo and favicon", () => {
+  test("the panel keeps the colour control and offers the logo and favicon upload", () => {
     const src = strip(read("features/settings/components/branding-panel.tsx"))
-    expect(src).toMatch(/LOGO_UPLOAD_ENABLED/)
-    expect(src).toMatch(/canUpload/)
     expect(src).toMatch(/ColorPicker/)
+    expect(src).toMatch(/BrandAssetCard/)
   })
 })

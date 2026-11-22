@@ -20,7 +20,7 @@ export const STATIC_ROLES: Role[] = [
 const ALL = ["dashboard", "tasks", "reports", "attention", "staff", "shifts", "recruitment", "files", "payroll", "orders", "settings", "audit", "roster"]
 const access = (v: "none" | "read" | "write") => Object.fromEntries(ALL.map((m) => [m, v]))
 
-type Tenants = Record<string, { status?: number; code?: string; body?: unknown; roleKey?: string; rosterLevel?: "office" | "supervisor" | null }>
+type Tenants = Record<string, { status?: number; code?: string; body?: unknown; roleKey?: string; rosterLevel?: "office" | "supervisor" | null; brand?: Record<string, unknown> }>
 export function world(o: {
   cookie?: boolean; tenantCookie?: string | null; me?: unknown | number | { status: number; code: string }; tenants?: Tenants
   ent?: Record<string, unknown>
@@ -29,10 +29,10 @@ export function world(o: {
 } = {}) {
   const calls: { path: string; tenant: string | null }[] = []
   const me = o.me ?? { user: { id: "u1", email: "ana@x.ie", name: "Ana Byrne", emailVerified: true, twoFactorEnabled: false }, platformRole: null, tenants: [{ slug: "alpha", name: "Alpha Co", roleKey: "owner" }, { slug: "bravo", name: "Bravo Co", roleKey: "manager" }] }
-  const tenantCtx = (slug: string, roleKey = "owner", rosterLevel: "office" | "supervisor" | null = roleKey === "owner" ? "office" : null) => ({
+  const tenantCtx = (slug: string, roleKey = "owner", rosterLevel: "office" | "supervisor" | null = roleKey === "owner" ? "office" : null, brand: Record<string, unknown> = { primaryColor: "#3b5bdb" }) => ({
     tenant: { id: `id-${slug}`, slug, name: slug.toUpperCase(), timezone: "Europe/Dublin", currency: "EUR", locale: "en-IE", sessionIdleHours: 12, mfaPolicy: { mode: "off", roles: [] } },
     member: { userId: "u1", roleId: "r1", roleKey, role: { label: roleKey === "owner" ? "Owner" : "Manager", description: "d", home: "manager", access: access("write"), rosterLevel } },
-    brand: { primaryColor: "#3b5bdb" }, reportDeadline: "17:30", reportDueAfterMinutes: 60,
+    brand, reportDeadline: "17:30", reportDueAfterMinutes: 60,
     device: { id: null, type: "browser", label: "Unregistered browser", trusted: false }, features: { drive: false },
   })
   const ent = { planId: "starter", status: "active", modules: ["M0", "M1"], seats: 10, seatsUsed: 2, trialEndsAt: null, graceEndsAt: null, billingState: "ok", ...o.ent }
@@ -50,7 +50,7 @@ export function world(o: {
     if (path === "/v1/me/tenant") {
       if (t?.status) return problem(t.status, t.code ?? "not_found")
       if (!tenant) return problem(404, "not_found")
-      return json(tenantCtx(tenant, t?.roleKey, t?.rosterLevel))
+      return json(tenantCtx(tenant, t?.roleKey, t?.rosterLevel, t?.brand))
     }
     if (path === "/v1/platform/session") return o.platform ? problem(o.platform.status, o.platform.code) : json({ staff: true, role: "owner", mfa: "ok" })
     if (path === "/v1/entitlements") return json(ent)

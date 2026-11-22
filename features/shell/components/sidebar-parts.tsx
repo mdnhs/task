@@ -4,22 +4,30 @@ import Link from "next/link"
 
 import { Icon } from "@/components/icon"
 import { Sk } from "@/components/sk"
+import { brandAssetUrl, type BrandAsset } from "@/lib/branding"
 
 // Static sidebar pieces, shared by AppShell and AppShellSkeleton so the skeleton matches exactly.
 
-// The mark is a fixed 38px box with the brand icon. A tenant logo can be uploaded (Settings, Branding), but /v1/me/tenant carries no logo for staff yet, so the shell shows the
-// brand icon (B7 follow-up: expose the logo to every member). The tenant app shows the workspace's own name next to the mark (the session's tenant name), cut with an
+// The mark is a fixed 38px box with the brand icon, or the organization's uploaded logo (Settings, Branding; GET /v1/me/tenant brand.logo, served same-origin and pinned to its
+// version) contain-fitted in the SAME box, so the skeleton (which cannot know whether a logo exists) never shifts. The tenant app shows the workspace's own name next to the mark (the session's tenant name), cut with an
 // ellipsis when long and with the full name as the tooltip; the console (href under /platform) and a missing name show the product name. `skeleton` swaps the text for a block.
-export function Logo({ name, href = "/", onNavigate, skeleton }: { name?: string; href?: string; onNavigate?: () => void; skeleton?: boolean }) {
+export function Logo({ name, href = "/", onNavigate, skeleton, logo }: { name?: string; href?: string; onNavigate?: () => void; skeleton?: boolean; logo?: BrandAsset | null }) {
   const platform = href.startsWith("/platform")
   const org = platform ? "" : (name ?? "").trim()
   const label = org || "OpsDesk"
   const where = platform ? "go to overview" : "go to dashboard"
   return (
     <Link href={href} className="logo" aria-label={skeleton ? undefined : `${label}, ${where}`} title={org || undefined} onClick={onNavigate}>
-      <span className="logo-mark">
-        <Icon name="brand" />
-      </span>
+      {logo && !platform && !skeleton ? (
+        <span className="logo-mark has-logo">
+          {/* eslint-disable-next-line @next/next/no-img-element -- same-origin, version-pinned, already scanned; next/image would re-encode it */}
+          <img src={brandAssetUrl("logo", logo.version)} alt="" />
+        </span>
+      ) : (
+        <span className="logo-mark">
+          <Icon name="brand" />
+        </span>
+      )}
       {skeleton ? (
         <span className="lbl logo-org">
           <Sk w={150} h={14} r="pill" className="sk-on-panel" />

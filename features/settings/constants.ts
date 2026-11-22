@@ -27,9 +27,3 @@ export const MATRIX_MODULES: Module[] = MATRIX_MODULE_LABELS.map((m) => m.id)
 export const OAUTH_REDIRECT_HOSTS: readonly string[] = ["accounts.google.com"]
 /** Rows of the data-request and grant lists. */
 export const REQUESTS_PAGE_SIZE = 5
-
-/**
- * The logo upload control is HIDDEN for now: the shell cannot show an uploaded logo because /v1/me/tenant carries no logo field, so an upload would change nothing a member sees.
- * The code stays (BrandingPanel, client.uploadLogo). Later phase: expose the logo through /v1/me/tenant, then set this to true.
- */
-export const LOGO_UPLOAD_ENABLED = false

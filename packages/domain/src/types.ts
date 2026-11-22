@@ -25,12 +25,17 @@ export type Role = {
   /** Location rosters (D4): "office" sees all locations and edits published weeks; "supervisor" only granted locations, draft only. */
   rosterLevel?: "office" | "supervisor"
 }
+/** A live organization logo or favicon (the API answers version, type, pixel size and bytes; the bytes are at /v1/branding/{kind}?v=version). */
+export type BrandAsset = { version: string; mime: string; width: number; height: number; sizeBytes: number }
 export type Tenant = {
   id: string
   name: string
   slug: string
   initials: string
   brand: string
+  /** The uploaded organization logo and favicon, when the company set them. */
+  logo?: BrandAsset | null
+  favicon?: BrandAsset | null
   /** Workspace appearance presets (lib/appearance.ts); undefined = the stock look. */
   appearance?: Appearance
   status: "trial" | "active" | "past_due" | "suspended"

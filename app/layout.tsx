@@ -1,3 +1,4 @@
+import type { Metadata } from "next"
 import { Plus_Jakarta_Sans, Geist_Mono } from "next/font/google"
 
 import "./globals.css"
@@ -34,6 +35,10 @@ const fontMono = Geist_Mono({
   subsets: ["latin"],
   variable: "--font-mono",
 })
+
+// The product favicon is an explicit metadata icon (public/favicon.ico), not the file convention: the file convention is always emitted next to a nested layout's icons, so a
+// company's uploaded favicon (app/(app)/layout.tsx generateMetadata) could never replace it. The console and the sign-in pages keep this one.
+export const metadata: Metadata = { icons: { icon: "/favicon.ico" } }
 
 export default function RootLayout({
   children,

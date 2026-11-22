@@ -18,6 +18,7 @@ import { daysBetween, formatDate, formatDue, formatTime } from "@/lib/dates"
 import { SUPPORT_STATUS, supportRows, type SupportAccess } from "@/lib/support-access"
 import { DEVICE_TYPES, DEVICE_FEATURES, allowFor, describePolicy } from "@/lib/devices"
 import type { Device, DevicePolicy } from "@/lib/devices"
+import { BRAND_ASSET_RULES } from "@/lib/branding"
 import { describeMfaPolicy } from "@/lib/mfa"
 import { enforcementOf, enforcementText } from "@/lib/mfa-enforcement"
 import type { MfaPolicy } from "@/lib/mfa"
@@ -537,7 +538,27 @@ function Devices({ canWrite, devices }: { canWrite: boolean; devices: number }) 
 const APPEAR_PILLS = [[66, 56, 70], [64, 77, 66], [88, 112, 89]]
 const LEGEND_W = [55, 62, 53]
 
-// `nameLines`: the tenant name wraps in the preview bar (21.75px lines) when it is long; browser-measured at 1440.
+// Logo and favicon cards (BrandAssetCard): the head, the preview tile (168 x 96 / 96 x 96), the drop control (76) and the fixed 36px row under it. The skeleton cannot know whether an
+// image exists, and the loaded card keeps these heights either way, so nothing moves. Read-only members get a hint line instead of the drop control.
+function AssetSk({ kind, canWrite }: { kind: "logo" | "favicon"; canWrite: boolean }) {
+  const rule = BRAND_ASSET_RULES[kind]
+  return (
+    <section className="card set-card set-asset" data-kind={kind}>
+      <CardHead title={rule.label} sub={rule.requirement} />
+      <div className="set-asset-body">
+        <Sk w={kind === "logo" ? 168 : 96} h={96} r={20} />
+        <div className="set-asset-main">
+          {canWrite ? <Sk h={76} r={20} /> : <Sk w={210} h={11} lh={17} />}
+          <div className="set-asset-slot">
+            <Sk w={150} h={11} lh={17} />
+          </div>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+// `nameLines`: the organization name wraps in the preview bar (21.75px lines) when it is long; browser-measured at 1440.
 function Branding({
   canWrite,
   nameLines,
@@ -546,31 +567,37 @@ function Branding({
   nameLines: number
 }) {
   return (
-    <section className="card set-card">
-      <CardHead title={90} sub={230} />
-      <div className="set-brand">
-        <div className="od-form set-form">
-          <SecSk title="Colour">
-            <div className="od-field">
-              <Sk w={90} h={11} lh={18.1} />
-              <Sk h={48} r={14} />
-            </div>
-          </SecSk>
-          {canWrite && <Foot w={138} />}
-        </div>
-        <div className="set-preview">
-          <div className="set-preview-bar">
-            <Sk w={42} h={42} r={14} />
-            <span className="set-preview-name">
-              {Array.from({ length: nameLines }, (_, i) => (
-                <Sk key={i} w={i ? 90 : 160} h={15} lh={21.75} />
-              ))}
-            </span>
+    <>
+      <section className="card set-card">
+        <CardHead title={90} sub={230} />
+        <div className="set-brand">
+          <div className="od-form set-form">
+            <SecSk title="Colour">
+              <div className="od-field">
+                <Sk w={90} h={11} lh={18.1} />
+                <Sk h={48} r={14} />
+              </div>
+            </SecSk>
+            {canWrite && <Foot w={138} />}
           </div>
-          <Sk w={170} h={10} lh={17.4} style={{ marginTop: 6 }} />
+          <div className="set-preview">
+            <div className="set-preview-bar">
+              <Sk w={42} h={42} r={14} />
+              <span className="set-preview-name">
+                {Array.from({ length: nameLines }, (_, i) => (
+                  <Sk key={i} w={i ? 90 : 160} h={15} lh={21.75} />
+                ))}
+              </span>
+            </div>
+            <Sk w={170} h={10} lh={17.4} style={{ marginTop: 6 }} />
+          </div>
         </div>
+      </section>
+      <div className="set-assets">
+        <AssetSk kind="logo" canWrite={canWrite} />
+        <AssetSk kind="favicon" canWrite={canWrite} />
       </div>
-    </section>
+    </>
   )
 }
 

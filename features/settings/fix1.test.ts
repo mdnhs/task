@@ -5,7 +5,6 @@ import { fakeApi, problem } from "@/test/support/fake-api"
 import { ApiError, userMessage } from "@/lib/api/problem"
 import { idleLabel, inviteDaysOf, needsRoleConfirm, toRoles } from "./adapters"
 import { makeSettingsClient } from "./client"
-import { LOGO_UPLOAD_ENABLED } from "./constants"
 
 const root = path.resolve(__dirname, "../..")
 const read = (p: string) => readFileSync(path.join(root, p), "utf8")
@@ -41,15 +40,13 @@ describe("T6.5 fix I1: copy a built-in role, then edit the copy", () => {
   })
 })
 
-describe("T6.5 fix I2: the logo upload control is hidden (code kept), the colour control stays", () => {
-  test("LOGO_UPLOAD_ENABLED is false, named for the later phase, and the panel keeps both controls in code", () => {
-    expect(LOGO_UPLOAD_ENABLED).toBe(false)
-    expect(read("features/settings/constants.ts")).toMatch(/\/v1\/me\/tenant/)
+describe("organization logo and favicon: the upload is on, the colour control stays", () => {
+  test("the panel has the colour picker and one card each for the logo and favicon; the old hidden switch is gone", () => {
     const src = read("features/settings/components/branding-panel.tsx")
-    expect(src).toMatch(/LOGO_UPLOAD_ENABLED/)
     expect(src).toMatch(/ColorPicker/)
-    expect(src).toMatch(/uploadLogo/) // the code is kept
-    expect(read("app/(app)/settings/[tab]/page.tsx")).toMatch(/LOGO_UPLOAD_ENABLED/)
+    expect(src).toMatch(/BrandAssetCard kind=\"logo\"/)
+    expect(src).toMatch(/BrandAssetCard kind=\"favicon\"/)
+    expect(src + read("features/settings/constants.ts") + read("app/(app)/settings/[tab]/page.tsx")).not.toMatch(/LOGO_UPLOAD_ENABLED|uploadLogo/)
   })
 })
 

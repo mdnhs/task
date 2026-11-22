@@ -193,6 +193,50 @@
 .set-appear-row:disabled .set-opt{cursor:not-allowed;opacity:.6}
 .set-appear-row:disabled .set-opt:hover{color:var(--ink-2)}
 @media (max-width:640px){.set-appear-row{grid-template-columns:minmax(0,1fr)}}
+/* Logo and favicon cards (Settings -> Branding) */
+.set-assets{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;align-items:stretch}
+@media (max-width:1100px){.set-assets{grid-template-columns:minmax(0,1fr)}}
+.set-asset .card-head{margin-bottom:14px}
+.set-asset-body{display:grid;grid-template-columns:auto minmax(0,1fr);gap:18px;align-items:start}
+@media (max-width:520px){.set-asset-body{grid-template-columns:minmax(0,1fr)}}
+.set-asset-view{display:grid;place-items:center;border-radius:var(--r-lg);background:var(--panel);color:var(--ink-3);overflow:hidden}
+.set-asset-view[data-kind="logo"]{width:168px;height:96px}
+.set-asset-view[data-kind="favicon"]{width:96px;height:96px}
+.set-asset-view img{display:block;max-width:100%;max-height:100%;object-fit:contain;padding:12px;transition:opacity var(--dur) var(--ease)}
+.set-asset-view[data-kind="favicon"] img{width:64px;height:64px;padding:0}
+.set-asset-view .ico{width:28px;height:28px}
+.set-asset-view[data-busy] img{opacity:.55}
+.set-asset-main{display:flex;flex-direction:column;gap:10px;min-width:0}
+.set-drop strong{display:inline-flex;align-items:center;gap:6px;font-weight:700}
+.set-drop strong .ico{width:16px;height:16px}
+.set-drop:disabled{cursor:not-allowed;opacity:.6}
+.set-drop:hover:disabled{background:var(--panel);color:var(--ink-2)}
+:root[data-theme="dark"] .set-drop:is(:hover,[data-over]):not(:disabled){color:var(--brand-3)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .set-drop:is(:hover,[data-over]):not(:disabled){color:var(--brand-3)}}
+.set-asset-prog{display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:var(--ink-2)}
+.set-asset-bar{height:6px;border-radius:var(--r-pill);background:var(--mute-bg);overflow:hidden}
+.set-asset-bar i{display:block;width:100%;height:100%;border-radius:inherit;background:var(--brand);transform-origin:left;transform:scaleX(var(--p,0));transition:transform var(--dur) var(--ease)}
+.set-asset-bar[data-indeterminate] i{width:40%;transform:none;transition:none;animation:set-scan 1.1s var(--ease-in-out) infinite}
+@keyframes set-scan{from{transform:translateX(-100%)}to{transform:translateX(250%)}}
+.set-asset-err{margin:0}
+.set-asset-slot{display:flex;align-items:center;min-height:36px}
+.set-asset-slot>*{flex:1 1 auto;min-width:0}
+.set-asset-none{margin:0}
+.set-asset-off{min-height:76px;box-sizing:border-box}
+.set-asset-meta{display:flex;align-items:center;flex-wrap:wrap;gap:8px 12px;font-size:12.5px;color:var(--ink-2);font-weight:600}
+.set-asset-rm{margin-left:auto;gap:6px;padding:7px 14px;font-size:13px;color:var(--bad);cursor:pointer}
+.set-asset .card-head>.set-saved{margin-left:auto}
+.set-asset .card-head>.set-asset-rm+.set-saved{margin-left:0}
+.set-asset-rm .ico{width:15px;height:15px}
+.set-fav-tab{display:inline-flex;align-items:center;gap:6px;min-width:0;max-width:170px;padding:5px 12px 5px 8px;border-radius:var(--r-pill);background:var(--panel);font-size:12px;font-weight:600;color:var(--ink-2)}
+.set-fav-tab img{width:16px;height:16px;flex:none;object-fit:contain}
+.set-fav-tab span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.set-asset-off{display:flex;align-items:flex-start;gap:12px;margin:0;padding:14px 16px;border-radius:var(--r-lg);background:var(--warn-bg);color:var(--warn);font-size:13px;line-height:1.45}
+.set-asset-off .ico{width:20px;height:20px;flex:none;margin-top:1px}
+.set-asset-off>span{display:flex;flex-direction:column;gap:2px;min-width:0}
+.set-asset-off strong{font-weight:700}
+.set-saved{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:var(--r-pill);background:var(--ok-bg);color:var(--ok);font-size:12.5px;font-weight:700;animation:od-fade-in var(--dur) var(--ease)}
+.set-saved .ico{width:14px;height:14px}
 /* Forms (ui-rules.md rule 32): chip choices inside settings cards; long labels may wrap on phones */
 .set-card .rp-day{height:auto;min-height:var(--ctl-h);padding-block:8px;line-height:20px;text-align:left}
 .set-card .rp-day:disabled{cursor:not-allowed}

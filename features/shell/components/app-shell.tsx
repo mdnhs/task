@@ -183,7 +183,7 @@ export function AppShell({
       <RevealObserver />
       <div className={cn("app", collapsed && "collapsed")}>
         <aside className={cn("sidebar", open && "open")} id="sidebar" aria-label="Main navigation">
-          {platform ? <Logo href="/platform" onNavigate={() => setOpen(false)} /> : <Logo name={session.tenant.name} onNavigate={() => setOpen(false)} />}
+          {platform ? <Logo href="/platform" onNavigate={() => setOpen(false)} /> : <Logo name={session.tenant.name} logo={session.tenant.logo} onNavigate={() => setOpen(false)} />}
 
           <div className="sidebar-scroll">
             {/* Shared indicators (background + bar): on route change they stretch from the old item to the new one, across both nav groups */}

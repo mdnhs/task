@@ -24,6 +24,22 @@ describe("T6.3 resolveSession (I7, I8): the real session from /v1/me, /v1/me/ten
     expect(calls[1].tenant).toBe("alpha")
   })
 
+  test("the tenant carries the uploaded logo and favicon (version, size) from /v1/me/tenant brand; none when the company has none", async () => {
+    const asset = { version: "9f86d081884c7d65", mime: "image/png", width: 240, height: 64, sizeBytes: 8123 }
+    const withAssets = await resolveSession(world({ tenants: { alpha: { brand: { primaryColor: "#3b5bdb", logo: asset, favicon: { ...asset, width: 64, height: 64 } } } } }).deps)
+    if (withAssets.kind !== "ok") throw new Error("not ok")
+    expect(withAssets.session.tenant.logo).toEqual(asset)
+    expect(withAssets.session.tenant.favicon).toMatchObject({ version: "9f86d081884c7d65", width: 64 })
+    const none = await resolveSession(world({ tenants: { alpha: { brand: { primaryColor: "#3b5bdb", logo: null, favicon: null } } } }).deps)
+    if (none.kind !== "ok") throw new Error("not ok")
+    expect(none.session.tenant.logo ?? null).toBeNull()
+    expect(none.session.tenant.favicon ?? null).toBeNull()
+    // an older API answer with no such fields reads as none
+    const old = await resolveSession(world().deps)
+    if (old.kind !== "ok") throw new Error("not ok")
+    expect(old.session.tenant.logo ?? null).toBeNull()
+  })
+
   test("no better-auth cookie: anonymous, and the API is never called", async () => {
     const { deps, calls } = world({ cookie: false })
     expect((await resolveSession(deps)).kind).toBe("anonymous")

@@ -8,11 +8,9 @@ import {
   SettingsLayout, TemplatePanel, UsersPanel, getBrandingPresets, getDeliveryLog, getNames, getNotificationSettings, getOrganisationOptions, loadReportTemplate, isTab, loadBranding, loadSessionIdleHours,
   loadDepartments, loadDevices, loadIntegrations, loadInvites, loadMatrix, loadMfaPolicy, loadMyExports, loadOrganisation, loadPolicies, loadRequests, loadUsers, nameOfFrom, readable, serverApi,
 } from "@/features/settings"
-import { LOGO_UPLOAD_ENABLED } from "@/features/settings/constants"
 import type { SettingsTabId } from "@/features/settings"
 import { AccessRestricted } from "@/features/shell"
 import { WhatsAppCard, WhatsAppCardError, WhatsAppCount, getWhatsApp } from "@/features/whatsapp"
-import { hasModule } from "@/lib/entitlements"
 import { mockEnabled } from "@/lib/mock-registry"
 import { getOrg } from "@/lib/org"
 import { can } from "@/lib/permissions"
@@ -108,8 +106,7 @@ export default async function Page({ params, searchParams }: { params: Promise<{
       case "branding": {
         const [o, b, presets] = await Promise.all([readable(() => loadOrganisation(api)), readable(() => loadBranding(api)), getBrandingPresets()])
         if (!o || !b) return null
-        const canUpload = LOGO_UPLOAD_ENABLED && hasModule(session.entitlements, "files") && canWrite(session, "files")
-        return <BrandingPanel name={o.name} color={b.primaryColor ?? tenant.brand} logoFileId={b.logoFileId} presets={presets.presets} canWrite={write} canUpload={canUpload} />
+        return <BrandingPanel name={o.name} color={b.primaryColor ?? tenant.brand} branding={b} presets={presets.presets} canWrite={write} />
       }
       case "billing": {
         // Owner or admin only: anyone else gets null (the tab is not offered). Not canWrite: a blocked (read-only) company's owner must still reach billing to pay.
