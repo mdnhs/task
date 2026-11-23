@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { daysBetween, formatDate, formatDue, formatTime, isOverdue, nowInTz } from "./dates"
+import { daysBetween, formatDate, formatDateTime, formatDue, formatTime, isOverdue, nowInTz } from "./dates"
 
 describe("dates", () => {
   const today = "2026-10-20T09:00:00"
@@ -11,6 +11,10 @@ describe("dates", () => {
   })
   it("formatDate", () => {
     expect(formatDate("2026-10-20T00:00:00")).toBe("Tue 20 Oct")
+  })
+  it("formatDateTime reads like the timeline, never raw ISO", () => {
+    expect(formatDateTime("2026-11-22T18:22")).toBe("Sun 22 Nov, 6:22 PM")
+    expect(formatDateTime("2026-11-22")).toBe("Sun 22 Nov")
   })
   it("formatTime", () => {
     expect(formatTime("2026-10-20T17:30:00")).toBe("5:30 PM")

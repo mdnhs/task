@@ -1676,6 +1676,7 @@ describe("projects, milestones, dependencies, knock-on and date proposals (T4.3)
     expect(await told("Date change proposed")).toEqual([w.owner.userId, w.ops.userId, w.manager.userId].sort())
     const [ph] = await w.q("select kind, text, notified from task_history where task_id = $1 and kind = 'proposal'", [a.id])
     expect(ph.text).toContain("The delivery is late")
+    expect(ph.text).toBe("Proposed new dates Sat 21 Nov, 9:00 AM to Sun 22 Nov, 5:00 PM: The delivery is late") // readable, never the raw ISO
     // staff cannot approve or decline
     expect((await w.req("POST", `/v1/tasks/${a.id}/date-proposal/approve`, w.staff, { version: 2, knockOn: { apply: false } })).status).toBe(403)
     expect((await w.req("POST", `/v1/tasks/${a.id}/date-proposal/decline`, w.staff, { version: 2 })).status).toBe(403)

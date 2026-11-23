@@ -9,6 +9,9 @@
 .od-filter-search{position:relative;flex:none;width:var(--ctl-h);height:var(--ctl-h);perspective:700px}
 .od-filter-search[data-open]{flex:1 1 220px;width:auto;max-width:320px}
 .ofs-bar{position:absolute;inset:0;display:flex;align-items:center;padding:0 calc(var(--ctl-h) + 8px) 0 20px;background:var(--mute-bg);border-radius:var(--r-pill);cursor:text;backface-visibility:hidden;transition:box-shadow var(--dur-fast) var(--ease)}
+/* Closed (rotateX 90deg, edge-on): the bar projects to a zero-height line that Chrome still hit-tests, which swallowed real mouse clicks on whatever
+   control sat at that row (the calendar's Week button). A shut bar is decoration for the flip only, so it never takes pointer events. */
+.od-filter-search[data-shut] .ofs-bar{pointer-events:none}
 .ofs-bar:focus-within{box-shadow:0 0 0 2px var(--brand)}
 .ofs-bar input{flex:1;min-width:0;background:transparent;border:0;outline:none;font:inherit;font-size:13.5px;color:var(--ink)}
 .ofs-bar input::placeholder{color:var(--placeholder)}

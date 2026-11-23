@@ -6,6 +6,7 @@ import { projectMilestones, projects, taskHistory, tasks, teams, user } from "..
 import type { TenantTx } from "../../db/tenant-tx"
 import { decodeCursor, encodeCursor } from "../../core/cursor"
 import { taskScopeWhere, type TaskCtx } from "./scope"
+import { readableProposalText } from "./proposal-text"
 import { wallOf } from "./time"
 
 export type HistoryInput = { kind: string; text?: string | null; changes?: RawChange[]; notified?: string[]; updateId?: string | null; causeTaskId?: string | null }
@@ -103,7 +104,7 @@ export async function historyDtos(tx: TenantTx, ctx: Pick<TaskCtx, "tenantId" | 
       if (c && LEGACY_CAUSE.test(r.text)) return c.neutral
       if (r.kind === "detached" && LEGACY_DETACHED.test(r.text)) return DETACHED_NEUTRAL
     }
-    return r.text ?? ""
+    return r.kind === "proposal" && r.text ? readableProposalText(r.text) : (r.text ?? "")
   }
   const depVisible = (x: unknown) => seeable.has(String(x))
   const fmt = {

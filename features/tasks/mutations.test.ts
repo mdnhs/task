@@ -116,6 +116,11 @@ describe("manager changes (CR-04)", () => {
   it("reschedules with old and new values and clears a proposal", () => {
     const p = proposeDates(task(), { start: "2026-10-18T09:00:00", due: "2026-10-25T17:00:00", reason: "Parts late" }, "Dan", NOW)
     expect(p.proposal?.by).toBe("Dan")
+    // the proposal holds the user id, the timeline line the name; declining names the person, never the id
+    const byId = proposeDates(task(), { start: "2026-10-18T09:00:00", due: "2026-10-25T17:00:00", reason: "x" }, "Dan", NOW, "user-dan")
+    expect(byId.proposal?.by).toBe("user-dan")
+    expect(byId.timeline.at(-1)?.by).toBe("Dan")
+    expect(declineProposal(byId, "Lil", NOW, "Dan").timeline.at(-1)?.text).toBe("Date change from Dan declined")
     const r = reschedule(p, { start: p.start, due: "2026-10-25T17:00:00" }, "Lil", NOW)
     expect(r.proposal).toBeUndefined()
     expect(r.timeline.at(-1)?.changes).toEqual([{ field: "Due", from: "Tue 20 Oct 17:00", to: "Sun 25 Oct 17:00" }])

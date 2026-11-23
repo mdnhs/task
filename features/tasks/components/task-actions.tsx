@@ -8,7 +8,7 @@ import { ConfirmDialog } from "@/components/confirm-dialog"
 import { Field } from "@/components/field"
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
-import { formatDate } from "@/lib/dates"
+import { formatDateTime } from "@/lib/dates"
 import { missingEvidence } from "@/lib/task-evidence"
 import { countable, ruleView } from "../evidence-view"
 import { completeOutcome, isOpen, nextStatuses } from "../lifecycle"
@@ -149,7 +149,7 @@ export function TaskActions({
       {canEdit && member && open && !task.archivedAt && (
         <div className="td-deadline">
           {task.proposal ? (
-            <p className="td-muted">You proposed due {formatDate(task.proposal.due)}. Waiting for your manager.</p>
+            <p className="td-muted">You proposed due {formatDateTime(task.proposal.due)}. Waiting for your manager.</p>
           ) : (
             <button type="button" className="btn btn-outline" onClick={member.onPropose}>Propose new dates</button>
           )}

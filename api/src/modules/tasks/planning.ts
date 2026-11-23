@@ -17,6 +17,7 @@ import { changeRecipients, notifyTask, type TaskEnv } from "./notify"
 import { allAssignees, assigneesOf } from "./repo"
 import { canManage, getTask, inScope, taskScopeWhere, TaskNotFound, type TaskCtx, type TaskRow } from "./scope"
 import { lockedTask, staleVersion, taskDetailDto } from "./service"
+import { formatDateTime } from "@opsdesk/domain/dates"
 import { instantOfWall, wallOf } from "./time"
 
 // Dependencies, knock-on reschedule and date proposals (FR-M1-02, FR-M1-14, Q8). Every mutation here is a manager's (or, for a
@@ -280,7 +281,7 @@ export async function proposeDates(tx: TenantTx, env: TaskEnv, ctx: TaskCtx, id:
   const proposal = { start, due, reason: input.reason, by: ctx.me, at: wallOf(ctx.now, ctx.tz) }
   const [next] = await tx.update(tasks).set({ proposal, version: row.version + 1, updatedAt: ctx.now }).where(and(eq(tasks.id, row.id), eq(tasks.tenantId, ctx.tenantId))).returning()
   const recipients = (await managersInScope(tx, ctx, row, assignees)).filter((u) => u !== ctx.me && u !== ctx.actorId).sort()
-  const historyId = await writeHistory(tx, ctx, row.id, { kind: "proposal", text: `Proposed new dates ${start} to ${due}: ${input.reason}`, notified: recipients })
+  const historyId = await writeHistory(tx, ctx, row.id, { kind: "proposal", text: `Proposed new dates ${formatDateTime(start)} to ${formatDateTime(due)}: ${input.reason}`, notified: recipients })
   await notifyTask(tx, env, ctx, next, recipients, "Date change proposed")
   const dto = await detail(tx, ctx, next)
   await publishTaskEvent(tx, ctx, { type: "task.updated", payload: { taskId: row.id, historyId, fields: ["proposal"] } })

@@ -13,7 +13,7 @@ import { StatusPill } from "@/components/status-pill"
 import { When } from "@/components/when"
 import { apiBrowser } from "@/lib/api/browser"
 import { userMessage } from "@/lib/api/problem"
-import { formatDate, isOverdue } from "@/lib/dates"
+import { formatDate, formatDateTime, isOverdue } from "@/lib/dates"
 import { EVIDENCE_STATE, reviewerText } from "@/lib/task-evidence"
 import { FileRefused, VoiceTooLong, isKnockOnChanged } from "../client"
 import { canVerifyTask, evState, fileRefusedCopy, type Viewer } from "../evidence-view"
@@ -193,13 +193,13 @@ export function TaskDetail({
       )}
       {task.proposal && manager && canEdit && open && (
         <div className="td-state info td-banner" role="status">
-          <strong>{task.proposal.by} proposes new dates</strong>
+          <strong>{name(task.proposal.by)} proposes new dates</strong>
           <span>
-            Start {formatDate(task.proposal.start)}, due {formatDate(task.proposal.due)} {task.proposal.due.slice(11, 16)}. “{task.proposal.reason}”
+            Start {formatDateTime(task.proposal.start)}, due {formatDateTime(task.proposal.due)}. “{task.proposal.reason}”
           </span>
           <span className="td-banner-btns">
             <button type="button" className="btn btn-primary" onClick={() => setDialog("approve")}>Review and approve</button>
-            <button type="button" className="btn btn-outline" onClick={() => void w("decline", (c) => c.declineProposal(task), (t) => declineProposal(t, me, now), "Proposal declined")}>Decline</button>
+            <button type="button" className="btn btn-outline" onClick={() => void w("decline", (c) => c.declineProposal(task), (t) => declineProposal(t, me, now, name(task.proposal?.by ?? "")), "Proposal declined")}>Decline</button>
           </span>
         </div>
       )}
@@ -394,7 +394,7 @@ export function TaskDetail({
         <ReassignDialog open onOpenChange={(o) => !o && setDialog(null)} task={task} people={people} onSave={(primary, others) => w("assign", (c) => c.setAssignees(task, primary, others), (t) => reassign(t, [primary, ...others], me, now, name))} />
       )}
       {dialog === "propose" && (
-        <ProposeDialog open onOpenChange={(o) => !o && setDialog(null)} task={task} today={today} onSave={(p) => w("propose", (c) => c.propose(task, p), (t) => proposeDates(t, p, me, now))} />
+        <ProposeDialog open onOpenChange={(o) => !o && setDialog(null)} task={task} today={today} onSave={(p) => w("propose", (c) => c.propose(task, p), (t) => proposeDates(t, p, me, now, meId))} />
       )}
       {dialog === "deps" && (
         <DependenciesDialog open onOpenChange={(o) => !o && setDialog(null)} task={task} search={searchTasks} onSave={(ids) => w("deps", (c) => c.setDependencies(task, ids), (t) => setDependencies(t, [], me, now))} />

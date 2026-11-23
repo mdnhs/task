@@ -185,18 +185,19 @@ export function reassign(t: Task, ids: string[], by: string, now: string, name: 
 }
 
 /** Member proposes new dates (Q8). Replaces an earlier open proposal. */
-export function proposeDates(t: Task, p: Omit<DateProposal, "by" | "at">, by: string, now: string): Task {
+export function proposeDates(t: Task, p: Omit<DateProposal, "by" | "at">, by: string, now: string, byId: string = by): Task {
   return {
     ...t,
-    proposal: { ...p, by, at: now },
+    proposal: { ...p, by: byId, at: now },
     timeline: log(t, by, now, `Date change proposed: ${p.reason}`, [{ field: "Due (proposed)", from: fmtWhen(t.due), to: fmtWhen(p.due) }]),
   }
 }
-export function declineProposal(t: Task, by: string, now: string): Task {
+/** `proposerName` is the proposer's display name (the proposal itself holds their user id). */
+export function declineProposal(t: Task, by: string, now: string, proposerName: string = t.proposal?.by ?? ""): Task {
   if (!t.proposal) return t
   const rest = { ...t }
   delete rest.proposal
-  return { ...rest, timeline: log(t, by, now, `Date change from ${t.proposal.by} declined`) }
+  return { ...rest, timeline: log(t, by, now, `Date change from ${proposerName} declined`) }
 }
 
 // ---------- archive (FR-M1-13) ----------

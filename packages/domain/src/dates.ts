@@ -36,6 +36,11 @@ export function formatTime(iso: string): string {
   return `${h % 12 || 12}:${String(mi).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`
 }
 
+/** Readable date and time, wall-clock: "Sun 22 Nov, 6:22 PM" (date only when the value has no time). */
+export function formatDateTime(iso: string): string {
+  return iso.length > 10 ? `${formatDate(iso)}, ${formatTime(iso)}` : formatDate(iso)
+}
+
 export function daysBetween(aIso: string, bIso: string): number {
   return dayNum(aIso) - dayNum(bIso)
 }
